@@ -21,11 +21,16 @@
 #      (#1176's argument); a `venue` precondition is MEASURED in BOTH forms (a
 #      repo-relative path, and a command the venue must be able to run -- the
 #      Cloud Build shape, #1361), so a supplied command is refused exactly as a
-#      supplied path is; a command-shaped declaration, a precondition of neither
-#      form, an entry naming a check that was not discovered, a missing record
-#      (fail-closed) and a malformed one (CANNOT-ASSESS) are each refused by
-#      name -- never a silent "no exemptions needed", which is how a control
-#      turns into a formality (GR-12).
+#      supplied path is; a `live-dependent` entry (#1410) is honoured BY NAME
+#      while the LIVE mechanism it names cannot answer, is NOT stale when its
+#      check assesses, and is REFUSED the moment its check FAILS, because a
+#      failing check is a FINDING and not a skip -- and its own validation is
+#      provoked too (an entry naming no mechanism, naming no issue, or carrying
+#      a precondition is refused by the run's own loader); a command-shaped
+#      declaration, a precondition of neither form, an entry naming a check that
+#      was not discovered, a missing record (fail-closed) and a malformed one
+#      (CANNOT-ASSESS) are each refused by name -- never a silent "no exemptions
+#      needed", which is how a control turns into a formality (GR-12).
 #   2. THE RECORD IS REAL. The committed `scripts/skip-budget.json` is loaded
 #      through the SAME loader the run uses (no second copy of the rule), and
 #      every entry must name a check this tree actually discovers -- an
@@ -46,6 +51,16 @@
 #      `scripts/lib/validate-attestation.py`; a well-formed one must pass, and an
 #      attestation carrying a SKIP with no ratchet record at all must be refused
 #      -- so the refusals are attributable rather than blanket.
+#
+#   5. THE THIRD KIND IS LOAD-BEARING (#1410). Sections 1-4 assert that the
+#      kinds' rules hold; they would still hold for a ratchet that narrated a
+#      LIVE-dependent skip as something else, because the mutant that does
+#      exactly that keeps rc 0. So the gate DELETES the honouring from a copy of
+#      the ratchet and requires the fixture that passed to red BY NAME -- and it
+#      prints how the mutant changed (it falls back to the standing-gap
+#      narration, the mislabel #1410 removes) rather than only that it did. A
+#      control that reports "it failed" without naming what changed would pass on
+#      a coincidence.
 #
 # This check is auto-discovered by `scripts/discover-checks.sh` (a new
 # `scripts/check-*.sh` is wired the moment it lands), so it needs no hand-edit to
@@ -128,6 +143,16 @@ if [ "$self_rc" -ne 0 ]; then
   exit 1
 fi
 
+# The summary quotes how many fixtures were provoked, and the number is READ from
+# the battery's own output rather than hard-coded: a literal beside a battery that
+# grew is a number nothing measured, which is the class of claim this repository
+# refuses.
+selftest_cases="$(sed -n 's/.*self-test: OK -- \([0-9][0-9]*\) provoked case(s).*/\1/p' "$work/self-test.txt" | tail -1)"
+check "the battery reports how many fixtures it provoked" \
+  "$([ -n "$selftest_cases" ] && echo 0 || echo 1)" \
+  "no fixture count could be read from the self-test output, so any number quoted in the summary would be one nothing measured"
+if [ -z "$selftest_cases" ]; then selftest_cases="?"; fi
+
 if [ "$self_test_only" -eq 1 ]; then
   echo "check-skip-ratchet: OK -- the ratchet's rules are provable (--self-test only)"
   exit 0
@@ -136,7 +161,7 @@ fi
 # --- 2. the committed record is real -----------------------------------------
 echo "== the committed record (scripts/skip-budget.json) =="
 record_rc=0
-python3 - "$root" "$budget" > "$work/record.txt" 2>&1 <<'PY' || record_rc=$?
+python3 - "$root" "$budget" "$work" > "$work/record.txt" 2>&1 <<'PY' || record_rc=$?
 """Load the committed budget through the RUN's own loader, and require every
 entry to name a check this tree discovers.
 
@@ -144,6 +169,7 @@ Reusing `load_budget` is the point: a second copy of the rule here could disagre
 with the rule the run applies, and this gate would then be asserting a fiction.
 """
 import importlib.util
+import json
 import re
 import sys
 from pathlib import Path
@@ -283,6 +309,68 @@ if not command_findings(planted_command, texts):
         "ACCEPTED -- this rule matches nothing, so any invented probe would pass"
     )
 
+# --- the THIRD kind (#1410), which has its own census and its own three rules ---
+# Each of the kind's validation rules is PROVED to have a failing path by running
+# the plant through the RUN's OWN loader: a rule that stopped matching would
+# otherwise be discovered only at the moment a live-dependent skip silently
+# passed, which is the failure this kind exists to make visible. And the census
+# itself is fail-able: the kind is declared in scripts/lib/skip-ratchet.py, so a
+# committed record with no such entry means the kind exists in the code and
+# nowhere in the record.
+live_entries = [e for e in entries if e.get("kind") == "live-dependent"]
+scratch = Path(sys.argv[3])
+scratch.mkdir(parents=True, exist_ok=True)
+
+
+def planted_loader_findings(candidate, label):
+    """The run's OWN loader, on a planted record: can this rule fail at all?"""
+    path = scratch / ("planted-%s.json" % label)
+    path.write_text(
+        json.dumps({"schema": module.BUDGET_SCHEMA, "entries": candidate}) + "\n",
+        encoding="utf-8",
+    )
+    _entries, findings_here = module.load_budget(path)
+    return findings_here
+
+
+PLANTED_LIVE = (
+    (
+        "no-issue",
+        {"check": "gate-status", "kind": "live-dependent",
+         "mechanism": "a planted live mechanism", "reason": "planted"},
+        "live-dependent with no open issue",
+    ),
+    (
+        "no-mechanism",
+        {"check": "gate-status", "kind": "live-dependent", "issue": 1410,
+         "reason": "planted"},
+        "is live-dependent with no 'mechanism'",
+    ),
+    (
+        "with-precondition",
+        {"check": "gate-status", "kind": "live-dependent", "issue": 1410,
+         "mechanism": "a planted live mechanism",
+         "precondition": {"command": "gh auth status"}, "reason": "planted"},
+        "is live-dependent and declares a precondition",
+    ),
+)
+for label, planted_entry, needle in PLANTED_LIVE:
+    got = planted_loader_findings([planted_entry], label)
+    if not any(needle in finding for finding in got):
+        findings.append(
+            "the planted live-dependent entry (%s) was ACCEPTED by the run's own "
+            "loader -- this rule matches nothing, so the kind's validation has no "
+            "failing path (expected a finding naming %r)" % (label, needle)
+        )
+
+if not live_entries:
+    findings.append(
+        "the committed record carries NO live-dependent entry -- the third kind "
+        "(#1410) is declared in scripts/lib/skip-ratchet.py, and the checks whose "
+        "assessability is a property of the WORLD must be named with it, so a census "
+        "of zero means the kind exists in the code and nowhere in the record"
+    )
+
 for finding in findings:
     print("  FAIL  %s" % finding)
 if findings:
@@ -302,10 +390,18 @@ print(
         ]
     )
 )
+print(
+    "  OK    %d live-dependent entry(ies), each naming the LIVE mechanism it depends "
+    "on and the OPEN issue that tracks it, and the planted records that omit the "
+    "issue, omit the mechanism and carry a precondition are each refused by the "
+    "run's own loader" % len(live_entries)
+)
 for entry in entries:
     declared = entry.get("precondition")
     if isinstance(declared, dict):
         declared = "command: %s" % declared.get("command")
+    elif declared is None and entry.get("mechanism"):
+        declared = "mechanism: %s" % entry.get("mechanism")
     print(
         "        %s [%s] %s  (issue #%s)"
         % (
@@ -612,13 +708,23 @@ check "the attestation record cannot under-report a skip" \
 #                          0, the shape the Cloud Build container produces (#1361);
 #   * the SAME entry once the venue SUPPLIES that command -> rc 1, refused by name
 #                          (without this arm the guard would be free to pass
-#                          whatever the venue supplies -- the fail-open direction).
+#                          whatever the venue supplies -- the fail-open direction);
+#   * a LIVE-DEPENDENT skip (the third kind, #1410) whose check cannot assess ->
+#                          `verify: PASS` naming the LIVE mechanism that did not
+#                          answer and the open issue, rc 0, never the check as the
+#                          thing to repair;
+#   * the SAME entry while its check ASSESSES (rc 0) -> rc 0, NOT stale: the not-
+#                          biting entry is reported and the run stays green;
+#   * the SAME entry while its check FAILS (rc 1) -> rc 1, refused by name -- a
+#                          failing check is a finding, not a skip;
+#   * a LIVE-DEPENDENT entry with no live mechanism -> rc 1, the record cannot be
+#                          evaluated and the malformed entry is named.
 # The gate permit store is a private fixture dir: this is a control, not a
 # competing gate (the box-wide cap is proved by scripts/check-gate-lock.sh).
 echo "== the composite, end to end (fixture checks, the real scripts/verify.sh) =="
 shim_rc=0
 python3 - "$root" "$work" > "$work/shim.txt" 2>&1 <<'PY' || shim_rc=$?
-"""Run the REAL scripts/verify.sh six times on a shim with a fixture check set."""
+"""Run the REAL scripts/verify.sh ten times on a shim with a fixture check set."""
 import json
 import os
 import shutil
@@ -648,12 +754,17 @@ FIXTURE_B = "skip-ratchet-fixture-b"
 failures = []
 
 
-def mount(fixture_rcs):
+def mount(fixture_rcs, ratchet_source=None):
     shutil.rmtree(shim, ignore_errors=True)
     for relative in ORCHESTRATOR:
         target = shim / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(root / relative, target)
+        if ratchet_source is not None and relative == "scripts/lib/skip-ratchet.py":
+            # Only the falsification control substitutes the ratchet, on purpose: a
+            # shim that did it by default would stop testing the real one.
+            shutil.copyfile(ratchet_source, target)
+        else:
+            shutil.copyfile(root / relative, target)
     verify = shim / "scripts" / "verify.sh"
     text = verify.read_text(encoding="utf-8")
     start = text.index("\nchecks=(\n")
@@ -858,23 +969,242 @@ expect(
     ],
 )
 
+# 7. a LIVE-DEPENDENT skip (#1410): the check cannot assess because the LIVE
+#    mechanism it reads did not answer. The composite PASSES and NAMES the
+#    mechanism and the open issue -- and it does NOT tell the operator to repair
+#    the check, which is the mislabel the third kind exists to remove.
+mount(((FIXTURE_A, 0), (FIXTURE_B, 2)))
+LIVE_MECHANISM = "the fixture's LIVE source, read with a tool the world may not answer with"
+budget([{"check": FIXTURE_B, "kind": "live-dependent", "issue": 1410,
+         "mechanism": LIVE_MECHANISM, "reason": "fixture"}])
+rc, text, att, verdict = run("live-dependent skip")
+expect(
+    "a LIVE-dependent skip is a PASS naming the mechanism, never the check",
+    rc, 0, text,
+    [
+        "verify: PASS (1 of 2 checks, 1 skipped: %s" % FIXTURE_B,
+        "verify: standing skip %s -- live-dependent: the LIVE mechanism" % FIXTURE_B,
+        "a property of the WORLD, not a defect of the check",
+        "honoured BY NAME rather than repaired",
+        "the open issue that tracks the mechanism is #1410",
+    ],
+    att,
+    [
+        (("skip_ratchet", "verdict"), "OK"),
+        (("skip_ratchet", "standing_skips", 0, "kind"), "live-dependent"),
+        (("skip_ratchet", "standing_skips", 0, "mechanism"), LIVE_MECHANISM),
+        (("skip_ratchet", "stale_entries"), []),
+        (("skip_ratchet", "unused_live_entries"), []),
+    ],
+)
+
+# 8. the SAME entry while its check ASSESSES: this kind does NOT go stale. The
+#    run stays green and the entry is REPORTED as not biting -- without this arm
+#    the kind would be free to fail a check that had come back, which is the
+#    half of the rule a plain honoured-on-rc-2 entry cannot express.
+mount(((FIXTURE_A, 0), (FIXTURE_B, 0)))
+budget([{"check": FIXTURE_B, "kind": "live-dependent", "issue": 1410,
+         "mechanism": LIVE_MECHANISM, "reason": "fixture"}])
+rc, text, att, verdict = run("live-dependent assessed")
+expect(
+    "a live-dependent entry is NOT stale when its check assesses",
+    rc, 0, text,
+    [
+        "verify: PASS (2 of 2 checks)",
+        "1 live-dependent entr(y/ies) did not bite in this run",
+        "this kind does NOT go stale",
+    ],
+    att,
+    [
+        (("skip_ratchet", "verdict"), "OK"),
+        (("skip_ratchet", "stale_entries"), []),
+        (("skip_ratchet", "unused_live_entries"), [FIXTURE_B]),
+    ],
+)
+
+# 9. the SAME entry while its check FAILS (rc 1): refused by name. A failing
+#    check is a FINDING, not a skip -- honouring it here would hide a defect
+#    behind the name of a mechanism that answered.
+mount(((FIXTURE_A, 0), (FIXTURE_B, 1)))
+budget([{"check": FIXTURE_B, "kind": "live-dependent", "issue": 1410,
+         "mechanism": LIVE_MECHANISM, "reason": "fixture"}])
+rc, text, att, verdict = run("live-dependent check fails")
+expect(
+    "a live-dependent entry whose check FAILS is REFUSED by name",
+    rc, 1, text,
+    [
+        "live-dependent entry '%s'" % FIXTURE_B,
+        "a failing check is a FINDING, not a skip",
+        # The ratchet's note rides in the SAME parenthesis as the counts, so the
+        # line is asserted whole: a needle that stopped before the note would pass
+        # while the note itself was missing.
+        "verify: FAIL (1 of 2 checks failed; skip ratchet FAIL",
+    ],
+    att,
+    [
+        (("skip_ratchet", "verdict"), "VIOLATION"),
+        (("result",), "FAIL"),
+    ],
+)
+
+# 10. a LIVE-DEPENDENT entry that names no live mechanism: the record cannot be
+#     evaluated at all, so the run cannot attest a skip set it could not read.
+mount(((FIXTURE_A, 0), (FIXTURE_B, 0)))
+budget([{"check": FIXTURE_B, "kind": "live-dependent", "issue": 1410,
+         "reason": "fixture, no mechanism named"}])
+rc, text, att, verdict = run("live-dependent without a mechanism")
+expect(
+    "a live-dependent entry with no LIVE mechanism is CANNOT-ASSESS by name",
+    rc, 1, text,
+    [
+        "malformed budget entry",
+        "is live-dependent with no 'mechanism'",
+        "skip ratchet CANNOT-ASSESS",
+    ],
+    att,
+    [(("skip_ratchet", "verdict"), "CANNOT-ASSESS")],
+)
+
 if failures:
-    print("  %d of 6 scenario(s) failed" % len(failures))
+    print("  %d of 10 scenario(s) failed" % len(failures))
     raise SystemExit(1)
 print(
-    "  OK    six scenarios on the real composite: clean, named, unnamed, stale, a "
-    "venue command the venue lacks, and the same entry with it supplied"
+    "  OK    ten scenarios on the real composite: clean, named, unnamed, stale, a "
+    "venue command the venue lacks, the same entry with it supplied, a "
+    "live-dependent skip honoured by name, the same entry NOT stale when its check "
+    "assesses, REFUSED when its check fails, and CANNOT-ASSESS when it names no "
+    "mechanism"
 )
 PY
 cat "$work/shim.txt"
-check "the composite itself names a standing skip and fails on an unnamed one" \
+check "the composite itself names a skip and fails on an unnamed one, and the third kind is honoured, not stale and refused on failure" \
   "$([ "$shim_rc" -eq 0 ] && echo 0 || echo 1)" \
   "the end-to-end shim exited $shim_rc"
+
+# --- 6. the falsification control --------------------------------------------
+# Sections 1-5 assert that the third kind's rules hold. This one proves they can
+# FAIL: the branch that HONOURS a live-dependent skip is deleted from a copy of
+# the ratchet, and the fixture that passed must then red BY NAME. Without it the
+# arms above could be satisfied by a ratchet that narrated every live-dependent
+# skip as something else -- and the report says HOW the mutant changed, because
+# "it failed" is not the same claim as "it failed for this reason": measured, the
+# mutant keeps rc 0 and narrates the entry as a STANDING GAP, which is exactly
+# the mislabel #1410 exists to remove. That is why the naming, not the exit code,
+# is the property under test here.
+echo "== the falsification control (the kind's honouring is load-bearing) =="
+falsify_rc=0
+python3 - "$root" "$work" > "$work/falsify.txt" 2>&1 <<'PY' || falsify_rc=$?
+"""Remove the live-dependent honouring from a COPY of the ratchet and require
+this fixture to stop meeting its expectation, naming what changed."""
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+work = Path(sys.argv[2])
+real = root / "scripts" / "lib" / "skip-ratchet.py"
+text = real.read_text(encoding="utf-8")
+ANCHOR = (
+    '        elif entry["kind"] == LIVE_DEPENDENT:\n'
+    '            lines.append(live_dependent_line(name, record))\n'
+)
+if ANCHOR not in text:
+    print(
+        "  FAIL  the mutation's anchor moved: the live-dependent honouring is not "
+        "where this control expects it, so the control would prove nothing"
+    )
+    raise SystemExit(1)
+mutant = work / "mutant-lib" / "skip-ratchet.py"
+mutant.parent.mkdir(parents=True, exist_ok=True)
+mutant.write_text(text.replace(ANCHOR, "", 1), encoding="utf-8")
+print("  OK    mutant written: %d byte(s) of the live-dependent honouring removed" % len(ANCHOR))
+
+fixture = work / "falsify-root"
+(fixture / "scripts").mkdir(parents=True, exist_ok=True)
+(fixture / "results.tsv").write_text("gate-status\t2\t0\tgate-status.out\n", encoding="utf-8")
+(fixture / "names.txt").write_text("gate-status\n", encoding="utf-8")
+(fixture / "skip-budget.json").write_text(
+    json.dumps(
+        {
+            "schema": "ao.verify.skip-budget/v1",
+            "entries": [
+                {
+                    "check": "gate-status",
+                    "kind": "live-dependent",
+                    "issue": 1382,
+                    "mechanism": "the GitHub commit statuses API, read with gh",
+                    "reason": "the live source did not answer",
+                }
+            ],
+        },
+        indent=2,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+
+
+def driven(lib):
+    proc = subprocess.run(
+        [sys.executable, str(lib), "--root", str(fixture),
+         "--results", str(fixture / "results.tsv"),
+         "--names", str(fixture / "names.txt"),
+         "--budget", str(fixture / "skip-budget.json")],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+rc_real, out_real = driven(real)
+rc_mutant, out_mutant = driven(mutant)
+HONOUR = "live-dependent: the LIVE mechanism"
+MISLABEL = "standing gap tracked by #1382"
+problems = []
+if rc_real != 0 or HONOUR not in out_real:
+    problems.append(
+        "the REAL ratchet did not honour the live-dependent skip by name (rc %d)" % rc_real
+    )
+if HONOUR in out_mutant:
+    problems.append(
+        "the MUTANT still named the live mechanism, so the honouring is not what "
+        "carries this behaviour"
+    )
+if MISLABEL not in out_mutant:
+    problems.append(
+        "the mutant did not fall back to the standing-gap narration, so this control "
+        "does not show what removing the honouring actually does"
+    )
+print("  real   rc=%d" % rc_real)
+for line in out_real.splitlines():
+    if HONOUR in line:
+        print("         %s" % line)
+print("  mutant rc=%d" % rc_mutant)
+for line in out_mutant.splitlines():
+    if "standing skip" in line:
+        print("         %s" % line)
+if problems:
+    for problem in problems:
+        print("  FAIL  %s" % problem)
+    raise SystemExit(1)
+print(
+    "  OK    the fixture that PASSED on the real ratchet REDS BY NAME once the "
+    "honouring is removed, and rc stays %d -- which is the point: the mutant keeps "
+    "the run green while narrating a LIVE-dependent skip as a standing gap, so the "
+    "naming is the property under test, not the exit code" % rc_mutant
+)
+PY
+cat "$work/falsify.txt"
+check "the live-dependent honouring is load-bearing (removing it mislabels the skip)" \
+  "$([ "$falsify_rc" -eq 0 ] && echo 0 || echo 1)" \
+  "the falsification control exited $falsify_rc"
 
 # --- verdict ------------------------------------------------------------------
 if [ "$fails" -gt 0 ]; then
   echo "check-skip-ratchet: NOT-OK -- $fails of $checks assertion(s) failed" >&2
   exit 1
 fi
-echo "check-skip-ratchet: OK -- $checks assertion(s) held: the ratchet's rules are all provoked (17 fixtures, each rc AND each refusal line), the committed record loads through the run's own loader, names discovered checks, and declares only venue command preconditions this tree actually runs (a planted phantom probe is refused by name), scripts/verify.sh invokes the ratchet and fails the run on its verdict (proved by mutation), the attestation validator refuses a skip that nothing accounts for and a venue skip that declares no precondition, and the REAL composite run on a shim fixture proves all six end states: clean PASS unchanged, a named standing skip named in the verdict line and recorded in attestation.json, an unnamed skip FAILING by name, a stale exemption FAILING the moment its check assesses, a venue COMMAND precondition the venue lacks honoured inside a PASS, and the same entry REFUSED once the venue supplies it"
+echo "check-skip-ratchet: OK -- $checks assertion(s) held: the ratchet's rules are all provoked ($selftest_cases fixtures, each rc AND each refusal line), the committed record loads through the run's own loader, names discovered checks, declares only venue command preconditions this tree actually runs (a planted phantom probe is refused by name) and carries the THIRD kind (#1410) with its own census -- a census of zero reds by name, and the planted live-dependent records that omit the issue, omit the mechanism or carry a precondition are each refused by the same loader; scripts/verify.sh invokes the ratchet and fails the run on its verdict (proved by mutation); the attestation validator refuses a skip that nothing accounts for and a venue skip that declares no precondition; the REAL composite run on a shim fixture proves all TEN end states (clean PASS unchanged, a named standing skip, an unnamed skip FAILING by name, a stale exemption FAILING, a venue COMMAND precondition honoured, the same entry REFUSED once supplied, a live-dependent skip honoured BY NAME while its LIVE mechanism cannot answer and NOT stale when its check assesses, the same entry REFUSED the moment the check FAILS because a failing check is a finding, and a live-dependent entry naming no mechanism CANNOT-ASSESS by name); and the FALSIFICATION control deletes the honouring from a copy of the ratchet and requires the fixture that passed to red by name -- measured, the mutant stays green and narrates the LIVE skip as a standing gap, so the naming is the load-bearing property rather than the exit code"
 exit 0
