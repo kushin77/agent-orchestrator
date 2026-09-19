@@ -198,6 +198,27 @@ def runtime_ids() -> tuple[str, ...]:
         _RUNTIME_IDS = runtimes.ids(ROOT)
     return _RUNTIME_IDS
 
+
+#: `RUNTIME_IDS` is the name #1273 declared for this vocabulary, and it is still
+#: the name `governance/spawn/admission.py::_allowlists` reads (#1413/#1421: the
+#: allowlist tables must come from THIS module's one closed function set, so the
+#: consumer names the reader here rather than re-deriving an id list of its own).
+#: The name therefore has to exist — and it has to be the SAME list, not a second
+#: copy: a resolved-to-equal twin would satisfy #1421 and still be the very thing
+#: this issue exists to remove (#1385's five ids against the contract's seven).
+#: `__getattr__` (PEP 562) resolves the name through `runtime_ids()`, so a reader
+#: of `channel.RUNTIME_IDS` gets the one list's object, while the read stays lazy
+#: for the scratch-tree copies described above. Any OTHER unknown name is still an
+#: `AttributeError` — a resolver that answered everything would turn a typo into a
+#: silent empty vocabulary, which is the failure mode this section refuses.
+#: `fleet/tests/test_runtime_vocabulary.py` carries this name as a consumer, so it
+#: is proved to FOLLOW the contract by mutation like every other reader.
+def __getattr__(name: str) -> object:
+    if name == "RUNTIME_IDS":
+        return runtime_ids()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 _VERBS_YAML = ROOT / "control-plane" / "control" / "verbs.yaml"
 _SKILLS_REGISTRY = ROOT / "integrations" / "paperclip" / "adapters" / "skills" / "registry.json"
 _SECRETS_CATALOG = ROOT / "integrations" / "paperclip" / "adapters" / "secrets" / "catalog" / "secrets.json"

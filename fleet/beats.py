@@ -257,7 +257,7 @@ def build_parser() -> argparse.ArgumentParser:
     post_parser.add_argument(
         "--min-interval",
         default=None,
-        help=f"skip a refresh younger than this many seconds (default: always write)",
+        help="skip a refresh younger than this many seconds (default: always write)",
     )
     post_parser.add_argument("--force", action="store_true", help="ignore the existing beat's age")
     post_parser.set_defaults(func=cmd_post)

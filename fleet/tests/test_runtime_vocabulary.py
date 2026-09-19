@@ -24,7 +24,7 @@ The consumers, and where each reads the vocabulary from now:
 
 | consumer | before | now |
 |---|---|---|
-| `fleet/channel.py` | a literal seven-tuple | `fleet.runtimes.ids()` |
+| `fleet/channel.py` (`runtime_ids()`, and the declared `RUNTIME_IDS` name it resolves) | a literal seven-tuple | `fleet.runtimes.ids()` |
 | `governance/notices/runtime_registry.py` | its own five-id derivation | the contract |
 | `governance/isolation/runtimes.py` | the contract, with a literal fallback | the contract (unchanged) |
 | `integrations/paperclip/adapters/heartbeat/beat.py` | the contract (unchanged) | the contract |
@@ -107,6 +107,11 @@ def consumers(fx: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, tuple[str,
     return {
         "fleet.runtimes.ids": runtimes.ids(fx),
         "fleet.channel.runtime_ids": tuple(channel.runtime_ids()),
+        # The DECLARED name `governance/spawn/admission.py::_allowlists` reads
+        # (#1413). It resolves through `runtime_ids()`, so it is the same list —
+        # and it is listed here so a version that stopped following the contract
+        # would fail this pin by name instead of only failing #1421's gate.
+        "fleet.channel.RUNTIME_IDS": tuple(channel.RUNTIME_IDS),
         "governance.notices.registered_runtimes": tuple(
             runtime.id for runtime in notices_registry.registered_runtimes(fx)
         ),
@@ -165,10 +170,30 @@ def test_the_pin_can_fail(
     """Negative control: a consumer reporting a STALE list must be named."""
     fx, ids = mutated
     observed = consumers(fx, monkeypatch)
-    observed["fleet.channel.runtime_ids"] = runtimes.ids(REPO_ROOT)  # the pre-#1412 tuple
-    assert disagreements(observed, ids) == ["fleet.channel.runtime_ids"], (
+    # The pre-#1412 tuple for both names that reach the vocabulary through
+    # `fleet/channel.py` — the reader and the declared name it resolves to.
+    observed["fleet.channel.runtime_ids"] = runtimes.ids(REPO_ROOT)
+    observed["fleet.channel.RUNTIME_IDS"] = runtimes.ids(REPO_ROOT)
+    assert disagreements(observed, ids) == [
+        "fleet.channel.runtime_ids",
+        "fleet.channel.RUNTIME_IDS",
+    ], (
         "the comparison cannot detect a second list, so the pin above proves nothing"
     )
+
+
+def test_the_declared_name_is_the_one_list_and_not_a_second(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`channel.RUNTIME_IDS` IS `channel.runtime_ids()` — one list, two names.
+
+    Identity, not equality: a second literal that happens to match today is the
+    defect (#1385), so the assertion has to be able to see through it.
+    """
+    monkeypatch.setattr(channel, "_RUNTIME_IDS", None)
+    assert channel.RUNTIME_IDS is channel.runtime_ids()
+    # ... and the resolver is not a catch-all: a name this module does not
+    # declare is still a refusal, never an accidental empty vocabulary.
+    with pytest.raises(AttributeError, match="RUNTIME_IDS_OF_SOMETHING_ELSE"):
+        _ = channel.RUNTIME_IDS_OF_SOMETHING_ELSE
 
 
 def test_the_real_tree_answers_with_the_contract(monkeypatch: pytest.MonkeyPatch) -> None:
