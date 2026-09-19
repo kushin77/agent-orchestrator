@@ -32,12 +32,53 @@ finding              an artifact that
 **Reclaim only with evidence.** Under ``apply`` the walk reclaims exactly two
 shapes, and only through the rules other lanes already landed: an
 ``orphan-worktree`` whose HEAD is content-landed on the default branch
-(``worktree.content_landed``, #1265/#1335) and holds no lane-authored dirt, and
-an ``orphan-branch`` whose tip is content-landed. Each tip is recorded to
-``.fleet/reaped-branches.jsonl`` (``worktree.record_reaped``) BEFORE removal.
-Everything else is a finding with its remedy, never touched — a lane and a
-directive reach terminal only through the lane close-out and the item close-out
-respectively, because those verbs are where the evidence is.
+(``worktree.content_landed``, #1265/#1335), holds no lane-authored dirt, and is
+**not in use**, and an ``orphan-branch`` whose tip is content-landed. Each tip is
+recorded to ``.fleet/reaped-branches.jsonl`` (``worktree.record_reaped``) only
+after the removal it describes actually happened. Everything else is a finding
+with its remedy, never touched — a lane and a directive reach terminal only
+through the lane close-out and the item close-out respectively, because those
+verbs are where the evidence is.
+
+**"In use" is a different question from "landed" (#1440).**
+``content_landed`` and ``foreign_dirt`` between them answer *"would reclaiming
+this lose work?"*. Neither answers *"is anything USING this?"*, and on
+2026-09-18 the walk answered the second question anyway: ``sweep --orphans
+--apply`` reclaimed 17 artifacts and had to be stopped from removing two more
+that were demonstrably in use — a running *Claude agent session's* worktree, and
+``ao-worktrees/ao-master-1789820219``, which another lane had **recorded** as its
+venue (``/tmp/ao-orch/master-venue.txt``, read by
+``V=$(cat …); cd $V; python3 $V/governance/...``). Two trees, two different kinds
+of use, one missing signal — and nothing wrong with the *work*: the walk had no
+signal about *use*.
+
+So a reclaim also requires :func:`judge_use` to have MEASURED the artifact free.
+Three signals are read, and they are deliberately unequal:
+
+* **git's own worktree lock** — the strong one. Measured on this box with git
+  2.53.0: ``git worktree list --porcelain`` reports ``locked <reason>``, and
+  ``git worktree remove --force`` then fails ``rc 128``, ``fatal: cannot remove a
+  locked working tree, lock reason: <reason>`` (only ``-f -f`` overrides it).
+  That is the signal that saved the agent's tree, and the walk now reads it
+  instead of discovering it as a failed removal.
+* **a live process whose working directory is inside the path** — measured from
+  ``/proc/<pid>/cwd``. This one is weaker, and the issue measured HOW: a holder
+  that ``cd``s away between the measure and the apply reads "clear", and a
+  directory that is already gone reads ``/path (deleted)`` and stops matching. It
+  is also Linux-only, which is why it is declared rather than assumed — where
+  ``/proc`` cannot be listed the signal is *unreadable*, never "clear".
+* **a recorded venue** — an ownership record naming the path, which is what the
+  deleted venue actually had. Read from the runtime spool (``$AO_VENUE_SPOOL``,
+  default ``/tmp/ao-orch``) and from ``.fleet/venues/`` beside the fleet's own
+  state, so "no lane record names it" stops being the same claim as "nobody needs
+  it".
+
+The verdict is a tri-state and it fails closed: ANY positive signal is IN USE and
+the artifact is refused **by name**, naming which process or which record;
+NOT IN USE requires every signal to have been read AND negative; a signal that
+could not be read at all is CANNOT-ASSESS — which refuses the reclaim and names
+the walk unmeasured, never "not in use". A refusal is always cheaper than a
+reclaim nobody can undo.
 
 **The budget.** ``orphan-budget.yaml`` declares, per kind, the count measured on
 the day the walk shipped and the date that allowance expires (the same ratchet
@@ -48,11 +89,15 @@ by the code — raising it is a reviewed edit.
 
 **Unmeasured is not clean.** A kind whose source could not be read (``gh`` is
 absent, the mailbox unreadable) is reported ``unmeasured`` by name and the walk
-is CANNOT-ASSESS; it never counts as zero orphans.
+is CANNOT-ASSESS; it never counts as zero orphans. The liveness read is held to
+the same rule (#1440): a worktree whose ``in use`` question could not be measured
+is reported under ``orphan-worktree-liveness`` and the walk is CANNOT-ASSESS,
+rather than that worktree being reclaimed on an unread signal.
 """
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -81,6 +126,212 @@ WOULD_RECLAIM = "would-reclaim"
 REPORTED = "reported"
 FAILED = "failed"
 
+#: The three liveness verdicts :func:`judge_use` returns. ``LIVENESS_CANNOT_ASSESS``
+#: is a REFUSAL and a report, never a "clear" (#1440).
+IN_USE = "in-use"
+NOT_IN_USE = "not-in-use"
+LIVENESS_CANNOT_ASSESS = "cannot-assess"
+
+#: The key the walk reports under ``OrphanReport.unmeasured`` when it could not
+#: measure whether a worktree is in use. Deliberately NOT one of ``KINDS``: the
+#: worktree kind is still counted and still held to its budget, so this only
+#: makes the walk CANNOT-ASSESS rather than quietly skipping the kind.
+LIVENESS_UNMEASURED = "orphan-worktree-liveness"
+
+#: Where a runtime venue record lives: a file naming the worktree an operator or
+#: a lane is working in. Measured shape (#1440): ``/tmp/ao-orch/master-venue.txt``
+#: holding one absolute path. The env seam exists so a gate can point the reader
+#: at a fixture instead of the box's real spool.
+VENUE_SPOOL_ENV = "AO_VENUE_SPOOL"
+VENUE_SPOOL_DEFAULT = "/tmp/ao-orch"
+
+#: The declared venue store, beside the fleet's own runtime state.
+VENUE_DIR = ".fleet/venues"
+
+
+def _path_forms(value: str) -> set[str]:
+    """Every spelling of one path this module will compare: the normalised form
+    and the symlink-resolved form, so a venue recorded through a symlinked parent
+    still names the artifact it names."""
+    text = (value or "").strip().rstrip("/")
+    if not text:
+        return set()
+    forms = {os.path.normpath(text)}
+    try:
+        forms.add(os.path.normpath(os.path.realpath(text)))
+    except OSError:  # a path the filesystem cannot even resolve
+        pass
+    return forms
+
+
+def _same_path(declared: str, path: str) -> bool:
+    return bool(_path_forms(declared) & _path_forms(path))
+
+
+def _declared_paths(text: str, *, expect_json: bool = False) -> list[str]:
+    """Every absolute path a venue record declares.
+
+    The measured shape (#1440) is a one-line text file holding the path
+    (``/tmp/ao-orch/master-venue.txt``); a JSON record carries the same path in a
+    value, at any depth. Raises ``ValueError`` when a record that should be JSON
+    cannot be parsed — the caller must report that as an UNREADABLE signal, never
+    as "this record names nothing".
+    """
+    stripped = text.strip()
+    if expect_json:
+        import json  # noqa: PLC0415 - same lazy import the rest of this module uses
+
+        payload = json.loads(stripped)  # ValueError on a malformed record
+        found: list[str] = []
+        stack = [payload]
+        while stack:
+            item = stack.pop()
+            if isinstance(item, dict):
+                stack.extend(item.values())
+            elif isinstance(item, list):
+                stack.extend(item)
+            elif isinstance(item, str) and item.startswith("/"):
+                found.append(item.strip())
+        return found
+    return [line.strip() for line in stripped.splitlines() if line.strip().startswith("/")]
+
+
+def _process_name(pid: str) -> str:
+    """A short, human-actionable identity for ``pid``, from ``/proc``."""
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return "command line unreadable"
+    parts = [part for part in raw.decode("utf-8", "replace").split("\0") if part]
+    if not parts:
+        return "no command line"
+    head = Path(parts[0]).name or parts[0]
+    return f"{head} {' '.join(parts[1:3])}".strip()[:80]
+
+
+def _holders(path: str, proc: str = "/proc") -> tuple[list[str], int, int, bool]:
+    """``(holders, pids_seen, cwds_unreadable, proc_readable)``.
+
+    A holder is a live process whose working directory IS the artifact or sits
+    inside it. Read from ``/proc/<pid>/cwd`` — Linux-only, and the WEAKER of the
+    three signals (#1440): a holder that ``cd``s away between this read and the
+    removal reads clear, and a directory that is already gone reads
+    ``/path (deleted)`` and stops matching. It is read anyway, because it is the
+    only signal that catches a *plain terminal* — the second artifact the walk had
+    to be stopped from removing had no git lock to catch it.
+
+    ``proc_readable`` is False only when ``/proc`` itself cannot be listed, which
+    is an UNREADABLE signal and must never be read as "clear". A single
+    ``/proc/<pid>/cwd`` that cannot be read is counted instead of treated as
+    blind: the process may simply have exited, and this box has other users'
+    processes, so raising the whole signal for each one would leave the walk
+    permanently CANNOT-ASSESS and therefore permanently unable to reclaim
+    anything — the opposite of a useful control.
+    """
+    try:
+        entries = list(Path(proc).iterdir())
+    except OSError:
+        return [], 0, 0, False
+    pids = sorted((entry.name for entry in entries if entry.name.isdigit()), key=int)
+    wanted = _path_forms(path)
+    holders: list[str] = []
+    unreadable = 0
+    for pid in pids:
+        try:
+            cwd = os.readlink(f"{proc}/{pid}/cwd")
+        except OSError:
+            unreadable += 1
+            continue
+        inside = False
+        for form in _path_forms(cwd):
+            if any(form == want or form.startswith(want + "/") for want in wanted):
+                inside = True
+                break
+        if inside:
+            holders.append(f"{pid} ({_process_name(pid)})")
+    return holders, len(pids), unreadable, True
+
+
+def _lock_reasons(porcelain: str) -> dict[str, str]:
+    """``path -> reason`` for every entry git reports as ``locked``.
+
+    Measured with git 2.53.0: the porcelain block carries ``locked`` alone when
+    no reason was given, and ``locked <reason>`` when one was. Only entries git
+    itself calls locked appear here, so an absent path means "git reports no
+    lock" — the strong, portable half of the liveness read.
+    """
+    reasons: dict[str, str] = {}
+    for block in porcelain.strip().split("\n\n"):
+        path = ""
+        reason: str | None = None
+        for line in block.splitlines():
+            key, _, value = line.partition(" ")
+            if key == "worktree":
+                path = value.strip()
+            elif key == "locked":
+                reason = value.strip()
+        if path and reason is not None:
+            reasons[path] = reason
+    return reasons
+
+
+@dataclass(frozen=True)
+class Signal:
+    """One measurement of "is anything using this artifact?".
+
+    ``read`` is False only when the signal could not be measured at all — never
+    when it was measured and found clear. ``hit`` is non-empty when the signal is
+    POSITIVE and says WHAT it names (the process, the lock reason, the record).
+    ``note`` carries coverage, and the reason when the signal could not be read.
+    """
+
+    name: str
+    read: bool
+    hit: str = ""
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class Use:
+    verdict: str
+    evidence: str = ""
+
+    @property
+    def in_use(self) -> bool:
+        return self.verdict == IN_USE
+
+    @property
+    def known(self) -> bool:
+        return self.verdict != LIVENESS_CANNOT_ASSESS
+
+    def __str__(self) -> str:
+        return f"{self.verdict}: {self.evidence}" if self.evidence else self.verdict
+
+
+def judge_use(signals: Iterable[Signal]) -> Use:
+    """``IN USE`` if any signal is positive; ``NOT IN USE`` only if every signal
+    was read and every one was negative; ``CANNOT-ASSESS`` otherwise.
+
+    The order is the whole point (#1440): a positive signal is a *measurement*
+    of use, so it wins over a signal that could not be read at all; and an
+    unreadable signal can never be reported as "nothing is using it". An empty
+    signal list is CANNOT-ASSESS too — no signal measured is not an absence of
+    holders, it is an absence of measurement.
+    """
+    measured = list(signals)
+    positive = [signal for signal in measured if signal.hit]
+    if positive:
+        return Use(IN_USE, "; ".join(f"{s.name}: {s.hit}" for s in positive))
+    blind = [signal for signal in measured if not signal.read]
+    if blind:
+        return Use(
+            LIVENESS_CANNOT_ASSESS,
+            "; ".join(f"{s.name}: {s.note or 'could not be measured'}" for s in blind),
+        )
+    if not measured:
+        return Use(LIVENESS_CANNOT_ASSESS, "no liveness signal was available")
+    return Use(NOT_IN_USE, "; ".join(signal.note for signal in measured if signal.note))
+
 
 @dataclass(frozen=True)
 class Worktree:
@@ -88,6 +339,8 @@ class Worktree:
     branch: str = ""
     head: str = ""
     primary: bool = False
+    locked: bool = False
+    lock_reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -112,6 +365,10 @@ class Orphan:
     sha: str = ""
     reclaimable: bool = False
     outcome: str = REPORTED
+    #: The liveness verdict's own words (``Use.__str__``) for an artifact kind
+    #: that has one — machine-readable naming of WHAT is in use, not only prose
+    #: in ``detail`` (#1440). Empty for the kinds liveness does not apply to.
+    use: str = ""
 
     def __str__(self) -> str:
         return f"{self.kind}:{self.name}"
@@ -125,6 +382,7 @@ class Orphan:
             "sha": self.sha,
             "reclaimable": self.reclaimable,
             "outcome": self.outcome,
+            "use": self.use,
         }
 
 
@@ -192,6 +450,10 @@ class OrphanOps(Protocol):
     def content_landed(self, ref: str) -> bool: ...
 
     def foreign_dirt(self, path: str) -> list[str]: ...
+
+    def in_use(self, entry: Worktree) -> Use:
+        """Is anything USING ``entry``? Never raises: a signal that cannot be
+        read is part of the :class:`Use` verdict, not an exception."""
 
     def record_reaped(self, *, branch: str, head_sha: str, worktree: str, reason: str) -> None: ...
 
@@ -261,23 +523,61 @@ def walk(
     # -- worktrees ------------------------------------------------------------
     worktrees = ops.worktrees()
     worktree_branches = {entry.branch for entry in worktrees if entry.branch}
+    unmeasured_liveness: list[str] = []
     for entry in worktrees:
         if entry.primary or entry.path in lane_worktrees:
             continue
         landed = bool(entry.head) and ops.content_landed(entry.head)
         dirt = ops.foreign_dirt(entry.path)
-        reclaimable = landed and not dirt
-        detail = (
-            f"no lane record names {entry.path} (branch {entry.branch or 'detached'}, HEAD {entry.head[:12]}); "
-            + ("its content is on the default branch and it holds no lane-authored dirt" if reclaimable
-               else ("HEAD is NOT content-landed" if not landed else f"it holds uncommitted work: {', '.join(dirt[:5])}"))
-        )
+        use = ops.in_use(entry)
+        reclaimable = landed and not dirt and use.verdict == NOT_IN_USE
+        refused: list[str] = []
+        if not landed:
+            refused.append("HEAD is NOT content-landed")
+        if dirt:
+            refused.append(f"it holds uncommitted work: {', '.join(dirt[:5])}")
+        if use.in_use:
+            refused.append(f"it is IN USE — {use.evidence}")
+        elif not use.known:
+            refused.append(f"its liveness could NOT be measured — {use.evidence}")
+            unmeasured_liveness.append(f"{entry.path}: {use.evidence}")
+        if reclaimable:
+            detail = (
+                f"no lane record names {entry.path} (branch {entry.branch or 'detached'}, HEAD {entry.head[:12]}); "
+                f"its content is on the default branch, it holds no lane-authored dirt, and nothing is using it"
+                f" ({use.evidence})"
+            )
+            remedy = "reclaimed by the walk under --apply (content-landed and not in use, tip recorded after removal)"
+        elif use.in_use:
+            detail = (
+                f"no lane record names {entry.path} (branch {entry.branch or 'detached'}, HEAD {entry.head[:12]}); "
+                + "; ".join(refused)
+            )
+            remedy = (
+                "left alone: something is using it — name the claim the walk can read "
+                "(`isolation open`, or a `.fleet/venues/` record) and stop the holder, then re-walk"
+            )
+        elif not use.known:
+            detail = (
+                f"no lane record names {entry.path} (branch {entry.branch or 'detached'}, HEAD {entry.head[:12]}); "
+                + "; ".join(refused)
+            )
+            remedy = (
+                "left alone: its liveness could not be measured, and an unmeasured artifact is never "
+                "reclaimed — re-run where /proc and the venue spool are readable"
+            )
+        else:
+            detail = (
+                f"no lane record names {entry.path} (branch {entry.branch or 'detached'}, HEAD {entry.head[:12]}); "
+                + "; ".join(refused)
+            )
+            remedy = "open a lane for it (`isolation open`) or commit/push its work; never deleted unevidenced"
         report.orphans.append(Orphan(
-            ORPHAN_WORKTREE, entry.path, detail,
-            remedy="reclaimed by the walk under --apply (content-landed, tip recorded first)" if reclaimable
-            else "open a lane for it (`isolation open`) or commit/push its work; never deleted unevidenced",
-            sha=entry.head, reclaimable=reclaimable,
+            ORPHAN_WORKTREE, entry.path, detail, remedy=remedy,
+            sha=entry.head, reclaimable=reclaimable, use=str(use),
         ))
+    if unmeasured_liveness:
+        report.unmeasured[LIVENESS_UNMEASURED] = "; ".join(unmeasured_liveness)
 
     # -- branches -------------------------------------------------------------
     try:
@@ -354,11 +654,17 @@ def walk(
         try:
             if orphan.kind == ORPHAN_WORKTREE:
                 entry = next(w for w in worktrees if w.path == orphan.name)
-                ops.record_reaped(branch=entry.branch, head_sha=entry.head, worktree=entry.path, reason="orphan-walk:content-landed")
                 ops.remove_worktree(entry.path)
+                # Recorded only AFTER a removal that happened (#1440). Recorded
+                # first, a removal that then FAILS leaves a ledger entry claiming
+                # a reap that never took place — true about the content, false
+                # about the removal. Measured: `git worktree remove --force`
+                # refuses a locked tree (rc 128), and a git lock is one of the
+                # ways an artifact turns out to be in use.
+                ops.record_reaped(branch=entry.branch, head_sha=entry.head, worktree=entry.path, reason="orphan-walk:content-landed")
             elif orphan.kind == ORPHAN_BRANCH:
-                ops.record_reaped(branch=orphan.name, head_sha=orphan.sha, worktree="", reason="orphan-walk:content-landed")
                 ops.delete_local_branch(orphan.name)
+                ops.record_reaped(branch=orphan.name, head_sha=orphan.sha, worktree="", reason="orphan-walk:content-landed")
             orphan.outcome = RECLAIMED
         except Exception as exc:  # noqa: BLE001 - a failed reclaim is data
             orphan.outcome = FAILED
@@ -399,12 +705,26 @@ class RepoOrphanOps:
     ``gh`` reads resolve the repository from that directory.
     """
 
-    def __init__(self, root: Path | str, *, snapshot: Path | str | None = None) -> None:
+    def __init__(
+        self,
+        root: Path | str,
+        *,
+        snapshot: Path | str | None = None,
+        venue_roots: Iterable[Path | str] | None = None,
+    ) -> None:
         import subprocess  # noqa: PLC0415
 
         self.root = Path(root)
         self.snapshot = Path(snapshot) if snapshot is not None else self.root / ".board" / "snapshot.json"
         self._subprocess = subprocess
+        #: Where declared venues are read from (#1440). The env seam exists so a
+        #: gate can point the reader at its own fixture instead of the box's real
+        #: spool; ``venue_roots=[]`` means "measure no venue store at all".
+        self.venue_roots = (
+            [Path(entry) for entry in venue_roots]
+            if venue_roots is not None
+            else [self.root / VENUE_DIR, Path(os.environ.get(VENUE_SPOOL_ENV) or VENUE_SPOOL_DEFAULT)]
+        )
 
     def _git(self, *args: str):
         return self._subprocess.run(["git", "-C", str(self.root), *args], capture_output=True, text=True)
@@ -445,7 +765,18 @@ class RepoOrphanOps:
         result = self._git("worktree", "list", "--porcelain")
         if result.returncode != 0:
             raise Unmeasured(f"the worktree list could not be read: {result.stderr.strip()[-160:]}")
-        return [Worktree(e.path, e.branch, e.head, e.primary) for e in parse_worktrees(result.stdout)]
+        # One read, two consumers: the shared parser answers "what worktrees are
+        # there and which are locked", and _lock_reasons recovers git's own lock
+        # REASON from the same porcelain — the strong liveness signal (#1440),
+        # which the shared parser deliberately does not carry.
+        reasons = _lock_reasons(result.stdout)
+        return [
+            Worktree(
+                entry.path, entry.branch, entry.head, entry.primary,
+                locked=bool(entry.locked), lock_reason=reasons.get(entry.path, ""),
+            )
+            for entry in parse_worktrees(result.stdout)
+        ]
 
     def local_branches(self) -> list[str]:
         result = self._git("for-each-ref", "--format=%(refname:short)", "refs/heads")
@@ -511,6 +842,93 @@ class RepoOrphanOps:
         from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415
 
         return isolation_worktree.foreign_uncommitted(path) if Path(path).exists() else []
+
+    # -- is anything USING it? (#1440) ----------------------------------------
+    def in_use(self, entry: Worktree) -> Use:
+        """Compose the three liveness signals into one fail-closed verdict."""
+        signals: list[Signal] = []
+
+        # 1. git's OWN lock — the strong, portable signal. Measured with git
+        # 2.53.0: porcelain carries `locked <reason>`, and `git worktree remove
+        # --force` then refuses with rc 128, so the walk reading it here is the
+        # difference between a named refusal and a failed removal.
+        if entry.locked:
+            signals.append(Signal(
+                "git-worktree-lock", True,
+                hit=f"git holds this worktree's lock (reason: {entry.lock_reason or 'none recorded'})",
+            ))
+        else:
+            signals.append(Signal("git-worktree-lock", True, note="git reports no worktree lock"))
+
+        # 2. a live process whose working directory is inside it — weaker, and
+        # Linux-only, so an unlistable /proc is UNREADABLE rather than "clear".
+        holders, seen, unreadable, proc_readable = _holders(entry.path)
+        if not proc_readable:
+            signals.append(Signal(
+                "holder-process", False,
+                note="no readable /proc on this platform, so no process could be checked for a working directory inside it",
+            ))
+        elif holders:
+            signals.append(Signal(
+                "holder-process", True,
+                hit="live process with a working directory inside it: " + ", ".join(holders[:5]),
+            ))
+        else:
+            signals.append(Signal(
+                "holder-process", True,
+                note=f"{seen} process(es) checked, none with a working directory inside it ({unreadable} cwd unreadable)",
+            ))
+
+        # 3. a recorded venue — the OWNERSHIP signal, which is the one the venue
+        # deleted on 2026-09-18 actually had.
+        naming, blind = self._venue_declarations(entry.path)
+        if naming:
+            signals.append(Signal("venue-record", True, hit="; ".join(naming[:5])))
+        elif blind:
+            signals.append(Signal("venue-record", False, note="; ".join(blind[:5])))
+        else:
+            signals.append(Signal(
+                "venue-record", True,
+                note=f"no venue record names it ({len(self.venue_roots)} store(s) read)",
+            ))
+        return judge_use(signals)
+
+    def _venue_declarations(self, path: str) -> tuple[list[str], list[str]]:
+        """``(records naming this path, stores that could not be read)``.
+
+        A store that does not exist is a measured ZERO — the same direction
+        ``lane_records`` takes for a missing ``.fleet/lanes`` — because the spool
+        is a runtime convention, not a requirement. A store that exists and cannot
+        be listed, or a record that cannot be parsed, IS unreadable and widens
+        nothing: it must never read as "this path is unclaimed".
+        """
+        naming: list[str] = []
+        blind: list[str] = []
+        for root in self.venue_roots:
+            try:
+                entries = sorted(Path(root).iterdir())
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                blind.append(f"venue store {root} could not be listed: {exc}")
+                continue
+            for record in entries:
+                if record.suffix not in (".txt", ".json"):
+                    continue
+                try:
+                    if not record.is_file():
+                        continue
+                    text = record.read_text(encoding="utf-8", errors="replace")
+                    declared = _declared_paths(text, expect_json=record.suffix == ".json")
+                except OSError as exc:
+                    blind.append(f"venue record {record} could not be read: {exc}")
+                    continue
+                except ValueError as exc:
+                    blind.append(f"venue record {record} could not be parsed: {exc}")
+                    continue
+                if any(_same_path(candidate, path) for candidate in declared):
+                    naming.append(f"venue record {record} names it")
+        return naming, blind
 
     def record_reaped(self, *, branch: str, head_sha: str, worktree: str, reason: str) -> None:
         from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415
