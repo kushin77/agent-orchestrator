@@ -60,6 +60,34 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _beat_live_call(root: Path) -> None:
+    """Report this live call as `hermes`' runtime beat (#1412).
+
+    WHY HERE. `hermes` is registered in `fleet/runtimes.yaml` and must beat, but
+    this repo runs no loop for it: the service is deployable-not-running, and the
+    only moment hermes is verifiably ALIVE is the moment it answers a live call.
+    So `probe` posts the beat — and ONLY when the service answered. An
+    unreachable probe writes nothing, deliberately: the record means "hermes is
+    alive", so a service that stopped must let its old beat age out and be judged
+    `runtime-stale:hermes`, which is exactly the signal the judge exists to make.
+
+    Never fatal to the probe, and silent unless something needs saying: the
+    probe's own exit code and stdout line are its contract with the caller, and a
+    liveness stamp must not be able to change either. The commit recorded is the
+    tree that made the call (the fleet's own HEAD), because that is the honest
+    answer to "which code is running" from a call site that cannot ask the
+    service for its version.
+    """
+    try:
+        from fleet import beats  # noqa: PLC0415 - lazy: the producer lives with the fleet
+    except ImportError as exc:  # a scratch tree that copied the adapter alone
+        print("probe: beat SKIPPED — fleet/beats.py is not importable: %s" % exc, file=sys.stderr)
+        return
+    posting = beats.best_effort("hermes", "running", root=root, cwd=root)
+    if posting is not None and posting.wrote:
+        print("probe: beat hermes at %s" % str(posting.record.get("commit"))[:12], file=sys.stderr)
+
+
 def cmd_probe(args: argparse.Namespace) -> int:
     from integrations.hermes import client as client_mod  # noqa: E402 - lazy: network path only
 
@@ -69,6 +97,7 @@ def cmd_probe(args: argparse.Namespace) -> int:
     except Exception as exc:  # noqa: BLE001 - probe is best-effort by design
         print("probe: UNREACHABLE — %s" % exc, file=sys.stderr)
         return 1
+    _beat_live_call(_root(args))
     print(
         "probe: %s /health -> HTTP %s" % (args.base_url, response.status)
     )

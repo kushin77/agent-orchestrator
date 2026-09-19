@@ -46,9 +46,9 @@
 #   AO_QUEUE_FIXTURE=<json|path>  feed `gh pr list --json ...`-shaped input
 #                                 (a literal JSON array, or a path to a file
 #                                 holding one) for offline runs — no `gh` call
-#   AO_QUEUE_VERIFY_MERGED=1      let the queue itself run scripts/verify.sh in a
-#                                 detached scratch worktree of master+PR-head when
-#                                 no CI status evidence exists for the head (see
+#   AO_QUEUE_VERIFY_MERGED=1      let the queue itself run the gate in a detached
+#                                 scratch worktree of master+PR-head when no CI
+#                                 status evidence exists for the head (see
 #                                 merged-tree evidence, below)
 #
 # MERGED-TREE EVIDENCE (issue #1254 step 6, child of #1254). Measured
@@ -63,13 +63,17 @@
 #   (a) the PR head's merge-base IS the current master tip, and the gate of
 #       record's own commit status (scripts/gate-status.sh show --sha <head>)
 #       reads success; or
-#   (b) with AO_QUEUE_VERIFY_MERGED=1, a local `scripts/verify.sh verify` run
-#       in a detached scratch worktree merging master's tip with the PR head
-#       (honouring scripts/verify.sh's own gate-lock; a PARKED/CANNOT-ASSESS
-#       run is not evidence either way).
+#   (b) with AO_QUEUE_VERIFY_MERGED=1, a local `bash scripts/verify.sh verify`
+#       run in a detached scratch worktree merging master's tip with the PR
+#       head (honouring scripts/verify.sh's own gate-lock; a PARKED/CANNOT-
+#       ASSESS run is not evidence either way). The interpreter is NAMED rather
+#       than the script exec'd, because `scripts/verify.sh` is committed mode
+#       100644 — see the invocation's own note inside merged_tree_local_verify
+#       (issue #1471).
 # Otherwise the merge is refused BY NAME: `merged-tree-unverified:<pr>`
-# (evidence is stale or absent — the base moved, or no CI status and (b) was
-# not opted into) or `merged-tree-red:<check>` (the merged tree reds).
+# (evidence is stale or absent — the base moved, no CI status and (b) was not
+# opted into, or the verify's log was nothing but a shell error, so no tree was
+# judged) or `merged-tree-red:<check>` (the merged tree really is red).
 # Refusing prints the remedy (update-branch / re-run) and the queue continues
 # with the NEXT candidate; after every successful merge the tip moved, so the
 # next candidate is re-judged against the NEW tip, exactly like the existing
@@ -465,6 +469,40 @@ gate_regression_check() { # <head-oid> <base-ref-or-empty>
   return 0
 }
 
+# verify_log_is_shell_error — TRUE when the merged-tree verify's log is nothing
+# but the shell's own complaint that it never reached the gate (issue #1471).
+#
+# `Permission denied` / `command not found` / `No such file or directory` /
+# `cannot execute` names NO tree and NO check: the gate did not run. Reading
+# that as `merged-tree-red:<check>` puts a red on a PR nothing judged, and an
+# rc of 0 with such a log would record a PASS for a gate that never started —
+# both are answered by asking this question BEFORE the exit code.
+#
+# EVERY non-blank line must be such a complaint, so a real verify run — whose
+# first line is never one — cannot match, and neither can a log that carries a
+# shell error alongside real gate output. An EMPTY log is not one either:
+# `AO_QUEUE_VERIFY_CMD="exit 1"` produces exactly that shape and must stay a
+# red, which is what keeps this predicate from swallowing the real red path.
+verify_log_is_shell_error() { # <logfile>
+  local log="$1" line seen=0
+  [ -s "$log" ] || return 1
+  while IFS= read -r line; do
+    line="${line%$'\r'}"
+    case "$line" in
+      *[![:space:]]*) seen=1 ;;
+      *) continue ;;
+    esac
+    case "$line" in
+      *"Permission denied"*) continue ;;
+      *"command not found"*) continue ;;
+      *"No such file or directory"*) continue ;;
+      *"cannot execute"*) continue ;;
+      *) return 1 ;;
+    esac
+  done < "$log"
+  [ "$seen" -eq 1 ]
+}
+
 # merged_tree_local_verify — evidence source (b): materialize origin/master's
 # CURRENT tip in a detached scratch worktree, merge the PR head into it, and
 # run scripts/verify.sh verify there (it applies its own gate-lock, so this
@@ -493,7 +531,19 @@ merged_tree_local_verify() { # <pr-number> <head-oid> <tip>
   # controls swap in a fast fake command + fixture attestation so the red
   # and green merged-tree paths are provable offline without paying for a
   # real `scripts/verify.sh verify` run per assertion.
-  ( cd "$wt" && bash -c "${AO_QUEUE_VERIFY_CMD:-"scripts/verify.sh verify"}" ) >"$logf" 2>&1
+  #
+  # The default NAMES AN INTERPRETER (`bash scripts/verify.sh verify` — exactly
+  # as the Makefile's own `verify` target invokes it) instead of exec'ing the
+  # script directly. Measured 2026-09-19 on master a7518cff (issue #1471):
+  # `scripts/verify.sh` is committed mode 100644, so the direct-exec form died
+  # on EVERY AO_QUEUE_VERIFY_MERGED=1 run with `bash: line 1:
+  # scripts/verify.sh: Permission denied` and the queue reported
+  # `merged-tree-red:verify` — a red on a tree that nothing had judged. The mode
+  # bit the gate runs under belongs to the SCRATCH MERGE-TREE, not to this
+  # checkout (`git merge` may take it from either side), so no invocation that
+  # depends on it can be correct here; naming the interpreter removes the
+  # dependency rather than relying on a bit this file cannot control.
+  ( cd "$wt" && bash -c "${AO_QUEUE_VERIFY_CMD:-"bash scripts/verify.sh verify"}" ) >"$logf" 2>&1
   verify_rc=$?
   failed_names=""
   local attestation_rel="${AO_QUEUE_VERIFY_ATTESTATION:-.verify/attestation.json}"
@@ -514,6 +564,16 @@ print(' '.join(c.get('name', '') for c in data.get('checks', []) if c.get('verdi
   fi
   git worktree remove --force "$wt" >/dev/null 2>&1
   rm -rf "$wt" 2>/dev/null
+  # A log that is ONLY the shell refusing to exec the gate judged no tree, so it
+  # must never be reported as a red on the PR (issue #1471 — the defect it
+  # closes reported `merged-tree-red:verify` for one line of `Permission
+  # denied`). Asking BEFORE the exit code gives every rc the same protection,
+  # including rc 0: a log of nothing but a shell error under a zero exit would
+  # otherwise be recorded as a PASS for a gate that never ran.
+  if verify_log_is_shell_error "$logf"; then
+    echo "pr-queue: REFUSED — merged-tree-unverified:$number — the merged-tree verify never ran: its log is nothing but a shell error ('$(head -n 1 "$logf" 2>/dev/null)'), so no tree was judged — CANNOT-ASSESS, not a red on #$number (remedy: fix the invocation, do not read this as a red on the PR); log at $logf" >&2
+    return 1
+  fi
   case "$verify_rc" in
     0)
       echo "pr-queue: merged-tree evidence for #$number — local scratch verify PASSED on master($tip)+#$number($head_oid); log at $logf"

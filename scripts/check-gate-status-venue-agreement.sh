@@ -30,6 +30,13 @@
 #   code AND its side effect -- a refusal that still posted would otherwise read
 #   as a pass.
 #
+#   The venue of record's OWN record is stubbed the same way (`gcloud`, issue
+#   #1467). It is stubbed rather than read for real because the alternative is a
+#   gate whose verdict depends on whether a REMOTE build's log still exists and
+#   still has the poster step in its last bytes -- measured: the real build this
+#   fixture names was readable one minute and its tail carried a check's output
+#   the next, which is a gate that answers differently on the same tree.
+#
 #   Arms 1-2 are the measured case and its red twin: green + the venue's run
 #   red/un-concluded => REFUSED by name, and NOTHING posted. Arm 3 is the
 #   healthy path (venue concluded success => the green is published). Arm 4 is
@@ -42,6 +49,9 @@
 #   MUTANT: the guard removed => the refusal arm must disappear, so the control
 #   is measuring the guard and not something else. Arms 10-13 provoke
 #   `reconcile`, which may only ever withdraw a green -- never publish one.
+#   Arms 14-15 are issue #1467's scope, in both directions: a red the venue
+#   MEASURED it cannot deliver loses its precedence (the deadlock), and a venue
+#   record that could not be READ keeps it (fail closed).
 #
 # Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
@@ -96,6 +106,37 @@ esac
 exit 0
 STUB
 chmod +x "$scratch/bin/gh"
+
+# --- the stubbed `gcloud` (issue #1467) --------------------------------------
+# The venue of record's OWN record of whether its poster step could reach the
+# API. `STUB_VENUE_LOG=none` makes the read fail, which is how an unreadable
+# venue record is provoked. Default: the venue DELIVERED its red -- so every arm
+# that predates #1467 keeps refusing for exactly the reason it always asserted.
+cat > "$scratch/bin/gcloud" <<'STUB'
+#!/usr/bin/env bash
+# Fixture stand-in for `gcloud builds log`. Records its argv, then serves the
+# venue record `STUB_VENUE_LOG` names; `none` fails the read.
+set -u
+{ printf 'gcloud %s\n' "$*" >> "${STUB_EVENTS:?}"; } 2>/dev/null || true
+case "${1:-} ${2:-}" in
+  "builds log")
+    [ "${STUB_VENUE_LOG:-none}" != "none" ] || exit 1
+    cat "$STUB_VENUE_LOG"; exit 0 ;;
+esac
+exit 1
+STUB
+chmod +x "$scratch/bin/gcloud"
+printf 'gate-status: posted ao/gate-of-record=failure for f300954d8a5c (make verify: FAIL)\n' \
+  > "$scratch/venue-delivered.log"
+# The venue's own words, quoted from its real build: BOTH producers inside the
+# venue say so, which is why the classifier quotes the LAST refusal rather than
+# the first.
+cat > "$scratch/venue-unable.log" <<'LOG'
+verify: NOTE -- the gate of record was NOT published for f300954d8a5c (the poster exited 2): gate-status: CANNOT-ASSESS - gh not found and no GH_TOKEN/GITHUB_TOKEN in env; status not posted
+gate-status: SKIPPED -- this runner image carries no gcloud, so the token cannot be read
+  here at all: creating ao-gate-status-token is NOT sufficient for this venue. The gate
+  verdict is NOT posted (issue #1350; the venue shape is #1361).
+LOG
 
 # --- fixtures ---------------------------------------------------------------
 write_runs() { # <file> <status> <conclusion>
@@ -155,6 +196,7 @@ poster_run() { # <runs-fixture> <status-fixture> <extra...>
   PATH="$scratch/bin:$PATH" \
   STUB_EVENTS="$EVENTS" STUB_CHECKRUNS="$scratch/$runs" STUB_STATUS="$scratch/$status" \
   STUB_READ_RC="${STUB_READ_RC_ARM:-0}" \
+  STUB_VENUE_LOG="${STUB_VENUE_LOG_ARM:-$scratch/venue-delivered.log}" \
     bash "$POSTER" "$@" >"$scratch/out.txt" 2>&1
 }
 
@@ -381,10 +423,48 @@ else
   bad "reconcile neither withdrew nor published anything unexpected: $(cat "$EVENTS")"
 fi
 
+echo "== 14. issue #1467: a red the venue MEASURED it cannot deliver loses its precedence =="
+# The measured deadlock: the venue of record's runner image carries neither `gh`
+# nor `gcloud`, so its own poster step exits 2 for want of a credential and
+# publishes NOTHING -- not even the red. The ordered rule then had no satisfier at
+# either end, and every PR head stayed BLOCKED behind the admin bypass. The
+# venue's OWN record is what scopes the guard: its red governs while it can
+# deliver one, and the red still travels -- in target_url.
+STUB_VENUE_LOG_ARM="$scratch/venue-unable.log" poster_run red.json no-status.json post --sha "$SHA" --rc 0
+rc=$?
+arm_count=$((arm_count + 1))
+if [ "$rc" -ne 0 ]; then
+  bad "a red venue that MEASURED it cannot deliver still deadlocked the required context (expected rc 0, got rc $rc): $(cat "$scratch/out.txt")"
+elif ! posted success; then
+  bad "the undeliverable red published nothing: $(cat "$EVENTS")"
+elif ! grep -qF "target_url=$BUILD_URL" "$EVENTS"; then
+  bad "the waiver did not carry the venue's red as evidence: $(cat "$EVENTS")"
+elif ! grep -qF "VENUE UNABLE TO DELIVER" "$scratch/out.txt"; then
+  bad "the waiver was not named: $(cat "$scratch/out.txt")"
+else
+  ok "a red the venue could not DELIVER no longer blocks: this run's green is published, the red linked"
+fi
+
+echo "== 15. fail-closed: an unreadable venue RECORD is never a waiver =="
+# The direction that would make arm 14 dishonest. "I could not read the venue"
+# must never become "therefore the venue does not matter".
+STUB_VENUE_LOG_ARM=none poster_run red.json no-status.json post --sha "$SHA" --rc 0
+rc=$?
+arm_count=$((arm_count + 1))
+if [ "$rc" -ne 2 ]; then
+  bad "an unreadable venue record was treated as a waiver (expected rc 2, got rc $rc): $(cat "$scratch/out.txt")"
+elif any_post; then
+  bad "the unreadable record still posted a green: $(cat "$EVENTS")"
+elif ! grep -qF "concluded 'failure'" "$scratch/out.txt"; then
+  bad "the refusal no longer names the conclusion: $(cat "$scratch/out.txt")"
+else
+  ok "an unreadable venue record keeps the guard standing (CANNOT-ASSESS, nothing posted)"
+fi
+
 echo
 if [ "$fail" -ne 0 ]; then
   echo "check-gate-status-venue-agreement: FAIL — $arm_count arm(s) run, at least one is not OK (see above)" >&2
   exit 1
 fi
-echo "check-gate-status-venue-agreement: OK — $arm_count arm(s) provoked: a green is refused while the venue of record's own run for the same commit is red or still running, the refusal names the run, the venue's own report and the healthy and un-run paths still publish, a red is never blocked, an unreadable verdict fails closed, removing the guard restores the false green, and reconcile can only withdraw"
+echo "check-gate-status-venue-agreement: OK — $arm_count arm(s) provoked: a green is refused while the venue of record's own run for the same commit is red or still running, the refusal names the run, the venue's own report and the healthy and un-run paths still publish, a red is never blocked, an unreadable verdict fails closed, a red the venue MEASURED it cannot deliver no longer deadlocks the required context while an unreadable record keeps it blocked, removing the guard restores the false green, and reconcile can only withdraw"
 exit 0

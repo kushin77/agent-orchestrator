@@ -365,6 +365,259 @@ PUBLISH_CALL_RC0 = 'publish_gate_of_record "$ATTEST_SHA" 0 "$total" "$skipped"'
 PUBLISH_CALL_RC2 = 'publish_gate_of_record "$ATTEST_SHA" 2 "$total" "$skipped"'
 
 
+# --- the venue of record's ability to DELIVER (issue #1467) -------------------
+#
+# THE DEFECT: the poster refused to publish a green for a commit whose venue run
+# was red -- and the venue of record STRUCTURALLY cannot publish anything, because
+# its runner image carries neither `gh` nor `gcloud`, so its own poster step exits
+# 2 for want of a credential. The ordered rule then had no satisfier at either
+# end: the local producer "may not satisfy it FIRST", and the venue cannot go at
+# all. Every PR head stayed BLOCKED, and the only way to land was the admin bypass
+# (`enforce_admins=false`) that scripts/check-branch-protection.sh exists to
+# prevent. Measured 2026-09-19 from the venue's OWN build log
+# (38ece2de-1412-4ae8-acd7-fe7fd2055e2, quoted in CAP_LOG_UNABLE below).
+#
+# THE REMEDY: a venue that concluded red loses its precedence ONLY when the
+# venue's own record for that run says it could not deliver. Both directions that
+# must NOT happen are provoked here, because either one is a defect:
+#   * a venue that CAN deliver keeps its precedence -- a green published over a red
+#     it stood behind is the #739/#1400 false-green class;
+#   * a record that cannot be READ keeps it too (fail closed) -- "I could not read
+#     the venue" must never become "therefore the venue does not matter".
+#
+# NOTHING HERE TOUCHES THE NETWORK OR THE REPOSITORY: both seams are stand-ins on
+# PATH (a recording `gh`, and a `gcloud` serving a fixture log), and the poster is
+# driven in a scratch venue with the whole PATH replaced.
+CAP_BUILD = "9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a"
+CAP_URL = ("https://console.cloud.google.com/cloud-build/builds;region=us-central1/"
+           "%s?project=1056038104733" % CAP_BUILD)
+CAP_SHA = "390ddd77a67fccd484047fa6c9f04259db79b985"
+
+CAP_GH = """#!/usr/bin/env bash
+# A RECORDING stand-in for `gh`. It records its argv, serves the check-runs the
+# poster reads, and records every POST -- so an arm can assert BOTH the decision
+# and the fact that nothing was posted. It never touches the network.
+set -u
+printf '%s\\n' "$*" >> "${CAP_EVENTS:?}"
+case "$*" in
+  *"-X POST"*) exit 0 ;;
+  *"/check-runs"*) cat "${CAP_RUNS:?}"; exit 0 ;;
+  *"/status"*) cat "${CAP_STATUS:?}"; exit 0 ;;
+esac
+exit 1
+"""
+
+CAP_GCLOUD = """#!/usr/bin/env bash
+# A RECORDING stand-in for `gcloud` -- the only reader of the venue of record's
+# own build log. `CAP_VENUE_LOG=none` makes the read fail, which is how an
+# unreadable venue record is provoked.
+set -u
+printf 'gcloud %s\\n' "$*" >> "${CAP_EVENTS:?}"
+case "${1:-} ${2:-}" in
+  "builds log")
+    [ "${CAP_VENUE_LOG:-none}" != "none" ] || exit 1
+    cat "$CAP_VENUE_LOG"; exit 0 ;;
+esac
+exit 1
+"""
+
+# The venue's own words, quoted from the real build the defect was measured on.
+# BOTH lines are there, in the order the venue produced them: the gate's own
+# publisher speaks first and the recipe's post step last, which is why the
+# classifier quotes the LAST refusal rather than the first.
+CAP_LOG_UNABLE = (
+    "verify: NOTE -- the gate of record was NOT published for 390ddd77a67f (the poster exited 2): "
+    "gate-status: CANNOT-ASSESS - gh not found and no GH_TOKEN/GITHUB_TOKEN in env; status not posted\n"
+    "gate-status: SKIPPED -- this runner image carries no gcloud, so the token cannot be read\n"
+    "  here at all: creating ao-gate-status-token is NOT sufficient for this venue. The gate\n"
+    "  verdict is NOT posted (issue #1350; the venue shape is #1361).\n")
+CAP_LOG_DELIVERED = "gate-status: posted ao/gate-of-record=failure for 390ddd77a67f (make verify: FAIL)\n"
+CAP_LOG_SILENT = "check-shell-patterns: OK -- nothing to report\n"
+
+# Every tool the poster needs. Spelled out rather than inherited, because the
+# `gcloud=False` arm has to build a PATH that is complete EXCEPT for the one tool
+# whose absence is the point -- and an inherited PATH would find the real one.
+CAP_TOOLS = ("bash", "sh", "cat", "tail", "head", "sed", "awk", "grep", "git", "python3",
+             "mktemp", "dirname", "basename", "date", "hostname", "id", "mkdir", "rm",
+             "sort", "uniq", "wc", "tr", "env", "tee", "chmod", "cp", "mv", "find", "xargs",
+             "timeout")
+
+
+def cap_venue(name, status="completed", conclusion="failure", venue_log=None, gcloud=True):
+    """A scratch venue holding the REAL poster plus stand-ins for both seams."""
+    path = work / name
+    shutil.rmtree(path, ignore_errors=True)
+    (path / "scripts").mkdir(parents=True)
+    for rel in ("scripts/gate-status.sh", "scripts/gate-status-map.py"):
+        shutil.copyfile(root / rel, path / rel)
+    runs = [] if status == "none" else [{
+        "name": "control-plane-verify (purebliss-ghl)",
+        "status": status,
+        "conclusion": None if conclusion == "none" else conclusion,
+        "started_at": "2026-09-19T15:04:18Z",
+        "completed_at": None if status != "completed" else "2026-09-19T16:07:44Z",
+        "details_url": CAP_URL,
+        "app": {"slug": "google-cloud-build"},
+    }]
+    write(path / "runs.json", json.dumps({"check_runs": runs}) + "\n")
+    write(path / "status.json", '{"state": "pending", "statuses": []}')
+    if venue_log is not None:
+        write(path / "venue.log", venue_log)
+    bins = path / "bin"
+    bins.mkdir(parents=True, exist_ok=True)
+    for tool in CAP_TOOLS:
+        which = shutil.which(tool)
+        if which:
+            (bins / tool).symlink_to(which)
+    write(bins / "gh", CAP_GH, 0o755)
+    if gcloud:
+        write(bins / "gcloud", CAP_GCLOUD, 0o755)
+    return path
+
+
+def cap_run(path, *args):
+    events = path / "events.log"
+    events.write_text("", encoding="utf-8")
+    venue_log = path / "venue.log"
+    rc, out = run(["bash", "scripts/gate-status.sh", *args], path, {
+        "PATH": str(path / "bin"),
+        "CAP_EVENTS": str(events),
+        "CAP_RUNS": str(path / "runs.json"),
+        "CAP_STATUS": str(path / "status.json"),
+        "CAP_VENUE_LOG": str(venue_log) if venue_log.exists() else "none",
+        "GH_TOKEN": "",
+        "GITHUB_TOKEN": "",
+    })
+    recorded = [x for x in events.read_text(encoding="utf-8").splitlines() if x.strip()]
+    return rc, out, recorded
+
+
+def cap_posts(recorded):
+    return [x for x in recorded if "-X POST" in x]
+
+
+def cap_reads_venue(recorded):
+    return [x for x in recorded if x.startswith("gcloud ")]
+
+
+def venue_delivery_arms():
+    """The venue of record's precedence, and the measurement that scopes it."""
+    # 1. THE DEFECT AND THE REMEDY. The venue concluded red, and its OWN record
+    #    says it could not deliver -- so the required context has no other
+    #    producer, and this run's attested verdict is published. The venue's red
+    #    rides in target_url rather than being erased.
+    path = cap_venue("cap-unable", venue_log=CAP_LOG_UNABLE)
+    rc, out, rec = cap_run(path, "post", "--sha", CAP_SHA, "--rc", "0")
+    made = cap_posts(rec)
+    arm("a red venue measured UNABLE TO DELIVER no longer deadlocks the required "
+        "context: this run's own green is published, and the venue's red is linked",
+        rc == 0 and len(made) == 1 and "state=success" in made[0]
+        and "target_url=%s" % CAP_URL in made[0]
+        and "VENUE UNABLE TO DELIVER" in out and "no gcloud" in out,
+        "rc=%s posts=%r" % (rc, made))
+
+    # 2. THE GUARD, UNCHANGED, for a venue that CAN deliver. Its own record shows
+    #    it posted, so its red is a VERDICT and no green may be published over it.
+    #    Arm 7 proves this arm bites.
+    path = cap_venue("cap-delivered", venue_log=CAP_LOG_DELIVERED)
+    rc, out, rec = cap_run(path, "post", "--sha", CAP_SHA, "--rc", "0")
+    arm("a red venue whose own record shows it DELIVERED keeps its precedence: no "
+        "green is published over a verdict it stood behind",
+        rc == 2 and not cap_posts(rec) and "concluded 'failure'" in out and CAP_BUILD in out,
+        "rc=%s posts=%r" % (rc, cap_posts(rec)))
+
+    # 3. FAIL CLOSED -- no reader. The venue record cannot be read (there is no
+    #    gcloud in this venue at all), so there is no measurement, so no waiver.
+    path = cap_venue("cap-unreadable", venue_log=CAP_LOG_UNABLE, gcloud=False)
+    rc, out, rec = cap_run(path, "post", "--sha", CAP_SHA, "--rc", "0")
+    arm("an UNREADABLE venue record is CANNOT-ASSESS, never a waiver: no green, and "
+        "the refusal still names the venue and its build",
+        rc == 2 and not cap_posts(rec) and not cap_reads_venue(rec)
+        and "concluded 'failure'" in out and CAP_BUILD in out,
+        "rc=%s posts=%r reads=%r" % (rc, cap_posts(rec), cap_reads_venue(rec)))
+
+    # 4. FAIL CLOSED -- read, but silent. Neither a POST nor a refusal: silence is
+    #    not evidence that the venue does not matter.
+    path = cap_venue("cap-silent", venue_log=CAP_LOG_SILENT)
+    rc, out, rec = cap_run(path, "post", "--sha", CAP_SHA, "--rc", "0")
+    arm("a venue record that says NEITHER is 'unassessable', not a waiver: no green",
+        rc == 2 and not cap_posts(rec) and cap_reads_venue(rec),
+        "rc=%s posts=%r" % (rc, cap_posts(rec)))
+
+    # 5. THE MEASURED #1400 HOLE, STILL CLOSED. A run in flight may yet deliver, so
+    #    its precedence is meaningful whatever its image carries -- and there is no
+    #    record to read yet, so none is read.
+    path = cap_venue("cap-inflight", status="in_progress", conclusion="none")
+    rc, out, rec = cap_run(path, "post", "--sha", CAP_SHA, "--rc", "0")
+    arm("a venue run still IN FLIGHT still refuses, and no venue record is read",
+        rc == 2 and not cap_posts(rec) and not cap_reads_venue(rec) and "has NOT concluded" in out,
+        "rc=%s posts=%r reads=%r" % (rc, cap_posts(rec), cap_reads_venue(rec)))
+
+    # 6. AGREEMENT, unchanged.
+    path = cap_venue("cap-green", conclusion="success")
+    rc, out, rec = cap_run(path, "post", "--sha", CAP_SHA, "--rc", "0")
+    made = cap_posts(rec)
+    arm("a venue that AGREES publishes the green carrying the venue's evidence URL",
+        rc == 0 and len(made) == 1 and "target_url=%s" % CAP_URL in made[0],
+        "rc=%s posts=%r" % (rc, made))
+
+    # 7. THE NEGATIVE CONTROLS. A red gate reports red and a CANNOT-ASSESS gate
+    #    reports error; neither reads the venue, and neither is ever published as
+    #    success. A red is ALWAYS allowed to speak -- refusing to report one is the
+    #    same control built the wrong way round.
+    path = cap_venue("cap-red", venue_log=CAP_LOG_UNABLE)
+    rc, out, rec = cap_run(path, "post", "--sha", CAP_SHA, "--rc", "1")
+    made = cap_posts(rec)
+    arm("NEGATIVE CONTROL: a RED gate publishes 'failure' and can never read as a pass",
+        rc == 0 and len(made) == 1 and "state=failure" in made[0] and "state=success" not in made[0]
+        and not cap_reads_venue(rec),
+        "rc=%s posts=%r" % (rc, made))
+    path = cap_venue("cap-ca", venue_log=CAP_LOG_UNABLE)
+    rc, out, rec = cap_run(path, "post", "--sha", CAP_SHA, "--rc", "2")
+    made = cap_posts(rec)
+    arm("NEGATIVE CONTROL: CANNOT-ASSESS publishes 'error', never success, and reads "
+        "no venue record -- so no venue can talk it into a pass",
+        rc == 0 and len(made) == 1 and "state=error" in made[0] and not cap_reads_venue(rec),
+        "rc=%s posts=%r" % (rc, made))
+
+    # 8. The venue record's EMPTY FIELDS. A venue that produced no run leaves the
+    #    URL and all three coordinates blank, and a blank field in a multi-line
+    #    record is what shifts every later field onto the previous one's value
+    #    (docs/SHELL-PATTERNS.md SP-2) -- the no-run path published the refusal's
+    #    REASON TEXT as the status's target_url until this arm's change.
+    path = cap_venue("cap-norun", status="none", conclusion="none")
+    rc, out, rec = cap_run(path, "post", "--sha", CAP_SHA, "--rc", "0")
+    made = cap_posts(rec)
+    arm("a commit the venue never ran publishes a green with NO target_url -- the "
+        "reason text is not shifted into the URL field",
+        rc == 0 and len(made) == 1 and "target_url=" not in made[0],
+        "rc=%s posts=%r" % (rc, made))
+
+    # 9-10. THE FALSIFICATIONS. A control is a formality until it is shown to be
+    #       able to fail, and the direction that fails OPEN is the one that
+    #       publishes a green over a verdict the venue stood behind.
+    mutant = cap_venue("cap-mutant-open", venue_log=CAP_LOG_DELIVERED)
+    ok = mutate(mutant, "scripts/gate-status.sh",
+                '            if [ "$cap_verdict" != "cannot" ]; then\n',
+                '            if [ "cannot" != "cannot" ]; then\n')
+    rc, out, rec = cap_run(mutant, "post", "--sha", CAP_SHA, "--rc", "0") if ok else (0, "", [])
+    made = cap_posts(rec)
+    arm("MUTANT waiver-made-unconditional IS CAUGHT (a green published over a red the "
+        "venue DELIVERED -- the #739/#1400 class arm 2 exists to refuse)",
+        ok and bool(made) and "state=success" in made[0],
+        "%s rc=%s posts=%r" % (planted(ok), rc, made))
+
+    mutant = cap_venue("cap-mutant-closed", venue_log=CAP_LOG_SILENT)
+    ok = mutate(mutant, "scripts/gate-status.sh",
+                '                cap_verdict="unassessable"\n',
+                '                cap_verdict="cannot"\n')
+    rc, out, rec = cap_run(mutant, "post", "--sha", CAP_SHA, "--rc", "0") if ok else (0, "", [])
+    made = cap_posts(rec)
+    arm("MUTANT unreadable-record-treated-as-a-waiver IS CAUGHT (fail closed is what "
+        "keeps arm 3 and arm 4 honest)",
+        ok and bool(made), "%s rc=%s posts=%r" % (planted(ok), rc, made))
+
+
 def verify_arms():
     green = venue("green", 0)
     sha = head_of(green)
@@ -588,13 +841,16 @@ def landing_arms():
 verify_arms()
 poster_arms()
 landing_arms()
+venue_delivery_arms()
 failed = [label for label, ok in ARMS if not ok]
 if failed:
     print("check-gate-publish: FAIL — %d producer control(s) did not hold: %s"
           % (len(failed), "; ".join(failed)), file=sys.stderr)
     raise SystemExit(1)
 print("  OK  %d producer control(s) held, mutants included: the gate of record's "
-      "producers on the ordinary lane path and the landing seam can REFUSE" % len(ARMS))
+      "producers on the ordinary lane path and the landing seam can REFUSE, and the "
+      "venue of record's precedence is kept for every venue that can deliver one"
+      % len(ARMS))
 PY
 producer_rc=$?
 case "$producer_rc" in
@@ -613,5 +869,5 @@ if [ "$cannot_assess" -ne 0 ]; then
   echo "check-gate-publish: CANNOT-ASSESS — the producers could not be provoked in a venue, so whether they can refuse is NOT established" >&2
   exit 2
 fi
-echo "check-gate-publish: OK — the gate of record publishes its own verdict from the ordinary lane path (scripts/verify.sh) and from the landing seam (scripts/merge-pr.sh); a park posts nothing, an ungated PR stays unproduced, no run publishes an outcome it did not measure, and a venue with no gh does not become a red gate"
+echo "check-gate-publish: OK — the gate of record publishes its own verdict from the ordinary lane path (scripts/verify.sh) and from the landing seam (scripts/merge-pr.sh); a park posts nothing, an ungated PR stays unproduced, no run publishes an outcome it did not measure, a venue with no gh does not become a red gate, and the venue of record's precedence is kept for every venue that can deliver one"
 exit 0

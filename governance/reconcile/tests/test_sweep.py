@@ -221,10 +221,83 @@ def test_sweep_refuses_to_run_without_an_operations_port(root: Path):
 
 
 def test_the_real_port_refuses_an_unknown_session_id(tmp_path: Path):
-    """The real port is only constructed here; its git effects are exercised by the gate."""
+    """The real port is constructed here; its git effects are exercised by the gate.
+
+    The ``forget-lane`` step is the exception: a lane record is not git state, so
+    it is driven for real by the two controls below rather than stubbed
+    (``RepoOps.forget_lane``, issues #1444/#1446/#1452).
+    """
     ops = RepoOps(tmp_path)
     assert ops.worktree_present("") is False
     assert ops.worktree_present(str(tmp_path)) is True
+
+
+# --- the real port's `forget-lane` step (issues #1444/#1446/#1452) -----------
+#
+# Every sweep reported this step as `forget-lane: ImportError: attempted relative
+# import with no known parent package`, and the step is what retires a lane's own
+# record. The suite built `RepoOps` and never called the method, so the gate stayed
+# green while the record — and with it the issue's claim — outlived the lane. Both
+# controls below fail on the old form and pass on the fix.
+
+import sys  # noqa: E402
+
+from governance.isolation.identity import mint  # noqa: E402
+from governance.isolation.worktree import (  # noqa: E402
+    list_records,
+    read_record,
+    write_record,
+)
+
+
+def _write_scratch_lane(root: Path):
+    """A lane record on disk, written by the isolation package's own writer."""
+    identity = mint(
+        issue=1444,
+        agent_id="copilot-qa-sme",
+        lane="governance/reconcile",
+        worktree_root=root / "lanes",
+    )
+    write_record(identity, root)
+    return identity
+
+
+def test_the_real_port_forgets_a_lane_record_under_a_scratch_root(tmp_path: Path):
+    """The step, driven for real: the record it is handed is gone afterwards."""
+    identity = _write_scratch_lane(tmp_path)
+    assert read_record(identity.session_id, tmp_path) is not None
+
+    loaded_before = set(sys.modules)
+    detail = RepoOps(tmp_path).forget_lane(identity.session_id)
+
+    assert detail == f"forgot lane record {identity.session_id}"
+    assert read_record(identity.session_id, tmp_path) is None
+    assert list_records(tmp_path) == []
+    # And it got there through the *package*: the old form put `governance/isolation`
+    # on `sys.path` and imported `worktree` as a top-level module, which is exactly a
+    # copy with no parent package for its own `from .identity import ...` to resolve.
+    assert "worktree" not in (set(sys.modules) - loaded_before)
+
+
+def test_a_root_carrying_governance_isolation_is_only_ever_the_data_venue(tmp_path: Path):
+    """The reported symptom, provoked: a root that carries `governance/isolation`.
+
+    Every real checkout does, and that is what made the old form import a bare
+    `worktree` and raise `ImportError: attempted relative import with no known
+    parent package` — `governance/isolation/worktree.py`'s own
+    `from .identity import ...` (#1444/#1446/#1452). The reconciled root supplies
+    the lane record; the collaborator must come from this checkout either way, so a
+    root that happens to carry one is data and nothing more.
+    """
+    (tmp_path / "governance").mkdir()
+    (tmp_path / "governance" / "isolation").symlink_to(
+        _conftest.REPO_ROOT / "governance" / "isolation", target_is_directory=True
+    )
+    identity = _write_scratch_lane(tmp_path)
+
+    detail = RepoOps(tmp_path).forget_lane(identity.session_id)
+    assert detail == f"forgot lane record {identity.session_id}"
+    assert read_record(identity.session_id, tmp_path) is None
 
 
 # --- controls (#885): the batch-limit refusal + the append-only ledger ------
