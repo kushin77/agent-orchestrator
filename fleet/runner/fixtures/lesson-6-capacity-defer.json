@@ -1,0 +1,15 @@
+{
+  "doc": "lesson 6 (capacity): the fan-out width is a BOUND, not a wish — the head it cannot take is DEFERred by NAME (`capacity:<pr>:<why>`) and picked up on the next cycle, never dropped in silence (a dropped head reads as green). The width is a declared/injected input, never the machine the gate happens to run on.",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "capacity": 1,
+  "prs": [
+    {
+      "number": 40,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "number": 41,
+      "head_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ]
+}

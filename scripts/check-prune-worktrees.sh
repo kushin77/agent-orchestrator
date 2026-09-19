@@ -21,6 +21,15 @@
 # name. The destroyed-venue half is provoked by deleting a venue's admin dir and
 # requiring the reaper to NAME it venue-invalid instead of skipping silently.
 #
+# The declared OWNERSHIP signal (#1337) is provoked the same way: a tree no lane
+# record claims and no declared reap root covers must be KEEP **by name**, beside
+# its twin inside a declared root that is still reaped in the same run; the three
+# shapes of an unusable declaration (absent, not a regular file, root-less) must
+# each be CANNOT-ASSESS and remove nothing; a relative root must resolve against
+# the REPOSITORY rather than the worktree the reaper was run from; and a mutant of
+# the tool that ignores the declaration must REMOVE the kept tree, REDing this
+# check by the needle its own arm asserts.
+#
 # Tri-state: 0 the contract holds / 1 a rule is broken / 2 CANNOT-ASSESS.
 set -uo pipefail
 
@@ -32,6 +41,18 @@ fi
 tool="$root/scripts/prune-worktrees.sh"
 if [ ! -f "$tool" ]; then
   echo "check-prune-worktrees: CANNOT-ASSESS — no scripts/prune-worktrees.sh" >&2
+  exit 2
+fi
+# The reap allowlist's path is READ from the reaper, never copied here: the
+# fixtures below have to write their declarations exactly where the tool says it
+# reads them, or every ownership arm would be measuring a different rule than the
+# one that ships. A tool that names no path is CANNOT-ASSESS — no arm below could
+# mean anything. (`awk 'NR == 1'` and not `head -1`: head exits on its first
+# match, SIGPIPEs sed, and under this script's pipefail reports the whole
+# pipeline as failed.)
+allowlist_rel="$(sed -n 's/^REAP_ALLOWLIST="\(.*\)"$/\1/p' "$tool" | awk 'NR == 1')"
+if [ -z "$allowlist_rel" ]; then
+  echo "check-prune-worktrees: CANNOT-ASSESS — the reaper names no reap-allowlist path, so no fixture can declare one" >&2
   exit 2
 fi
 
@@ -72,6 +93,17 @@ bad() {
 # printed verbatim on every arm, so they are kept to one line each.
 git_() { git -C "$1" "${@:2}"; }
 
+declare_reap_roots() { # declare_reap_roots <repo> <root>... — the reap declaration, written where the reaper reads it
+  local repo="$1"
+  shift
+  local root_path
+  mkdir -p "$repo/$(dirname -- "$allowlist_rel")"
+  : >"$repo/$allowlist_rel"
+  for root_path in "$@"; do
+    printf '%s\n' "$root_path" >>"$repo/$allowlist_rel"
+  done
+}
+
 make_repo() { # make_repo <dir> — a repo with an origin-like remote and origin/master
   local dir="$1" origin="$1.origin.git"
   git init -q --bare "$origin"
@@ -79,6 +111,10 @@ make_repo() { # make_repo <dir> — a repo with an origin-like remote and origin
   git_ "$dir" config user.email check@example.com
   git_ "$dir" config user.name check
   git_ "$dir" config commit.gpgsign false
+  # Owned by default: every fixture tree below lives under $work, so the arms that
+  # predate the ownership rule keep measuring what they were written to measure,
+  # and the arms for that rule declare NARROWER roots of their own.
+  declare_reap_roots "$dir" "$work"
   printf 'seed\n' >"$dir/README.md"
   git_ "$dir" add -A
   git_ "$dir" commit -qm seed
@@ -133,6 +169,12 @@ reap_with() { # reap_with <tool-path> <repo> <args...> — run a MUTANT of the t
   local mutant="$1" repo="$2"
   shift 2
   (cd "$repo" && bash "$mutant" "$@") 2>&1
+}
+
+reap_in() { # reap_in <cwd> <args...> — run the tool with its cwd somewhere else (a linked worktree, say)
+  local cwd="$1"
+  shift
+  (cd "$cwd" && bash "$tool" "$@") 2>&1
 }
 
 sha_of() { # sha_of <file>
@@ -711,6 +753,142 @@ if [ "$gate_mutant_rc" -eq 0 ]; then
 fi
 release_gate
 
+echo "== prune-worktrees: ownership — no declaration, no removal (#1337) =="
+# Liveness (#1159, above) and a gate's permit (#1345, above) are measurements of
+# an INSTANT. A harness session working inside a tree between two of its commands
+# holds no descriptor and runs no gate, so neither can see it — while
+# `ao-fleet-reap` runs --apply unattended from cron, and the sweep that measured
+# #1337 called 9 `.claude/worktrees/agent-*` trees and 5 scratch roots removable
+# with not one `.fleet/lanes/` record between them. Ownership is therefore
+# DECLARED: a lane record, or a root in the reap allowlist. The arms below pair a
+# tree OUTSIDE the declared roots (KEEP, by name) with its twin INSIDE one (reaped
+# in the same run), so the rule can never be a blanket refusal — which is what
+# #1159's own acceptance item forbids. Every assertion prints the ACTUAL report,
+# so a wrong expectation reads as a mismatch instead of an inference.
+
+own_repo="$work/ownership"
+make_repo "$own_repo"
+declare_reap_roots "$own_repo" "$work/declared-root"
+own_inside="$work/declared-root/lane-owned"
+own_outside="$work/harness/.claude/worktrees/agent-1337"
+mkdir -p "$(dirname -- "$own_outside")"
+clean_lane "$own_repo" "$own_inside"
+clean_lane "$own_repo" "$own_outside"
+own_report="$(reap "$own_repo" --apply)"
+own_rc=$?
+if [ "$own_rc" -eq 0 ]; then
+  ok "the declaration is read where the reaper says it is read ($allowlist_rel)"
+else
+  bad "a readable declaration did not let the reaper run (rc=$own_rc) ACTUAL: $(oneline "$own_report")"
+fi
+if [ ! -d "$own_inside" ]; then
+  ok "a tree INSIDE a declared reap root is still reaped — the rule is not a refusal of everything"
+else
+  bad "a tree under a declared reap root was kept (ACTUAL: $(oneline "$own_report"))"
+fi
+if [ -d "$own_outside" ] && [[ "$own_report" == *"KEEP   $own_outside — not-created-by-the-reaper: no lane record"* ]]; then
+  ok "an unrecorded, harness-shaped tree outside the declared roots is KEEP, and the refusal is NAMED"
+else
+  bad "an unrecorded tree outside the declared roots was not kept by name: present=$([ -d "$own_outside" ] && echo yes || echo no) ACTUAL: $(oneline "$own_report")"
+fi
+
+# The OTHER declared authoriser: a `.fleet/lanes/` record naming the tree. The
+# claim is a negative one — ownership does not refuse a tree the repository still
+# believes is OPEN — so it is asserted as a negative needle.
+own_recorded="$work/outside-recorded/lane-recorded"
+mkdir -p "$(dirname -- "$own_recorded")" "$own_repo/.fleet/lanes"
+printf '{"session_id": "1337check", "issue": 1337, "lane": "fleet", "worktree": "%s"}\n' \
+  "$own_recorded" >"$own_repo/.fleet/lanes/1337check.json"
+clean_lane "$own_repo" "$own_recorded"
+record_report="$(reap "$own_repo" --apply)"
+if [ -d "$own_recorded" ] \
+  && [[ "$record_report" == *"KEEP   $own_recorded — claimed by an open lane"* ]] \
+  && [[ "$record_report" != *"$own_recorded — not-created-by-the-reaper"* ]]; then
+  ok "a .fleet/lanes/ record is the other declared authoriser: a recorded tree outside the declared roots is never refused by ownership"
+else
+  bad "a recorded tree was refused by ownership, or was not kept as an open lane: present=$([ -d "$own_recorded" ] && echo yes || echo no) ACTUAL: $(oneline "$record_report")"
+fi
+
+# FAIL CLOSED: a declaration that cannot be used is CANNOT-ASSESS (rc 2) and the
+# reaper removes NOTHING. Three shapes, because each has a different precondition
+# and one arm cannot stand for the others — and the unreadable shape is provoked by
+# a NON-REGULAR file rather than a chmod, which would silently pass when the gate
+# runs as root (this box is uid 1000, the gate's next runner may not be).
+for shape in absent not-a-file root-less; do
+  case "$shape" in
+    absent) detail="no declaration at all" ;;
+    not-a-file) detail="a directory where the declaration belongs" ;;
+    *) detail="a declaration carrying only comments" ;;
+  esac
+  closed_repo="$work/closed-$shape"
+  make_repo "$closed_repo"
+  closed_lane="$work/lane-closed-$shape"
+  clean_lane "$closed_repo" "$closed_lane"
+  rm -f "$closed_repo/$allowlist_rel"
+  if [ "$shape" = "not-a-file" ]; then
+    mkdir -p "$closed_repo/$allowlist_rel"
+  fi
+  if [ "$shape" = "root-less" ]; then
+    printf '# every root this fleet owns was removed from this fixture\n' >"$closed_repo/$allowlist_rel"
+  fi
+  closed_report="$(reap "$closed_repo" --apply)"
+  closed_rc=$?
+  if [ "$closed_rc" -eq 2 ] && [ -d "$closed_lane" ] \
+    && [[ "$closed_report" == *"CANNOT-ASSESS — the reap ownership declaration"* ]]; then
+    ok "$detail is CANNOT-ASSESS (rc 2) and removes nothing — never a silent keep-everything, never a reap"
+  else
+    bad "$detail did not fail closed: rc=$closed_rc present=$([ -d "$closed_lane" ] && echo yes || echo no) ACTUAL: $(oneline "$closed_report")"
+  fi
+done
+
+# A RELATIVE root is relative to the REPOSITORY, not to the worktree the reaper was
+# started from. Resolved the other way, `.claude/worktrees` names a directory that
+# does not exist the moment the tool is run from a lane — measured while building
+# this rule: 23 of 33 trees went unowned and were kept for ever.
+rel_repo="$work/relative-root"
+make_repo "$rel_repo"
+declare_reap_roots "$rel_repo" ".claude/worktrees"
+rel_tree="$rel_repo/.claude/worktrees/lane-relative"
+rel_runner="$work/relative-runner"
+mkdir -p "$rel_repo/.claude"
+clean_lane "$rel_repo" "$rel_tree"
+clean_lane "$rel_repo" "$rel_runner"
+rel_report="$(reap_in "$rel_runner" --apply)"
+rel_rc=$?
+if [ "$rel_rc" -eq 0 ] && [ ! -d "$rel_tree" ] && [[ "$rel_report" == *"REMOVED $rel_tree"* ]]; then
+  ok "a relative root resolves against the REPOSITORY, not the worktree the reaper was run from"
+else
+  bad "a relative root did not authorise its tree when the reaper was run from a linked worktree: rc=$rel_rc present=$([ -d "$rel_tree" ] && echo yes || echo no) ACTUAL: $(oneline "$rel_report")"
+fi
+
+# The mutant that ignores the declaration must REMOVE the tree the arm above keeps
+# — and take the arm's own needle with it, which is what makes this a control
+# rather than a coincidence: the KEEP arm fails BY NAME, not by accident.
+mutant_ownership_off="$work/mutant-reap-ownership-off.sh"
+ownership_mutant_rc=0
+make_mutant "$mutant_ownership_off" 's/^REAP_OWNERSHIP="declared"$/REAP_OWNERSHIP="off"/' || ownership_mutant_rc=$?
+case "$ownership_mutant_rc" in
+  0)
+    ok "mutant D built: REAP_OWNERSHIP=\"off\" (the pre-#1337 predicate); sha256 $sha_pristine -> $(sha_of "$mutant_ownership_off")" ;;
+  3)
+    bad "mutant D is a NO-OP: the REAP_OWNERSHIP anchor moved, so nothing was reverted and nothing is proven" ;;
+  *)
+    bad "mutant D could not be built (rc=$ownership_mutant_rc)" ;;
+esac
+if [ "$ownership_mutant_rc" -eq 0 ]; then
+  mutant_own_report="$(reap_with "$mutant_ownership_off" "$own_repo" --apply)"
+  if [ -d "$own_outside" ]; then
+    bad "the ownership-ignoring mutant KEPT the unrecorded tree, so this control cannot catch the regression it exists for (ACTUAL: $(oneline "$mutant_own_report"))"
+  else
+    ok "the ownership-ignoring mutant REMOVES the unrecorded tree — the declaration is load-bearing (ACTUAL: $(oneline "$mutant_own_report"))"
+  fi
+  if [[ "$mutant_own_report" == *"not-created-by-the-reaper"* ]]; then
+    bad "the mutant still prints the refusal, so no arm could RED by name (ACTUAL: $(oneline "$mutant_own_report"))"
+  else
+    ok "under the mutant the arm's own needle 'not-created-by-the-reaper' is ABSENT — that arm fails by name"
+  fi
+fi
+
 # Nothing above may have touched the tool itself: the mutants are copies.
 if [ "$(sha_of "$tool")" = "$sha_pristine" ]; then
   ok "the tool is unchanged by this check (sha256 $sha_pristine)"
@@ -737,7 +915,7 @@ case "$discovered" in
 esac
 
 if [ "$fails" -eq 0 ]; then
-  echo "check-prune-worktrees: OK — a venue a live gate holds is kept by name and a destroyed venue is named venue-invalid, liveness is cwd OR an open file under the tree, declared runtime state cannot pin a worktree, and a lane branch is reaped only when its content is provably on master"
+  echo "check-prune-worktrees: OK — a venue a live gate holds is kept by name and a destroyed venue is named venue-invalid, liveness is cwd OR an open file under the tree, a tree with no lane record and no declared reap root is kept by name (#1337), declared runtime state cannot pin a worktree, and a lane branch is reaped only when its content is provably on master"
   exit 0
 fi
 echo "check-prune-worktrees: NOT-OK — $fails rule(s) broken" >&2
