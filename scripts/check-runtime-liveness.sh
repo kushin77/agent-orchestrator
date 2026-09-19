@@ -21,8 +21,16 @@
 # only ever reds proves nothing, so the fresh stage is asserted first and the
 # negative stage asserts the exact set.
 #
+# The REAL-TREE stage then names the HOST's own facts APART instead of collapsing
+# them: a registered runtime that has never beaten here is `runtime-unbeaten:<id>`
+# — a NAMED GAP, printed and never a red, because no producer is installed for it
+# on this host — while a runtime whose beat EXISTS and has stopped stays
+# `runtime-stale:<id>` and NOT-OK. `reframe_controls` provokes that split on every
+# run, and the note above `never_beaten` records the measurement that required it.
+#
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. Findings are named
-# `runtime-stale:<id>`, `runtime-drift:<id>`, `runtime-unregistered:<id>`.
+# `runtime-stale:<id>`, `runtime-drift:<id>`, `runtime-unregistered:<id>`;
+# `runtime-unbeaten:<id>` names a gap, and never sets rc 1 on its own.
 #
 # Usage:
 #   bash scripts/check-runtime-liveness.sh               # producers, then the real tree
@@ -60,6 +68,167 @@ contains() { # contains <haystack> <needle> — bash-native, so it cannot SIGPIP
     *"$2"*) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+# --- the real tree: what THIS host can supply, named rather than collapsed ----
+# The pure judge keeps its own rule: the FIRST beat engages it, and from then on
+# every registered runtime without a beat is `runtime-stale:<id>`. That rule is
+# right for a fleet whose producers are installed — `--self-test`'s
+# FIRST-BEAT-ENGAGES-THE-JUDGE probe pins it, and this stage does not change it.
+# It is the WRONG reading of a tree where no producer is installed, which is what
+# a lane worktree cut from `master` always is: `.fleet/runtime-beats/` there is
+# empty, so this stage has only ever reported `no-beats-yet`. The one beat that
+# CAN appear in one is a FIXTURE ARTIFACT, not a runtime —
+# `scripts/check-spawn-envelope.sh` drives `fleet/terminal.py::run_once` against
+# the real tree, and `run_once` beats before it can refuse. That hazard is named
+# in the producers' own docstrings ("one stray beat engages the judge ... and
+# reports every OTHER registered runtime `runtime-stale`"; measured there as "red
+# on five innocent runtimes"). Measured on the folded tree: with
+# `.fleet/runtime-beats/deepseek-executor.json` on disk the judge named the other
+# six and the run ended NOT-OK; the same tree with that one file removed reports
+# `no-beats-yet` and rc 0. The red was the fixture's, not a runtime's.
+#
+# So the two facts are NAMED APART, never merged into one word:
+#   * `runtime-unbeaten:<id>` — registered here, and NO beat has ever been
+#     recorded for it, so no producer was ever installed to supply one. A NAMED
+#     GAP: printed, and never a red, because this check cannot supply that
+#     runtime's producer on this host — a worktree has no cron, and a beat this
+#     stage faked would go stale inside the window and red again.
+#   * `runtime-stale:<id>` — a beat EXISTS and is past the window: the runtime
+#     BEAT and then STOPPED, which is the fact this gate is for. Still a red — as
+#     are `runtime-drift:<id>` and `runtime-unregistered:<id>`.
+# The producers stage is what keeps the split from being a weakening: it drives
+# every registered runtime's OWN producer on a scratch fleet and requires seven
+# FRESH beats and then `runtime-stale:deepseek-sister` BY NAME on every run, so
+# "beat, then stopped" is proven red whatever this host's real tree holds.
+
+# never_beaten <root> — the registered runtimes with no beat at all here: absent
+# from the gate's own reader AND with no beat file on disk. A TORN file is a
+# problem to report, not an absence to excuse, so it is deliberately NOT a gap.
+# Both sets come from the judge's own readers, so this is the judge's
+# "no beat has ever been recorded" set by construction. An unreadable registry
+# prints nothing: the judge is already reporting CANNOT-ASSESS for it, and an
+# empty gap set leaves this stage's judgments exactly as they were.
+never_beaten() {
+  env PYTHONPATH="$1" python3 - "$1" <<'PY' 2>/dev/null
+import sys
+from pathlib import Path
+
+from fleet import runtimes
+from fleet.runtime_liveness import beat_module_beats
+
+root = Path(sys.argv[1]).resolve()
+try:
+    registered = runtimes.ids(root)
+except Exception:  # noqa: BLE001 - a refusal is the judge's CANNOT-ASSESS, not this stage's
+    raise SystemExit(0)
+
+beats = beat_module_beats(root)
+for runtime_id in sorted(registered):
+    if runtime_id in beats:
+        continue
+    if (root / ".fleet" / "runtime-beats" / f"{runtime_id}.json").exists():
+        continue
+    print(runtime_id)
+PY
+}
+
+# partition_gaps <gaps> <the judge's output> — reframe every finding that is a
+# `runtime-stale` for a runtime in <gaps> as a named, non-failing gap, and leave
+# everything else (any other code, any other runtime) in `unbeaten_strays`.
+# Returns 0 only when EVERY finding the judge made named one of the gaps, so the
+# set is reframed whole or not at all: a mixed result can never quietly drop the
+# finding that matters.
+unbeaten_gap_lines=""
+unbeaten_strays=""
+unbeaten_named=0
+partition_gaps() {
+  local gap_list gaps_total named=0 line name id
+  gap_list=" $(printf '%s\n' "$1" | tr '\n' ' ') "
+  gaps_total="$(printf '%s\n' "$1" | grep -c . || true)"
+  unbeaten_gap_lines=""
+  unbeaten_strays=""
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    name="${line#  }"
+    name="${name%% *}"
+    id="${name#*:}"
+    case "$name" in
+      runtime-stale:*)
+        if contains "$gap_list" " $id "; then
+          named=$((named + 1))
+          unbeaten_gap_lines="${unbeaten_gap_lines}  runtime-unbeaten:${id} — no beat has ever been recorded for this runtime on this host (no producer is installed for it here)"$'\n'
+          continue
+        fi
+        ;;
+    esac
+    unbeaten_strays="${unbeaten_strays}${line}"$'\n'
+  done <<<"$2"
+  unbeaten_named="$named"
+  # Every finding reframed AND nothing left over. The second half is load-bearing:
+  # a run that named both gaps and ALSO kept a stray has not reframed the set, and
+  # returning 0 on the count alone would have swallowed the stray (measured by the
+  # stopped-stays-red control when this read `[ "$named" -eq "$gaps_total" ]`).
+  [ "$named" -eq "$gaps_total" ] && [ -z "$unbeaten_strays" ]
+}
+
+# --- the reframing's own controls --------------------------------------------
+# `partition_gaps` is the one place on this gate where a red becomes an OK, so it
+# is provoked on every `run` — the rule the producers stage already follows, and
+# for the same reason: an arm nobody falsifies passes for the wrong reason.
+reframe_controls() {
+  local fail=0
+  rf_ok() { printf '  OK    %-22s %s\n' "$1" "$2"; }
+  rf_no() { printf '  FAIL  %-22s %s\n' "$1" "$2" >&2; fail=$((fail + 1)); }
+
+  echo "== the never-beaten reframing: a gap is named, a stopped runtime is a red =="
+
+  local gaps="claude-session"$'\n'"hermes"
+  local all_gaps="  runtime-stale:claude-session — no beat has ever been recorded"$'\n'"  runtime-stale:hermes — no beat has ever been recorded"
+
+  if partition_gaps "$gaps" "$all_gaps" &&
+    [ "$unbeaten_named" -eq 2 ] &&
+    contains "$unbeaten_gap_lines" "runtime-unbeaten:claude-session" &&
+    contains "$unbeaten_gap_lines" "runtime-unbeaten:hermes" &&
+    [ -z "$unbeaten_strays" ]; then
+    rf_ok "never-beaten-are-gaps" "both never-beaten runtimes named as gaps, and no finding kept"
+  else
+    rf_no "never-beaten-are-gaps" "named=$unbeaten_named gaps=$unbeaten_gap_lines stray=$unbeaten_strays"
+  fi
+
+  local stopped="  runtime-stale:deepseek-executor — beat is 7200s old, past the 3600s window"
+  if partition_gaps "$gaps" "$all_gaps"$'\n'"$stopped"; then
+    rf_no "stopped-stays-red" "a recorded beat past the window was reframed as a gap"
+  elif contains "$unbeaten_strays" "runtime-stale:deepseek-executor"; then
+    rf_ok "stopped-stays-red" "a beat that stopped is kept as a red, beside the gaps"
+  else
+    rf_no "stopped-stays-red" "the stopped runtime was dropped: stray=$unbeaten_strays"
+  fi
+
+  local drifted="  runtime-drift:claude-session — running commit trails master by 9 (> 5) with no directive in flight"
+  if partition_gaps "$gaps" "$drifted"; then
+    rf_no "drift-is-not-a-gap" "drift against a never-beaten runtime was reframed as a gap"
+  elif contains "$unbeaten_strays" "runtime-drift:claude-session"; then
+    rf_ok "drift-is-not-a-gap" "the finding's code counts, not only the runtime id"
+  else
+    rf_no "drift-is-not-a-gap" "the drift finding was dropped: stray=$unbeaten_strays"
+  fi
+
+  local ghost="  runtime-unregistered:ghost — beat exists for an id fleet/runtimes.yaml does not declare"
+  if partition_gaps "$gaps" "$ghost"; then
+    rf_no "unregistered-not-a-gap" "an unregistered beat was reframed as a gap"
+  elif contains "$unbeaten_strays" "runtime-unregistered:ghost"; then
+    rf_ok "unregistered-not-a-gap" "an id outside the contract stays a red"
+  else
+    rf_no "unregistered-not-a-gap" "the unregistered finding was dropped: stray=$unbeaten_strays"
+  fi
+
+  if [ "$fail" -eq 0 ]; then
+    echo "check-runtime-liveness: reframing OK — a never-beaten runtime is a named gap, and a stopped / drifted / unregistered one is not"
+    return 0
+  fi
+  echo "check-runtime-liveness: reframing NOT-OK — $fail arm(s) failed" >&2
+  return 1
 }
 
 # --- the producers stage (#1412) ---------------------------------------------
@@ -243,8 +412,32 @@ if [ "$verb" = "producers" ] || [ "$verb" = "run" ]; then
   fi
 fi
 
-judge "$root" "$verb"
-rc=$?
+if [ "$verb" = "run" ]; then
+  # The reframing's own controls run FIRST: what they assert is exactly what the
+  # judgment below relies on, so a broken split is refused before it is applied.
+  reframe_controls || exit 1
+
+  gaps="$(never_beaten "$root")"
+  findings="$(judge "$root" "$verb" 2>&1)"
+  rc=$?
+  if [ "$rc" -eq 1 ] && [ -n "$gaps" ] && partition_gaps "$gaps" "$findings"; then
+    printf '%s' "$unbeaten_gap_lines" >&2
+    printf 'check-runtime-liveness: OK — %s registered runtime(s) have never beaten on this host, so no producer is installed for them here (named above); every recorded beat is inside the window\n' \
+      "$unbeaten_named"
+    exit 0
+  fi
+  # Anything else is the judge's own verdict, in its own words. The gaps are
+  # reframed as a whole set or not at all, so a mixed result cannot drop the
+  # finding that matters.
+  if [ -n "$findings" ]; then printf '%s\n' "$findings"; fi
+else
+  judge "$root" "$verb"
+  rc=$?
+  if [ "$verb" = "self-test" ]; then
+    reframe_controls || rc=1
+  fi
+fi
+
 case "$rc" in
   0) echo "check-runtime-liveness: OK" ;;
   1) echo "check-runtime-liveness: NOT-OK" >&2 ;;
