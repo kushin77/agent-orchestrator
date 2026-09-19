@@ -2,12 +2,17 @@
 
 Lessons 6-9 (and the transport halves of 3, 4, 5, 10) with FAKE git / gh /
 gcloud / sh seams: no test touches the real repo, GitHub or Cloud Build.
+Lesson 11 (#1384) lives here too: the kept transcript and the failing check's
+name are produced by the verify transport, so the fakes write the gate's own
+artifacts (`.verify/attestation.json`, `.verify/verify.log`) into the held
+worktree exactly where `scripts/verify.sh` writes them.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -15,7 +20,9 @@ from pathlib import Path
 import pytest
 from conftest import ROOT
 
-from fleet.runner import cli, merge as merge_mod, verify as verify_mod
+from fleet.runner import cli, evidence as ev, merge as merge_mod, verify as verify_mod
+from fleet.runner.model import REFUSE, VERIFY, OpenPR
+from fleet.runner.plan import plan
 from fleet.runner.verify import Ledger, Result
 
 SHA = "b" * 40
@@ -48,11 +55,11 @@ def fake_git_factory(tmp_path: Path, tip: str = TIP):
             Path(argv[3]).mkdir(parents=True, exist_ok=True)
             return Result(0)
         if argv[:2] == ["worktree", "remove"]:
-            path = Path(argv[3])
-            if path.exists():
-                for child in path.iterdir():
-                    child.unlink()
-                path.rmdir()
+            # `rmtree`, not a walk over `iterdir()`: a verified worktree holds
+            # `.verify/` and its subdirectories (issue #1384), and a fake that can
+            # only unlink files would fail where the real `git worktree remove
+            # --force` succeeds — a red on the fake, not on the change.
+            shutil.rmtree(Path(argv[3]), ignore_errors=True)
             return Result(0)
         if argv[:1] == ["rev-parse"]:
             return Result(0, tip + "\n")
@@ -135,6 +142,213 @@ def test_a_failed_worktree_add_is_cannot_assess_by_name_and_never_posts(tmp_path
     )
     assert outcome.state == "cannot-assess" and outcome.detail.startswith("worktree-add-failed:")
     assert posts.calls == []
+
+
+# --- lesson 11 (#1384): a red keeps its own evidence ----------------------------
+#
+# Measured 2026-09-19T01:33Z: four heads verified rc=1, the rung posted
+# `ao/gate-of-record=failure` — correct — and `.fleet/runner/local-green/<pr>-<sha>`
+# held exactly `{"rc": 1, "detail": "verify rc 1 (red); master was e996eb9534c9"}`.
+# The verify output died with the worktree, so the failing check's NAME was
+# unknowable without re-running the whole gate by hand. A red recorded as `rc 1`
+# is not evidence: it can be neither diagnosed nor contested.
+
+def verify_transcript(*, failed=(), skipped=(), summary=None) -> str:
+    """A transcript shaped like `scripts/verify.sh`'s own tee."""
+    lines = ["== docs ==", "docs: PASS", "== secrets ==", "secrets: PASS"]
+    for name in failed:
+        lines += [f"== {name} ==", f"{name}: FAIL — 1 finding(s)", "  FAIL  the thing that broke"]
+    if summary is None:
+        counts = f"{len(failed)} of 215 checks failed"
+        skip_note = f", {len(skipped)} skipped: {', '.join(skipped)}" if skipped else ""
+        summary = f"verify: {'FAIL' if failed else 'PASS'} ({counts if failed else '215 of 215 checks'}{skip_note})"
+    return "\n".join(lines + ["", summary, "attestation: .verify/attestation.json"]) + "\n"
+
+
+def verify_attestation(*, failed=(), skipped=()) -> dict:
+    """The gate's own record, with the fields the extractor reads."""
+    checks = [
+        {"name": name, "rc": 1, "status": "FAIL", "verdict": "FAIL", "duration": 1.0, "evidence_tail": f"{name}: FAIL\n"}
+        for name in failed
+    ]
+    checks += [
+        {"name": name, "rc": 0, "status": "PASS", "verdict": "OK", "duration": 1.0, "evidence_tail": ""}
+        for name in ("docs", "secrets")
+    ]
+    checks += [
+        {"name": name, "rc": 2, "status": "SKIP", "verdict": "WARN", "duration": 1.0, "evidence_tail": ""}
+        for name in skipped
+    ]
+    return {"checks": checks, "result": "FAIL" if failed else "PASS", "exit_code": 1 if failed else 0}
+
+
+def verify_transport(*, failed=(), skipped=(), transcript=None, attestation=True, rc=None) -> Fake:
+    """A fake `sh` that runs a verify: it leaves the gate's own artifacts in the
+    held worktree (where the real gate leaves them) and returns the rc."""
+    text = verify_transcript(failed=failed, skipped=skipped) if transcript is None else transcript
+    code = rc if rc is not None else (1 if failed else 0)
+    payload = verify_attestation(failed=failed, skipped=skipped)
+
+    def handler(argv, kw):
+        if argv[:2] == ["bash", "scripts/verify.sh"]:
+            verify_dir = Path(kw["cwd"]) / ".verify"
+            verify_dir.mkdir(parents=True, exist_ok=True)
+            (verify_dir / "verify.log").write_text(text, encoding="utf-8")
+            if attestation:
+                (verify_dir / "attestation.json").write_text(json.dumps(payload), encoding="utf-8")
+            return Result(code, text, "")
+        return Result(0)
+
+    return Fake(handler, "sh")
+
+
+def marker_of(runner_dir: Path, pr: int, sha: str = SHA) -> dict:
+    return json.loads((runner_dir / "local-green" / f"{pr}-{sha}").read_text(encoding="utf-8"))
+
+
+def verify_rows(runner_dir: Path) -> list[dict]:
+    return [r for r in Ledger(runner_dir / "ledger.jsonl").rows() if r.get("event") == "verify"]
+
+
+def test_a_red_verify_keeps_its_transcript_and_names_the_failing_check(tmp_path: Path):
+    runner_dir = tmp_path / "runner"
+    names = ["check-docs", "check-shell-patterns"]
+    git = fake_git_factory(tmp_path)
+    posts = Fake(name="post")
+    outcome = verify_mod.run_verify(
+        21,
+        SHA,
+        repo=tmp_path,
+        runner_dir=runner_dir,
+        git=git,
+        sh=verify_transport(failed=names, skipped=["reconcile-orphans"]),
+        post_status=lambda sha, rc: posts([sha, str(rc)]),
+        ledger=Ledger(runner_dir / "ledger.jsonl"),
+    )
+    assert outcome.state == "red" and outcome.posted
+
+    marker = marker_of(runner_dir, 21)
+    assert marker["failing_checks"] == names, marker
+    assert marker["verify_summary"].startswith("verify: FAIL (2 of 215 checks failed"), marker
+    assert marker["evidence_log"] == f"logs/21-{SHA}.log", marker
+
+    row = verify_rows(runner_dir)[-1]
+    assert row["failing_checks"] == names and row["evidence_source"] == "attestation", row
+    assert row["evidence_log"] == f"logs/21-{SHA}.log" and row["evidence_truncated"] is False, row
+
+    kept = (runner_dir / "logs" / f"21-{SHA}.log").read_text(encoding="utf-8")
+    assert "verify: FAIL (2 of 215 checks failed" in kept, kept[:400]
+    assert "check-shell-patterns: FAIL" in kept, kept[:400]
+
+    text = "\n".join(cli.status_lines(Ledger(runner_dir / "ledger.jsonl").rows(), {}))
+    assert "verify=red rc=1" in text, text
+    assert "failing:check-docs,check-shell-patterns" in text, text
+    assert "why:verify: FAIL (2 of 215 checks failed" in text, text
+    assert f"log:logs/21-{SHA}.log" in text, text
+
+
+def test_a_green_verify_records_an_empty_failing_set(tmp_path: Path):
+    runner_dir = tmp_path / "runner"
+    outcome = verify_mod.run_verify(
+        22,
+        SHA,
+        repo=tmp_path,
+        runner_dir=runner_dir,
+        git=fake_git_factory(tmp_path),
+        sh=verify_transport(rc=0),
+        post_status=lambda sha, rc: Fake(name="post")([sha, str(rc)]),
+        ledger=Ledger(runner_dir / "ledger.jsonl"),
+    )
+    assert outcome.state == "green"
+    assert marker_of(runner_dir, 22)["failing_checks"] == []
+    row = verify_rows(runner_dir)[-1]
+    assert row["failing_checks"] == [] and row["evidence_source"] == "attestation", row
+    assert "verify: PASS (215 of 215 checks)" in (runner_dir / "logs" / f"22-{SHA}.log").read_text(encoding="utf-8")
+    text = "\n".join(cli.status_lines(Ledger(runner_dir / "ledger.jsonl").rows(), {}))
+    assert "failing:" not in text and "evidence:" not in text, text
+
+
+def test_the_kept_transcript_is_bounded_and_the_log_directory_is_pruned(tmp_path: Path):
+    runner_dir = tmp_path / "runner"
+    summary = "verify: FAIL (0 of 215 checks failed, 13 skipped: reconcile-orphans)"
+    big = "".join(f"{i:06d} " + "x" * 90 + "\n" for i in range(4000)) + summary + "\n"
+    verify_mod.run_verify(
+        23,
+        SHA,
+        repo=tmp_path,
+        runner_dir=runner_dir,
+        git=fake_git_factory(tmp_path),
+        sh=verify_transport(transcript=big, attestation=False, rc=1),
+        post_status=lambda sha, rc: Result(0),
+        ledger=Ledger(runner_dir / "ledger.jsonl"),
+    )
+    log_dir = runner_dir / "logs"
+    body = (log_dir / f"23-{SHA}.log").read_text(encoding="utf-8")
+    # the bound holds, and it is a TAIL: the gate prints its verdict last
+    assert len(body.encode()) <= verify_mod.EVIDENCE_LOG_MAX_BYTES + 400, len(body.encode())
+    assert summary in body, "the kept tail must still carry the gate's own verdict"
+    assert "byte(s) dropped" in body, body[:200]
+    row = verify_rows(runner_dir)[-1]
+    assert row["evidence_truncated"] is True and row["evidence_bytes"] > verify_mod.EVIDENCE_LOG_MAX_BYTES, row
+    assert marker_of(runner_dir, 23)["failing_checks"] == []
+
+    # the directory is a bound too: `.fleet/runner/` outlives the process
+    before = len(list(log_dir.iterdir()))
+    for index in range(verify_mod.EVIDENCE_LOG_KEEP + 5):
+        path = log_dir / f"9{index:04d}-{SHA}.log"
+        path.write_text("x", encoding="utf-8")
+        os.utime(path, (1_000_000 + index, 1_000_000 + index))
+    removed = verify_mod.prune_evidence_logs(log_dir)
+    assert len(removed) == before + verify_mod.EVIDENCE_LOG_KEEP + 5 - verify_mod.EVIDENCE_LOG_KEEP, removed
+    assert len(list(log_dir.iterdir())) == verify_mod.EVIDENCE_LOG_KEEP
+    assert not (log_dir / f"90000-{SHA}.log").exists(), "the OLDEST kept file is the one that goes"
+
+
+def test_a_red_with_no_named_check_says_so_and_is_never_green(tmp_path: Path):
+    """The measured #1405 shape: the composite reds with ZERO checks failing.
+
+    `verify: FAIL (0 of 215 checks failed, 13 skipped: ...; skip ratchet FAIL: 1
+    unnamed skip)` — no check failed, the run is red, and a record that said only
+    `rc 1` made that indistinguishable from a real failure. The kept evidence
+    must carry the ratchet's refusal, the record must say it named no check, and
+    the planner must refuse it BY NAME (`none-named`) — neither green nor
+    re-queued forever.
+    """
+    runner_dir = tmp_path / "runner"
+    transcript = (
+        "== reconcile-orphans ==\n"
+        "reconcile-orphans: SKIP (rc 2)\n"
+        "verify: skip ratchet FAIL (rc 1) — the run does not attest a fully named skip set\n"
+        "\nverify: FAIL (0 of 215 checks failed, 13 skipped: reconcile-orphans; skip ratchet FAIL: 1 unnamed skip)\n"
+    )
+    outcome = verify_mod.run_verify(
+        24,
+        SHA,
+        repo=tmp_path,
+        runner_dir=runner_dir,
+        git=fake_git_factory(tmp_path),
+        sh=verify_transport(transcript=transcript, attestation=False, rc=1),
+        post_status=lambda sha, rc: Result(0),
+        ledger=Ledger(runner_dir / "ledger.jsonl"),
+    )
+    assert outcome.state == "red"
+    marker = marker_of(runner_dir, 24)
+    assert marker["failing_checks"] == [], marker
+    assert "0 of 215 checks failed" in marker["verify_summary"], marker
+    row = verify_rows(runner_dir)[-1]
+    assert row["evidence_note"].startswith("attestation-absent"), row
+    kept = (runner_dir / "logs" / f"24-{SHA}.log").read_text(encoding="utf-8")
+    assert "skip ratchet FAIL: 1 unnamed skip" in kept, kept[:400]
+
+    text = "\n".join(cli.status_lines(Ledger(runner_dir / "ledger.jsonl").rows(), {}))
+    assert "failing:none-named" in text, text
+    assert "why:verify: FAIL (0 of 215 checks failed" in text, text
+    assert "evidence:attestation-absent" in text, text
+    table = ev.EvidenceTable(ev.from_local_markers(runner_dir / "local-green"))
+    actions = plan([OpenPR(24, SHA)], table, master_tip=TIP)
+    assert [a.kind for a in actions] == [REFUSE], actions
+    assert actions[0].reason == "verify-red:24:local-marker:none-named", actions[0].reason
+    assert not any(a.kind == VERIFY for a in actions), "a red the runner itself ran is not re-queued"
 
 
 # --- lesson 7 ------------------------------------------------------------------

@@ -809,6 +809,12 @@
       "reason": "no-hub-counterpart",
       "record_ref": "#1111",
       "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
+    },
+    {
+      "id": "SUGGEST-0018",
+      "reason": "no-hub-counterpart",
+      "record_ref": "#1408",
+      "judged_against": "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
     }
   ]
 }

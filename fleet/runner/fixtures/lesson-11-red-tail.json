@@ -1,0 +1,19 @@
+{
+  "doc": "lesson 11 (#1384): a local red whose kept evidence NAMES the failing check — the refusal must say which check, not only that it is red",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 18,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "evidence": [
+    {
+      "pr": 18,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "local-marker",
+      "state": "red",
+      "failing_checks": ["check-shell-patterns", "check-docs"]
+    }
+  ]
+}

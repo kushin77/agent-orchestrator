@@ -35,9 +35,17 @@ THE RULES, EACH A MEASURED LESSON FROM THE 2026-09-18 PROTOTYPE
      green on its own. It is re-queued (`requeue:foreign-red:<pr>:<source>`,
      subject to the same running/capacity rules as `requeue:no-evidence`),
      never refused forever. A RED with a local-marker record present — as
-     basis or alongside — stays refused (`verify-red:<pr>:local-marker`): the
-     runner already ran it and got red. A green from any source still wins
+     basis or alongside — stays refused (`verify-red:<pr>:local-marker:<check>`):
+     the runner already ran it and got red. A green from any source still wins
      first (lesson 5, lesson 3's staleness check still applies to it).
+  9. A refusal must name WHY it is refusing (issue #1384). A red whose reason
+     was `verify-red:<pr>:local-marker` and nothing else named no check: the
+     worktree is gone by then, so `rc 1` was the whole record and the red could
+     be neither diagnosed nor contested. The reason now carries the first check
+     the runner itself saw fail — read from the LOCAL-MARKER record, never the
+     basis, because for a foreign red the basis is a check-run whose evidence
+     carries no check names. A run that named no check renders `none-named`,
+     which is an answer (the #1405 shape: red, 0 checks failed), not a blank.
 """
 
 from __future__ import annotations
@@ -170,7 +178,13 @@ def plan(
                 else:
                     actions.append(Action(DEFER, number, sha, reason=f"capacity:{number}:foreign-red:{basis_source}"))
                 continue
-            actions.append(Action(REFUSE, number, sha, reason=f"verify-red:{number}:local-marker"))
+            # Read the name from the LOCAL-MARKER record, not from the basis: a
+            # foreign red's basis is a check-run and carries no check names
+            # (#1384), so a head the box really did run would otherwise refuse
+            # without naming the check it failed on.
+            local = [r for r in verdict.records if r.source == SOURCE_LOCAL]
+            named = next((r.failing_checks[0] for r in local if r.failing_checks), "")
+            actions.append(Action(REFUSE, number, sha, reason=f"verify-red:{number}:local-marker:{named or 'none-named'}"))
             continue
 
         # No verdict for this head. Running for the current head -> await.

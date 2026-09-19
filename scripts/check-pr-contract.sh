@@ -134,6 +134,47 @@
 # `--selftest` proves every violation is provoked and refused, so the gate is
 # not a formality while it waits for those hooks.
 #
+# THE INERTNESS IS RECORDED, NOT ASSUMED (#1396)
+#   "Not wired" is true, and incomplete. `pr-contract` is disabled BY NAME in
+#   `scripts/check-denylist.txt`, so `make verify` never runs this check — which
+#   means the scoped PR-context passthrough that #1341 added to
+#   `scripts/verify.sh` is UNEXERCISED by the composite: the wiring reads as
+#   done and does nothing, the same class of defect as the one it caused. The
+#   resolution taken here is the issue's second option — RECORD it as
+#   unexercised rather than wire it in — and for a measured reason: a check that
+#   runs in the composite with no PR context must record a SKIP, which means a
+#   `scripts/skip-budget.json` entry, and both that file and the composite's
+#   check set belong to other lanes (AGENTS.md rule 2 forbids two lanes sharing
+#   a file). So `scripts/check-denylist.txt` carries the record
+#   (`unexercised-seam: #1341`) and `--selftest` asserts it in BOTH directions,
+#   refusing by name: `denylist-inertness-undeclared` when a denylisted seam
+#   loses its record, `denylist-inertness-record-stale` when the seam becomes
+#   live and the record outlives it. A record in a comment rots (GR-29: a
+#   doc-only rule is advisory); this one is a checked property.
+#
+# PRECEDENCE — argv > DECLARED env > ambient hint (#1396)
+#   An explicit `--pr`/`--body-file`/`--range` is a STATEMENT of what to judge.
+#   An exported `PR_NUMBER`/`_PR_NUMBER` is a HINT about which PR the caller is
+#   on. This check used to resolve `PR_NUMBER="${_PR_NUMBER:-${PR_NUMBER:-}}"`
+#   BEFORE parsing argv, so the hint outranked the statement — and it was
+#   measured, not reasoned about: `scripts/verify.sh` exported `PR_NUMBER` into
+#   the whole composite environment, and `scripts/check-landing.sh`'s
+#   attribution fixture — which calls this check with an explicit
+#   `--body-file`/`--range` against a stub `gh`, precisely so that it cannot
+#   read the host's GitHub state — was hijacked into the LIVE PR path and
+#   answered CANNOT-ASSESS, reddening the gate of record for the whole tree
+#   (#1344, #1396). The principle is general: a control must not read the
+#   machine it is supposed to be independent of.
+#   The order is now argv > the DECLARED env interface (`AO_PR_NUMBER`, the name
+#   `infra/cloudbuild/verify.yaml` exports and `scripts/merge-gate.sh` reads) >
+#   the ambient `_PR_NUMBER`/`PR_NUMBER` hint — and the hint is consulted ONLY
+#   when no argv named a subject at all, so #1341's no-flags passthrough in
+#   `scripts/verify.sh` still reaches `pr_check` exactly as before while an
+#   ambient name can no longer rewrite the argv a caller wrote on purpose. A
+#   `--pr` with no number is refused by name. `--selftest` provokes the hijack
+#   under BOTH ambient spellings and requires the mutant that restores the
+#   ambient-first resolution to be caught.
+#
 # Usage:
 #   bash scripts/check-pr-contract.sh --body-file <path> [--range <git-range>]
 #   bash scripts/check-pr-contract.sh --pr <number>      # PR-time hook (via gh)
@@ -155,12 +196,16 @@ trailer_pattern="${AO_TRAILER_PATTERN:-Refs:?\\s+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+
 default_gate="a7e7312991ae24b1047363ff36627060a810fdd8"
 gate="${AO_PR_ENFORCEMENT_GATE:-$default_gate}"
 RANGE_SET=0
+# Did ARGV itself name the subject to judge? See "PRECEDENCE" in the header
+# (#1396): `--pr`, `--body-file` and `--range` all state what to judge, and
+# argv outranks an ambient PR number, which is only a hint.
+ARGV_CONTEXT=0
+PR_ARG_SET=0
 
 usage() {
   printf 'usage: %s --body-file <path> [--range <git-range>] | --pr <number> | --landed [--range <git-range>] | --selftest\n' "$0" >&2
 }
 
-PR_NUMBER="${_PR_NUMBER:-${PR_NUMBER:-}}"
 # The `## Classification` block (issue #1254 step 5 / #1328). Vocabularies are
 # read live from the sources the tagging gate already owns; the scratch path
 # below exists only so `--selftest` can provoke `pr-class-below-surface`
@@ -169,19 +214,43 @@ surfaces_yaml_override=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --body-file) body_file="${2:-}"; shift 2 ;;
-    --range)     range="${2:-}"; RANGE_SET=1; shift 2 ;;
+    --body-file) body_file="${2:-}"; ARGV_CONTEXT=1; shift 2 ;;
+    --range)     range="${2:-}"; RANGE_SET=1; ARGV_CONTEXT=1; shift 2 ;;
     --repo)      repo="${2:-}"; shift 2 ;;
     --selftest)  SELFTEST=1; shift ;;
     --self-test) SELFTEST=1; shift ;;
     --landed)    LANDED=1; shift ;;
-    --pr)        PR_NUMBER="${2:-}"; shift 2 ;;
+    --pr)        PR_NUMBER="${2:-}"; PR_ARG_SET=1; ARGV_CONTEXT=1; shift 2 ;;
     --enforcement-gate) gate="${2:-}"; shift 2 ;;
     --surfaces-yaml) surfaces_yaml_override="${2:-}"; shift 2 ;;
     -h|--help)   usage; exit 0 ;;
     *) printf 'check-pr-contract: unknown argument %s\n' "$1" >&2; usage; exit 2 ;;
   esac
 done
+
+if [ "$PR_ARG_SET" -eq 1 ] && [ -z "${PR_NUMBER:-}" ]; then
+  printf 'check-pr-contract: --pr needs a number (an empty --pr is not a context)\n' >&2
+  usage
+  exit 2
+fi
+
+# --- BEGIN #1396 precedence block (mutated by --selftest; keep the markers) --
+# The order is stated once, in the header: argv > declared env > ambient hint.
+if [ "$PR_ARG_SET" -eq 1 ]; then
+  : # `--pr` named the PR itself; there is nothing to resolve.
+elif [ "$ARGV_CONTEXT" -eq 0 ]; then
+  # No argv named a subject: the DECLARED interface first, then the ambient
+  # hint. This is #1341's no-flags path -- `scripts/verify.sh` hands this check
+  # a bare `PR_NUMBER` and `infra/cloudbuild/verify.yaml` exports
+  # `AO_PR_NUMBER` -- so it must keep reaching `pr_check`.
+  PR_NUMBER="${AO_PR_NUMBER:-${_PR_NUMBER:-${PR_NUMBER:-}}}"
+else
+  # argv named the subject. An ambient PR number is a hint about which PR the
+  # caller is on, never a statement of what to judge, so it is refused here
+  # rather than allowed to rewrite the argv the caller wrote on purpose.
+  PR_NUMBER=""
+fi
+# --- END #1396 precedence block ---------------------------------------------
 
 if ! command -v git >/dev/null 2>&1; then
   echo "check-pr-contract: CANNOT-ASSESS — git not found" >&2
@@ -920,6 +989,54 @@ pr_check() { # <number>
   rc=$?
   rm -rf "$tmpdir"
   return "$rc"
+}
+
+# --- the denylist inertness record (#1396) -----------------------------------
+# `make verify` does not run this check while `pr-contract` is disabled by name
+# in `scripts/check-denylist.txt`, so #1341's scoped PR-context passthrough in
+# `scripts/verify.sh` is UNEXERCISED by the composite. The header states why that
+# is recorded rather than wired in; what it must not be is a comment, because a
+# comment cannot fail (GR-29: a doc-only rule is advisory). So the record is a
+# property this gate checks, in BOTH directions, and the check is itself provoked
+# with a mutant copy of the denylist.
+denylist_marker="unexercised-seam: #1341"
+denylist_path() { # the discovery layer's own seam (scripts/discover-checks.sh)
+  printf '%s\n' "${CHECK_DENYLIST:-$root/scripts/check-denylist.txt}"
+}
+denylist_inertness() { # <denylist-file> — prints a refusal, rc 1; silent, rc 0
+  local file="$1" out rc
+  if [ ! -f "$file" ]; then
+    echo "check-pr-contract: denylist-unreadable: $file (the record cannot be asserted without it)"
+    return 1
+  fi
+  if grep -qE '^[[:space:]]*(pr-contract|check-pr-contract\.sh)[[:space:]]*$' "$file"; then
+    # Disabled by name: the seam is inert, so the inertness must be RECORDED and
+    # the passthrough the record names must still exist.
+    if ! grep -qF "$denylist_marker" "$file"; then
+      echo "check-pr-contract: denylist-inertness-undeclared: $file disables pr-contract, so #1341's PR-context passthrough in scripts/verify.sh is unexercised by the composite, and the record ($denylist_marker) is missing"
+      return 1
+    fi
+    if ! grep -qF '"$name" = "pr-contract"' "$root/scripts/verify.sh" 2>/dev/null \
+       || ! grep -qF 'pr_contract_context' "$root/scripts/verify.sh" 2>/dev/null; then
+      echo "check-pr-contract: denylist-inertness-record-stale: the record names an unexercised passthrough, but scripts/verify.sh no longer wires one"
+      return 1
+    fi
+    return 0
+  fi
+  # Not denylisted: the composite runs this check, so the record must be gone and
+  # a context-less run must be a SKIP (rc 2), never a pass.
+  if grep -qF "$denylist_marker" "$file"; then
+    echo "check-pr-contract: denylist-inertness-record-stale: pr-contract is NOT denylisted any more, so the seam is live and the record ($denylist_marker) must be deleted"
+    return 1
+  fi
+  out="$(env -u AO_PR_NUMBER -u _PR_NUMBER -u PR_NUMBER -u AO_PR_BODY_FILE -u AO_PR_RANGE \
+    bash "$0" --repo "$root" 2>&1)"
+  rc=$?
+  if [ "$rc" -ne 2 ]; then
+    echo "check-pr-contract: denylist-inertness-record-stale: pr-contract is wired into the composite, but a context-less run exits $rc, not 2 — the composite would record a PASS where nothing was judged"
+    return 1
+  fi
+  return 0
 }
 
 # --- selftest: the gate must be able to fail --------------------------------
@@ -1771,6 +1888,101 @@ JSON
     ok=1
   fi
 
+  # --- ambient-vs-argv precedence (#1396) -----------------------------------
+  # A control must not read the machine it is supposed to be independent of. An
+  # exported PR context is a HINT about which PR the caller is on; an explicit
+  # `--body-file`/`--range` is a STATEMENT of what to judge, and the statement
+  # wins. Every arm below runs with a stub `gh` on PATH that FAILS, so a hijacked
+  # run cannot hide behind a live GitHub read: it answers, by name, for the
+  # ambient PR number instead.
+  stub_bin="$work/bin"
+  mkdir -p "$stub_bin"
+  printf '#!/usr/bin/env bash\nexit 1\n' >"$stub_bin/gh"
+  chmod +x "$stub_bin/gh"
+  hijack_argv=(--repo "$scratch" --body-file "$good_body" --range "$base..$a_sha")
+  clean_out="$(env PATH="$stub_bin:$PATH" bash "$0" "${hijack_argv[@]}" 2>&1)"
+  clean_rc=$?
+  if [ "$clean_rc" -eq 0 ]; then
+    printf '  OK    the explicit argv alone reaches a verdict (rc=0), so the arms below measure the hint\n'
+  else
+    printf '  FAIL  the explicit argv alone did not reach a verdict (rc=%s)\n%s\n' "$clean_rc" "$clean_out" >&2
+    ok=1
+  fi
+  # (a)/(b) the hijack itself, under BOTH ambient spellings the check reads, each
+  # set to a DIFFERENT PR than any the argv names.
+  for ambient in PR_NUMBER _PR_NUMBER; do
+    out="$(env PATH="$stub_bin:$PATH" "$ambient=1396" bash "$0" "${hijack_argv[@]}" 2>&1)"
+    rc=$?
+    if [ "$rc" -eq "$clean_rc" ] && [ "$out" = "$clean_out" ]; then
+      printf '  OK    an ambient %s naming a DIFFERENT PR leaves the explicit argv verdict byte-identical (#1396)\n' "$ambient"
+    else
+      printf '  FAIL  ambient %s hijacked the explicit argv (rc %s -> %s)\n%s\n' "$ambient" "$clean_rc" "$rc" "$out" >&2
+      ok=1
+    fi
+  done
+  # (c) negative controls: with NO argv naming a subject the hint IS the context.
+  #     This is #1341's no-flags passthrough — it must still reach `pr_check`,
+  #     and a context it cannot resolve must be a SKIP, never a pass. `gh` is the
+  #     failing stub, so the arm also proves the arm cannot silently reach GitHub.
+  for hint in AO_PR_NUMBER PR_NUMBER; do
+    out="$(env PATH="$stub_bin:$PATH" "$hint=1396" bash "$0" --repo "$scratch" 2>&1)"
+    rc=$?
+    if [ "$rc" -eq 2 ] && [[ "$out" == *"PR #1396"* ]]; then
+      printf '  OK    with no argv, %s still selects the PR context (rc 2, a SKIP that names PR #1396)\n' "$hint"
+    else
+      printf '  FAIL  with no argv, %s no longer reaches pr_check (rc=%s)\n%s\n' "$hint" "$rc" "$out" >&2
+      ok=1
+    fi
+  done
+  # (d) the mutant: the ambient-first resolution restored. It must be hijacked,
+  #     naming the ambient PR — otherwise the control above proves nothing. It
+  #     lives inside the scratch repo (with a copy of the real gate-paths list,
+  #     made by case 12b) because the script derives both its own repo root and
+  #     that list from `BASH_SOURCE`. The pattern is ANCHORED at column 0: an
+  #     unanchored one would also match this very line and delete the arm.
+  prec_mutant="$scratch/scripts/check-pr-contract.ambient-first.sh"
+  sed -e '/^# --- BEGIN #1396 precedence block/,/^# --- END #1396 precedence block/c\PR_NUMBER="${_PR_NUMBER:-${PR_NUMBER:-}}"' "$0" >"$prec_mutant"
+  if cmp -s "$0" "$prec_mutant"; then
+    echo "check-pr-contract: SELFTEST FAIL — the ambient-precedence mutant is byte-identical to this script; the mutation proved nothing" >&2
+    ok=1
+  else
+    out="$(env PATH="$stub_bin:$PATH" PR_NUMBER=1396 bash "$prec_mutant" "${hijack_argv[@]}" 2>&1)"
+    rc=$?
+    if [ "$rc" -ne "$clean_rc" ] && [[ "$out" == *"PR #1396"* ]]; then
+      printf '  OK    the mutant that resolves the ambient name unconditionally IS hijacked by PR #1396; the control is load-bearing\n'
+    else
+      printf '  FAIL  the ambient-first mutant was not hijacked (rc=%s)\n%s\n' "$rc" "$out" >&2
+      ok=1
+    fi
+    rm -f "$prec_mutant"
+  fi
+
+  # --- the inertness record cannot rot (#1396) ------------------------------
+  dout="$(denylist_inertness "$(denylist_path)")"
+  drc=$?
+  if [ "$drc" -eq 0 ] && [ -z "$dout" ]; then
+    printf '  OK    the seam is RECORDED as unexercised while denylisted (%s), and verify.sh still wires it\n' "$denylist_marker"
+  else
+    printf '  FAIL  the real denylist/verify.sh pair does not satisfy the inertness record (rc=%s)\n%s\n' "$drc" "$dout" >&2
+    ok=1
+  fi
+  # the mutant: the same denylist with the record stripped must be refused BY NAME.
+  dmutant="$work/check-denylist.no-record.txt"
+  grep -vF "$denylist_marker" "$(denylist_path)" >"$dmutant"
+  if cmp -s "$(denylist_path)" "$dmutant"; then
+    echo "check-pr-contract: SELFTEST FAIL — the denylist mutant is byte-identical to the real record; the mutation proved nothing" >&2
+    ok=1
+  else
+    dout="$(denylist_inertness "$dmutant")"
+    drc=$?
+    if [ "$drc" -ne 0 ] && [[ "$dout" == *"denylist-inertness-undeclared"* ]]; then
+      printf '  OK    a denylisted seam whose record is missing is refused BY NAME; the record is load-bearing\n'
+    else
+      printf '  FAIL  a denylisted seam with no record was accepted (rc=%s)\n%s\n' "$drc" "$dout" >&2
+      ok=1
+    fi
+  fi
+
   rm -rf "$work"
   if [ "$ok" -ne 0 ]; then
     echo "check-pr-contract: SELFTEST FAIL — the gate cannot detect every violation it defines" >&2
@@ -1800,7 +2012,7 @@ if [ -n "${PR_NUMBER:-}" ]; then
 fi
 
 if [ -z "$body_file" ]; then
-  echo "check-pr-contract: CANNOT-ASSESS — pr-context-missing: no --pr, no \$_PR_NUMBER/\$PR_NUMBER, and no PR body file (--body-file or AO_PR_BODY_FILE); a missing body is not a pass" >&2
+  echo "check-pr-contract: CANNOT-ASSESS — pr-context-missing: no --pr, no --body-file/AO_PR_BODY_FILE, and no \$AO_PR_NUMBER/\$_PR_NUMBER/\$PR_NUMBER hint to fall back on; a missing body is not a pass" >&2
   exit 2
 fi
 if [ ! -f "$body_file" ]; then

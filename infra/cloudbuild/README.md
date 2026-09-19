@@ -196,6 +196,53 @@ attestation for a different commit, recording something that is not an outcome
 (a PARKED run writes none), or older than `AO_ATTEST_MAX_AGE` (default 6h) is
 refused by name. `--self-test` proves those refusals offline, in dry-run.
 
+### The venue of record has to agree before a green is published (issue #1400)
+
+`ao/gate-of-record` has **two** producers: a box-side driver (a landing/train
+runner with `gh` already authenticated) and the `verify` step above. Only the
+second one is the **venue of record**, and until #1400 nothing made the first
+one check whether the second disagreed. Measured on the train head `f300954d`
+of #1398:
+
+| moment (UTC) | what happened |
+|---|---|
+| `03:51:19` | box-side `post --rc 0` publishes `ao/gate-of-record = success` |
+| `03:51:19` | the Cloud Build run for the **same** sha opens its check-run `control-plane-verify (purebliss-ghl)` |
+| `03:53:43` | box-side `post --rc 0` again — this is the status that **stands** |
+| `04:19:01` | that run concludes **FAILURE** (`check-reconcile: FAIL (1 violation)`, build `32cb10f7`) |
+
+So the required check read green for a commit whose own CI run was red, and the
+guard that consumes it (`scripts/pr-queue.sh`) reads the **status**, never the
+run. `scripts/gate-status.sh` now refuses that, in one place both producers go
+through:
+
+- a post that is **not** the venue reporting its own verdict does not publish
+  `success` while the venue's run for that commit is **red** — or still
+  **running**. The second half is the half that closes the measured case: the
+  standing green was posted *while the run was in flight*, so "refuse on a red"
+  alone would still have published it;
+- an **unreadable** venue verdict is `CANNOT-ASSESS`, never an agreement — the
+  control fails closed;
+- a **red gate is never blocked**: the guard gates `success` only, so reporting a
+  failure is always allowed;
+- the venue names itself with `--venue-run "$BUILD_ID"` (the line above), because
+  its own run is still in flight while it posts. Cloud Build exports that
+  built-in into every step, so the marker is the environment's claim rather than
+  an author's.
+- `scripts/gate-status.sh reconcile --sha <sha>` is the other half, and it exists
+  because the halves are not symmetric in **time**: a green published before the
+  venue produced any run for the commit cannot be refused at post time. The verb
+  withdraws a standing green (`state=error`, naming the build in `target_url`) —
+  it can only ever publish a **non-success**, so it cannot become a second way to
+  satisfy the context.
+
+The honest consequence for a box-side driver: it must **wait for the venue's run
+to conclude** before a green of its own is accepted. `scripts/check-gate-status-venue-agreement.sh`
+(wired into `make verify` by the discovery layer) provokes every arm of this —
+the measured case, the contradicting red, the healthy path, the venue's own
+report, an unreadable verdict, a conclusion nobody enumerated, and a **mutant
+with the guard removed**, which must restore the false green.
+
 ### Owner step — create the token secret ONCE (not run by this task)
 
 A fine-grained GitHub PAT scoped to `statuses:write` on this repo only:
