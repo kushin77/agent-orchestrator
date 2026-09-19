@@ -4,27 +4,32 @@
     {
       "id": "board-sync-plugin",
       "kind": "plugin",
-      "declaration": "plugins/board-sync-plugin/SKILL.md"
+      "declaration": "plugins/board-sync-plugin/SKILL.md",
+      "allowed_runtimes": ["claude-session", "claude-subagent"]
     },
     {
       "id": "claim-gate-check",
       "kind": "plugin",
-      "declaration": "plugins/claim-gate-check/SKILL.md"
+      "declaration": "plugins/claim-gate-check/SKILL.md",
+      "allowed_runtimes": ["claude-session", "claude-subagent", "deepseek-sister"]
     },
     {
       "id": "mcp-tool-projection",
       "kind": "skill",
-      "declaration": "library/mcp-tool-projection/SKILL.md"
+      "declaration": "library/mcp-tool-projection/SKILL.md",
+      "allowed_runtimes": ["claude-session", "claude-subagent", "deepseek-sister", "deepseek-executor", "copilot-agent", "hermes", "paperclip"]
     },
     {
       "id": "sme-card-authoring",
       "kind": "skill",
-      "declaration": "library/sme-card-authoring/SKILL.md"
+      "declaration": "library/sme-card-authoring/SKILL.md",
+      "allowed_runtimes": ["claude-session", "claude-subagent"]
     },
     {
       "id": "ticket-contract-read",
       "kind": "skill",
-      "declaration": "library/ticket-contract-read/SKILL.md"
+      "declaration": "library/ticket-contract-read/SKILL.md",
+      "allowed_runtimes": ["claude-session", "claude-subagent", "deepseek-sister", "deepseek-executor", "copilot-agent", "hermes", "paperclip"]
     }
   ]
 }

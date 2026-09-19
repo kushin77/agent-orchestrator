@@ -92,8 +92,19 @@ make_mutant "escalate-from-brain" '{"from":"brain","to":"brain","type":"escalate
 make_mutant "escalate-bad-severity" '{"from":"sister","to":"brain","type":"escalate","correlation_id":"directive-0001","severity":"max"}'
 make_mutant "control-from-sister" '{"from":"sister","to":"brain","type":"directive","control":"poke"}'
 make_mutant "control-bad-action" '{"from":"brain","to":"sister","type":"directive","control":"fly"}'
+# Per-runtime allowlists for verbs, skills and secrets (issue #1273, parent
+# #1268). fleet.override is irreversible and NOT in deepseek-executor's
+# allowed_runtimes (control-plane/control/verbs.yaml) — a real, provokable
+# refusal, not a fixture the validator could pass vacuously.
+make_mutant "verb-not-allowed" '{"schema":2,"from":"director","to":"dispatcher","type":"directive","runtime":"deepseek-executor","task":{"kind":"work","issue":1,"verb":"fleet.override"}}'
+make_mutant "skill-not-allowed" '{"schema":2,"from":"director","to":"dispatcher","type":"directive","runtime":"deepseek-executor","task":{"kind":"work","issue":1,"skill":"board-sync-plugin"}}'
+make_mutant "secret-not-allowed" '{"schema":2,"from":"director","to":"dispatcher","type":"directive","runtime":"deepseek-executor","task":{"kind":"work","issue":1,"secret":"projects/example/secrets/agent-x-signing-key"}}'
+# Laundering: deepseek-executor is denied fleet.override, so it asks a
+# permitted runtime (claude-session, the sender) to run it "on its behalf" —
+# refused under the ORIGINATING runtime's name, not the intermediary's.
+make_mutant "verb-laundering" '{"schema":2,"from":"director","to":"dispatcher","type":"directive","runtime":"claude-session","on_behalf_of":"deepseek-executor","task":{"kind":"work","issue":1,"verb":"fleet.override"}}'
 
-for mutant in bad-type bad-tier bad-thinking missing-role sister-issues misaddressed ack-no-correlation brain-acks escalate-missing-correlation escalate-from-brain escalate-bad-severity control-from-sister control-bad-action; do
+for mutant in bad-type bad-tier bad-thinking missing-role sister-issues misaddressed ack-no-correlation brain-acks escalate-missing-correlation escalate-from-brain escalate-bad-severity control-from-sister control-bad-action verb-not-allowed skill-not-allowed secret-not-allowed verb-laundering; do
   if $channel verify --message "$work/$mutant.json" >/dev/null 2>&1; then
     echo "  FAIL  mutant '$mutant' was accepted (the channel cannot refuse invalid traffic)" >&2
     fail=$((fail + 1))
@@ -124,6 +135,31 @@ if $channel verify --message "$work/valid-control.json" >/dev/null 2>&1; then
   echo "  OK    a valid control directive validates"
 else
   echo "  FAIL  a valid control directive was refused (over-strict contract)" >&2
+  fail=$((fail + 1))
+fi
+
+# Each allowlist refusal must name the offender, not just fail generically.
+check_needle() { # check_needle <mutant> <needle>
+  out="$($channel verify --message "$work/$1.json" 2>&1)"
+  if printf '%s' "$out" | grep -qF "$2"; then
+    echo "  OK    mutant '$1' named '$2'"
+  else
+    echo "  FAIL  mutant '$1' did not name '$2':" >&2
+    printf '%s\n' "$out" | sed 's/^/          /' >&2
+    fail=$((fail + 1))
+  fi
+}
+check_needle "verb-not-allowed" "verb-not-allowed:deepseek-executor:fleet.override"
+check_needle "skill-not-allowed" "skill-not-allowed:deepseek-executor:board-sync-plugin"
+check_needle "secret-not-allowed" "secret-not-allowed:deepseek-executor:projects/example/secrets/agent-x-signing-key"
+check_needle "verb-laundering" "laundering:deepseek-executor:fleet.override"
+
+# A verb the runtime IS allowed must still pass (the gate is not over-strict).
+printf '%s\n' '{"schema":2,"from":"director","to":"dispatcher","type":"directive","runtime":"claude-session","task":{"kind":"work","issue":1,"verb":"fleet.override"}}' > "$work/valid-verb-allowed.json"
+if $channel verify --message "$work/valid-verb-allowed.json" >/dev/null 2>&1; then
+  echo "  OK    a verb the runtime IS allowed still validates"
+else
+  echo "  FAIL  a permitted runtime/verb pair was refused (over-strict contract)" >&2
   fail=$((fail + 1))
 fi
 

@@ -34,6 +34,30 @@
       "format": "date-time",
       "description": "ISO-8601 UTC timestamp; stamped by the channel when absent."
     },
+    "runtime": {
+      "enum": [
+        "claude-session",
+        "claude-subagent",
+        "deepseek-sister",
+        "deepseek-executor",
+        "copilot-agent",
+        "hermes",
+        "paperclip"
+      ],
+      "description": "The SENDER's runtime id (issue #1273, parent #1268), from the closed vocabulary fleet/runtimes.yaml declares. Optional on read (a message with no runtime is judged only on role/hierarchy, as before), but once present it is checked against `control-plane/control/verbs.yaml::allowed_runtimes` (task.verb), `integrations/paperclip/adapters/skills` (task.skill) and `integrations/paperclip/adapters/secrets` (task.secret) allowlists by `fleet/channel.py::validate`. A verb/skill/secret outside the sender runtime's list is refused by name (verb-not-allowed:<runtime>:<verb> / skill-not-allowed:<runtime>:<skill> / secret-not-allowed:<runtime>:<secret>)."
+    },
+    "on_behalf_of": {
+      "enum": [
+        "claude-session",
+        "claude-subagent",
+        "deepseek-sister",
+        "deepseek-executor",
+        "copilot-agent",
+        "hermes",
+        "paperclip"
+      ],
+      "description": "Cross-session permission laundering guard: the runtime this directive's action is REALLY being carried out for (e.g. a denied deepseek-executor asking a permitted runtime to run the same verb for it). When present, the ORIGINATING runtime's allowlist is checked in addition to the sender's — a denial on either side refuses the whole directive as laundering:<on_behalf_of>:<verb>."
+    },
     "correlation_id": {
       "type": "string",
       "description": "Binds a result/ack to the directive that caused it."
@@ -77,6 +101,18 @@
         "issue": { "type": "integer", "minimum": 1 },
         "epic": { "type": "integer", "minimum": 1 },
         "lane": { "type": "string" },
+        "verb": {
+          "type": "string",
+          "description": "A control-plane verb (control-plane/control/verbs.yaml id) this directive invokes. Checked against the sender runtime's (and, if on_behalf_of is set, the originating runtime's) allowed_runtimes at spawn/dispatch (issue #1273)."
+        },
+        "skill": {
+          "type": "string",
+          "description": "A skill id (integrations/paperclip/adapters/skills registry) this directive loads. Checked against the sender runtime's allowlist (issue #1273)."
+        },
+        "secret": {
+          "type": "string",
+          "description": "A secret's gsm_path (integrations/paperclip/adapters/secrets catalog) this directive reads. Checked against the sender runtime's allowlist (issue #1273); never the secret's value (GR-6)."
+        },
         "title": { "type": "string", "description": "Optional title, used by the brain's FinOps floor check (a security/auth/IaC order never dispatches at flash/none)." },
         "files": {
           "type": "array",
