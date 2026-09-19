@@ -83,6 +83,49 @@
 #   (honoured / STALE / malformed / closed tracker / broken anchor) are driven
 #   through the decision function directly.
 #
+# ============================================================================
+# DECLARED vs LIVE (issue #1415) — the half a PARSE cannot see either
+# ============================================================================
+#
+#   `disabled: true` in a `*-trigger.yaml` is a DECLARATION. Until #1415 nothing
+#   in this gate read what the project actually RUNS, so the check was green
+#   while all three control-plane triggers were ENABLED: a control that reads
+#   only the declaration cannot fail, and one that fails OPEN is worse than none.
+#
+#   THE LIVE HALF IS RECORDED, NOT CALLED. It is read from
+#   `infra/cloudbuild/live-triggers.json` — a read-only inventory carrying the
+#   project, the instant and the exact `gcloud builds triggers list` command that
+#   produced it — so the comparison is deterministic, sandbox-safe, and never
+#   claims to have contacted GCP. A missing or unreadable inventory is
+#   CANNOT-ASSESS (2), never a pass: "I could not ask" and "they agree" are not
+#   the same answer.
+#
+#   Three disagreements are named, and nothing else is: the declaration ships
+#   `disabled: true` while the live trigger is ENABLED; the declared trigger SHAPE
+#   differs from the live one (a 1st-gen `github:` block cannot describe a 2nd-gen
+#   trigger); and a live trigger for this repository has no declaration at all.
+#   A declaration with no live trigger is NOT a finding — these files are
+#   importable templates, and nothing requires a template to be live.
+#
+#   THE BASELINE — same NAMED, TRACKED, SHRINK-ONLY contract as
+#   `template-baseline.txt`: `infra/cloudbuild/live-baseline.txt` carries
+#   `name <TAB> #tracker <TAB> reason`, a row is honoured ONLY while its
+#   disagreement is live (bring the trigger in line and the row is STALE and the
+#   gate fails until it is deleted), the reason comes from a closed vocabulary,
+#   the tracker must be OPEN in the committed board snapshot, and malformed,
+#   duplicated or glob-shaped rows fail rather than being skipped. Every honoured
+#   row is REPORTED by name.
+#
+# PROVEN ON EVERY RUN (GR-12)
+#   The provocation drives the SAME decision function the repository run uses: a
+#   clean pair must find nothing, each of the three disagreements must be refused
+#   BY NAME when unbaselined, the same finding must be accepted AND reported when
+#   its row exists, that row must be refused as STALE once the drift is gone,
+#   and the MUTANT — the rule replaced by one that matches nothing — must stop
+#   refusing its own drift, so each refusal is shown to come from the rule under
+#   test. The baseline's own controls (malformed / duplicate / invented reason /
+#   glob-shaped name) are driven through the loader directly.
+#
 # EXIT CONTRACT (the repo's honesty tri-state, guardrails/honesty)
 #   0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (python3, git or the board snapshot is
 #   unavailable — never a pass).
@@ -144,7 +187,7 @@ else:
     if doc.get("disabled") is not True:
         errs.append(f"{rel}: must ship disabled: true (GR-5)")
     subs = doc.get("substitutions") or {}
-    if subs.get(flag) != "false":
+    if flag and subs.get(flag) != "false":
         errs.append(f"{rel}: substitution {flag} must be \"false\"")
     fn = doc.get("filename")
     if not fn:
@@ -158,13 +201,28 @@ sys.exit(1 if errs else 0)
 PY
   rc=$?
   if [ "$rc" -eq 0 ]; then
-    printf '  OK    %s (disabled, %s=false)\n' "$file" "$flag"
+    if [ -n "$flag" ]; then
+      printf '  OK    %s (disabled, %s=false)\n' "$file" "$flag"
+    else
+      printf '  OK    %s (disabled)\n' "$file"
+    fi
   fi
   return "$rc"
 }
 
-check_trigger "$cb_dir/verify-trigger.yaml" _ENABLE_VERIFY "$cb_dir/verify.yaml" || fail=$((fail + 1))
-check_trigger "$cb_dir/apply-trigger.yaml"  _ENABLE_APPLY  "$cb_dir/apply.yaml"  || fail=$((fail + 1))
+# EVERY declaration file, not just the two that were wired first (#1415): a
+# `disabled: true` rule that reads two of five `*-trigger.yaml` is green on the
+# three it does not read. The flag assertion stays only where the file declares
+# one -- a trigger whose only switch is its own `disabled` field (the web-image
+# declaration) has no `_ENABLE_*` key to mirror, and inventing one here would
+# assert a contract the file does not claim.
+while IFS= read -r trigger; do
+  case "${trigger##*/}" in
+    verify-trigger.yaml) check_trigger "$trigger" _ENABLE_VERIFY "$cb_dir/verify.yaml" || fail=$((fail + 1)) ;;
+    apply-trigger.yaml)  check_trigger "$trigger" _ENABLE_APPLY  "$cb_dir/apply.yaml"  || fail=$((fail + 1)) ;;
+    *)                   check_trigger "$trigger" "" "" || fail=$((fail + 1)) ;;
+  esac
+done < <(find "$cb_dir" -maxdepth 1 -name '*-trigger.yaml' -type f | LC_ALL=C sort)
 
 # ---------------------------------------------------------------------------
 # Submission-time templates (issue #1369). The rule, the baseline contract and
@@ -465,6 +523,178 @@ def evaluate(findings, rows, states):
     return accepted, refusals
 
 
+# --- declared vs live (issue #1415) -----------------------------------------
+
+LIVE_INVENTORY = "live-triggers.json"
+LIVE_BASELINE = "live-baseline.txt"
+LIVE_REASONS = ("declared-disabled-live-enabled", "declared-shape-differs", "live-not-declared")
+NAME_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def load_inventory(path):
+    """The recorded live inventory. Never a silent empty read: an inventory that
+    cannot be read is CANNOT-ASSESS, because "I could not ask" is not an answer."""
+    if not path.is_file():
+        cannot_assess(
+            "the recorded live inventory %s is missing, so declared == live cannot be asked at "
+            "all; record it with (read-only) `gcloud builds triggers list --project=<project> "
+            "--format=json`" % os.path.relpath(str(path), str(root)))
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        cannot_assess("the recorded live inventory %s cannot be read (%s)" % (path.name, exc))
+    if not isinstance(doc, dict) or not isinstance(doc.get("triggers"), list):
+        cannot_assess("the recorded live inventory %s has no 'triggers' list" % path.name)
+    return doc
+
+
+def declared_triggers(directory):
+    """Every `*-trigger.yaml` as the declaration the live state is compared to.
+    ALL of them: a rule that reads a subset is green on the files it skips."""
+    out = []
+    for f in sorted(Path(directory).glob("*-trigger.yaml")):
+        doc = yaml_doc(f)
+        if not isinstance(doc, dict):
+            continue
+        if "repositoryEventConfig" in doc:
+            shape = "repositoryEventConfig"
+        elif "github" in doc:
+            shape = "github"
+        elif "pubsub" in doc:
+            shape = "pubsub"
+        else:
+            shape = "none"
+        out.append({"name": str(doc.get("name") or f.name), "path": "%s/%s" % (cb_rel, f.name),
+                    "disabled": doc.get("disabled") is True,
+                    "filename": str(doc.get("filename") or ""), "shape": shape})
+    return out
+
+
+def drift(declared, live, detector=True):
+    """(findings, notes) — the three disagreements, and nothing else.
+
+    `detector=False` is the MUTANT: the walk is identical and the rule matches
+    nothing, so the provocation can show each refusal comes from this rule and
+    not from the pair of documents existing.
+    """
+    by_name = {str(t.get("name") or ""): t for t in live}
+    findings, notes = [], []
+    for decl in declared:
+        found = by_name.get(decl["name"])
+        if found is None:
+            notes.append("  note  %s — declared at %s with no live trigger: an importable "
+                         "declaration is not required to be live" % (decl["name"], decl["path"]))
+            continue
+        if detector and decl["disabled"] and found.get("disabled") is not True:
+            findings.append({"kind": "declared-disabled-live-enabled", "name": decl["name"],
+                             "path": decl["path"], "detail":
+                             "the declaration ships disabled: true and the live trigger is ENABLED"})
+        if detector and decl["shape"] != str(found.get("shape") or ""):
+            findings.append({"kind": "declared-shape-differs", "name": decl["name"],
+                             "path": decl["path"], "detail":
+                             "the declaration is %s-shaped and the live trigger is %s"
+                             % (decl["shape"], found.get("shape"))})
+    known = {decl["name"] for decl in declared}
+    for found in live:
+        name = str(found.get("name") or "")
+        if detector and name not in known:
+            findings.append({"kind": "live-not-declared", "name": name,
+                             "path": str(found.get("filename") or ""), "detail":
+                             "a live trigger for this repository has no declaration under %s/" % cb_rel})
+    return findings, notes
+
+
+def load_live_baseline(path):
+    """Rows and structural errors. An absent baseline is an empty one."""
+    rows, errors, seen = [], [], set()
+    if not path.is_file():
+        return rows, errors
+    where_base = os.path.relpath(str(path), str(root))
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        where = "%s:%d" % (where_base, lineno)
+        cols = raw.split("\t")
+        if len(cols) != 3:
+            errors.append("%s MALFORMED — 3 tab-separated columns expected, got %d" % (where, len(cols)))
+            continue
+        name, tracker, reason = (c.strip() for c in cols)
+        if not NAME_OK.match(name):
+            errors.append("%s MALFORMED — %r is not a trigger name (no globs, no wildcards)" % (where, name))
+            continue
+        if not TRACKER.match(tracker):
+            errors.append("%s MALFORMED — tracker %r is not #<issue>" % (where, tracker))
+            continue
+        if reason not in LIVE_REASONS:
+            errors.append("%s MALFORMED — reason %r is not in the vocabulary %s"
+                          % (where, reason, list(LIVE_REASONS)))
+            continue
+        if (name, reason) in seen:
+            errors.append("%s DUPLICATE — %s is already baselined for %s" % (where, name, reason))
+            continue
+        seen.add((name, reason))
+        rows.append({"name": name, "tracker": tracker, "reason": reason})
+    return rows, errors
+
+
+def evaluate_live(findings, rows, states):
+    """(accepted, refusals) — the decision, with no knowledge of files or git."""
+    accepted, refusals = [], []
+    index = {(r["name"], r["reason"]): r for r in rows}
+    for finding in findings:
+        row = index.get((finding["name"], finding["kind"]))
+        if row is None:
+            refusals.append(dict(finding, detail="%s — and it is not baselined in %s/%s"
+                                 % (finding["detail"], cb_rel, LIVE_BASELINE)))
+        else:
+            accepted.append(dict(finding, tracker=row["tracker"]))
+    live = {(f["name"], f["kind"]) for f in findings}
+    for row in rows:
+        if (row["name"], row["reason"]) not in live:
+            refusals.append(dict(row, kind="STALE", path="%s/%s" % (cb_rel, LIVE_BASELINE), detail=(
+                "%s no longer disagrees with the live trigger — the exception must be removed, "
+                "not carried" % row["name"])))
+        state = states.get(int(row["tracker"].lstrip("#")))
+        if state == "closed":
+            refusals.append(dict(row, kind="TRACKER-CLOSED", path="%s/%s" % (cb_rel, LIVE_BASELINE),
+                                 detail="the tracking issue it defers to is CLOSED in the board snapshot"))
+    return accepted, refusals
+
+
+def report_live():
+    """The declared-vs-live half, printed as evidence rather than claimed."""
+    print("== cloudbuild declared vs live (issue #1415) ==")
+    inv = load_inventory(root / cb_rel / LIVE_INVENTORY)
+    print("  live: project %s, captured %s, by %s"
+          % (inv.get("project"), inv.get("captured_at"), inv.get("captured_by")))
+    print("  live: recorded with `%s`" % inv.get("command"))
+    declared = declared_triggers(root / cb_rel)
+    live = inv["triggers"]
+    rows, errors = load_live_baseline(root / cb_rel / LIVE_BASELINE)
+    states = tracker_states()
+    findings, notes = drift(declared, live)
+    accepted, refusals = evaluate_live(findings, rows, states)
+    for note in notes:
+        print(note)
+    for error in errors:
+        print("  FAIL  %s" % error, file=sys.stderr)
+    for item in accepted:
+        print("  QUAR  %s %s — accepted exception tracked by %s (%s)"
+              % (item["path"], item["name"], item["tracker"], item["kind"]))
+    for item in refusals:
+        print("  FAIL  %s %s (%s) — %s"
+              % (item.get("path", ""), item.get("name", ""), item["kind"], item["detail"]),
+              file=sys.stderr)
+    unbaselined = [r for r in refusals if r["kind"] not in ("STALE", "TRACKER-CLOSED")]
+    for decl in declared:
+        print("  decl  %-34s disabled=%s shape=%s filename=%s"
+              % (decl["name"], decl["disabled"], decl["shape"], decl["filename"]))
+    print("  live: %d trigger(s) live for this repository — %d declaration(s), %d disagreement(s) "
+          "(%d baselined, %d unbaselined), %d structural error(s)"
+          % (len(live), len(declared), len(findings), len(accepted), len(unbaselined), len(errors)))
+    return len(errors) + len(refusals)
+
+
 # --- the repository run -----------------------------------------------------
 
 
@@ -648,6 +878,92 @@ def arms():
     arm("anchor probe: the same read the other way is refused", "ANCHOR",
         "ANCHOR" if any("ANCHOR" in e for e in errors) else "none")
 
+    # --- declared vs live (issue #1415) -------------------------------------
+    # The pure decision function, driven in both directions. The fixture trigger
+    # is named `t`; nothing here reads the repository's own inventory.
+    one_decl = [{"name": "t", "path": "%s/t-trigger.yaml" % cb_rel, "disabled": True,
+                 "filename": "%s/t.yaml" % cb_rel, "shape": "repositoryEventConfig"}]
+    one_live_off = [{"name": "t", "disabled": True, "filename": "%s/t.yaml" % cb_rel,
+                     "shape": "repositoryEventConfig"}]
+    one_live_on = [dict(one_live_off[0], disabled=False)]
+    one_live_old = [dict(one_live_off[0], shape="github")]
+    live_row = {"name": "t", "tracker": "#1415", "reason": "declared-disabled-live-enabled"}
+
+    def live_kinds(declared, live, detector=True):
+        found, _ = drift(declared, live, detector=detector)
+        return ",".join(f["kind"] for f in found) or "clean"
+
+    def live_refused(declared, live, rows, states=None, detector=True):
+        found, _ = drift(declared, live, detector=detector)
+        _, out = evaluate_live(found, rows, {1415: "open"} if states is None else states)
+        return ",".join(r["kind"] for r in out) or "none"
+
+    arm("live: a declaration and a live trigger that agree find nothing", "clean",
+        live_kinds(one_decl, one_live_off))
+    arm("live: declared disabled while the live trigger is ENABLED is a finding",
+        "declared-disabled-live-enabled", live_kinds(one_decl, one_live_on))
+    arm("live: a 1st-gen declaration against a 2nd-gen live trigger is a finding",
+        "declared-shape-differs", live_kinds(one_decl, one_live_old))
+    arm("live: a live trigger with no declaration is a finding", "live-not-declared",
+        live_kinds(one_decl, one_live_off + [dict(one_live_off[0], name="other")]))
+    arm("live: a declaration with no live trigger is NOT a finding", "clean",
+        live_kinds(one_decl + [dict(one_decl[0], name="dormant")], one_live_off))
+    arm("live: the unbaselined drift is refused by name", "declared-disabled-live-enabled",
+        live_refused(one_decl, one_live_on, []))
+    arm("live: the same drift baselined by an OPEN tracker is accepted", "none",
+        live_refused(one_decl, one_live_on, [live_row]))
+    arm("live: a row whose drift is gone is STALE", "STALE",
+        live_refused(one_decl, one_live_off, [live_row]))
+    arm("live: a row whose tracker is CLOSED is refused", "TRACKER-CLOSED",
+        live_refused(one_decl, one_live_on, [live_row], states={1415: "closed"}))
+    arm("live: mutant (rule off) stops refusing its own drift", "none",
+        live_refused(one_decl, one_live_on, [], detector=False))
+
+    # The baseline's own controls, through the loader.
+    lb = scratch / LIVE_BASELINE
+    lb.write_text("t\t#1415\tdeclared-disabled-live-enabled\n", encoding="utf-8")
+    rows, errors = load_live_baseline(lb)
+    arm("live-baseline: a well-formed row loads", "1/0", "%d/%d" % (len(rows), len(errors)))
+    lb.write_text("t\t#1415\tbecause-i-said-so\n", encoding="utf-8")
+    rows, errors = load_live_baseline(lb)
+    arm("live-baseline: an invented reason is MALFORMED", "MALFORMED",
+        "MALFORMED" if any("MALFORMED" in e for e in errors) else "none")
+    lb.write_text("t*\t#1415\tdeclared-disabled-live-enabled\n", encoding="utf-8")
+    rows, errors = load_live_baseline(lb)
+    arm("live-baseline: a glob-shaped name is MALFORMED", "MALFORMED",
+        "MALFORMED" if any("MALFORMED" in e for e in errors) else "none")
+    lb.write_text("t\t1415\tdeclared-disabled-live-enabled\n", encoding="utf-8")
+    rows, errors = load_live_baseline(lb)
+    arm("live-baseline: a tracker that is not #<issue> is MALFORMED", "MALFORMED",
+        "MALFORMED" if any("MALFORMED" in e for e in errors) else "none")
+    lb.write_text("t\t#1415\tdeclared-disabled-live-enabled\n"
+                  "t\t#1415\tdeclared-disabled-live-enabled\n", encoding="utf-8")
+    rows, errors = load_live_baseline(lb)
+    arm("live-baseline: a duplicate row is DUPLICATE", "DUPLICATE",
+        "DUPLICATE" if any("DUPLICATE" in e for e in errors) else "none")
+
+    # The repository's own pair, so the control is shown to be load-bearing on
+    # THIS tree and not only on fixtures.
+    inv = load_inventory(root / cb_rel / LIVE_INVENTORY)
+    real_declared = declared_triggers(root / cb_rel)
+    real_live = inv["triggers"]
+    real_findings, _ = drift(real_declared, real_live)
+    real_rows, real_errors = load_live_baseline(root / cb_rel / LIVE_BASELINE)
+    real_ok, real_bad = evaluate_live(real_findings, real_rows, tracker_states())
+    enabled_live = [t for t in real_live if t.get("disabled") is not True]
+    arm("live: the inventory records project, instant and command", "ok",
+        "ok" if (inv.get("project") and inv.get("captured_at") and inv.get("command")) else "missing")
+    arm("live: every live trigger for this repository is declared", "0",
+        str(len([t for t in real_live
+                 if str(t.get("name") or "") not in {d["name"] for d in real_declared}])))
+    arm("live: every ENABLED live trigger is a named finding", "0",
+        str(len([t for t in enabled_live
+                 if str(t.get("name") or "") not in {f["name"] for f in real_findings}])))
+    arm("live: the repository's own rows are well formed", "0", str(len(real_errors)))
+    arm("live: no finding in this tree is left unbaselined", "0", str(len(real_bad)))
+    arm("live: every finding in this tree is baselined by an open tracker",
+        "%d" % len(real_findings), "%d" % len(real_ok))
+
     print("== cloudbuild submission templates: provocation ==")
     bad = 0
     for name, expect, actual, ok in results:
@@ -660,6 +976,7 @@ def arms():
 
 
 problems = report()
+problems += report_live()
 problems += arms()
 sys.exit(1 if problems else 0)
 PY

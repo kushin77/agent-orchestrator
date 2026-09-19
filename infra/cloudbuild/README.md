@@ -77,6 +77,44 @@ promotion that reached the trigger but not the plan is visible as `false`
 in the deploy record. `_DEPLOYER_SA` is still supplied at import (never
 hard-coded, GR-6), and the apply stays fail-closed behind `_ENABLE_APPLY`.
 
+## Declared vs live: the gate compares the declarations to what actually runs (#1415)
+
+`disabled: true` in a `*-trigger.yaml` is a **declaration**. Until #1415 the gate
+read only the declarations, so it was green while all three control-plane
+triggers were ENABLED — a control that reads one side of a comparison cannot
+fail, and one that fails *open* is worse than none.
+
+The live side is **recorded, not called**:
+
+| what | where |
+|---|---|
+| the live inventory | `infra/cloudbuild/live-triggers.json` — carries the project, the instant, the account and the exact read-only command that produced it |
+| the accepted exceptions | `infra/cloudbuild/live-baseline.txt` — `name <TAB> #tracker <TAB> reason`, honoured only while the disagreement is live |
+
+Refresh it (read-only — it mutates nothing):
+
+```bash
+gcloud builds triggers list --project=purebliss-ghl --format=json > infra/cloudbuild/live-triggers.json
+```
+
+The three disagreements it names, and nothing else:
+
+- the declaration ships `disabled: true` while the live trigger is **ENABLED**;
+- the declared trigger **shape** differs from the live one (a 1st-gen `github:`
+  block cannot describe a 2nd-gen trigger);
+- a live trigger for this repository has **no declaration** at all.
+
+A declaration with **no** live trigger is not a finding: these files are importable
+templates, and nothing requires a template to be live.
+
+Measured 2026-09-19, as committed in `infra/cloudbuild/live-triggers.json`: three
+triggers live for this repository, all three **ENABLED**, all three declared
+`disabled: true`. The gate therefore reports three *baselined* disagreements
+tracked by #1415, and fails **by name** on any disagreement that is not in the
+baseline. Bring a live trigger in line and its row goes **STALE** — the gate fails
+naming it until the row is deleted, so the baseline can only shrink by fixing the
+drift.
+
 ## Why this exists (issue #6)
 
 The repo gate of record is `make verify`, runnable with no network and no
@@ -85,17 +123,28 @@ containers. When a real GCP project exists (a later deploy concern), the
 only way infrastructure changes reach GCP — executed by the deployer SA, never
 by a human in a console.
 
-## The verify runner posts `ao/gate-of-record` (issue #1350)
+## The Cloud Build venue does NOT post `ao/gate-of-record` (issue #1415)
 
-The now-required status check `ao/gate-of-record` (#1342) needs a producer on
-the PR head. `verify.yaml`'s `verify` step runs the gate of record (via
-`scripts/verify.sh verify` — the same entrypoint `make verify` uses), captures
-its rc, publishes it with `scripts/gate-status.sh post --attestation
-.verify/attestation.json`, and then exits with that same `$rc`. Publishing can
-therefore never turn a red gate green, and the check-run stays truthful to the
-gate.
+`ao/gate-of-record` is required on `master` (#1342) and has exactly **one**
+producer: the box-side runner rung, publishing through `scripts/verify.sh` →
+the one poster, `scripts/gate-status.sh post`. It used to have two: #1354 added a
+poster step to `verify.yaml`, so this venue published a **second** status for the
+same commit while the runner published the first. Two producers of one required
+context is the drift class #1342/#1382 exists for — and both described the same
+`make verify` run.
 
-### The commit under review comes from the gate's own record, not the trigger
+**The poster step is gone.** `verify.yaml`'s `verify` step runs the gate of
+record (via `scripts/verify.sh verify` — the same entrypoint `make verify` uses),
+captures its rc, and exits with it. Nothing in that step reads a secret, and
+nothing in it can fail for a reason other than the gate's own verdict.
+
+### What the removed step measured — the record a re-introduction must not lose
+
+*Everything below in this subsection describes the step #1415 removed. It is kept
+because each item cost a CI round trip, and a future poster in this venue would
+hit both of them again.*
+
+#### The commit under review came from the gate's own record, not the trigger
 
 `$COMMIT_SHA` is a built-in Cloud Build populates for **push/tag** triggers; on
 a `pull_request`-triggered build it is **empty**. Measured on build
@@ -125,7 +174,7 @@ Secret Manager (`gcloud secrets versions access`) and exports it as `GH_TOKEN`
 for the poster, which falls back from `gh` to a raw authenticated `curl` call
 when `gh` is absent.
 
-### An unreadable token skips the POST — the gate still runs and still reports its rc
+#### An unreadable token skipped the POST — the gate still ran and still reported its rc
 
 The build must not spend the gate's verdict to publish it. Cloud Build resolves
 `availableSecrets` **before any step runs**, so declaring the PAT there made an
@@ -160,7 +209,7 @@ produces no `ao/gate-of-record` status**, so the required check has no
 *automatic* producer and merges ride the operator override — the gap recorded in
 `docs/RELEASE-PLAN.md` §4/§5.
 
-### Ordering: what has to exist before the check can be relied on
+#### Ordering that applied to the removed step
 
 1. **secret** — create `ao-gate-status-token` and grant the build SA read
    access (commands below);
@@ -178,6 +227,11 @@ Until all four hold, this repository's `ao/gate-of-record` check has no
 override (`enforce_admins: false` in
 `governance/platform/branch-protection.yaml`) rather than by satisfying it.
 That gap is recorded in `docs/RELEASE-PLAN.md` §4/§5, not hidden here.
+
+**None of that is needed now (#1415).** The runner rung produces the context, the
+venue posts nothing, and `ao-gate-status-token` is no longer read by any build —
+so the secret's remaining role is to be **deleted** once the declarations have
+held for 7 days (see "Owner step" below).
 
 ### The same producer, run locally (no GH_TOKEN needed)
 
@@ -198,11 +252,14 @@ refused by name. `--self-test` proves those refusals offline, in dry-run.
 
 ### The venue of record has to agree before a green is published (issue #1400)
 
-`ao/gate-of-record` has **two** producers: a box-side driver (a landing/train
+`ao/gate-of-record` had **two** producers: a box-side driver (a landing/train
 runner with `gh` already authenticated) and the `verify` step above. Only the
-second one is the **venue of record**, and until #1400 nothing made the first
-one check whether the second disagreed. Measured on the train head `f300954d`
-of #1398:
+second one was the **venue of record**, and until #1400 nothing made the first
+one check whether the second disagreed. **Since #1415 the venue posts nothing, so
+the box-side driver is the single producer** — the guard below stays in
+`scripts/gate-status.sh` because a venue that posts is one `verify.yaml` edit
+away, and its check (`scripts/check-gate-status-venue-agreement.sh`) still
+provokes every arm. Measured on the train head `f300954d` of #1398:
 
 | moment (UTC) | what happened |
 |---|---|
@@ -243,26 +300,40 @@ the measured case, the contradicting red, the healthy path, the venue's own
 report, an unreadable verdict, a conclusion nobody enumerated, and a **mutant
 with the guard removed**, which must restore the false green.
 
-### Owner step — create the token secret ONCE (not run by this task)
+### Owner step — DELETE the token secret and the triggers (not run by this task, #1415)
 
-A fine-grained GitHub PAT scoped to `statuses:write` on this repo only:
+None of this runs from a lane. Every command below is a **live mutation** of the
+project, so it is an OWNER step, and the deletion half is additionally gated on
+**the declarations having held for 7 days** (#1415 step 4) — it cannot be
+done today, and no lane may do it:
 
 ```bash
-# 1. Create the secret from the PAT (read from stdin, never as a CLI arg/file):
-echo -n "<the fine-grained PAT>" | gcloud secrets create ao-gate-status-token \
-  --data-file=- --replication-policy=automatic
+# 1. Bring the three declarations' live state in line with what the repo declares
+#    (they currently read ENABLED while every *-trigger.yaml ships disabled: true):
+gcloud builds triggers update control-plane-verify      --region=us-central1 --no-disabled
+#    ^ the flag is the MUTATION form; the DE-ENERGISE form is:
+gcloud builds triggers update control-plane-verify      --region=us-central1 --disabled
+gcloud builds triggers update control-plane-web-image   --region=us-central1 --disabled
+gcloud builds triggers update control-plane-apply       --region=us-central1 --disabled
 
-# 2. Grant the Cloud Build service account read access to it:
-gcloud secrets add-iam-policy-binding ao-gate-status-token \
-  --member="serviceAccount:1056038104733-compute@developer.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
+# 2. After 7 days with the declarations holding (#1415 step 4), delete them:
+gcloud builds triggers delete control-plane-verify      --region=us-central1 --quiet
+gcloud builds triggers delete control-plane-web-image   --region=us-central1 --quiet
+gcloud builds triggers delete control-plane-apply       --region=us-central1 --quiet
+
+# 3. And the Secret Manager token the removed poster read (nothing reads it now):
+gcloud secrets delete ao-gate-status-token --quiet
+
+# 4. Re-record the live inventory, which is what turns this file's baseline rows
+#    STALE and forces their deletion (they may not outlive the drift):
+gcloud builds triggers list --project=purebliss-ghl --format=json   # -> infra/cloudbuild/live-triggers.json
 ```
 
-Do (1) **before** relying on the check: without the secret the `verify` build
-still runs the gate and still reports its own rc, but it posts nothing (the
-`SKIPPED` line above), so the required status has to come from somewhere else —
-a lane invoking the poster locally, or the operator override. With the secret in
-place the build supplies the status itself.
+Do step (4) **after** step (1) or (2): while the three live triggers still read
+ENABLED, the baseline rows in `infra/cloudbuild/live-baseline.txt` are live and
+this gate stays green; as soon as they are disabled or deleted, those rows are
+STALE and `make verify` fails naming them until they are removed. That is the
+point — the exception cannot outlive the drift it excuses.
 
 
 ## Web surface (issue #258)

@@ -1,0 +1,36 @@
+# infra/cloudbuild/live-baseline.txt — ACCEPTED declared-vs-live exceptions (#1415).
+#
+# One TAB-separated row per accepted exception. Read by
+# `scripts/check-cloudbuild.sh` (wired into `make verify`) against the recorded
+# live inventory `infra/cloudbuild/live-triggers.json`.
+#
+# Format — exactly three columns, tab-separated, no globs and no wildcard
+# prefixes (a glob would absorb a newly planted trigger name and quietly
+# restore the hole this rule closes):
+#
+#   <trigger-name> <TAB> #tracker <TAB> <reason>
+#
+# The honest part — what keeps this list from becoming a permanent excuse:
+#
+#   * a row is honoured ONLY while its disagreement is live. Bring the live
+#     trigger in line with the declaration (or delete it) and refresh
+#     live-triggers.json, and the row is STALE: this gate fails, naming it,
+#     until the row is deleted. The list can only shrink by fixing the drift.
+#   * the reason must come from the closed vocabulary this gate declares
+#     (`declared-disabled-live-enabled`, `declared-shape-differs`,
+#     `live-not-declared`) — a row may not invent one.
+#   * the tracker must be OPEN in the committed board snapshot
+#     (`.board/snapshot.json`, read offline); a CLOSED tracker fails by name.
+#   * malformed, duplicated or glob-shaped rows FAIL rather than being skipped,
+#     and every honoured row is REPORTED by name in the gate's output.
+#
+# The rows below are therefore a NAMED, TRACKED gap, not a fix: the three
+# control-plane triggers are DECLARED `disabled: true` and are LIVE ENABLED, so
+# the platform still runs `control-plane-verify` and `control-plane-web-image`
+# per push and holds an `control-plane-apply` route. Bringing them in line is a
+# `gcloud builds triggers update --disabled` (a live mutation, so it is an
+# OWNER step, never a lane step), and #1415's own 7-day hold gates deleting
+# them. This file is what makes that gap visible instead of silent.
+control-plane-apply	#1415	declared-disabled-live-enabled
+control-plane-web-image	#1415	declared-disabled-live-enabled
+control-plane-verify	#1415	declared-disabled-live-enabled
