@@ -983,15 +983,27 @@ record. `scripts/check-runtime-liveness.sh` (in `make verify`) judges them:
 runtime-stale:<id>          the beat is older than the window (3600s by default)
 runtime-drift:<id>          the beat's commit trails origin/master and no directive is in flight
 runtime-unregistered:<id>   a beat exists for an id the contract does not declare
+runtime-unbeaten:<id>       registered, and no beat has EVER been recorded here — a GAP, never a red
 ```
 
-A runtime that stops beating is `runtime-stale:<id>` — "never reported" is the
-maximum case of "too old". The gate also **drives every producer** on a scratch
+A runtime that stops beating is `runtime-stale:<id>`. The judge holds that rule for
+every runtime that HAS beaten — once the fleet has started beating, "never reported"
+is the maximum case of "too old" — but the gate names the two facts APART on a real
+tree, because a tree where no producer is installed cannot supply the difference. A
+registered runtime with no beat at all is `runtime-unbeaten:<id>`: a **named gap**,
+printed and never a red, because no producer was ever installed for it here (a lane
+worktree has no cron, and a beat the gate faked would go stale inside the window and
+red again). A beat that EXISTS and has passed the window stays a red. The gate's
+`reframe_controls` provokes that split on every run.
+
+The gate also **drives every producer** on a scratch
 fleet before it judges anything (`--producers`): seven fresh beats must be judged
 live, and a backdated one must be named by name with the other six NOT named. That
 stage exists because the alternative was measured: #1376 landed the registry, the
 adapter and the judge, and nothing wrote a beat, so the gate could only ever say
-`no-beats-yet` — inert, and unable to tell a dead runtime from a silent one.
+`no-beats-yet` — inert, and unable to tell a dead runtime from a silent one. It is
+also what keeps the gap from being a weakening: "beat, then stopped" is proven red on
+every run, on a fleet the gate builds itself.
 
 ### Who writes each beat
 
