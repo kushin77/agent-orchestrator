@@ -75,6 +75,55 @@ permanently malformed order is retired instead of re-dispatched forever.
 
 `check --without <field>` is the documented provocation of that contract.
 
+## Admission: the three judges are CALLED here (issue #1413)
+
+Three judges landed outside this package — `registry/service/identity.py::resolve_actor`
+(#1371), `governance/spawn/tiering.py::judge` (#1372) and `fleet/channel.py`'s
+per-runtime verb/skill/secret allowlists (#1377) — and **nothing called them at
+the spawn point**. `render.py` only renders an already-admitted envelope, so a
+lane could still be spawned at a forbidden tier or by an actor nobody had ever
+declared, and all three judges were inert.
+
+`model.admission_refusals()` is the caller, and it runs inside `validate()`, so no
+path can admit a document without being judged:
+
+| judge | input | refusal (its owning module's own name) |
+|-------|-------|----------------------------------------|
+| actor (#1275) | `spawn.actor` | `actor-unresolved:<actor>` |
+| FinOps tier (#1272) | `spawn.role` + `spawn.task_class` + `spawn.tier`/`spawn.model` | `FINOPS-ROLE-NOT-ALLOWED: …` |
+| allowlists (#1273) | `spawn.runtime` + `spawn.verbs`/`skills`/`secrets` | `verb-not-allowed:<runtime>:<verb>` (and `skill-not-allowed`, `secret-not-allowed`) |
+
+The `spawn` block is also where the lane-binding values `{runtime, role, tier,
+actor}` (#1301's `isolation open` vocabulary) are **stored**, so `make tagging`
+and any auditor can read the spend shape of a spawn from its envelope instead of
+inferring it from the environment the spawn happened to run in. They are
+materialised by `governance/spawn/admission.py::spawn_record`, resolved from the
+flags (`--runtime`, `--role`, `--tier`, `--model`, `--class`, `--actor`, `--verb`
+/ `--skill` / `--secret`), then the `AO_RUNTIME`/`AO_ROLE`/`AO_MODEL_TIER`/
+`AO_TASK_CLASS`/`AO_ACTOR`/`AO_SPAWN_*` variables, then the declarations the
+tables already make (the runtime both paths run, the role the path speaks as, the
+class's own `defaultTier` floored at `security.floorTier`).
+
+* **Declared is judged, absent is resolved.** A spawn that asks for nothing is
+  judged at its class's cheapest capable tier and admitted; a spawn that asks for
+  the opus rung for an L0-capped class is refused by name. `--model claude-opus-5`
+  works because the ladder in `gateway/finops/tiers.yaml` is the only place a
+  model's tier is written down.
+* **Admission runs before anything exists.** `cli.py open` admits *before* it
+  takes the claim and *before* it mints the lane, so a refused spawn strands
+  nothing. `scripts/check-spawn-envelope.sh` proves the order by driving a refused
+  spawn with minting ENABLED and requiring the mint never to have been attempted.
+* **One control per judge, and it must be able to fail.** The gate drives a
+  negative control per judge through the real CLI, then removes that judge's call
+  from a copy of `model.py` and requires the control to STOP being refused — a
+  refusal that survives its judge being deleted was never that judge's.
+
+Two of the four lane-binding values reach the lane record itself: `cli.py open`
+passes `--runtime` and `--actor` to `governance/isolation`, which records them
+(#1301). `role` and `tier` are **not** fields of the isolation record, so they
+live in this envelope (`.fleet/spawn/<session>.json`) until that record declares
+them.
+
 ## A run in flight is the marker's own evidence
 
 `fleet/watchdog.py::run_in_flight()` used to ask whether a run marker's `pid` was
