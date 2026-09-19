@@ -4,10 +4,10 @@
   "tracked_by": "#1338",
   "tracking": {
     "state": "open",
-    "measured_at": "2026-09-18T20:07:12Z",
-    "measured_by": "governance/reconcile (issue #1311 lane)",
+    "measured_at": "2026-09-19T20:52:05Z",
+    "measured_by": "reconcile lease refresh (issue #1485 lane)",
     "max_age_hours": 24,
-    "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1338 -> state=open at 2026-09-18T20:07:12Z"
+    "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1338 -> state=open at 2026-09-19T20:52:05Z"
   },
   "venue": {
     "git_common_dir": "/home/akushnir/agent-orchestrator/.git",
