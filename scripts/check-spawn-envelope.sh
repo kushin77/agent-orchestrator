@@ -34,6 +34,14 @@
 #   6. The one-gate-per-worktree bound is provoked with a REAL second gate: the
 #      envelope names the worktree, and a second `scripts/gate-lock.sh acquire` in
 #      that same worktree must be REFUSED (rc 10) naming the holder.
+#   7. The three admission judges that landed outside this module (#1377
+#      allowlists, #1372 `tiering.judge`, #1371 `resolve_actor`) are CALLED, at
+#      this admission point, before anything is created: each has ONE negative
+#      control driven through the real CLI with minting ENABLED, and ONE mutation
+#      arm that removes that judge's call from a copy of `governance/spawn/model.py`
+#      and requires the control to STOP being refused. A refusal that survives its
+#      judge being deleted was never that judge's — a control that cannot fail is a
+#      formality (GR-12), so the gate measures the failure instead of asserting it.
 #
 # Every scratch artifact lives under a unique /tmp directory, and every gate-lock
 # call gets its own permit store via `AO_GATE_LOCK_ROOT`, so this gate never
@@ -54,12 +62,14 @@ cd "$root" || exit 2
 required_files=(
   "governance/spawn/__init__.py"
   "governance/spawn/model.py"
+  "governance/spawn/admission.py"
   "governance/spawn/sources.py"
   "governance/spawn/render.py"
   "governance/spawn/liveness.py"
   "governance/spawn/cli.py"
   "governance/spawn/README.md"
   "governance/spawn/tests/test_spawn_model.py"
+  "governance/spawn/tests/test_admission.py"
   "governance/spawn/tests/test_consumption.py"
   "fleet/terminal.py"
   "fleet/watchdog.py"
@@ -360,6 +370,189 @@ check(
 )
 note("the refusal was", refused.stderr.strip().splitlines()[0] if refused.stderr.strip() else "")
 
+# --- 3g. the three judges are called AT the admission point (issue #1413) ---
+# Each judge has ONE negative control, driven through the REAL CLI — with minting
+# ENABLED, so the refusal has to happen before anything is created — and ONE
+# mutation arm that removes that judge's call from a copy of `model.py` and
+# requires the control to stop being refused. The arm is what makes the control a
+# control: the gate measures that its refusal DEPENDS on the call, rather than
+# asserting that a refusal happened.
+from governance.spawn import admission  # noqa: E402  (the admission inputs' one producer)
+
+judge_root = work / "judges"
+judge_root.mkdir(parents=True, exist_ok=True)
+scratch_board(judge_root)
+mint_root = work / "judge-worktrees"
+mint_root.mkdir(parents=True, exist_ok=True)
+
+MUTANT_RUNNER = '''"""Load a MUTATED governance/spawn/model.py and judge one record with it."""
+import importlib.util
+import json
+import sys
+
+mutant, record_path, repo_root = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, repo_root)
+import governance.spawn  # noqa: F401,E402  the package, so the mutant has a parent
+spec = importlib.util.spec_from_file_location("governance.spawn.model", mutant)
+module = importlib.util.module_from_spec(spec)
+sys.modules["governance.spawn.model"] = module
+spec.loader.exec_module(module)
+record = json.loads(open(record_path, encoding="utf-8").read())
+print(json.dumps([refusal.line() for refusal in module.admission_refusals({"spawn": record})]))
+'''
+runner = judge_root / "mutant-runner.py"
+runner.write_text(MUTANT_RUNNER, encoding="utf-8")
+
+
+def cli_refusal_lines(stderr: str) -> list[str]:
+    """The refusal lines the CLI printed, without its own prefix."""
+    prefix = "spawn: REFUSED — "
+    return [line[len(prefix):] for line in stderr.splitlines() if line.startswith(prefix)]
+
+
+def judge_arm(judge: str, label: str, declarations: list, expected: str, spawn_overrides: dict) -> None:
+    """One control: the CLI refuses by name, and the mutation flips that refusal."""
+    result = spawn_cli(
+        ["open", "--issue", str(ISSUE), "--lane", LANE, "--agent", AGENT,
+         "--root", str(judge_root), "--worktree", str(local_wt), "--worktree-root", str(mint_root),
+         "--no-claim", *declarations],
+        judge_root,
+        local_env,
+    )
+    record = admission.spawn_record(
+        path="local", agent=AGENT, env={**os.environ, **local_env}, **spawn_overrides
+    )
+    real = [refusal.line() for refusal in model.admission_refusals({"spawn": record})]
+    mutated = run_mutant(judge, spawn_overrides)
+    refused_by_name = any(expected in line for line in real)
+    control = (
+        result.returncode == model.EXIT_REFUSED
+        and any(expected in line for line in cli_refusal_lines(result.stderr))
+        and refused_by_name
+        and cli_refusal_lines(result.stderr) == real
+        and "lane not minted" not in result.stderr
+        and "no lane was provisioned" in result.stderr
+        and "ADMITTED" not in result.stderr
+        and list(mint_root.iterdir()) == []
+    )
+    load_bearing = not any(expected in line for line in mutated) and real != mutated
+    print(
+        f"  arm   {label}: expect=refused-by-name leashed   "
+        f"actual={'refused' if refused_by_name else 'ADMITTED'}/"
+        f"{'flipped-by-mutation' if load_bearing else 'unchanged-by-mutation'}   "
+        f"ok={'YES' if control and load_bearing else 'NO'}",
+        flush=True,
+    )
+    if not control:
+        problems.append(f"the {label} control did not hold")
+        print(f"  FAIL  {label}: rc={result.returncode} stderr={result.stderr.strip()[-300:]}", file=sys.stderr, flush=True)
+    if not load_bearing:
+        problems.append(f"the {label} control survived its judge being removed")
+        print(f"  FAIL  {label}: the control is not load-bearing (mutation changed nothing)", file=sys.stderr, flush=True)
+
+
+def run_mutant(judge: str, spawn_overrides: dict) -> list:
+    """The same record judged by a copy of model.py with ONE judge call removed."""
+    source = (repo / "governance" / "spawn" / "model.py").read_text(encoding="utf-8")
+    anchor = f"    findings += admission.{judge}_findings(record)  # ADMISSION-JUDGE-{judge.upper()}"
+    if source.count(anchor) != 1:
+        raise SystemExit(
+            f"check-spawn-envelope: CANNOT-ASSESS — the {judge!r} admission call anchor "
+            f"{anchor.strip()!r} appears {source.count(anchor)} time(s) in governance/spawn/model.py"
+        )
+    mutant = judge_root / f"model-mutant-{judge}.py"
+    mutant.write_text(
+        source.replace(
+            anchor,
+            f"    pass  # MUTANT: the ADMISSION-JUDGE-{judge.upper()} call was removed to prove "
+            "its control is load-bearing",
+        ),
+        encoding="utf-8",
+    )
+    record_path = judge_root / f"record-{judge}.json"
+    record_path.write_text(
+        json.dumps(
+            admission.spawn_record(
+                path="local", agent=AGENT, env={**os.environ, **local_env}, **spawn_overrides
+            )
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(runner), str(mutant), str(record_path), str(repo)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"check-spawn-envelope: CANNOT-ASSESS — the {judge!r} mutation runner failed: "
+            f"{result.stderr.strip()[-300:]}"
+        )
+    return json.loads(result.stdout)
+
+
+from governance.spawn import admission  # noqa: E402  (the admission inputs' one producer)
+
+judge_arm(
+    "actor",
+    "judge 1 — an undeclared actor cannot open a lane",
+    ["--actor", "definitely-not-declared-anywhere"],
+    "actor-unresolved:definitely-not-declared-anywhere",
+    {"actor": "definitely-not-declared-anywhere"},
+)
+judge_arm(
+    "tier",
+    "judge 2 — a spawn at the opus rung (L2) for an L0-capped class",
+    ["--model", "claude-opus-5", "--class", "code-author"],
+    "FINOPS-ROLE-NOT-ALLOWED",
+    {"model": "claude-opus-5", "task_class": "code-author"},
+)
+judge_arm(
+    "allowlist",
+    "judge 3 — a verb the runtime may not call",
+    ["--runtime", "deepseek-sister", "--actor", "deepseek-sister", "--verb", "closure.close"],
+    "verb-not-allowed:deepseek-sister:closure.close",
+    {"runtime": "deepseek-sister", "actor": "deepseek-sister", "verbs": ["closure.close"]},
+)
+
+# The vacuity guard: the same spawn with the offending declaration removed IS
+# admitted, and the mint IS attempted — so "the lane was never minted" above is
+# about the ORDER, not about minting being switched off.
+admitted_again = spawn_cli(
+    ["open", "--issue", str(ISSUE), "--lane", LANE, "--agent", AGENT,
+     "--root", str(judge_root), "--worktree", str(local_wt), "--worktree-root", str(mint_root),
+     "--no-claim", "--runtime", "claude-subagent", "--role", "claude-subagent", "--tier", "L0",
+     "--class", "code-author", "--actor", "claude-subagent", "--json"],
+    judge_root,
+    local_env,
+)
+check(
+    "the same spawn with nothing forbidden IS admitted, and the mint is attempted after admission",
+    admitted_again.returncode == model.EXIT_OK
+    and "lane not minted" in admitted_again.stderr,
+    f"rc={admitted_again.returncode} {admitted_again.stderr.strip()[-200:]}",
+)
+try:
+    admitted_document = json.loads(admitted_again.stdout)
+except json.JSONDecodeError:
+    admitted_document = {}
+    print("  FAIL  the admitted spawn printed no document (#1413 arm)", file=sys.stderr, flush=True)
+    problems.append("the admitted spawn printed no document (#1413 arm)")
+admitted_binding = admitted_document.get("spawn", {}) if isinstance(admitted_document, dict) else {}
+check(
+    "the admitted envelope stores the four lane-binding values (#1301: runtime, role, tier, actor)",
+    {key: admitted_binding.get(key) for key in ("runtime", "role", "tier", "actor")}
+    == {"runtime": "claude-subagent", "role": "claude-subagent", "tier": "L0", "actor": "claude-subagent"},
+    json.dumps(admitted_binding),
+)
+check(
+    "the admitted envelope validates, and its rendered block NAMES the admission it was granted",
+    bool(admitted_document)
+    and model.validate(admitted_document) == []
+    and "runtime=claude-subagent" in render.envelope_block(admitted_document)
+    and "tier=L0" in render.envelope_block(admitted_document),
+    str(model.validate(admitted_document))[:200] if admitted_document else "no document",
+)
 # --- 3c. EVERY required field is refused BY NAME, one at a time ------------
 if document:
     target = work / "envelope.json"
@@ -578,5 +771,5 @@ if [ "$fail" -gt 0 ]; then
   echo "check-spawn-envelope: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-spawn-envelope: OK — one versioned envelope from one producer is consumed by both spawn paths, every required field is refused BY NAME with its own exit code, the local path is admitted and refused for real against its own board, the fleet prompt IS that envelope's rendering, run_in_flight() decides on the marker's own evidence and reports the contradiction, and a real second gate in the envelope's worktree is refused (AO-GR-22)"
+echo "check-spawn-envelope: OK — one versioned envelope from one producer is consumed by both spawn paths, every required field is refused BY NAME with its own exit code, the local path is admitted and refused for real against its own board, the fleet prompt IS that envelope's rendering, run_in_flight() decides on the marker's own evidence and reports the contradiction, a real second gate in the envelope's worktree is refused (AO-GR-22), and each of the three admission judges (#1377 allowlists, #1372 tiering.judge, #1371 resolve_actor) is CALLED at the spawn point with one negative control that a mutation proves is load-bearing (issue #1413)"
 exit 0
