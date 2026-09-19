@@ -14,6 +14,10 @@
 #   post    --sha <sha> --rc <0|1|2>     publish the gate's outcome for a commit
 #   post    --attestation <file>         publish the rc the GATE ITSELF recorded,
 #                                        bound to the commit it measured
+#   reconcile --sha <sha>                make the PUBLISHED context agree with the
+#                                        CI venue's own verdict for that commit,
+#                                        withdrawing a standing green the venue's
+#                                        run contradicts (see VENUE AGREEMENT)
 #   show    --sha <sha>                  read the combined status BACK
 #   dry-run --sha <sha> --rc <0|1|2>     print the request without sending it
 #   --self-test                          prove the token + attestation seams
@@ -45,6 +49,41 @@
 # CANNOT-ASSESS (2) -- this poster never claims a status it did not post -- and
 # the RUNNER decides what that costs (the Cloud Build step fails the build by
 # name rather than leaving a required check silently unproduced).
+#
+# VENUE AGREEMENT (issue #1400): this context has TWO producers -- a box-side
+# driver, and the Cloud Build verify step (infra/cloudbuild/verify.yaml) -- and
+# only the second one is the VENUE OF RECORD. Measured on the train head
+# f300954d of #1398: a box-side `post --rc 0` published `success` at 03:53:43Z
+# while the Cloud Build run for the SAME commit had existed since 03:51:19Z and
+# was still in flight; that run then concluded FAILURE at 04:19:01Z (build
+# 32cb10f7, `check-reconcile: FAIL (1 violation)`). So the required context read
+# green for a commit whose own CI run was red -- and the guard that reads it
+# (scripts/pr-queue.sh) reads the STATUS, never the run. A gate that fails open
+# is worse than no gate, so:
+#
+#   * a post that is NOT the venue reporting its own verdict must not publish
+#     `success` for a commit whose venue run is RED or still UN-CONCLUDED. The
+#     second half is the half that closes the measured hole: the standing green
+#     was posted while the run was in flight, so "refuse on a red" alone would
+#     have published it -- the contradiction did not exist YET;
+#   * an unreadable venue verdict is CANNOT-ASSESS (2), never an agreement: a
+#     control that cannot fail is a formality, and this one fails CLOSED;
+#   * a red gate is NEVER blocked. The guard gates `success` only, so reporting
+#     a failure is always allowed -- refusing to report a red is the other way
+#     this could have been built wrong;
+#   * the venue names itself with `--venue-run <build-id>` (Cloud Build sets
+#     $BUILD_ID, a built-in substitution). It cannot refuse its own in-flight
+#     run, because it IS that run -- and it is the source of truth for it. The
+#     marker must look like a build id, so the seam is a claim with a shape
+#     rather than free text; it is not an access boundary, because anyone
+#     holding the token can post a status directly, and this poster guards the
+#     AUTOMATIC second producer, not a forgery.
+#
+# `reconcile` is the other half of the same invariant, and it exists because the
+# halves are not symmetric in TIME: a green published before the venue produced
+# any run for the commit is not refusable at post time, so after the fact the
+# published context must be brought back into agreement -- a standing `success`
+# whose venue run concluded red is SUPERSEDED by an `error` that names the run.
 set -u
 
 # This script's own ABSOLUTE path, captured before the `cd` below: the self-test
@@ -63,6 +102,10 @@ CONTEXT="${AO_GATE_CONTEXT:-ao/gate-of-record}"
 # verdict". The gate writes the record when it finishes, so a producer posting
 # straight after a run sees seconds, not hours.
 ATTEST_MAX_AGE="${AO_ATTEST_MAX_AGE:-21600}"
+# The venue of record's own check, by the name its Cloud Build trigger gives it
+# (`control-plane-verify (purebliss-ghl)`). Prefix, because the suffix is the
+# project. Overridable so a fixture, and any future venue, can name its own.
+VENUE_CHECK_PREFIX="${AO_VENUE_CHECK_PREFIX:-control-plane-verify}"
 
 die() { printf 'gate-status: %s\n' "$1" >&2; exit "${2:-1}"; }
 
@@ -116,6 +159,148 @@ print(int(datetime.now(timezone.utc).timestamp() - when.timestamp()))
 PY
 }
 
+# --- venue agreement (issue #1400) ------------------------------------------
+# The venue of record's own verdicts for a commit, written to <out>. 0 read /
+# 2 unreadable -- and unreadable is never an agreement.
+fetch_venue_runs() { # <sha> <out-file>
+  local sha="$1" out="$2" rc=0
+  if command -v gh >/dev/null 2>&1; then
+    gh api "repos/$REPO/commits/$sha/check-runs" >"$out" 2>/tmp/gs-venue-err.txt || rc=$?
+  else
+    [ -n "$(resolve_token)" ] || { printf 'gh is absent and neither GH_TOKEN nor GITHUB_TOKEN is set\n' >/tmp/gs-venue-err.txt; return 2; }
+    curl -sS -H "Authorization: Bearer $(resolve_token)" \
+        -H 'Accept: application/vnd.github+json' \
+        "https://api.github.com/repos/$REPO/commits/$sha/check-runs" \
+        >"$out" 2>/tmp/gs-venue-err.txt || rc=$?
+  fi
+  [ "$rc" -eq 0 ] || return 2
+  [ -s "$out" ] || return 2
+  return 0
+}
+
+# Decide whether this commit's venue run AGREES with publishing `success`.
+# Prints THREE LINES -- verdict, reason, target URL -- never a TSV row: an empty
+# field in a TSV record collapses adjacent tabs and silently shifts every field
+# after it (docs/SHELL-PATTERNS.md SP-2), and this record has a field that is
+# EMPTY whenever the venue has no page to point at. `read_attestation` above
+# reads its fields the same way, for the same reason.
+#
+# The conclusions that AGREE are named, and everything else is a contradiction:
+# an unknown conclusion must not be read as agreement (a control that cannot
+# fail), and enumerating the red ones would make every new GitHub conclusion a
+# silent pass.
+venue_agreement() { # <runs-json-file>
+  python3 - "$1" "$VENUE_CHECK_PREFIX" <<'PY'
+import json
+import re
+import sys
+
+path, prefix = sys.argv[1], sys.argv[2]
+
+def answer(verdict, reason, url=""):
+    print(verdict)
+    print(reason)
+    print(url)
+    raise SystemExit(0)
+
+try:
+    with open(path) as fh:
+        data = json.load(fh)
+except (OSError, ValueError) as exc:
+    answer("unassessable", "the venue read is not readable JSON: %s" % exc)
+if not isinstance(data, dict):
+    answer("unassessable", "the venue read is not a JSON object")
+runs = data.get("check_runs")
+if not isinstance(runs, list):
+    answer("unassessable", "the venue read carries no check_runs array, so no verdict can be read from it")
+
+venue = [r for r in runs if isinstance(r, dict) and str(r.get("name") or "").startswith(prefix)]
+AGREES = {"success", "neutral", "skipped"}
+
+def build_of(run):
+    matched = re.search(r"/builds;region=[^/]+/([0-9a-fA-F-]{36})", str(run.get("details_url") or ""))
+    return matched.group(1) if matched else "build-unknown"
+
+reds = [r for r in venue if str(r.get("status")) == "completed" and str(r.get("conclusion")) not in AGREES]
+live = [r for r in venue if str(r.get("status")) != "completed"]
+if reds:
+    run = reds[0]
+    # The build URL travels as the third field even on a refusal: `reconcile`
+    # publishes it with the withdrawal, so the operator lands on the run that
+    # contradicts the green instead of hunting for it.
+    answer("refuse", "the CI venue's own run for this commit concluded '%s' (%s, %s)"
+           % (run.get("conclusion"), run.get("name"), build_of(run)), str(run.get("details_url") or ""))
+if live:
+    run = live[0]
+    # NOT settled yet -- which is NOT the same as a contradiction, and the two
+    # must stay distinguishable: `post` refuses both (the measured false green
+    # was published while the run was in flight), while `reconcile` withdraws on
+    # a real red only. Collapsing them would make reconcile withdraw a green
+    # because a build had merely started.
+    answer("unsettled", "the CI venue's own run for this commit has NOT concluded (%s, status '%s', started %s, %s) "
+                        "-- a second producer must not satisfy the required context before the venue of record speaks"
+           % (run.get("name"), run.get("status"), run.get("started_at") or "unknown", build_of(run)))
+if venue:
+    run = venue[-1]
+    answer("allow", "the CI venue's own run for this commit concluded '%s' (%s, %s)"
+           % (run.get("conclusion"), run.get("name"), build_of(run)), str(run.get("details_url") or ""))
+answer("allow", "the CI venue produced no run for this commit, so this post is the only producer it has")
+PY
+}
+
+# The status this poster has already published for a commit under CONTEXT, as
+# TWO LINES -- state, description -- with state `none` when there is no such
+# status. Newline-delimited for the same reason as `venue_agreement` above: a
+# description can be empty and a TSV row would mis-split it.
+# The payload reaches python as a FILE, never on stdin: `python3 - <<'PY'` reads
+# its PROGRAM from stdin, so a `printf ... | python3 - <<'PY'` would hand the
+# heredoc to the interpreter and leave the JSON unread -- measured while writing
+# the #1400 gate, where it silently answered `unassessable`/`none` for a status
+# that WAS published and exited 0, i.e. the withdrawal path would have no-opped
+# on a real false green. Two of that gate's arms failed on exactly this.
+published_state() { # <sha>
+  local sha="$1" out rc=0
+  if command -v gh >/dev/null 2>&1; then
+    out="$(gh api "repos/$REPO/commits/$sha/status" 2>/tmp/gs-status-err.txt)" || rc=$?
+  else
+    [ -n "$(resolve_token)" ] || return 2
+    out="$(curl -sS -H "Authorization: Bearer $(resolve_token)" \
+        -H 'Accept: application/vnd.github+json' \
+        "https://api.github.com/repos/$REPO/commits/$sha/status" 2>/tmp/gs-status-err.txt)" || rc=$?
+  fi
+  [ "$rc" -eq 0 ] || return 2
+  local payload
+  payload="$(mktemp /tmp/gs-published.XXXXXX)" || return 2
+  printf '%s' "$out" >"$payload"
+  python3 - "$payload" "$CONTEXT" <<'PY'
+import json
+import sys
+
+path, want = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as fh:
+        data = json.load(fh)
+except (OSError, ValueError) as exc:
+    print("unassessable")
+    print("%s" % exc)
+    raise SystemExit(0)
+if not isinstance(data, dict):
+    print("unassessable")
+    print("the status read is not a JSON object")
+    raise SystemExit(0)
+statuses = [s for s in (data.get("statuses") or []) if s.get("context") == want]
+if not statuses:
+    print("none")
+    print("no '%s' status is published on this commit" % want)
+else:
+    newest = statuses[0]
+    print(newest.get("state"))
+    print(newest.get("description") or "")
+PY
+  local printed=$?
+  rm -f "$payload"
+  return "$printed"
+}
 # GH_TOKEN takes precedence (this repo's own seam name); GITHUB_TOKEN is `gh`'s
 # own fallback convention, honored here too so a runner that only sets the
 # generic name still works. Prints nothing (empty) if neither is set.
@@ -216,24 +401,74 @@ command -v python3 >/dev/null 2>&1 || die "CANNOT-ASSESS — python3 not found" 
 rc=""
 sha=""
 attestation=""
+venue_run=""
 mode=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    post|show|dry-run) mode="$1" ;;
+    post|show|dry-run|reconcile) mode="$1" ;;
     --self-test) mode="self-test" ;;
     --sha) sha="${2:-}"; shift ;;
     --rc)  rc="${2:-}";  shift ;;
     --attestation) attestation="${2:-}"; shift ;;
+    --venue-run) venue_run="${2:-}"; shift ;;
     --repo) REPO="${2:-}"; shift ;;
-    -h|--help) sed -n '2,36p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,56p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" 1 ;;
   esac
   shift
 done
 
+# Cloud Build sets $BUILD_ID in every step it runs, so the venue of record names
+# itself without the recipe having to say so -- a second trigger added later is
+# safe by default, and its claim is the environment's, not the author's.
+[ -n "$venue_run" ] || venue_run="${BUILD_ID:-}"
+if [ -n "$venue_run" ] && [[ ! "$venue_run" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+  die "REFUSED — --venue-run '$venue_run' is not a build id (a UUID); the venue's own marker is a claim with a shape, not free text" 2
+fi
+
 [ "$mode" = "self-test" ] && { self_test; exit $?; }
 
-[ -n "$mode" ] || die "usage: $0 {post|show|dry-run} --sha <sha> [--rc <0|1|2> | --attestation <file>] | --self-test" 2
+[ -n "$mode" ] || die "usage: $0 {post|reconcile|show|dry-run} --sha <sha> [--rc <0|1|2> | --attestation <file>] [--venue-run <build-id>] | --self-test" 2
+
+# Publish ONE status for ONE commit. Both verbs that write go through here, so
+# the venue-agreement guard and the reporting path cannot drift apart.
+publish_status() { # <sha> <state> <description> [<target_url>]
+  local psha="$1" pstate="$2" pdesc="$3" purl="${4:-}"
+  if command -v gh >/dev/null 2>&1; then
+    if [ -n "$purl" ]; then
+      gh api -X POST "repos/$REPO/statuses/$psha" \
+          -f state="$pstate" -f context="$CONTEXT" -f description="$pdesc" -f target_url="$purl" \
+          >/dev/null 2>/tmp/gs-post-err.txt \
+        || die "CANNOT-ASSESS — the POST failed: $(head -c 200 /tmp/gs-post-err.txt)" 2
+    else
+      gh api -X POST "repos/$REPO/statuses/$psha" \
+          -f state="$pstate" -f context="$CONTEXT" -f description="$pdesc" \
+          >/dev/null 2>/tmp/gs-post-err.txt \
+        || die "CANNOT-ASSESS — the POST failed: $(head -c 200 /tmp/gs-post-err.txt)" 2
+    fi
+  else
+    # The token is resolved AT THE POINT OF USE and never held in a named
+    # assignment. Assigning it to a local whose name says "token" over a quoted
+    # value is a runtime read, not a credential -- but it is byte-for-byte the
+    # shape scripts/check-secrets.sh's generic-assignment detector must refuse,
+    # and that detector is RIGHT to refuse it: it cannot tell the two apart, so
+    # the SHAPE is what has to go, never the exemption (an exemption widened for
+    # a false positive is a hole for the real thing).
+    command -v curl >/dev/null 2>&1 || die "CANNOT-ASSESS — neither gh nor curl found; cannot post the status" 2
+    [ -n "$(resolve_token)" ] || die "CANNOT-ASSESS — gh not found and no GH_TOKEN/GITHUB_TOKEN in env; status not posted" 2
+    http_code="$(curl -sS -o /tmp/gs-post-err.txt -w '%{http_code}' \
+        -X POST "https://api.github.com/repos/$REPO/statuses/$psha" \
+        -H "Authorization: Bearer $(resolve_token)" \
+        -H 'Accept: application/vnd.github+json' \
+        -d "$(python3 -c 'import json,sys;print(json.dumps({k:v for k,v in zip(("state","context","description","target_url"),sys.argv[1:]) if v}))' "$pstate" "$CONTEXT" "$pdesc" "$purl")" \
+      2>/tmp/gs-post-err.txt)" || http_code="000"
+    case "$http_code" in
+      2??) : ;;
+      *) die "CANNOT-ASSESS — the POST failed (HTTP $http_code): $(head -c 200 /tmp/gs-post-err.txt)" 2 ;;
+    esac
+  fi
+  echo "gate-status: posted $CONTEXT=$pstate for ${psha:0:12} ($pdesc)"
+}
 
 case "$mode" in
   post|dry-run)
@@ -297,36 +532,107 @@ PY
       echo "  context     = $CONTEXT"
       echo "  state       = $state"
       echo "  description = $description"
+      echo "  venue guard = $([ "$state" = "success" ] && [ -z "$venue_run" ] && echo "runs at post time (this dry run writes nothing and reads nothing)" || echo "not applicable to this outcome")"
       exit 0
     fi
 
-    if command -v gh >/dev/null 2>&1; then
-      gh api -X POST "repos/$REPO/statuses/$sha" \
-          -f state="$state" -f context="$CONTEXT" -f description="$description" \
-          >/dev/null 2>/tmp/gs-post-err.txt \
-        || die "CANNOT-ASSESS — the POST failed: $(head -c 200 /tmp/gs-post-err.txt)" 2
-    else
-      # The token is resolved AT THE POINT OF USE and never held in a named
-      # assignment. Assigning it to a local whose name says "token" over a quoted
-      # value is a runtime read, not a credential -- but it is byte-for-byte the
-      # shape scripts/check-secrets.sh's generic-assignment detector must refuse,
-      # and that detector is RIGHT to refuse it: it cannot tell the two apart, so
-      # the SHAPE is what has to go, never the exemption (an exemption widened for
-      # a false positive is a hole for the real thing).
-      command -v curl >/dev/null 2>&1 || die "CANNOT-ASSESS — neither gh nor curl found; cannot post the status" 2
-      [ -n "$(resolve_token)" ] || die "CANNOT-ASSESS — gh not found and no GH_TOKEN/GITHUB_TOKEN in env; status not posted" 2
-      http_code="$(curl -sS -o /tmp/gs-post-err.txt -w '%{http_code}' \
-          -X POST "https://api.github.com/repos/$REPO/statuses/$sha" \
-          -H "Authorization: Bearer $(resolve_token)" \
-          -H 'Accept: application/vnd.github+json' \
-          -d "$(python3 -c 'import json,sys; print(json.dumps({"state": sys.argv[1], "context": sys.argv[2], "description": sys.argv[3]}))' "$state" "$CONTEXT" "$description")" \
-        2>/tmp/gs-post-err.txt)" || http_code="000"
-      case "$http_code" in
-        2??) : ;;
-        *) die "CANNOT-ASSESS — the POST failed (HTTP $http_code): $(head -c 200 /tmp/gs-post-err.txt)" 2 ;;
-      esac
+    # --- the venue of record must agree before a green is published ----------
+    # Only a `success` is guarded: refusing to report a red would be the same
+    # control built the other way round, and the red is the verdict the merge
+    # path most needs to see.
+    target_url=""
+    if [ "$state" = "success" ]; then
+      if [ -n "$venue_run" ]; then
+        echo "gate-status: build $venue_run is the venue of record reporting its own verdict, so its own in-flight run is not a contradiction" >&2
+      else
+        venue_json="$(mktemp /tmp/gs-venue.XXXXXX)" \
+          || die "CANNOT-ASSESS — no scratch file for the venue read" 2
+        if ! fetch_venue_runs "$sha" "$venue_json"; then
+          rm -f "$venue_json"
+          die "CANNOT-ASSESS — the CI venue's verdict for ${sha:0:12} could not be read ($(head -c 160 /tmp/gs-venue-err.txt 2>/dev/null)); an unread verdict is not an agreement, so no green is published" 2
+        fi
+        agreement="$(venue_agreement "$venue_json")"
+        rm -f "$venue_json"
+        venue_verdict="${agreement%%$'\n'*}"
+        venue_rest="${agreement#*$'\n'}"
+        venue_reason="${venue_rest%%$'\n'*}"
+        venue_url="${venue_rest#*$'\n'}"
+        case "$venue_verdict" in
+          allow)
+            target_url="$venue_url"
+            echo "gate-status: venue agreement — $venue_reason" >&2
+            ;;
+          refuse|unsettled)
+            die "REFUSED — no green is published for ${sha:0:12}: $venue_reason; the required context '${CONTEXT}' must be derived from the venue of record's own verdict on this commit, and a second producer (this one) may not satisfy it first" 2
+            ;;
+          *)
+            die "CANNOT-ASSESS — the venue agreement could not be decided: $venue_reason" 2
+            ;;
+        esac
+      fi
     fi
-    echo "gate-status: posted $CONTEXT=$state for ${sha:0:12} ($description)"
+
+    publish_status "$sha" "$state" "$description" "$target_url"
+    ;;
+
+  reconcile)
+    # The other half of the invariant, and it exists because post-time refusal is
+    # not symmetric in TIME: a green published BEFORE the venue produced any run
+    # for the commit cannot be refused at post time (there was nothing yet to
+    # contradict it), so the published context has to be brought back into
+    # agreement afterwards. This verb never publishes a green -- it can only
+    # withdraw one -- so it cannot become a second way to satisfy the context.
+    #
+    # `writes` is what the gate asserts on: this verb either posts a non-success
+    # or posts nothing at all.
+    [ -n "$sha" ] || die "CANNOT-ASSESS — --sha is required" 2
+    published="$(published_state "$sha")" || die "CANNOT-ASSESS — the published '${CONTEXT}' status for ${sha:0:12} could not be read ($(head -c 160 /tmp/gs-status-err.txt 2>/dev/null))" 2
+    pub_state="${published%%$'\n'*}"
+    pub_desc="${published#*$'\n'}"
+    case "$pub_state" in
+      success) ;;
+      none)
+        echo "gate-status: reconcile OK — nothing is published under '${CONTEXT}' on ${sha:0:12}, so there is no green to withdraw"
+        exit 0
+        ;;
+      *)
+        echo "gate-status: reconcile OK — the published '${CONTEXT}' on ${sha:0:12} is '$pub_state' ($pub_desc), not a green, so no withdrawal is owed"
+        exit 0
+        ;;
+    esac
+    reconcile_json="$(mktemp /tmp/gs-reconcile.XXXXXX)" \
+      || die "CANNOT-ASSESS — no scratch file for the venue read" 2
+    if ! fetch_venue_runs "$sha" "$reconcile_json"; then
+      rm -f "$reconcile_json"
+      die "CANNOT-ASSESS — the CI venue's verdict for ${sha:0:12} could not be read ($(head -c 160 /tmp/gs-venue-err.txt 2>/dev/null)), so whether the published green agrees with it cannot be decided" 2
+    fi
+    agreement="$(venue_agreement "$reconcile_json")"
+    rm -f "$reconcile_json"
+    venue_verdict="${agreement%%$'\n'*}"
+    venue_rest="${agreement#*$'\n'}"
+    venue_reason="${venue_rest%%$'\n'*}"
+    venue_url="${venue_rest#*$'\n'}"
+    case "$venue_verdict" in
+      allow)
+        echo "gate-status: reconcile OK — the published green on ${sha:0:12} agrees with the venue of record: $venue_reason"
+        exit 0
+        ;;
+      unsettled)
+        echo "gate-status: reconcile OK — nothing is withdrawn while the venue is still running: $venue_reason"
+        exit 0
+        ;;
+      refuse)
+        # Short on purpose: a commit-status description is capped at 140
+        # characters, and the BUILD that failed is the evidence an operator
+        # needs -- it travels in target_url, where the API allows a URL.
+        publish_status "$sha" error "WITHDRAWN: the CI venue's own run concluded against this commit" "$venue_url"
+        echo "gate-status: reconcile WITHDREW the standing green on ${sha:0:12} — $venue_reason" >&2
+        exit 0
+        ;;
+      *)
+        die "CANNOT-ASSESS — the venue agreement could not be decided: $venue_reason" 2
+        ;;
+    esac
     ;;
 
   show)

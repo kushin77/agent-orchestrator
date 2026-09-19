@@ -175,7 +175,15 @@ steps:
         # the source: it is empty on pull_request triggers -- the empty value is
         # read as "no claim" -- and when it IS populated a disagreement is
         # REFUSED, because an rc belongs only to the commit that was measured.
-        if ! bash scripts/gate-status.sh post --attestation .verify/attestation.json --sha "${COMMIT_SHA:-}"; then
+        #
+        # --venue-run marks this post as the VENUE OF RECORD reporting its own
+        # verdict (issue #1400). It is this build's own id -- a built-in
+        # substitution, so it is allowed here by name like PROJECT_ID -- and it
+        # is load-bearing: the poster refuses to publish a green for a commit
+        # whose venue run is red or still RUNNING, and THIS run is still running
+        # while it posts. Without the marker this step would refuse its own
+        # verdict and the required check would lose its only automatic producer.
+        if ! bash scripts/gate-status.sh post --attestation .verify/attestation.json --sha "${COMMIT_SHA:-}" --venue-run "$BUILD_ID"; then
           echo "gate-status: CANNOT-ASSESS -- the gate ran (rc $rc) but its status was not published"
           echo "  for the commit it measured; the build is not reported as a gated run."
           exit 2
