@@ -236,15 +236,24 @@ def neuter(venue, rel="scripts/verify.sh"):
     path.write_text(body, encoding="utf-8")
 
 
-def venue(name, fixture_rc=None, poster="stub", entries=()):
+def venue(name, fixture_rc=None, poster="stub", entries=(), moves=False):
     path = work / name
     shutil.rmtree(path, ignore_errors=True)
     copy_surface(path, REAL_POSTER if poster == "real" else ())
     neuter(path)
     if fixture_rc is not None:
-        write(path / "scripts" / "check-producer-fixture.sh",
-              "#!/usr/bin/env bash\nset -u\necho 'check-producer-fixture: rc %d'\nexit %d\n"
-              % (fixture_rc, fixture_rc), 0o755)
+        body = ("#!/usr/bin/env bash\nset -u\necho 'check-producer-fixture: rc %d'\nexit %d\n"
+                % (fixture_rc, fixture_rc))
+        if moves:
+            # A check that COMMITS while the gate is running -- the measured
+            # shape of a lane's tree moving under its own run (#1310/#1356).
+            body = ("#!/usr/bin/env bash\nset -u\nfx_root=\"$(dirname \"$0\")/..\"\n"
+                    "printf 'the tree moved under the run\\n' > \"$fx_root/moved.txt\"\n"
+                    "git -C \"$fx_root\" add moved.txt >/dev/null 2>&1\n"
+                    "git -C \"$fx_root\" -c user.name=fixture -c user.email=f@ao.invalid "
+                    "-c commit.gpgsign=false commit -q -m 'the tree moves mid-run' >/dev/null 2>&1\n"
+                    "echo 'check-producer-fixture: rc %d'\nexit %d\n" % (fixture_rc, fixture_rc))
+        write(path / "scripts" / "check-producer-fixture.sh", body, 0o755)
     write(path / "scripts" / "skip-budget.json",
           json.dumps({"schema": "ao.verify.skip-budget/v1", "entries": list(entries)}, indent=2) + "\n")
     if poster == "stub":
@@ -444,6 +453,16 @@ def verify_arms():
     arm("a publisher that is DEFINED but never CALLED publishes nothing "
         "(the static arm cannot see this; the behaviour arms can)",
         ok and not posts(rec), "%s rc=%s posts=%r" % (planted(ok), rc, posts(rec)))
+
+    # A verdict belongs to the commit the CHECKS ran against. A tree that moves
+    # mid-run is the measured #1310/#1356 shape, and a status for the later commit
+    # resting on a verdict reached on the earlier one is the fabricated green with
+    # a producer attached -- so the arm's fixture COMMITS while the gate runs.
+    moved = venue("moved-tree", 0, moves=True)
+    rc, out, rec = run_verify(moved)
+    arm("a tree that MOVED under the run publishes NOTHING and names the class",
+        not posts(rec) and any("MOVED under this run" in x for x in notes(out)),
+        "rc=%s posts=%r" % (rc, posts(rec)))
 
     # The rc the producer publishes must BE the run's verdict. A CANNOT-ASSESS
     # outcome (rc 2) is not a verdict of the gate of record, so it must not become

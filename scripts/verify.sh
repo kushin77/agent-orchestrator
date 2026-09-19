@@ -1000,6 +1000,19 @@ fi
 
 check_out_dir="$verify_dir/.check-out"
 mkdir -p "$check_out_dir"
+
+# --- the tree this run MEASURES (issue #1382) --------------------------------
+# The gate of record publishes a verdict FOR A COMMIT, so the commit has to be
+# the one the CHECKS ran against. `ATTEST_SHA` is read after the loop (it is the
+# commit the attestation carries), and on a shared box a lane's tree can move
+# under its own run: a commit landing mid-run leaves a run whose checks assessed
+# tree A while the record names tree B -- the #1310/#1356 class, measured here
+# (a gate admitted at 00:29:11Z, the lane's next commit 21 seconds later).
+# A status for B resting on a verdict reached on A is a fabricated green with a
+# producer attached, so the head is recorded HERE, before the first check, and
+# `publish_gate_of_record` refuses when the two disagree.
+publish_head_before="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+
 for entry in "${checks[@]}"; do
   name="${entry%%|*}"
   cmd="${entry#*|}"
@@ -1335,6 +1348,12 @@ fi
 #     reach it; a run that discovered NO check at all (the whole list denylisted
 #     or undiscovered) and a run in which every check answered CANNOT-ASSESS both
 #     publish nothing, and say which of the two they were by name.
+#   * NEVER attest a tree that MOVED under the run. The verdict belongs to the
+#     commit the checks ran against (`publish_head_before`, recorded before the
+#     first check), never to whatever `HEAD` happens to be when the attestation is
+#     written -- a commit landing mid-run is the #1310/#1356 class, and a status
+#     for the later commit resting on a verdict reached on the earlier one is the
+#     fabricated green wearing a producer's clothes.
 #   * NEVER let publishing change the verdict. Whether a status can be POSTED is
 #     a fact about the VENUE (the CI container ships no `gh`), not about the code
 #     under test, so a refusal is reported BY NAME and the run still exits with
@@ -1358,6 +1377,17 @@ publish_gate_of_record() {
       return 0
       ;;
   esac
+  # The tree must not have MOVED under the run. A verdict reached on one commit
+  # and attested for another is the fabricated-green class with a producer
+  # attached, so it is refused by name rather than published (#1310/#1356).
+  if [ -z "${publish_head_before:-}" ] || [ "$publish_head_before" = "unknown" ]; then
+    printf 'verify: NOTE -- the gate of record was NOT published for %s: the commit this run started on could not be read before the first check ran, so no verdict can be attributed to a commit with confidence\n' "${psha:0:12}"
+    return 0
+  fi
+  if [ "$publish_head_before" != "$psha" ]; then
+    printf 'verify: NOTE -- the gate of record was NOT published: the tree MOVED under this run (HEAD was %s before the first check, and the attestation names %s), so this verdict was reached on a different commit than a status would name (#1310/#1356)\n' "${publish_head_before:0:12}" "${psha:0:12}"
+    return 0
+  fi
   if [ "${ptotal:-0}" -le 0 ]; then
     printf 'verify: NOTE -- the gate of record was NOT published for %s: this run discovered NO check at all (the whole check list is denylisted or undiscovered), so it judged nothing to publish for\n' "${psha:0:12}"
     return 0
