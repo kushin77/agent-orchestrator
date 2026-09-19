@@ -149,6 +149,12 @@ class SessionIdentity:
     branch: str
     worktree: Path
     repo_slug: str = REPO_SLUG_DEFAULT
+    #: When ``open`` minted this record (UTC, ``YYYY-MM-DDTHH:MM:SSZ``), or ``""``
+    #: for a record written before the session plane existed (#917). The value
+    #: is what tells a session-aware rule that this lane OWES a heartbeat: a
+    #: legacy record owes none and is classified by the reconcile sweep instead,
+    #: so 33 pre-existing records (measured 2026-09-18) do not turn red at once.
+    opened_at: str = ""
 
     @property
     def author_name(self) -> str:
@@ -232,7 +238,7 @@ class SessionIdentity:
         return "\n".join(f"export {name}={shlex.quote(value)}" for name, value in sorted(self.env().items()))
 
     def to_json(self) -> dict:
-        return {
+        payload = {
             "session_id": self.session_id,
             "issue": self.issue,
             "agent_id": self.agent_id,
@@ -243,9 +249,15 @@ class SessionIdentity:
             "author_name": self.author_name,
             "author_email": self.author_email,
         }
+        if self.opened_at:
+            payload["opened_at"] = self.opened_at
+        return payload
 
     @classmethod
     def from_json(cls, payload: dict) -> "SessionIdentity":
+        # Every field added after the first records were written is READ with a
+        # default: a record that predates it is still a lane record, and an
+        # audit that could not read it would be blind, not strict.
         return cls(
             session_id=str(payload["session_id"]),
             issue=int(payload["issue"]),
@@ -254,6 +266,7 @@ class SessionIdentity:
             branch=str(payload["branch"]),
             worktree=Path(str(payload["worktree"])),
             repo_slug=str(payload.get("repo_slug", REPO_SLUG_DEFAULT)),
+            opened_at=str(payload.get("opened_at") or ""),
         )
 
 

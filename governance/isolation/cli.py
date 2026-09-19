@@ -31,6 +31,7 @@ assess the rule rather than reporting it satisfied (issue #287, GR-12).
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import shlex
 import sys
@@ -40,7 +41,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from governance.isolation import journal, live, speculative  # noqa: E402
+from governance.isolation import journal, live, session, speculative  # noqa: E402
 from governance.isolation.audit import Violation, audit_lane  # noqa: E402
 from governance.isolation.identity import (  # noqa: E402
     IDENTITY_DOMAIN,
@@ -193,8 +194,14 @@ def foreign_authored_commits(identity: SessionIdentity, main: Path | str) -> lis
 
 
 def audit_lane_full(identity: SessionIdentity, main: Path | str) -> list[Violation]:
-    """``audit_lane`` plus the authorship-ownership rule the audit surface owns."""
-    return [*audit_lane(identity, main), *foreign_authored_commits(identity, main)]
+    """``audit_lane`` plus the rules the audit surface owns: authorship-ownership
+    (#934) and the session rule (#917 — a session-minted lane whose session is
+    gone is refused by name, ``lane-session-gone``)."""
+    return [
+        *audit_lane(identity, main),
+        *foreign_authored_commits(identity, main),
+        *session.session_gone(identity, main),
+    ]
 
 
 def _mint(args: argparse.Namespace) -> SessionIdentity:
@@ -208,8 +215,14 @@ def _mint(args: argparse.Namespace) -> SessionIdentity:
     )
 
 
+def _utc_now() -> str:
+    import time
+
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
 def cmd_open(args: argparse.Namespace) -> int:
-    """Mint the identity and create the lane — worktree, branch, signature."""
+    """Mint the identity and create the lane — worktree, branch, signature, session."""
     identity = _mint(args)
     main = Path(args.main)
     if not main.exists():
@@ -228,7 +241,15 @@ def cmd_open(args: argparse.Namespace) -> int:
         # reason names itself — e.g. lane-worktree-on-tmpfs (issue #516).
         print(f"open: NOT-OK — {refused}", file=sys.stderr)
         return EXIT_NOT_OK
+    # #917: the lane's session is stamped by the mint itself, in the sweeper's
+    # own vocabulary, so `.fleet/sessions/` is populated the moment a lane
+    # exists rather than only when a runtime remembers to beat. A re-open of an
+    # existing lane keeps its original `opened_at` and refreshes the beat.
+    existing = read_record(identity.session_id, main)
+    opened_at = existing.opened_at if existing is not None and existing.opened_at else _utc_now()
+    identity = dataclasses.replace(identity, opened_at=opened_at)
     write_record(identity, main)
+    beat = session.stamp_for(identity, main, pid=args.pid)
     if args.speculative_base:
         # DG-3 (#699): the lane was cut from an upstream LANE'S BRANCH instead of
         # waiting for its squash-merge. Recording the claim here — not as a
@@ -251,6 +272,14 @@ def cmd_open(args: argparse.Namespace) -> int:
         "env": identity.shared_shell_env(),
         "git_signature": identity.git_signature(),
         "commit_form": identity.commit_form(),
+        # #917: the session beat this mint wrote, or why it could not. Never
+        # silently absent — a caller that needs the sweeper to see this lane
+        # can read the answer here.
+        "session": (
+            {"stamped": True, "pid": beat.pid, "at": beat.to_json()["at_iso"]}
+            if beat is not None
+            else {"stamped": False, "reason": "unstamped: governance.reconcile is not importable from this root"}
+        ),
         "problems": [str(problem) for problem in problems],
     }
     print(json.dumps(payload, indent=2))
@@ -464,6 +493,9 @@ def cmd_close(args: argparse.Namespace) -> int:
         for reason in kept:
             print(f"close: NOT-OK — {reason}", file=sys.stderr)
         return EXIT_NOT_OK
+    # #917: the session ends with the lane. The beat is cleared only once the
+    # worktree is actually gone, so a kept lane keeps its session too.
+    session.clear_for(identity, main)
     note = f" (ignored machine-managed state: {', '.join(ignored)})" if ignored else ""
     print(f"close: OK — lane {identity.session_id} removed{note}")
     return EXIT_OK
@@ -493,6 +525,15 @@ def build_parser() -> argparse.ArgumentParser:
     open_cmd.add_argument("--main", default=default_main(), help="the repository to add the worktree to")
     open_cmd.add_argument("--base", default="origin/master", help="the commit the lane branches from")
     open_cmd.add_argument("--fetch", action="store_true", help="fetch origin/master first")
+    open_cmd.add_argument(
+        "--pid",
+        type=int,
+        default=None,
+        help=(
+            "the process that OWNS the lane, recorded in its session beat (#917); default: the "
+            "parent of this mint, because the mint exits as soon as it has printed the identity"
+        ),
+    )
     open_cmd.add_argument(
         "--allow-tmpfs-root",
         action="store_true",

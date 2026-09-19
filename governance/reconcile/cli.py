@@ -63,6 +63,7 @@ from governance.reconcile.heartbeat import (  # noqa: E402
     SHELVED,
     clear,
     judge,
+    lane_records_without_beat,
     list_sessions,
     read,
     stamp,
@@ -176,13 +177,28 @@ def cmd_status(args: argparse.Namespace) -> int:
     disk = audit(args.root, ops=RepoOps(args.root)) if args.disk else None
     live_rows = project_live(args.root) if getattr(args, "live", False) else None
     orphans = [row for row in rows if row["status"] == ORPHAN]
-    summary = f"reconcile-status: {len(rows)} session(s), {len(orphans)} orphan(s)"
+    # #917: `status` reads the SESSION plane; the LANE plane (`.fleet/lanes/`)
+    # is what the sweeper was blind to when it printed `0 session(s), 0
+    # orphan(s)` over 78 lane records. The two counts are printed side by side,
+    # and a lane record with no beat is said out loud — never folded into the
+    # session count as if it were live, never dropped as if it were absent.
+    lanes_total, lanes_unbeaten = lane_records_without_beat(args.root, {row["session_id"] for row in rows})
+    summary = (
+        f"reconcile-status: {len(rows)} session(s), {len(orphans)} orphan(s); "
+        f"{lanes_total} lane record(s), {len(lanes_unbeaten)} without a session beat"
+    )
     if args.json:
         # Measured while adding --disk: this summary line used to follow the JSON
         # document on stdout, so `status --json` was not parseable as JSON at all.
         # stdout is now the document alone; the human line goes to stderr and the
         # counts are in the payload, so no information is lost either way.
-        payload: dict = {"sessions": rows, "session_count": len(rows), "orphan_count": len(orphans)}
+        payload: dict = {
+            "sessions": rows,
+            "session_count": len(rows),
+            "orphan_count": len(orphans),
+            "lane_record_count": lanes_total,
+            "lane_records_without_beat": lanes_unbeaten,
+        }
         if disk is not None:
             payload["disk"] = disk.to_json()
         if live_rows is not None:
@@ -197,6 +213,14 @@ def cmd_status(args: argparse.Namespace) -> int:
         if live_rows is not None:
             print(describe_live(live_rows))
         print(summary)
+    if lanes_unbeaten:
+        print(
+            f"reconcile-status: NOTE — {len(lanes_unbeaten)} lane record(s) under .fleet/lanes carry no "
+            "session beat, so the session sweep cannot see them; the orphan walk "
+            "(`sweep --orphans`) classifies them by name: " + ", ".join(lanes_unbeaten[:8])
+            + (" …" if len(lanes_unbeaten) > 8 else ""),
+            file=sys.stderr,
+        )
     if disk is not None:
         # The disk audit reports; it never removes. Its refusal is named here in
         # the same words the audit uses, and its verdict is folded into the exit

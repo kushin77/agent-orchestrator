@@ -26,6 +26,18 @@ a dispatched lane that is the subagent, not the loop that spawned it; recording
 the loop's pid would make every lane look alive for as long as the loop runs,
 which is exactly the signal the sweep needs to be able to lose.
 
+**Who writes the first beat (issue #917).** Measured 2026-09-16 on the shared
+checkout: `.fleet/sessions/` held 0 beats while `.fleet/lanes/` held 78 records
+and the worktree list 110 entries, so `status` printed `0 session(s), 0
+orphan(s)` and the sweep had nothing to sweep — a vacuously green control. The
+first beat is now written by the mint itself: `governance/isolation/cli.py open`
+stamps the lane's session (`governance/isolation/session.py`) with the pid that
+owns the lane, and `close` clears it, so every lane is in this plane from the
+moment it exists whatever runtime opened it. `status` reads the lane plane
+beside the session plane and says out loud when a record carries no beat
+(`N lane record(s), K without a session beat`, plus a `NOTE` naming them) — the
+sweep's input is never silently smaller than the lanes on disk.
+
 ## 2. Two signals, deliberately not one
 
 | Status | When | Reclaimable |

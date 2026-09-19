@@ -466,6 +466,57 @@ else
   fail=$((fail + 1))
 fi
 
+# --- 3f. the session plane: stamped by open, judged by the audit (#917) -----
+# Measured 2026-09-16: `.fleet/sessions/` empty while 78 lane records existed,
+# so `reconcile status` swept nothing. The mint now stamps the lane's session
+# in the sweeper's own vocabulary, and a session-minted lane whose session is
+# GONE (beat past the TTL AND owning process dead) is refused by name.
+beat_file="$scratch/.fleet/sessions/$a_sid.json"
+if [ -f "$beat_file" ]; then
+  echo "  OK    open stamped the lane's session beat ($beat_file)"
+else
+  echo "  FAIL  open did not stamp a session beat for lane $a_sid" >&2
+  fail=$((fail + 1))
+fi
+record_file="$scratch/.fleet/lanes/$a_sid.json"
+if python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("opened_at") else 1)' "$record_file"; then
+  echo "  OK    the lane record carries opened_at, so it owes a session"
+else
+  echo "  FAIL  the lane record carries no opened_at" >&2
+  fail=$((fail + 1))
+fi
+rewrite_beat() { # rewrite_beat <file> <age-seconds> <pid> — age the beat and re-own it
+  python3 - "$1" "$2" "$3" <<'PY'
+import json, sys, time
+path, age, pid = sys.argv[1], float(sys.argv[2]), int(sys.argv[3])
+beat = json.load(open(path, encoding="utf-8"))
+beat["at"] = time.time() - age
+beat["pid"] = pid
+json.dump(beat, open(path, "w", encoding="utf-8"))
+PY
+}
+# A dead pid: the largest pid the kernel can hand out is never this process.
+dead_pid=4194303
+saved_beat="$(cat "$beat_file" 2>/dev/null)"
+rewrite_beat "$beat_file" 960 "$dead_pid"
+expect_fail "a session-minted lane whose beat is past the TTL and whose process is dead" "$a_sid" "lane-session-gone"
+rewrite_beat "$beat_file" 960 "$$"
+expect_ok "vacuity control: a stale beat behind a LIVE process is suspect, not gone" "$a_sid"
+rm -f "$beat_file"
+expect_fail "a session-minted lane with no beat at all" "$a_sid" "lane-session-gone"
+printf '%s' "$saved_beat" > "$beat_file"
+# Re-opening the same lane refreshes the beat and keeps the original opened_at.
+opened_before="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["opened_at"])' "$record_file")"
+open_lane 263 gate-agent foundation >/dev/null || true
+opened_after="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["opened_at"])' "$record_file")"
+if [ -f "$beat_file" ] && [ "$opened_before" = "$opened_after" ]; then
+  echo "  OK    re-opening a lane refreshes its beat and keeps opened_at ($opened_after)"
+else
+  echo "  FAIL  re-opening the lane lost the beat or rewrote opened_at ($opened_before -> $opened_after)" >&2
+  fail=$((fail + 1))
+fi
+expect_ok "the re-opened lane is isolated again (its session is live)" "$a_sid"
+
 # --- 3b. the audit does not read the ambient identity -----------------------
 # The control that makes the clearing at the top of this file an assertion rather
 # than a hope (issue #934). The same lane, audited from a shell that exports a

@@ -66,3 +66,6 @@ refusal_codes:
   - speculative-base-not-landed
   - speculative-base-stale-merge-base
   - speculative-base-unmeasurable
+  # #917: a session-minted lane whose beat is gone past the TTL and whose owning
+  # process is dead (session.py).
+  - lane-session-gone
