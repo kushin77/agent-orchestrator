@@ -31,6 +31,24 @@
 #   a declaration, and the number of files it rejected is printed by name-count
 #   below so the scope is visible rather than assumed.
 #
+# WHICH FILES ARE READ — the list comes from GIT, never from a bare walk
+#   Where the root is a git work tree the candidates are
+#   `git ls-files --cached --others --exclude-standard -- '*.yaml' '*.yml'
+#   '*.json'`: the idiom the sibling checks use (`check-verdict-contains.sh`,
+#   `check-shell-patterns.sh`, `check-docs.sh`), i.e. tracked files PLUS
+#   untracked-not-ignored ones, so a lane's just-written declaration is seen
+#   while gitignored runtime state is not. A filesystem walk is used ONLY for a
+#   root that is not a work tree (the `--root` fixture seam), and the report
+#   names which of the two ran, because a scope nobody states is a scope nobody
+#   can check. This is load-bearing rather than stylistic, and it was measured:
+#   the default root is the checkout `make verify` runs in, and on this box that
+#   is the MAIN checkout, where a walk descends into `.claude/worktrees/agent-*`
+#   — 20,630 data files against the 477 git records — so the gate took its two
+#   findings from OTHER LANES' worktrees (peer copies still saying `measured=90`,
+#   `renewed_at=none`) and never read the checked-out repo's own ratchets. Git
+#   collapses a nested worktree to a single directory entry, so the git list is
+#   this repo's own two declarations and nothing else.
+#
 # THE RULE (from #1414's Do)
 #   "every dated ratchet/budget in the tree (grep `expires:`) must be >= 3 days
 #    from expiry or carry a `renewed_at`; expired -> red naming the file; 7 days
@@ -68,13 +86,17 @@
 #                      be read as a declaration. Never recorded as a pass.
 #
 # SEAMS (so the clock and the tree can be pinned for an offline provocation):
-#   --root <dir>    | RATCHET_ROOT    the tree to scan (default: git toplevel)
-#   --clock <date>  | RATCHET_CLOCK   the ISO date to measure from
-#                                     (default: today, UTC)
+#   --root <dir>     | RATCHET_ROOT   the tree to scan (default: git toplevel)
+#   --now <ISO-8601> | RATCHET_NOW    the instant to measure from (default:
+#   --clock <date>   | RATCHET_CLOCK  today, UTC). `--now` is the flag #1414
+#                                     names; `--clock` is the same seam under
+#                                     the name this check first shipped with,
+#                                     kept as an alias so no caller breaks.
 #   --self-test                       provoke every arm on scratch fixtures
 #
 # Usage:
 #   bash scripts/check-ratchets.sh
+#   bash scripts/check-ratchets.sh --now 2026-10-02
 #   bash scripts/check-ratchets.sh --root <dir> --clock 2026-10-02
 #   bash scripts/check-ratchets.sh --self-test
 set -uo pipefail
@@ -86,11 +108,11 @@ floor_days=3  # <  this many days, unrenewed        -> RED  (rc 1)
 
 self_test=0
 root="${RATCHET_ROOT:-}"
-clock="${RATCHET_CLOCK:-}"
+clock="${RATCHET_CLOCK:-${RATCHET_NOW:-}}"
 
 bad_arg() {
   printf 'check-ratchets: unknown or incomplete argument %s\n' "$1" >&2
-  printf 'usage: check-ratchets.sh [--root DIR] [--clock YYYY-MM-DD] [--self-test]\n' >&2
+  printf 'usage: check-ratchets.sh [--root DIR] [--now YYYY-MM-DD] [--clock YYYY-MM-DD] [--self-test]\n' >&2
   exit 2
 }
 
@@ -101,8 +123,10 @@ while [ "$#" -gt 0 ]; do
       root="$2"
       shift 2
       ;;
-    --clock)
-      [ "$#" -ge 2 ] || bad_arg "--clock"
+    --now | --clock)
+      # `--now` is the seam #1414 names; `--clock` is the same one under the name
+      # this check first shipped with, kept so a caller is never broken by it.
+      [ "$#" -ge 2 ] || bad_arg "$1"
       clock="$2"
       shift 2
       ;;
@@ -114,13 +138,57 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# --- the candidate list: derived from GIT, not from a filesystem walk ---------
+# The idiom is the siblings' (`check-verdict-contains.sh`, `check-shell-patterns.sh`,
+# `check-docs.sh`): `--cached` so a tracked declaration is seen, `--others
+# --exclude-standard` so a lane's not-yet-committed declaration is seen too while
+# gitignored runtime state is not. A filesystem walk is reserved for a root that
+# is not a work tree (the `--root` fixture seam), and the caller prints which of
+# the two ran. Measured, and why this is not a style preference: the default root
+# is the checkout `make verify` runs in, and a walk there descends into
+# `.claude/worktrees/agent-*` — 20,630 data files against the 477 git records —
+# so the verdict was decided by OTHER LANES' worktrees (peer copies still saying
+# `measured=90`, `renewed_at=none`) and the checked-out repo's own ratchets were
+# never read. Git collapses a nested worktree to one directory entry.
+ratchet_file_list() { # ratchet_file_list <root> <list-out> -> the scope, on stdout
+  local root="$1" out="$2" rc
+  if [ -e "$root/.git" ]; then
+    git -C "$root" ls-files --cached --others --exclude-standard \
+      -- '*.yaml' '*.yml' '*.json' > "$out" 2>/dev/null
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+      printf 'the candidate list is unknown — git ls-files failed for %s (rc=%d), so the class cannot be covered' \
+        "$root" "$rc"
+      return 2
+    fi
+    printf '%s' 'git ls-files --cached --others --exclude-standard'
+    return 0
+  fi
+  : > "$out"
+  printf '%s' 'filesystem walk (this root is not a git work tree)'
+  return 0
+}
+
 # --- the check itself, parameterized so --self-test can run it on a fixture ---
 core() { # core <root> <clock> — prints findings, returns 0 / 1 / 2
-  local scan_root="$1" moment="$2" out rc
-  out="$(python3 - "$scan_root" "$moment" "$window_days" "$floor_days" <<'PY' 2>&1
+  local scan_root="$1" moment="$2" out rc scope list
+  list="$(mktemp "${TMPDIR:-/tmp}/check-ratchets-list.XXXXXX")" || {
+    printf 'check-ratchets: CANNOT-ASSESS — cannot create a scratch candidate list\n'
+    return 2
+  }
+  scope="$(ratchet_file_list "$scan_root" "$list")"
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    printf 'check-ratchets: CANNOT-ASSESS — %s\n' "$scope"
+    rm -f "$list"
+    return 2
+  fi
+  out="$(python3 - "$scan_root" "$moment" "$window_days" "$floor_days" "$list" "$scope" <<'PY' 2>&1
 """Every dated ratchet under <root>, held to the floor and the window.
 
-argv: root, clock (ISO date), window days, floor days.
+argv: root, clock (ISO date), window days, floor days, candidate-list file
+      (a `git ls-files` listing when the root is a work tree; empty otherwise),
+      and the scope label to report.
 Exit: 0 (live/approaching only), 1 (expired / expiry-reached / renewal-window /
 unreadable date), 2 (could not assess at all -- never a pass).
 """
@@ -200,6 +268,8 @@ def main():
     root = Path(sys.argv[1])
     window = int(sys.argv[3])
     floor = int(sys.argv[4])
+    listing = sys.argv[5]
+    scope = sys.argv[6]
 
     try:
         clock = datetime.date.fromisoformat(sys.argv[2])
@@ -220,13 +290,38 @@ def main():
         say("CANNOT-ASSESS — PyYAML is not importable, so no declaration can be read (never a pass)")
         return 2
 
+    # The candidates arrive from the shell, which derived them from GIT whenever
+    # the root is a work tree and says so in `scope` (printed below, so the
+    # derivation is visible rather than assumed). Only a fixture root that is not
+    # a repository is walked, which is the one case where a walk is the truth.
+    if scope.startswith("git ls-files"):
+        try:
+            candidates = [
+                root / line.strip()
+                for line in Path(listing).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+        except OSError as exc:
+            say(
+                "CANNOT-ASSESS — the `git ls-files` candidate list could not be read (%s); "
+                "nothing was scanned and that is never a pass" % exc
+            )
+            return 2
+    else:
+        candidates = list(data_files_under(root))
+
     scanned = 0
     with_token = 0
     fixtures = []
     unreadable = []
     found = []
-    for path in data_files_under(root):
-        relative = path.relative_to(root)
+    for path in candidates:
+        try:
+            relative = path.relative_to(root)
+        except ValueError:
+            continue
+        if not path.is_file():
+            continue
         if set(relative.parts[:-1]) & FIXTURE_DIRS:
             fixtures.append(str(relative))
             continue
@@ -248,9 +343,9 @@ def main():
             found.append((str(relative), ".".join(mapping_path), mapping))
 
     say(
-        "clock=%s root=%s scanned=%d data file(s) (%d carrying the `%s` token), "
+        "clock=%s root=%s scope=%s scanned=%d data file(s) (%d carrying the `%s` token), "
         "dated declaration(s)=%d, window=%dd floor=%dd"
-        % (clock.isoformat(), root, scanned, with_token, TOKEN, len(found), window, floor)
+        % (clock.isoformat(), root, scope, scanned, with_token, TOKEN, len(found), window, floor)
     )
     if fixtures:
         shown = ", ".join(fixtures[:5]) + (" (+%d more)" % (len(fixtures) - 5) if len(fixtures) > 5 else "")
@@ -373,6 +468,7 @@ sys.exit(main())
 PY
 )"
   rc=$?
+  rm -f "$list"
   printf '%s\n' "$out"
   return "$rc"
 }
@@ -565,6 +661,81 @@ exceptions: []
     "$d" "2026-09-19"
   expect 2 "not an ISO date" "a malformed clock is CANNOT-ASSESS" "$d/commented" "yesterday"
   expect 2 "is not a directory" "a missing root is CANNOT-ASSESS" "$d/does-not-exist" "2026-09-19"
+
+  # 14. the candidate list is derived from git, so state git does not record cannot
+  #     decide this gate's verdict: a gitignored runtime file, and a NESTED peer
+  #     worktree, are both invisible — and the same two shapes ARE read by the walk
+  #     fallback at a root that is not a work tree, which is why the arm is a pair.
+  mkdir -p "$d/gitscope/.runtime" "$d/gitscope/.claude/worktrees/agent-x"
+  write_ratchet "$d/gitscope/governance/live.yaml" 'ratchet:
+  expires: "2027-01-01"'
+  printf '.runtime/\n' > "$d/gitscope/.gitignore"
+  write_ratchet "$d/gitscope/.runtime/stale.json" '{"expires": "2000-01-01"}'
+  write_ratchet "$d/gitscope/.claude/worktrees/agent-x/governance/peer.yaml" 'ratchet:
+  expires: "2000-01-01"'
+  # The fixture is only hermetic if it strips what the code under test reads: an
+  # exported GIT_DIR/GIT_WORK_TREE/identity would repoint or re-sign these repos.
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_AUTHOR_NAME \
+      -u GIT_AUTHOR_EMAIL -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL \
+      git init -q "$d/gitscope" 2>/dev/null
+  env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
+      git init -q "$d/gitscope/.claude/worktrees/agent-x" 2>/dev/null
+  local gitscope_out gitscope_rc
+  gitscope_out="$(core "$d/gitscope" "2026-09-19")"
+  gitscope_rc=$?
+  if [ "$gitscope_rc" -eq 0 ] && [[ "$gitscope_out" == *"scope=git ls-files"* ]] &&
+    [[ "$gitscope_out" == *"dated declaration(s)=1"* ]]; then
+    ok "git-derived scope: a gitignored runtime file and a nested peer worktree are NOT read (rc 0)"
+  else
+    bad "the git-derived scope did not exclude unrecorded state (rc=$gitscope_rc): $gitscope_out"
+  fi
+  write_ratchet "$d/walkscope/.runtime/stale.json" '{"expires": "2000-01-01"}'
+  local walkscope_out walkscope_rc
+  walkscope_out="$(core "$d/walkscope" "2026-09-19")"
+  walkscope_rc=$?
+  if [ "$walkscope_rc" -eq 1 ] && [[ "$walkscope_out" == *"ratchet-expired: .runtime/stale.json"* ]] &&
+    [[ "$walkscope_out" == *"scope=filesystem walk"* ]]; then
+    ok "...and the same shape at a non-git root IS read by the walk fallback (rc 1, by name)"
+  else
+    bad "the walk fallback did not read the runtime file (rc=$walkscope_rc): $walkscope_out"
+  fi
+
+  # 15. the shape this check does NOT consider, asserted rather than assumed: the
+  #     class is the DECLARATION (`*.yaml`/`*.yml`/`*.json`), not the text. Both
+  #     halves exist in this tree — `governance/reconcile/tests/test_orphans.py`
+  #     writes `expires: "2026-10-02"` into a fixture as a Python string (a
+  #     generator, not a declaration), and `governance/board/exceptions.yaml`
+  #     carries its `expires` only inside a commented-out example, which the YAML
+  #     parse already refuses (arm 9). The suffix boundary is asserted here.
+  mkdir -p "$d/suffix"
+  printf 'BODY = "budget:\\n  x: 1\\nexpires: \\"2000-01-01\\"\\n"\n' > "$d/suffix/declaration.py"
+  expect 0 "no dated ratchet found" "a .py quoting the shape is not a declaration (rc 0, and it says it found none)" \
+    "$d/suffix" "2026-09-19"
+  write_ratchet "$d/suffix/same-text.yaml" 'budget:
+  x: 1
+expires: "2000-01-01"'
+  expect 1 "same-text.yaml" "...and the SAME text in a .yaml IS one (rc 1, naming the file)" \
+    "$d/suffix" "2026-09-19"
+
+  # 16. the seam #1414 names, end to end through the real entry point (argv, not
+  #     the shell functions the other arms call), so the flag itself is provoked.
+  local now_out now_rc
+  now_out="$(bash "${BASH_SOURCE[0]}" --root "$d/three-days" --now 2026-10-02 2>&1)"
+  now_rc=$?
+  if [ "$now_rc" -eq 1 ] &&
+    [[ "$now_out" == *"ratchet-expiry-reached: governance/isolation/worktree-cap.yaml"* ]]; then
+    ok "--now <ISO-8601> is the injected clock: 2026-10-02 reds by file name (rc 1)"
+  else
+    bad "--now did not inject the clock (rc=$now_rc): $now_out"
+  fi
+  local alias_out alias_rc
+  alias_out="$(bash "${BASH_SOURCE[0]}" --root "$d/three-days" --clock 2026-10-02 2>&1)"
+  alias_rc=$?
+  if [ "$alias_rc" -eq 1 ] && [[ "$alias_out" == *"ratchet-expiry-reached:"* ]]; then
+    ok "...and its retained alias --clock reaches the same verdict (rc 1)"
+  else
+    bad "--clock stopped being the same seam (rc=$alias_rc): $alias_out"
+  fi
 
   local result=0
   if [ "$fails" -eq 0 ]; then
