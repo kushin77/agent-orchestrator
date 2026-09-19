@@ -121,6 +121,17 @@ steps:
         git fetch --unshallow --quiet origin 2>/dev/null || git fetch --deepen=100000 --quiet origin || true
         git config --global user.email ci@cloudbuild.local
         git config --global user.name "cloudbuild-verify"
+        # issue #1424: the runner's checkout never initializes vendor/CMR, so
+        # check-module-registry, check-cmr-pin, check-diagrams-declaration,
+        # check-codeidx-surface, and check-cmr-knowledge silently
+        # CANNOT-ASSESS on every CI run (zero real coverage of those gates).
+        # kushin77/CMR is a PRIVATE repo and this runner has no GitHub
+        # credentials, so the clone may fail here even though it succeeds
+        # locally -- best-effort, same posture as the gate-status poster
+        # above (#1350): a failed init degrades to today's CANNOT-ASSESS
+        # instead of hard-failing the whole gate.
+        git submodule update --init --recursive vendor/CMR \
+          || echo "WARN: vendor/CMR submodule init failed; CMR gates will CANNOT-ASSESS (issue #1424)"
         command -v make >/dev/null || { echo "make missing"; exit 1; }
         python3 -c 'import yaml' || { echo "PyYAML missing"; exit 1; }
         PATH=/usr/bin:/bin python3 -c 'import yaml' || { echo "PyYAML missing on /usr/bin/python3"; exit 1; }
