@@ -12,5 +12,28 @@ description: Auto-rollback on canary/gradual health failure (flag to off).
 pubsub:
   topic: projects/agent-orchestrator-control-plane/topics/canary-health-fail
 filename: infra/cloudbuild/rollout-rollback.yaml
+# EVERY substitution rollout-rollback.yaml consumes is declared here, so the
+# pair can be SUBMITTED as declared: Cloud Build refuses a build AT SUBMISSION
+# whose config spells a bare dollar template that neither the config nor a
+# trigger naming it declares (the refusal that cost #1350 two ~20-minute CI
+# round trips; enforced offline by scripts/check-cloudbuild.sh, issue #1369).
+#
+# Mirroring apply-trigger.yaml, the posture is readable in one place: the
+# rollout flag is "false" and every key a go-live must supply holds an INERT
+# sentinel, never a real target. Nothing here is read while the trigger ships
+# disabled - the pipeline refuses at its first step unless _ENABLE_ROLLOUT is
+# "true" - and the sentinels are refused at the point of use rather than
+# honoured: "none" is not a declared flag (the engine raises "unknown flag")
+# and not a health verdict, so the decide step exits 1 instead of rolling back.
 substitutions:
   _ENABLE_ROLLOUT: "false"
+  # The deployer SA: the same one-time bootstrap identity apply-trigger.yaml
+  # declares (the deployer SA does not exist yet - the first apply creates it).
+  # Supplied/overridden at import; never a credential (GR-6).
+  _DEPLOYER_SA: "projects/purebliss-ghl/serviceAccounts/1056038104733-compute@developer.gserviceaccount.com"
+  # Which flag to roll back: a deliberately inert placeholder.
+  _FLAG: "none"
+  # The health verdict is per-event (ok|fail) and is supplied by the submission,
+  # never by a repo-wide default; "none" is neither verdict, so the decide step
+  # refuses (exit 1) rather than acting on an unknown signal.
+  _CANARY_HEALTH: "none"
