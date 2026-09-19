@@ -32,6 +32,8 @@ from governance.notices.notice_records import (
 )
 from governance.notices.runtime_registry import (
     RegistryUnavailable,
+    contract_gaps,
+    contract_ids,
     registered_runtimes,
     unregistered_profiles,
 )
@@ -138,10 +140,24 @@ def test_an_unreadable_registry_is_not_an_empty_one(scratch) -> None:
 
 
 def test_the_live_tree_registers_the_fleet_runtimes() -> None:
-    ids = {runtime.id for runtime in registered_runtimes(REPO_ROOT)}
+    """The live tree's set IS the contract's rows (#1412) -- not a subset of them.
+
+    Before the reconciliation this asked whether four identity names were a subset
+    of a five-id derivation. A subset check passes for two lists that disagree, so
+    the assertion is now equality against the contract, plus the two differences
+    the reconciliation decided by measurement: `copilot-agent` owes an ack and
+    `ollama` (bundled by a live pack, carried by the catalog, registered by no row)
+    does not.
+    """
+    ids = tuple(runtime.id for runtime in registered_runtimes(REPO_ROOT))
+    contract = contract_ids(REPO_ROOT)
+    assert contract is not None, "this tree declares fleet/runtimes.yaml"
+    assert ids == contract
+    assert "copilot-agent" in ids, "the contract registers a runtime the old derivation never saw"
     roles = set(unregistered_profiles(REPO_ROOT))
-    assert {"claude", "deepseek", "hermes", "paperclip"} <= ids
     assert "coder" in roles, "a role bundled by a live pack has no transport: it owes no ack"
+    assert "ollama" in roles, "no contract row registers ollama, so it is a role (#1412)"
+    assert contract_gaps(REPO_ROOT) == ("ollama",), "the demotion is reported, not silent"
 
 
 # -- the record ---------------------------------------------------------------

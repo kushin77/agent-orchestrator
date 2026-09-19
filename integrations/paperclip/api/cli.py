@@ -97,9 +97,44 @@ def _cmd_check(args: argparse.Namespace) -> int:
     return RC_OK
 
 
+def _beat_live_read(root: Path, report: "health_mod.HealthReport") -> None:
+    """Report this live dependency read as `paperclip`'s runtime beat (#1412).
+
+    `paperclip` is registered in `fleet/runtimes.yaml` and must beat, but this
+    repo runs no loop for it: the adapter is a CLI, and the only moment it is
+    verifiably ALIVE is a live read of its own dependencies — which is what
+    `health` does and what `check` cross-checks.
+
+    The beat is written when the read came back OK or DEGRADED (the surface
+    answered, one dependency is merely stale) and NOT when it is unhealthy (a
+    named dependency is unreachable): the record means "paperclip is alive", so an
+    unhealthy read must let the old beat age out and be judged
+    `runtime-stale:paperclip` rather than refresh the claim with a stamp the
+    surface cannot honour.
+
+    Never fatal, and never on stdout: `health`'s JSON document is its contract
+    with `check` and with the gate, and a liveness stamp must not be able to
+    change it.
+    """
+    if report.status not in (health_mod.STATUS_OK, health_mod.STATUS_DEGRADED):
+        print(
+            "health: beat SKIPPED — the read is %s, so nothing here is alive to report"
+            % report.status,
+            file=sys.stderr,
+        )
+        return
+    try:
+        from fleet import beats  # noqa: PLC0415 - lazy: the producer lives with the fleet
+    except ImportError as exc:  # a scratch tree that copied the adapter alone
+        print("health: beat SKIPPED — fleet/beats.py is not importable: %s" % exc, file=sys.stderr)
+        return
+    beats.best_effort("paperclip", "running", root=root, cwd=root)
+
+
 def _cmd_health(args: argparse.Namespace) -> int:
     root = _root(args)
     report = health_mod.health(root)
+    _beat_live_read(root, report)
     print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
     return {health_mod.STATUS_OK: RC_OK, health_mod.STATUS_DEGRADED: RC_DEGRADED}.get(
         report.status, RC_UNHEALTHY

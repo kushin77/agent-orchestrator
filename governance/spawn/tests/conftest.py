@@ -72,7 +72,22 @@ def envelope_fields(tmp_path: Path) -> dict[str, Any]:
             "ttl_seconds": 900,
         },
         "verify": {"command": "bash scripts/check-spawn-envelope.sh", "source": "issue-verify-clause"},
-        "spawn": {"path": "fleet", "agent": "fixture-agent", "directive": "fixture-directive"},
+        "spawn": {
+            "path": "fleet",
+            "agent": "fixture-agent",
+            "directive": "fixture-directive",
+            # The admission inputs the three judges read (#1413): the fixture is a
+            # spawn that is admissible, so every refusal test below still removes
+            # exactly ONE thing.
+            "runtime": "claude-subagent",
+            "role": "fleet",
+            "tier": "L0",
+            "task_class": "code-author",
+            "actor": "claude-subagent",
+            "verbs": [],
+            "skills": [],
+            "secrets": [],
+        },
     }
 
 

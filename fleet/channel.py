@@ -43,6 +43,7 @@ from typing import Callable
 
 import runtime
 import runaway
+import runtimes
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -172,18 +173,30 @@ NON_WORK_KINDS = ("status", "report", "ping", "steer")
 
 # ── per-runtime allowlists for verbs, skills and secrets (issue #1273, parent
 # #1268) ─────────────────────────────────────────────────────────────────────
-# The closed runtime vocabulary. Another lane declares these same seven ids in
-# fleet/runtimes.yaml (do not re-declare that file here); this tuple is the
-# wire-value contract `message.schema.json::runtime`/`on_behalf_of` also names.
-RUNTIME_IDS = (
-    "claude-session",
-    "claude-subagent",
-    "deepseek-sister",
-    "deepseek-executor",
-    "copilot-agent",
-    "hermes",
-    "paperclip",
-)
+# The closed runtime vocabulary, READ from its one authority (#1412): the contract
+# `fleet/runtimes.yaml`, through `fleet/runtimes.py`. It used to be a literal
+# seven-tuple here — "the wire-value contract `message.schema.json::runtime` also
+# names" — which is exactly how a second list is born: the notices rule (#1385)
+# carried five ids against this contract's seven, and every lane record validated
+# against whichever list its caller happened to reach. A literal that agrees today
+# is not one list; the contract is, and `fleet/tests/test_runtime_vocabulary.py`
+# proves every consumer FOLLOWS it.
+#
+# Read LAZILY and cached, not at import: this module is copied into scratch trees
+# by gate fixtures that provoke a mutation of the levers
+# (`scripts/check-control-verbs.sh`), and an import-time read of a contract those
+# trees do not carry would make `channel` unloadable there. A registry that cannot
+# be read is REFUSED, never treated as an empty vocabulary (an empty list would
+# make every runtime-bearing message valid or invalid by accident).
+_RUNTIME_IDS: tuple[str, ...] | None = None
+
+
+def runtime_ids() -> tuple[str, ...]:
+    """The registered runtime ids (the wire values `runtime`/`on_behalf_of` carry)."""
+    global _RUNTIME_IDS
+    if _RUNTIME_IDS is None:
+        _RUNTIME_IDS = runtimes.ids(ROOT)
+    return _RUNTIME_IDS
 
 _VERBS_YAML = ROOT / "control-plane" / "control" / "verbs.yaml"
 _SKILLS_REGISTRY = ROOT / "integrations" / "paperclip" / "adapters" / "skills" / "registry.json"
@@ -1057,19 +1070,28 @@ def validate(message: dict) -> list[str]:
     # are optional: a message naming neither is judged only on role/hierarchy,
     # exactly as before this issue.
     runtime = message.get("runtime")
-    if runtime is not None and runtime not in RUNTIME_IDS:
-        problems.append(f"runtime must be one of {', '.join(RUNTIME_IDS)}")
     on_behalf_of = message.get("on_behalf_of")
-    if on_behalf_of is not None and on_behalf_of not in RUNTIME_IDS:
-        problems.append(f"on_behalf_of must be one of {', '.join(RUNTIME_IDS)}")
-    if isinstance(task, dict) and runtime in RUNTIME_IDS:
+    try:
+        known_runtimes = runtime_ids()
+        vocabulary_problem = ""
+    except runtimes.RegistryRefused as exc:
+        # Fail-closed: a vocabulary that cannot be read cannot clear a runtime.
+        known_runtimes = ()
+        vocabulary_problem = f"runtime-vocabulary-unreadable: {exc}"
+    if vocabulary_problem and (runtime is not None or on_behalf_of is not None):
+        problems.append(vocabulary_problem)
+    if runtime is not None and runtime not in known_runtimes:
+        problems.append(f"runtime must be one of {', '.join(known_runtimes)}")
+    if on_behalf_of is not None and on_behalf_of not in known_runtimes:
+        problems.append(f"on_behalf_of must be one of {', '.join(known_runtimes)}")
+    if isinstance(task, dict) and runtime in known_runtimes:
         verb = task.get("verb")
         if isinstance(verb, str):
             allowed = _verb_allowlist().get(verb)
             if allowed is not None and runtime not in allowed:
                 problems.append(f"verb-not-allowed:{runtime}:{verb}")
             if (
-                on_behalf_of in RUNTIME_IDS
+                on_behalf_of in known_runtimes
                 and allowed is not None
                 and on_behalf_of not in allowed
             ):
@@ -1082,14 +1104,14 @@ def validate(message: dict) -> list[str]:
             allowed = _skill_allowlist().get(skill)
             if allowed is not None and runtime not in allowed:
                 problems.append(f"skill-not-allowed:{runtime}:{skill}")
-            if on_behalf_of in RUNTIME_IDS and allowed is not None and on_behalf_of not in allowed:
+            if on_behalf_of in known_runtimes and allowed is not None and on_behalf_of not in allowed:
                 problems.append(f"laundering:{on_behalf_of}:{skill}")
         secret = task.get("secret")
         if isinstance(secret, str):
             allowed = _secret_allowlist().get(secret)
             if allowed is not None and runtime not in allowed:
                 problems.append(f"secret-not-allowed:{runtime}:{secret}")
-            if on_behalf_of in RUNTIME_IDS and allowed is not None and on_behalf_of not in allowed:
+            if on_behalf_of in known_runtimes and allowed is not None and on_behalf_of not in allowed:
                 problems.append(f"laundering:{on_behalf_of}:{secret}")
     return problems
 
