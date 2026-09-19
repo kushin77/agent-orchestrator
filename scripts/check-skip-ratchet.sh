@@ -363,12 +363,36 @@ for label, planted_entry, needle in PLANTED_LIVE:
             "failing path (expected a finding naming %r)" % (label, needle)
         )
 
-if not live_entries:
-    findings.append(
+def census_findings(candidate_entries):
+    """The census as a FUNCTION, so the committed record AND a record with the kind
+    stripped run through exactly the same code.
+
+    A census only ever called on a record that already carries the kind is a
+    formality (GR-12): it would keep passing after it stopped matching anything,
+    and the only witness would be the record nobody checked. So its failing path
+    is PROVED below, on the same function, with the kind stripped -- not claimed.
+    """
+    if [e for e in candidate_entries if e.get("kind") == "live-dependent"]:
+        return []
+    return [
         "the committed record carries NO live-dependent entry -- the third kind "
         "(#1410) is declared in scripts/lib/skip-ratchet.py, and the checks whose "
         "assessability is a property of the WORLD must be named with it, so a census "
         "of zero means the kind exists in the code and nowhere in the record"
+    ]
+
+
+findings.extend(census_findings(entries))
+CENSUS_NEEDLE = "carries NO live-dependent entry"
+planted_census = census_findings(
+    [e for e in entries if e.get("kind") != "live-dependent"]
+)
+if not any(CENSUS_NEEDLE in finding for finding in planted_census):
+    findings.append(
+        "the planted record with every live-dependent entry STRIPPED was ACCEPTED by "
+        "the census -- it matches nothing, so a record that names the third kind "
+        "nowhere would pass it (expected a finding naming %r, got %r)"
+        % (CENSUS_NEEDLE, planted_census or "no finding")
     )
 
 for finding in findings:
@@ -394,7 +418,9 @@ print(
     "  OK    %d live-dependent entry(ies), each naming the LIVE mechanism it depends "
     "on and the OPEN issue that tracks it, and the planted records that omit the "
     "issue, omit the mechanism and carry a precondition are each refused by the "
-    "run's own loader" % len(live_entries)
+    "run's own loader, while a record with the kind STRIPPED is refused by the census "
+    "itself (so a census of zero has a failing path, not only a passing one)"
+    % len(live_entries)
 )
 for entry in entries:
     declared = entry.get("precondition")
@@ -1206,5 +1232,5 @@ if [ "$fails" -gt 0 ]; then
   echo "check-skip-ratchet: NOT-OK -- $fails of $checks assertion(s) failed" >&2
   exit 1
 fi
-echo "check-skip-ratchet: OK -- $checks assertion(s) held: the ratchet's rules are all provoked ($selftest_cases fixtures, each rc AND each refusal line), the committed record loads through the run's own loader, names discovered checks, declares only venue command preconditions this tree actually runs (a planted phantom probe is refused by name) and carries the THIRD kind (#1410) with its own census -- a census of zero reds by name, and the planted live-dependent records that omit the issue, omit the mechanism or carry a precondition are each refused by the same loader; scripts/verify.sh invokes the ratchet and fails the run on its verdict (proved by mutation); the attestation validator refuses a skip that nothing accounts for and a venue skip that declares no precondition; the REAL composite run on a shim fixture proves all TEN end states (clean PASS unchanged, a named standing skip, an unnamed skip FAILING by name, a stale exemption FAILING, a venue COMMAND precondition honoured, the same entry REFUSED once supplied, a live-dependent skip honoured BY NAME while its LIVE mechanism cannot answer and NOT stale when its check assesses, the same entry REFUSED the moment the check FAILS because a failing check is a finding, and a live-dependent entry naming no mechanism CANNOT-ASSESS by name); and the FALSIFICATION control deletes the honouring from a copy of the ratchet and requires the fixture that passed to red by name -- measured, the mutant stays green and narrates the LIVE skip as a standing gap, so the naming is the load-bearing property rather than the exit code"
+echo "check-skip-ratchet: OK -- $checks assertion(s) held: the ratchet's rules are all provoked ($selftest_cases fixtures, each rc AND each refusal line), the committed record loads through the run's own loader, names discovered checks, declares only venue command preconditions this tree actually runs (a planted phantom probe is refused by name) and carries the THIRD kind (#1410) with its own census -- a census of zero reds by name, and a record with the kind STRIPPED is refused by that same census, so it has a failing path rather than only a passing one, while the planted live-dependent records that omit the issue, omit the mechanism or carry a precondition are each refused by the same loader; scripts/verify.sh invokes the ratchet and fails the run on its verdict (proved by mutation); the attestation validator refuses a skip that nothing accounts for and a venue skip that declares no precondition; the REAL composite run on a shim fixture proves all TEN end states (clean PASS unchanged, a named standing skip, an unnamed skip FAILING by name, a stale exemption FAILING, a venue COMMAND precondition honoured, the same entry REFUSED once supplied, a live-dependent skip honoured BY NAME while its LIVE mechanism cannot answer and NOT stale when its check assesses, the same entry REFUSED the moment the check FAILS because a failing check is a finding, and a live-dependent entry naming no mechanism CANNOT-ASSESS by name); and the FALSIFICATION control deletes the honouring from a copy of the ratchet and requires the fixture that passed to red by name -- measured, the mutant stays green and narrates the LIVE skip as a standing gap, so the naming is the load-bearing property rather than the exit code"
 exit 0
