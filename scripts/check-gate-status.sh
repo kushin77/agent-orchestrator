@@ -55,14 +55,34 @@
 #
 # The live half therefore answers one of three things, and never blurs them:
 #
-#   * the context IS being produced (observed on the commit under test or on a
-#     recent commit) -> the producer exists AND is live -> rc 0;
-#   * the source WAS READ and nothing is producing -> rc 1 BY NAME (a finding
-#     about the repository, not an inability to assess);
-#   * the source could NOT be read -> rc 2 CANNOT-ASSESS naming the source --
-#     never a green, and never a false named verdict.
+#   * the context IS being produced (observed on the commit under test, or on a
+#     commit of the default branch inside the AGE window) -> rc 0;
+#   * the AGE window WAS READ TO ITS END and holds no observation -> rc 1 BY
+#     NAME (a finding about the window, not an inability to assess);
+#   * the source could NOT be read, or the window could NOT BE COVERED -> rc 2
+#     CANNOT-ASSESS naming the source -- never a green, and never a false named
+#     verdict.
+#
+# THE BOUND ON THAT WINDOW IS AN AGE, NOT A COMMIT COUNT (#1460)
+# It was `${AO_GATE_STATUS_WINDOW:-20}` default-branch COMMITS, which on this
+# repository is not a recency bound at all: 100 commits are 41.4 hours at the
+# measured landing rate, so a 20-commit window is ~8 hours, while the producer's
+# own observations are 20.0h and 30.5h apart -- so a healthy producer read as
+# `disabled gh-status-absent-in-last-20-commits` with the refusal "the producer
+# is genuinely not producing", which is FALSE and sends the reader to the wrong
+# remedy. The window is now an AGE (`AO_GATE_STATUS_MAX_AGE_DAYS`, default 7)
+# that the walk must COVER before it may report the negative, and the verdict
+# names the bound it used. See `live_producer_state` for the measurements.
 #
 # Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+#
+# A CHECK THAT CANNOT NAME ITS OWN REFUSAL (#1407)
+# The description the required context carries was a FIXED string per rc, so every
+# red PR page read `make verify: FAIL` and the failing check's name existed only
+# inside the build log. Section 3c provokes the opposite: `post --detail <text>`
+# must put the name on the PR page, and must NOT be able to put a PASS there -- a
+# detail that can manufacture a green is the #739 class this repository measures
+# rather than assumes.
 #
 # Usage: bash scripts/check-gate-status.sh
 #        bash scripts/check-gate-status.sh --producer-probe [--root DIR]
@@ -77,6 +97,19 @@
 #          the provocation seat: stand a live answer in for a fixture. REFUSED
 #          on this repository's own tree, so the gate can never be told that its
 #          own producer is enabled.
+#
+# Environment (the live read-back's bounds; every one of them is a BUDGET, and
+# exhausting a budget without covering the window is CANNOT-ASSESS, never
+# 'not producing'):
+#   AO_GATE_STATUS_MAX_AGE_DAYS   the recency bound, in DAYS (default 7)
+#   AO_GATE_STATUS_MAX_PAGES      the walk's page budget (default 8 = 800 commits)
+#   AO_GATE_STATUS_MAX_PROBES     the REST fallback's probe budget (default 60)
+#   AO_GATE_STATUS_WINDOW         RETIRED (#1460): a commit count cannot bound
+#                                 'not producing' on a repository that lands
+#                                 dozens of commits a day. Setting it prints a
+#                                 note; it is not read.
+#
+# --- end of usage ---
 set -u
 
 # --- the probe seam, parsed BEFORE anything else -------------------------
@@ -102,7 +135,7 @@ while [ $# -gt 0 ]; do
     # the producer is enabled.
     --live-state) live_state_override="${2:-}"; shift ;;
     --live-source) live_source_override="${2:-}"; shift ;;
-    -h|--help) sed -n '2,79p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,/^# --- end of usage ---$/p' "$0"; exit 0 ;;
     *) : ;;
   esac
   shift
@@ -234,13 +267,57 @@ reaches_producer() {
 # is the producer actually producing? Printed as "<state> <source>" on one line.
 #
 #   enabled    the required context was OBSERVED -- on the commit under test, or
-#              on one of the most recent default-branch commits
-#   disabled   the source WAS readable and no such observation exists: the
-#              producer is genuinely not producing
-#   unreadable the source could not be read at all; a caller must never turn this
-#              into either verdict
+#              on a commit of the default branch inside the AGE window
+#   disabled   the AGE window was read TO ITS END and holds no observation: the
+#              producer is not producing
+#   unreadable the source could not be read, or the window could not be COVERED;
+#              a caller must never turn this into either verdict
 #
-# WHY THIS EXISTS, measured 2026-09-19 (#1394): the LIVE trigger is ENABLED and
+# THE RECENCY BOUND IS AN AGE, NOT A COMMIT COUNT (#1460, measured 2026-09-19)
+# The bound used to be `${AO_GATE_STATUS_WINDOW:-20}` COMMITS of the default
+# branch, and on a repository that lands as heavily as this one a commit count
+# is not a recency bound at all. Measured at `origin/master` = a7518cff: 100
+# commits of history are 41.4 hours (about 58 commits/day), so a 20-commit
+# window is roughly EIGHT HOURS -- while over the whole 670-commit / 239-day
+# history the same 20 commits are about SEVEN DAYS (2.8/day). The same number
+# meant "eight hours" or "a week" depending on the week, which is why it cannot
+# be the instrument. And the producer's own cadence is measured at gaps of 20.0h
+# and 30.5h between observations -- 4 observations in that whole history, the
+# last at 66fa3d4d, with a 134-commit gap between two of them -- so the window
+# converted "the producer ran 30 commits ago" into "the producer is not
+# producing" (REQUIRED-BUT-UNOBSERVED, rc 1) on a repository whose producer was
+# demonstrably posting. A finding about the WINDOW, reported as a finding about
+# the PRODUCER, sent the reader to the wrong remedy; that is the defect this
+# function now refuses to make.
+#
+# So the walk is bounded by TIME (`AO_GATE_STATUS_MAX_AGE_DAYS`, default 7 --
+# 5.5x the largest measured gap, chosen so that a weekend plus a quiet stretch
+# cannot manufacture a refusal) and it must COVER that window before it may say
+# `disabled`. A walk that ran out of requests, or that a request failed inside,
+# is CANNOT-ASSESS (`gh-status-window-incomplete`), never "not producing": that
+# guard is the whole reason the false negative cannot come back through the
+# bound. The verdict NAMES the bound it used
+# (`gh-status-absent-in-last-<D>-days`), because "no producer exists" and "no
+# RECENT observation" need different remedies: the tree half of this check
+# answers the first, and this half answers only the second.
+#
+# The commit under test is probed FIRST and can only ever produce a POSITIVE: a
+# commit that carries the context IS an observation of the producer, while a
+# commit the API does not know -- a lane's not-yet-pushed head -- is not
+# evidence about the producer either way. So a failed HEAD probe cannot
+# manufacture the negative, and cannot hide it: the walk decides that.
+#
+# WHY ONE REQUEST PER 100 COMMITS
+# `history(since:)` returns the commits inside the window AND each commit's
+# `statusCheckRollup` in the SAME request, so covering the window costs 1
+# rate-limit point and ~1.0s per 100 commits (measured), against the 0.34s PER
+# COMMIT the statuses endpoint costs. `gh api graphql` is therefore the primary
+# instrument; if it cannot answer AT ALL, the walk is redone with the REST
+# instrument (`commits?since=`, one statuses probe per commit, bounded by
+# `AO_GATE_STATUS_MAX_PROBES`) rather than reporting an inability to assess on a
+# venue where the older transport is the one that works.
+#
+# WHY THE LIVE HALF IS A READ-BACK AT ALL, measured 2026-09-19 (#1394): the LIVE trigger is ENABLED and
 # the context IS posted -- `gcloud builds triggers describe control-plane-verify`
 # answers `control-plane-verify  infra/cloudbuild/verify.yaml` (an empty
 # `disabled` field, i.e. enabled), and `ao/gate-of-record` is observed on
@@ -253,6 +330,113 @@ reaches_producer() {
 # probe that reads it as LIVE state names a condition the world contradicts --
 # rc 2 forever, on a repository that is healthy. The declared value stays an
 # OBSERVATION; the verdict is taken here, from the thing that can be wrong.
+lw_query='query($owner: String!, $name: String!, $ref: String!, $n: Int!, $after: String, $since: GitTimestamp) {
+  repository(owner: $owner, name: $name) {
+    object(expression: $ref) {
+      ... on Commit {
+        history(first: $n, after: $after, since: $since) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            oid
+            statusCheckRollup {
+              contexts(first: 100) {
+                nodes {
+                  __typename
+                  ... on StatusContext { context }
+                  ... on CheckRun { name }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+
+# live_walk_graphql <slug> <ref> <since> <cursor> <n> <ctx> -- one page of the
+# walk: "node <sha> <0|1>" per commit, then "next <cursor>|<none>|<unusable>".
+# rc 1 when the request did not answer. A page that answered with commits but no
+# observation, and said the window ENDS there, is a real answer and rc 0.
+live_walk_graphql() {
+  lwg_slug="$1"; lwg_ref="$2"; lwg_since="$3"; lwg_cursor="$4"; lwg_n="$5"; lwg_ctx="$6"
+  if [ -n "$lwg_cursor" ]; then
+    lwg_out="$(gh api graphql \
+      -F owner="${lwg_slug%%/*}" -F name="${lwg_slug#*/}" -F ref="$lwg_ref" \
+      -F n="$lwg_n" -F after="$lwg_cursor" -F since="$lwg_since" \
+      -f query="$lw_query" 2>/dev/null)" || return 1
+  else
+    lwg_out="$(gh api graphql \
+      -F owner="${lwg_slug%%/*}" -F name="${lwg_slug#*/}" -F ref="$lwg_ref" \
+      -F n="$lwg_n" -F since="$lwg_since" \
+      -f query="$lw_query" 2>/dev/null)" || return 1
+  fi
+  [ -n "$lwg_out" ] || return 1
+  # The program travels in `-c` and the PAYLOAD travels on a pipe, so neither
+  # can be mistaken for the other: `python3 - "$ctx" <<PY` would take its
+  # PROGRAM from the heredoc and leave `sys.stdin` with nothing to parse, which
+  # reads as "no observation" and exits 0 (measured, #1400).
+  printf '%s' "$lwg_out" | python3 -c '
+import json
+import sys
+
+ctx = sys.argv[1]
+try:
+    doc = json.load(sys.stdin)
+    history = doc["data"]["repository"]["object"]["history"]
+    nodes = history["nodes"]
+    info = history["pageInfo"]
+except (ValueError, KeyError, TypeError):
+    sys.exit(3)
+for node in nodes:
+    rollup = node.get("statusCheckRollup") or {}
+    seen = [c.get("context") or c.get("name")
+            for c in (rollup.get("contexts") or {}).get("nodes") or []]
+    print("node %s %d" % (node.get("oid") or "-", 1 if ctx in seen else 0))
+end = info.get("endCursor")
+if not info.get("hasNextPage"):
+    print("next none")
+elif end:
+    print("next %s" % end)
+else:
+    # More commits inside the window and no cursor to reach them with: the walk
+    # cannot continue, and a walk that cannot continue must never be read as
+    # "the window ended here".
+    print("next unusable")
+' "$lwg_ctx"
+}
+
+# live_walk_rest <slug> <ref> <since> <page> <n> <ctx> -- the same page over the
+# older transport: the commit list inside the window, then ONE statuses probe
+# per commit (which is why this instrument is bounded by
+# AO_GATE_STATUS_MAX_PROBES and the GraphQL one is not). Printed as
+# "node <sha> <0|1>", then "probes <k>", then "next <page>|<none>".
+# rc 1 when a request did not answer: a page whose probes were cut short must
+# never be read as "nothing observed".
+live_walk_rest() {
+  lwr_slug="$1"; lwr_ref="$2"; lwr_since="$3"; lwr_page="$4"; lwr_n="$5"; lwr_ctx="$6"
+  lwr_shas="$(gh api \
+    "repos/$lwr_slug/commits?sha=$lwr_ref&since=$lwr_since&per_page=$lwr_n&page=$lwr_page" \
+    --jq '.[].sha' 2>/dev/null)" || return 1
+  lwr_k=0
+  for lwr_c in $lwr_shas; do
+    lwr_k=$((lwr_k + 1))
+    lwr_ctxs="$(gh api "repos/$lwr_slug/commits/$lwr_c/statuses" \
+      --jq '[.[].context]|join(",")' 2>/dev/null)" || return 1
+    case ",$lwr_ctxs," in
+      *",$lwr_ctx,"*) printf 'node %s 1\n' "$lwr_c" ;;
+      *) printf 'node %s 0\n' "$lwr_c" ;;
+    esac
+  done
+  printf 'probes %d\n' "$lwr_k"
+  if [ "$lwr_k" -ge "$lwr_n" ]; then
+    printf 'next %d\n' "$((lwr_page + 1))"
+  else
+    printf 'next none\n'
+  fi
+  return 0
+}
+
 live_producer_state() {
   lroot="$1"
   lctx="$2"
@@ -264,39 +448,124 @@ live_producer_state() {
     printf 'unreadable gh-unauthenticated\n'
     return 0
   fi
-  lslug="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)"
-  if [ -z "$lslug" ]; then
+  lslugref="$(gh repo view --json nameWithOwner,defaultBranchRef \
+    --jq '.nameWithOwner + " " + (.defaultBranchRef.name // "")' 2>/dev/null)"
+  lslug=""
+  lref=""
+  case "$lslugref" in
+    *' '*) lslug="${lslugref%% *}"; lref="${lslugref#* }" ;;
+  esac
+  if [ -z "$lslug" ] || [ -z "$lref" ] || [ "$lref" = "null" ]; then
     printf 'unreadable gh-repo-unresolvable\n'
     return 0
   fi
-  lwindow="${AO_GATE_STATUS_WINDOW:-20}"
-  case "$lwindow" in ''|*[!0-9]*) lwindow=20 ;; esac
-  [ "$lwindow" -gt 50 ] && lwindow=50
-  # The commit under test is probed FIRST -- a head that carries the status is
-  # found in one request, and the requirement is per-PR-head once protection is
-  # applied (governance/platform/branch-protection.yaml).
+  ldays="${AO_GATE_STATUS_MAX_AGE_DAYS:-7}"
+  case "$ldays" in ''|*[!0-9]*) ldays=7 ;; esac
+  [ "$ldays" -lt 1 ] && ldays=1
+  [ "$ldays" -gt 90 ] && ldays=90
+  lmaxpages="${AO_GATE_STATUS_MAX_PAGES:-8}"
+  case "$lmaxpages" in ''|*[!0-9]*) lmaxpages=8 ;; esac
+  [ "$lmaxpages" -lt 1 ] && lmaxpages=1
+  [ "$lmaxpages" -gt 40 ] && lmaxpages=40
+  lmaxprobes="${AO_GATE_STATUS_MAX_PROBES:-60}"
+  case "$lmaxprobes" in ''|*[!0-9]*) lmaxprobes=60 ;; esac
+  [ "$lmaxprobes" -lt 1 ] && lmaxprobes=1
+  lcut="$(python3 -c 'import datetime, sys
+print((datetime.datetime.now(datetime.timezone.utc)
+       - datetime.timedelta(days=int(sys.argv[1]))).strftime("%Y-%m-%dT%H:%M:%SZ"))' "$ldays" 2>/dev/null)"
+  if [ -z "$lcut" ]; then
+    printf 'unreadable gh-window-uncomputable\n'
+    return 0
+  fi
+  # The retired seam is NAMED, never silently ignored: an operator who widened
+  # the old commit window to make this check pass must be told that what they
+  # set is no longer read, and what to set instead.
+  if [ -n "${AO_GATE_STATUS_WINDOW:-}" ]; then
+    echo "check-gate-status: note — AO_GATE_STATUS_WINDOW is RETIRED (#1460) and is not read: a commit count cannot bound 'not producing' on a repository that lands dozens of commits a day (measured: 100 commits = 41.4h here, so the old 20-commit window was ~8 hours while the producer's own observations are 20.0-30.5h apart). The read-back is bounded by AO_GATE_STATUS_MAX_AGE_DAYS=$ldays instead." >&2
+  fi
+  # THE COMMIT UNDER TEST -- a POSITIVE-ONLY probe (#1460). A commit that carries
+  # the context IS an observation of the producer, so this can only ever answer
+  # `enabled`. A commit the API does not know (a lane's not-yet-pushed head) is
+  # not evidence about the producer either way, so a failure here is NOT counted
+  # as "not producing" and cannot hide one either: the walk decides the negative.
   lhead="$(git -C "$lroot" rev-parse HEAD 2>/dev/null)"
-  lrecent="$(gh api "repos/$lslug/commits?per_page=$lwindow" --jq '.[].sha' 2>/dev/null)"
-  lread=0
-  lfound=0
-  for lc in $lhead $lrecent; do
-    [ -n "$lc" ] || continue
-    if ! lctxs="$(gh api "repos/$lslug/commits/$lc/statuses" \
-                   --jq '[.[].context]|join(",")' 2>/dev/null)"; then
+  if [ -n "$lhead" ]; then
+    lhead_ctxs="$(gh api "repos/$lslug/commits/$lhead/statuses" \
+      --jq '[.[].context]|join(",")' 2>/dev/null)"
+    case ",$lhead_ctxs," in
+      *",$lctx,"*) printf 'enabled gh-status-observed\n'; return 0 ;;
+    esac
+  fi
+  # THE WALK. Bounded by TIME, and it must COVER the window before it may report
+  # the negative; `AO_GATE_STATUS_MAX_PAGES` and `AO_GATE_STATUS_MAX_PROBES` are
+  # request budgets, and exhausting one WITHOUT covering the window is an
+  # inability to assess, never an observation of absence.
+  for linstr in graphql rest; do
+    lread=0
+    lcovered=0
+    lprobes=0
+    lfound=0
+    lstopped=""
+    lpage=1
+    lcursor=""
+    while [ "$lpage" -le "$lmaxpages" ]; do
+      if [ "$linstr" = "graphql" ]; then
+        lpage_out="$(live_walk_graphql "$lslug" "$lref" "$lcut" "$lcursor" 100 "$lctx")"
+      else
+        lpage_out="$(live_walk_rest "$lslug" "$lref" "$lcut" "$lpage" 100 "$lctx")"
+      fi
+      lprc=$?
+      if [ "$lprc" -ne 0 ]; then
+        lstopped="request-failed"
+        break
+      fi
+      lread=$((lread + 1))
+      lnext=""
+      while read -r lkind lfield1 lfield2; do
+        case "$lkind" in
+          node) [ "$lfield2" = "1" ] && lfound=1 ;;
+          probes) lprobes=$((lprobes + lfield1)) ;;
+          next) lnext="$lfield1" ;;
+        esac
+      done <<< "$lpage_out"
+      [ "$lfound" -eq 1 ] && break
+      if [ -z "$lnext" ] || [ "$lnext" = "none" ]; then
+        lcovered=1
+        break
+      fi
+      if [ "$lnext" = "unusable" ]; then
+        lstopped="cursor-unusable"
+        break
+      fi
+      if [ "$lprobes" -ge "$lmaxprobes" ]; then
+        lstopped="probe-budget"
+        break
+      fi
+      lcursor="$lnext"
+      lpage=$((lpage + 1))
+    done
+    if [ "$lfound" -eq 1 ]; then
+      printf 'enabled gh-status-observed\n'
+      return 0
+    fi
+    if [ "$lread" -eq 0 ]; then
+      # This instrument could not answer AT ALL, so the walk is redone with the
+      # other one rather than reporting an inability to assess on a venue where
+      # the older transport is the one that works.
       continue
     fi
-    lread=$((lread + 1))
-    case ",$lctxs," in
-      *",$lctx,"*) lfound=1; break ;;
-    esac
+    if [ "$lcovered" -eq 1 ]; then
+      printf 'disabled gh-status-absent-in-last-%s-days\n' "$ldays"
+      return 0
+    fi
+    if [ "$lstopped" = "probe-budget" ]; then
+      printf 'unreadable gh-status-probe-budget-exhausted\n'
+      return 0
+    fi
+    printf 'unreadable gh-status-window-incomplete\n'
+    return 0
   done
-  if [ "$lfound" -eq 1 ]; then
-    printf 'enabled gh-status-observed\n'
-  elif [ "$lread" -gt 0 ]; then
-    printf 'disabled gh-status-absent-in-last-%s-commits\n' "$lwindow"
-  else
-    printf 'unreadable gh-statuses-unreadable\n'
-  fi
+  printf 'unreadable gh-statuses-unreadable\n'
   return 0
 }
 
@@ -317,12 +586,18 @@ probe_line() {
 #     the live producer state could not be read, or (live) nothing is producing
 #
 # `live-mode` is one of:
-#   ask       read the live state from live_producer_state() -- the real answer
+#   ask       read the live state from live_producer_state() -- the real answer.
+#             On a FOREIGN tree this is the provocation seat for the READ-BACK
+#             ITSELF (#1460): the API on PATH may be stubbed, and the walk that
+#             is provoked is still the real one. Nothing is asserted here, so
+#             this seat cannot tell the gate that its producer is enabled
 #   skip      ask nothing: the DECLARED state stands as the verdict. This is what
 #             a foreign tree gets: a fixture is not the repository the live state
 #             describes, so there is no live fact about it to read (#1394)
 #   enabled|disabled|unreadable
-#             the provocation seat -- a fixture's live answer, stood in
+#             the provocation seat -- a fixture's live answer, STOOD IN for the
+#             walk, for the arms that must keep asserting a state the walk did
+#             not read
 producer_probe() {
   r="${1:-}"
   lmode="${2:-skip}"
@@ -470,13 +745,17 @@ PY
         echo "      That declaration is pinned true by this repository's own policy (scripts/check-cloudbuild.sh, GR-5) and is therefore unfalsifiable from the tree; the verdict is taken from the live read-back instead (#1394)."
         return 0 ;;
       disabled)
-        # The source WAS readable and it says nothing is producing. That is not an
-        # inability to assess -- it is a FINDING, so it is rc 1 like every other
-        # unproduced-context refusal, not rc 2. (rc 2 here would also be the wrong
-        # shape for the skip budget: a skip means "this venue cannot answer", and
-        # this venue just did.)
+        # The window WAS covered and it says nothing has been observed. That is
+        # not an inability to assess -- it is a FINDING, so it is rc 1 like
+        # every other unproduced-context refusal, not rc 2. (rc 2 here would
+        # also be the wrong shape for the skip budget: a skip means "this venue
+        # cannot answer", and this venue just did.) The wording keeps the two
+        # remedies apart (#1460): the tree half above answers "does a producer
+        # exist" and this half answers only "has it been OBSERVED in the
+        # window", so it says which window and never claims the producer is
+        # absent.
         probe_line 1 unobserved
-        echo "check-gate-status: FAIL REQUIRED-BUT-UNOBSERVED — '$pctx' is REQUIRED and a producer exists on the PR verdict path, and the live producer state WAS read ('$live_source'), but the context is not observed on the commit under test nor on any of the most recent commits: the producer is genuinely not producing, so the requirement is not satisfiable, which is never a pass:" >&2
+        echo "check-gate-status: FAIL REQUIRED-BUT-UNOBSERVED — '$pctx' is REQUIRED and a producer exists on the PR verdict path, and the live producer state WAS read ('$live_source'), but NO COMMIT OF THE DEFAULT BRANCH INSIDE THAT WINDOW carries the context: the producer has not been OBSERVED in the window, which is a finding about the WINDOW and not a claim that no producer exists (the tree half above proved one is reached where the PR verdict is made). The producer's most recent observation is older than the window, or there is none; until it posts again -- or the window is widened deliberately, with AO_GATE_STATUS_MAX_AGE_DAYS -- the requirement is not satisfiable, and a merge would proceed only through the admin bypass (enforce_admins=false). The window is the verdict's own bound, and it is named in the state above." >&2
         printf '      declared flag-gated OFF as well: %s\n' $gated_off >&2
         return 1 ;;
       unreadable)
@@ -515,14 +794,18 @@ if [ "$probe_mode" -eq 1 ]; then
   # answering the declared-state verdict. So a foreign tree gets `skip`, and the
   # provocation seat (`--live-state`) supplies a live answer explicitly.
   if [ "$root" = "$own_root" ]; then
-    if [ -n "$live_state_override" ]; then
-      echo "check-gate-status: CANNOT-ASSESS — --live-state is REFUSED on this repository's OWN tree: the live producer state is READ here, never asserted (#1394)" >&2
-      exit 2
-    fi
-    producer_probe "$root" ask
+    # `ask` IS this tree's behaviour, so being explicit about the READ is not an
+    # assertion and is accepted; every asserted value is REFUSED by name.
+    case "$live_state_override" in
+      ''|ask) producer_probe "$root" ask ;;
+      *)
+        echo "check-gate-status: CANNOT-ASSESS — --live-state is REFUSED on this repository's OWN tree: the live producer state is READ here, never asserted (#1394)" >&2
+        exit 2 ;;
+    esac
   else
     case "$live_state_override" in
       '') producer_probe "$root" skip ;;
+      ask) producer_probe "$root" ask ;;
       enabled|disabled|unreadable)
         producer_probe "$root" "$live_state_override" "$live_source_override" ;;
       *) echo "check-gate-status: CANNOT-ASSESS — --live-state must be enabled, disabled or unreadable (got '$live_state_override')" >&2
@@ -651,6 +934,173 @@ if [ -f "$POSTER" ]; then
   fi
 fi
 
+# 3c. DETAIL — the description must be able to say WHY the gate redded (#1407).
+#
+#    The description was a FIXED string per rc, so every red PR page read
+#    `make verify: FAIL` and WHICH check failed was knowable only by opening the
+#    build log: a required check that cannot name its own refusal. The poster now
+#    takes `--detail <text>`, and the seam has TWO halves that must both hold:
+#
+#      * the detail REACHES the description -- and reaches the POSTED payload,
+#        not only the dry-run text, because a seam that stops one step short is a
+#        description the operator still never sees;
+#      * the detail does NOT reach the OUTCOME. A detail able to turn a
+#        CANNOT-ASSESS (rc 2) into a pass is exactly the #739 false-green class.
+#
+#    Every arm is offline. The posting arm shadows `gh` with a stub that records
+#    its argv, so the POST path itself is measured without making a request.
+if [ -f "$POSTER" ]; then
+  det_sha=0000000000000000000000000000000000000000
+  desc_of() { printf '%s\n' "$1" | sed -n 's/^  description = //p' | head -1; }
+  state_of() { printf '%s\n' "$1" | sed -n 's/^  state       = //p' | head -1; }
+  # The arm form below states the EXPECTATION beside the ACTUAL value, because an
+  # arm that only reports "ok=NO" cannot be audited.
+  darm() { # darm <label> <expect> <actual>
+    _dlbl="$1"; _dexp="$2"; _dact="$3"
+    if [ "$_dexp" = "$_dact" ]; then
+      echo "  OK    $_dlbl"
+      echo "        expect: $_dexp"
+      echo "        actual: $_dact"
+    else
+      echo "check-gate-status: FAIL — the detail arm '$_dlbl' did not hold" >&2
+      echo "        expect: $_dexp" >&2
+      echo "        actual: $_dact" >&2
+      fail=1
+    fi
+  }
+
+  # (a) PARITY. With NO detail the description is byte-identical to today's. The
+  #     three strings are pinned HERE as literals, so a drift in the mapper reds
+  #     this gate instead of quietly matching itself in two places at once.
+  declare -A TODAY=( [0]="make verify: PASS" [1]="make verify: FAIL" [2]="make verify: CANNOT-ASSESS (not a pass)" )
+  for rc in 0 1 2; do
+    det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc "$rc" 2>&1)"
+    darm "rc $rc with no --detail keeps today's description byte-for-byte" \
+      "${TODAY[$rc]}" "$(desc_of "$det_out")"
+  done
+
+  # (b) The detail REACHES the description, in front of an intact outcome string.
+  det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc 1 --detail 'check-reconcile' 2>&1)"
+  darm "post --rc 1 --detail 'check-reconcile' renders a description naming it" \
+    "make verify: FAIL -- check-reconcile" "$(desc_of "$det_out")"
+  darm "and the outcome is still the rc's own (the detail is a suffix)" \
+    "failure" "$(state_of "$det_out")"
+  det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc 1 --detail "$(printf 'check-a\n  check-b')" 2>&1)"
+  darm "a detail carrying newlines is flattened to ONE description line" \
+    "make verify: FAIL -- check-a check-b" "$(desc_of "$det_out")"
+
+  # (c) THE #739 ARM: a detail can not turn rc 2 into a pass. A status page reads
+  #     the STATE as well as the description, so both are asserted.
+  det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc 2 --detail 'success PASS green' 2>&1)"
+  darm "a passing-sounding detail on rc 2 is STILL published as an error" \
+    "error" "$(state_of "$det_out")"
+  case "$det_out" in
+    *"state       = success"*)
+      echo "check-gate-status: FAIL — a detail turned CANNOT-ASSESS into a pass (the #739 class)" >&2
+      fail=1 ;;
+    *)
+      echo "  OK    no state built for rc 2 is a pass, whatever the detail says" ;;
+  esac
+  case "$(desc_of "$det_out")" in
+    "make verify: CANNOT-ASSESS (not a pass)"*)
+      echo "  OK    and the description still leads with the CANNOT-ASSESS outcome" ;;
+    *)
+      echo "check-gate-status: FAIL — a detail displaced the CANNOT-ASSESS outcome string" >&2
+      printf '        actual: %s\n' "$(desc_of "$det_out")" >&2
+      fail=1 ;;
+  esac
+  # A detail is not a SOURCE of the outcome: offered with no --rc it must still be
+  # CANNOT-ASSESS, never an outcome guessed from the text of the detail.
+  bash "$POSTER" dry-run --sha "$det_sha" --detail 'check-reconcile' >/dev/null 2>&1
+  darm "a --detail with no --rc is still CANNOT-ASSESS (a detail is not an outcome)" \
+    2 "$?"
+
+  # (d) BOUNDED. GitHub cuts a status description at 140 characters, so the poster
+  #     must cut it deliberately: keep the outcome string, mark the cut. The API's
+  #     own limit is pinned here as a literal -- it is an external fact, not a
+  #     number this repository gets to choose.
+  #
+  # Measured in CHARACTERS, matching the unit GitHub's description cap and the
+  # producer's own len() use (scripts/gate-status-map.py) -- not bytes. Bash's
+  # `${#var}` counts BYTES under a C/POSIX locale (as on the python:3.14 Cloud
+  # Build runner), so a 140-char description containing the multi-byte "\u2026" cut
+  # mark measures 142 there and this arm false-reds (#1382). python3's len() on
+  # a decoded str is locale-independent and agrees with the producer. Both the
+  # positive and negative arms below call this ONE helper, so the fix and its
+  # proof share the same measurement -- a helper redefined only in the negative
+  # arm would prove nothing about the path the positive arm runs.
+  desc_len() { python3 -c 'import sys; print(len(sys.argv[1]))' "$1"; }
+
+  cut_mark="$(python3 -c 'print("\u2026", end="")')"
+  det_out="$(bash "$POSTER" dry-run --sha "$det_sha" --rc 2 --detail "$(printf 'c%.0s' $(seq 1 500))" 2>&1)"
+  det_desc="$(desc_of "$det_out")"
+  det_desc_len="$(desc_len "$det_desc")"
+  darm "a 500-character detail still fits the API's 140-character description cap" \
+    "<=140" "$([ "$det_desc_len" -le 140 ] && echo '<=140' || echo ">140 ($det_desc_len)")"
+
+  # Negative control: the measurement above must still CATCH a genuinely
+  # oversized description -- proof this repo's convention requires alongside
+  # the fix. A fixture of plain ASCII would measure the same under bytes and
+  # characters and discriminate nothing, so this one reuses the real, actual
+  # 140-char CANNOT-ASSESS description plus one more copy of the multi-byte
+  # cut mark: 141 characters / 143 bytes, genuinely over the cap in EITHER
+  # unit, so a regression back to byte-counting cannot make this arm pass by
+  # accident.
+  oversized_desc="${det_desc}${cut_mark}"
+  oversized_len="$(desc_len "$oversized_desc")"
+  darm "a genuinely oversized description is still measured as over the cap" \
+    ">140 ($((det_desc_len + 1)))" "$([ "$oversized_len" -le 140 ] && echo '<=140' || echo ">140 ($oversized_len)")"
+  case "$det_desc" in
+    "make verify: CANNOT-ASSESS (not a pass)"*"$cut_mark")
+      echo "  OK    and the truncation is MARKED, and the outcome string is what survived it" ;;
+    *)
+      echo "check-gate-status: FAIL — a truncated description neither kept its outcome string nor said it was cut" >&2
+      printf '        actual: %s\n' "$det_desc" >&2
+      fail=1 ;;
+  esac
+
+  # (e) The POST path itself: the detail must reach the PAYLOAD, not just the
+  #     dry-run text. `--rc 1` is deliberate -- the venue guard gates `success`
+  #     only, so a red reaches publish_status with no live read at all.
+  det_bin="$(mktemp -d /tmp/cgs-detail.XXXXXX)" || det_bin=""
+  if [ -z "$det_bin" ]; then
+    echo "check-gate-status: CANNOT-ASSESS — mktemp failed, so the posting arm could not be provoked" >&2
+    exit 2
+  fi
+  mkdir -p "$det_bin/bin"
+  cat > "$det_bin/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+# Fixture stand-in for `gh`: records its argv and answers success. The boundary
+# stubbed is the API, never the poster -- its parsing and decision all run.
+printf '%s\n' "$*" >> "${STUB_ARGV:?}"
+exit 0
+STUB
+  chmod +x "$det_bin/bin/gh"
+  : > "$det_bin/argv.txt"
+  STUB_ARGV="$det_bin/argv.txt" PATH="$det_bin/bin:$PATH" \
+    bash "$POSTER" post --sha "$det_sha" --rc 1 --detail 'check-shell-patterns' \
+    >"$det_bin/out.txt" 2>&1
+  det_rc=$?
+  darm "post --rc 1 --detail ... succeeds through the shadowed gh (no request made)" \
+    0 "$det_rc"
+  case "$(cat "$det_bin/argv.txt")" in
+    *"description=make verify: FAIL -- check-shell-patterns"*)
+      echo "  OK    and the detail reaches the POSTED payload: $(tr '\n' ' ' < "$det_bin/argv.txt")" ;;
+    *)
+      echo "check-gate-status: FAIL — the detail did not reach the posted payload" >&2
+      printf '        argv: %s\n' "$(tr '\n' ' ' < "$det_bin/argv.txt")" >&2
+      printf '        out:  %s\n' "$(tr '\n' ' ' < "$det_bin/out.txt")" >&2
+      fail=1 ;;
+  esac
+  rm -rf "$det_bin"
+
+  # (f) A verb that does not publish an outcome from --rc must REFUSE the detail
+  #     rather than accept and drop it: a flag that is silently ignored leaves the
+  #     producer believing it reached the PR page.
+  bash "$POSTER" reconcile --sha "$det_sha" --detail 'check-reconcile' >/dev/null 2>&1
+  darm "--detail on 'reconcile' is REFUSED, never silently dropped" 2 "$?"
+fi
+
 # 4. LIVE PRODUCER STATE — provoked (#1394).
 #
 #    The defect this provokes: the probe read the checked-in import stub's
@@ -747,6 +1197,197 @@ out="$(bash scripts/check-gate-status.sh --producer-probe --root "$live_fx/off" 
 arm "a foreign tree gets the DECLARED verdict, not a live one" \
     2 'REQUIRED-BUT-GATED-OFF' '' "$out" "$rc"
 
+# 4f. THE READ-BACK'S BOUND IS AN AGE, AND IT MUST BE COVERED (#1460).
+#
+#     Arms 4a-4e stand a live ANSWER in through the seat; these arms measure the
+#     INSTRUMENT that produces that answer, because the defect was in the
+#     instrument: a fixed commit window read "the producer ran 30 commits ago" as
+#     "the producer is not producing". So `live_producer_state` is driven for
+#     real here -- `gh` is shadowed at the API boundary (the same technique
+#     section 3c uses for the poster) and every page it answers with is a shaped
+#     response, so the walk, its budgets and its verdicts all execute.
+#
+#     Each arm is the pair the doctrine asks for: the expectation beside the line
+#     that was actually produced. And each one CAN fail -- (f7) proves it, with a
+#     MUTANT of this very script whose coverage guard is replaced by the pre-fix
+#     reading ("any readable source with nothing observed").
+win_fx="$live_fx/window"
+mkdir -p "$win_fx/bin"
+mk_live_fixture "$win_fx" true
+cp "$own_root/scripts/check-gate-status.sh" "$win_fx/scripts/check-gate-status.sh"
+
+# The stub is the API and nothing else: the checker's own parsing, walking and
+# deciding all run. It answers every call from STUB_* knobs, so an arm is a
+# description of what the API said, never of what the checker should conclude.
+cat > "$win_fx/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${STUB_ARGV:?}"
+case "$*" in
+  "auth status"*) exit 0 ;;
+  "repo view"*) printf '%s %s\n' "${STUB_SLUG:-kushin77/agent-orchestrator}" "${STUB_REF:-master}"; exit 0 ;;
+esac
+case "$*" in
+  *"/statuses"*)
+    [ "${STUB_STATUSES_FAIL:-0}" = "1" ] && exit 1
+    case "$*" in *"${STUB_OBSERVED_SHA:-@@no-sha@@}"*) printf 'ao/gate-of-record\n'; exit 0 ;; esac
+    exit 0 ;;
+esac
+case "$*" in
+  *graphql*)
+    [ "${STUB_GRAPHQL_FAIL:-0}" = "1" ] && exit 1
+    _n=0
+    [ -f "${STUB_COUNTER:?}" ] && _n="$(cat "$STUB_COUNTER")"
+    _n=$((_n + 1))
+    printf '%s' "$_n" > "$STUB_COUNTER"
+    _f="$STUB_PAGES/gql-page$_n.json"
+    [ -f "$_f" ] || _f="$STUB_PAGES/gql-page-last.json"
+    cat "$_f"
+    exit 0 ;;
+esac
+case "$*" in
+  *"per_page="*)
+    [ "${STUB_REST_FAIL:-0}" = "1" ] && exit 1
+    _pp=100; _pg=1
+    case "$*" in *"per_page="*) _pp="$(printf '%s' "$*" | sed -n 's/.*per_page=\([0-9]*\).*/\1/p')" ;; esac
+    case "$*" in *"page="*) _pg="$(printf '%s' "$*" | sed -n 's/.*page=\([0-9]*\).*/\1/p')" ;; esac
+    [ -n "$_pp" ] || _pp=100
+    [ -n "$_pg" ] || _pg=1
+    awk -v p="$_pg" -v w="$_pp" 'NR > (p-1)*w && NR <= p*w' "${STUB_REST_ALL:?}"
+    exit 0 ;;
+esac
+exit 1
+STUB
+chmod +x "$win_fx/bin/gh"
+
+# mk_gql_page <nodes> <ctx-index|-1> <has-next true|false>: one shaped page. Every
+# commit carries a real commit context; the required one appears only where the
+# arm says it does.
+mk_gql_page() { # mk_gql_page <dir> <nodes> <ctx-index> <has-next>
+  python3 - "$1" "$2" "$3" "$4" <<'PY'
+import json
+import sys
+
+out, count, ctx_at, has_next = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4] == "true"
+
+
+def node(i):
+    ctxs = [{"__typename": "StatusContext", "context": "control-plane-apply"}]
+    if i == ctx_at:
+        ctxs.append({"__typename": "StatusContext", "context": "ao/gate-of-record"})
+    return {"oid": "%040d" % i, "statusCheckRollup": {"contexts": {"nodes": ctxs}}}
+
+
+def page(nodes, more):
+    return {"data": {"repository": {"object": {"history": {
+        "pageInfo": {"hasNextPage": more, "endCursor": "cursor-100"},
+        "nodes": nodes}}}}}
+
+
+with open(out + "/gql-page1.json", "w") as fh:
+    json.dump(page([node(i) for i in range(count)], has_next), fh)
+with open(out + "/gql-page-last.json", "w") as fh:
+    json.dump(page([node(i + count) for i in range(count)], True), fh)
+PY
+}
+
+win_arm() { # win_arm <label> <tree> <script> <want-rc> <want-needle> <forbid-needle> <env...>
+  _wlbl="$1"; _wtree="$2"; _wscript="$3"; _wrc="$4"; _wneed="$5"; _wforbid="$6"; shift 6
+  # The counter is reset per arm, so "page 1" is page 1 in every arm and an arm
+  # cannot be answered by the previous arm's page.
+  : > "$win_fx/argv.txt"
+  : > "$win_fx/counter.txt"
+  _wout="$(env "$@" PATH="$win_fx/bin:$PATH" STUB_ARGV="$win_fx/argv.txt" \
+             STUB_COUNTER="$win_fx/counter.txt" STUB_PAGES="$win_fx/pages" \
+             bash "$_wscript" --producer-probe --root "$_wtree" 2>&1)"
+  _wrcgot=$?
+  arm "$_wlbl" "$_wrc" "$_wneed" "$_wforbid" "$_wout" "$_wrcgot"
+}
+
+mkdir -p "$win_fx/pages"
+# (f1) THE DEFECT, end to end: the producer's most recent observation is 26
+#      commits back -- outside ANY 20-commit window -- and it is still an
+#      observation, so the read-back must say PRODUCED. The same fixture under
+#      the pre-fix instrument is the BEFORE case in this issue's evidence.
+mk_gql_page "$win_fx/pages" 100 26 false
+win_arm "an observation 26 commits back (outside any 20-commit window) is PRODUCED" \
+    "$win_fx" "$win_fx/scripts/check-gate-status.sh" 0 'verdict=produced' 'REQUIRED-BUT-UNOBSERVED' \
+    AO_GATE_STATUS_MAX_AGE_DAYS=7
+
+# (f2) THE GUARD THAT CANNOT BE DROPPED: the walk ran out of page budget with the
+#      window NOT covered, so "nothing observed" has not been established. It must
+#      be CANNOT-ASSESS naming the incomplete window -- never the negative. This
+#      is the arm that makes the false verdict unable to come back through the
+#      bound: a budget is not an observation.
+mk_gql_page "$win_fx/pages" 100 -1 true
+win_arm "a walk cut short by its page budget is CANNOT-ASSESS, never 'not producing'" \
+    "$win_fx" "$win_fx/scripts/check-gate-status.sh" 2 'gh-status-window-incomplete' 'live=disabled' \
+    AO_GATE_STATUS_MAX_AGE_DAYS=7 AO_GATE_STATUS_MAX_PAGES=1
+
+# (f3) A source that cannot be read at all is CANNOT-ASSESS, and the checker tries
+#      the other transport before saying so.
+mk_gql_page "$win_fx/pages" 100 -1 false
+win_arm "an API that cannot be read is CANNOT-ASSESS, never a false negative" \
+    "$win_fx" "$win_fx/scripts/check-gate-status.sh" 2 'gh-statuses-unreadable' 'verdict=produced' \
+    AO_GATE_STATUS_MAX_AGE_DAYS=7 STUB_GRAPHQL_FAIL=1 STUB_REST_FAIL=1 STUB_STATUSES_FAIL=1
+
+# (f4) THE CASE THE FIX MUST NOT BREAK: a producer that really has stopped (the
+#      window IS covered, and holds nothing) still refuses BY NAME, and the
+#      refusal names the WINDOW it used rather than claiming the producer does
+#      not exist.
+mk_gql_page "$win_fx/pages" 100 -1 false
+win_arm "a producer with no observation in the covered window is REFUSED by name" \
+    "$win_fx" "$win_fx/scripts/check-gate-status.sh" 1 'REQUIRED-BUT-UNOBSERVED' 'verdict=produced' \
+    AO_GATE_STATUS_MAX_AGE_DAYS=7
+case "$_wout" in
+  *"absent-in-last-7-days"*) echo "  OK    and the verdict NAMES the bound it used: absent-in-last-7-days" ;;
+  *) echo "check-gate-status: FAIL — the refusal did not name the window it used" >&2; fail=1 ;;
+esac
+case "$_wout" in
+  *"genuinely not producing"*)
+    echo "check-gate-status: FAIL — the refusal still reports a window finding as a producer finding (#1460)" >&2
+    fail=1 ;;
+  *) echo "  OK    and it does NOT report the window finding as 'the producer is genuinely not producing'" ;;
+esac
+
+# (f5) The commit under test is POSITIVE-ONLY: a HEAD the API does not know (a
+#      lane's not-yet-pushed commit) must neither manufacture the negative nor
+#      hide the positive -- the walk decides both.
+mk_gql_page "$win_fx/pages" 100 26 false
+win_arm "an UNREACHABLE commit under test does not block a positive found by the walk" \
+    "$win_fx" "$win_fx/scripts/check-gate-status.sh" 0 'verdict=produced' '' \
+    AO_GATE_STATUS_MAX_AGE_DAYS=7 STUB_STATUSES_FAIL=1
+mk_gql_page "$win_fx/pages" 100 -1 false
+win_arm "nor does it manufacture a negative: the covered window still decides" \
+    "$win_fx" "$win_fx/scripts/check-gate-status.sh" 1 'REQUIRED-BUT-UNOBSERVED' 'live=unreadable' \
+    AO_GATE_STATUS_MAX_AGE_DAYS=7 STUB_STATUSES_FAIL=1
+
+# (f6) The retired seam is NAMED, not silently ignored: an operator who widened
+#      the old commit window to make this check pass is told what changed.
+mk_gql_page "$win_fx/pages" 100 26 false
+win_arm "the retired AO_GATE_STATUS_WINDOW is announced, and no longer read" \
+    "$win_fx" "$win_fx/scripts/check-gate-status.sh" 0 'AO_GATE_STATUS_WINDOW is RETIRED' '' \
+    AO_GATE_STATUS_MAX_AGE_DAYS=7 AO_GATE_STATUS_WINDOW=200
+
+# (f7) CAN THE ARMS FAIL? A mutant of THIS script whose coverage guard is replaced
+#      by the pre-fix reading -- "any readable source with nothing observed is the
+#      negative" -- must STOP refusing (f2)'s shape and report the false verdict.
+#      Without this half the arms above would be assertions nothing proves are
+#      load-bearing, which is the formality GR-12 refuses.
+mut_fx="$live_fx/mutant"
+mk_live_fixture "$mut_fx" true
+sed 's/\[ "\$lcovered" -eq 1 \]; then/[ "$lread" -gt 0 ]; then/' \
+    "$own_root/scripts/check-gate-status.sh" > "$mut_fx/scripts/check-gate-status.sh"
+if cmp -s "$own_root/scripts/check-gate-status.sh" "$mut_fx/scripts/check-gate-status.sh"; then
+  echo "check-gate-status: FAIL — the (f7) mutation did not apply: the coverage guard's text moved, so the falsification would prove nothing" >&2
+  fail=1
+else
+  mk_gql_page "$win_fx/pages" 100 -1 true
+  win_arm "the mutant that drops the coverage guard reports the FALSE negative" \
+      "$mut_fx" "$mut_fx/scripts/check-gate-status.sh" 1 'REQUIRED-BUT-UNOBSERVED' 'window-incomplete' \
+      AO_GATE_STATUS_MAX_AGE_DAYS=7 AO_GATE_STATUS_MAX_PAGES=1
+  echo "  OK    so (f2)'s CANNOT-ASSESS comes from that guard, and not from the file existing"
+fi
+
 # 5. PRODUCER — the REQUIRED context must have a PRODUCER (#1357).
 #
 #    Everything above proves the poster's machinery; this proves the poster is
@@ -803,8 +1444,11 @@ esac
 #    -- `live=` carries it, so the two halves cannot disagree):
 #
 #      enabled    the context IS being produced -> this half passes
-#      disabled   the source WAS read and nothing is producing -> CANNOT-ASSESS
-#      unreadable the source could NOT be read -> CANNOT-ASSESS naming it
+#      disabled   the AGE window was covered and holds no observation -> NOT-OK
+#                 by name (rc 1): a finding about the window, not an inability
+#                 to assess -- and the refusal says which window (#1460)
+#      unreadable the source could NOT be read, or the window could not be
+#                 covered -> CANNOT-ASSESS naming it
 #
 #    An unobserved context when nothing is REQUIRED is not a failure at all --
 #    no merge is deadlocked by the absence of a check nobody requires.
@@ -818,7 +1462,7 @@ else
     enabled)
       echo "  OK  the LIVE producer state was OBSERVED on the repository ($producer_live_source): branch protection REQUIRES '$context_poster' and the context IS being produced, so the read-back half is satisfied by the mechanism rather than by one head" ;;
     disabled)
-      echo "  FAIL REQUIRED-BUT-UNOBSERVED — branch protection REQUIRES '$context_poster' and the live source WAS read ($producer_live_source), but nothing is producing the context: the requirement cannot be satisfied, and a merge would proceed only through the admin bypass (enforce_admins=false)"
+      echo "  FAIL REQUIRED-BUT-UNOBSERVED — branch protection REQUIRES '$context_poster' and the live window WAS read to its end ($producer_live_source), but no commit of the default branch inside it carries the context: the producer has not been OBSERVED in the window the read-back declares, which is a finding about the WINDOW rather than a claim that no producer exists — so the two remedies are 'make the producer post again' and 'widen AO_GATE_STATUS_MAX_AGE_DAYS deliberately', and until one of them the requirement cannot be satisfied and a merge would proceed only through the admin bypass (enforce_admins=false)"
       fail=1 ;;
     unreadable)
       echo "  CANNOT-ASSESS LIVE-PRODUCER-UNREADABLE — the live producer state could not be read from its source ($producer_live_source), so neither 'produced' nor 'gated off' can be claimed for the REQUIRED context '$context_poster': an unreadable source is never a pass"

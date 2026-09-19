@@ -56,6 +56,17 @@
 #                     Each link is driven with its provoked half AND its clean
 #                     twin, because a chain whose links all pass while doing
 #                     nothing is a decoration, not an integration.
+#   tagging-freshness the committed `.board/snapshot.json` the live projection
+#                     reads (`cli.py board --live`) is bounded by
+#                     TAGGING_BOARD_STALENESS_MINUTES (issue #1427): past that
+#                     age this check FAILS by name instead of silently
+#                     describing a board that has moved. Still fully offline —
+#                     it reads the committed snapshot, it does not fetch one;
+#                     refreshing it is still the explicit, manual
+#                     `python3 governance/dispatch/cli.py snapshot
+#                     --from-github` (docs/TAGGING.md), because the verify
+#                     runner's image has no `gh` and no network (see
+#                     infra/cloudbuild/verify.yaml).
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 # CANNOT-ASSESS must never be reported as a pass.
@@ -236,6 +247,33 @@ case "$rc" in
     ;;
   *)
     report SKIP "tagging-e2e — CANNOT-ASSESS (rc $rc)"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    skipped=$((skipped + 1))
+    ;;
+esac
+
+# --- check 8: the committed snapshot's own freshness ------------------------
+# `board --live` is offline (it reads the committed .board/snapshot.json, it
+# never fetches one) but until issue #1427 nothing in the verify path called
+# it, so drift between manual `snapshot --from-github` refreshes went
+# undetected here. This does not make the check network-touching: a stale
+# snapshot now fails BY NAME, at its own declared threshold, instead of a gap
+# nothing reported.
+out="$(python3 governance/tagging/cli.py board --live 2>&1)"
+rc=$?
+case "$rc" in
+  0)
+    assessed=$((assessed + 1))
+    report PASS "tagging-freshness — $(printf '%s' "$out" | grep -m1 '^tagging-live: snapshot' | head -1)"
+    ;;
+  1)
+    assessed=$((assessed + 1))
+    failures=$((failures + 1))
+    report FAIL "tagging-freshness — the committed board snapshot is stale"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    ;;
+  *)
+    report SKIP "tagging-freshness — CANNOT-ASSESS (rc $rc)"
     printf '%s\n' "$out" | sed 's/^/      /'
     skipped=$((skipped + 1))
     ;;

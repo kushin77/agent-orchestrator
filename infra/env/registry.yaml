@@ -499,6 +499,18 @@ variables:
     required_by: [local-run, tooling]
     readers: [telemetry/clock.py]
 
+  # -- reconcile -----------------------------------------------------------
+  - name: AO_VENUE_SPOOL
+    purpose: >-
+      points the orphan walk at the venue spool it reads to answer "is this
+      artifact IN USE?" before reclaiming it (governance/reconcile/orphans.py).
+      Set, a reclaim refuses an artifact whose venue still holds a live entry;
+      unset, the walk keeps its content-landed-only reading and says so at the
+      point of decision rather than guessing.
+    secret: false
+    required_by: [ops]
+    readers: [governance/reconcile/orphans.py]
+
 # Read by the tree, deliberately NOT part of the surface a deploy or a local run
 # supplies. Each carries the reason it is exempt; `surface.py` refuses an
 # exemption with no reason, and one whose variable nothing reads any more.

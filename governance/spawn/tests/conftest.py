@@ -14,6 +14,8 @@ the test's own.
 
 from __future__ import annotations
 
+import importlib
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,61 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 for extra in (REPO_ROOT, REPO_ROOT / "fleet"):
     if str(extra) not in sys.path:
         sys.path.insert(0, str(extra))
+
+
+@pytest.fixture(autouse=True)
+def isolate_the_beat_producer(tmp_path: Path, monkeypatch) -> None:
+    """Point the runtime-beat producer (#1412) at this test's own tmp dir.
+
+    ``fleet/terminal.py::run_once`` posts a runtime beat BEFORE it refuses or
+    spawns — ``beats.best_effort(..., root=beats.ROOT, ...)`` — and
+    ``beats.ROOT`` is a module constant naming the tree the beat lands in: this
+    repository. ``fleet/tests/conftest.py`` redirects that constant for every
+    test in THAT suite; this suite drives the same loop (through
+    ``governance/spawn/cli.py`` and ``terminal.run_once``), so it needs the same
+    cover.
+
+    Measured without it (#1459):
+
+        python3 -m pytest -p no:cacheprovider -q \\
+          governance/spawn/tests/test_consumption.py::test_the_loop_still_spawns_when_the_envelope_is_well_formed
+
+    leaves ``.fleet/runtime-beats/deepseek-executor.json`` in the repository, and
+    the next ``scripts/check-runtime-liveness.sh`` then reports every OTHER
+    registered runtime ``runtime-stale`` — a gate whose verdict depends on which
+    check ran before it, the ``check-docs.sh find .`` class (#764).
+
+    A tree with no producer cannot leak one, so that absence is accepted (and a
+    ``fleet/beats.py`` that is present but not importable is NOT treated as one:
+    it is refused by name, the rule ``redirect_runtime_paths`` follows in
+    ``fleet/tests/conftest.py``).
+
+    The registry travels with the tree, exactly as it does in the check scripts
+    that redirect this producer (#1459): the beat is therefore really WRITTEN,
+    just not into this repository. A bare redirect to a tmp dir would be a
+    refusal instead of a redirect — `load_registry(root)` reads
+    ``<root>/fleet/runtimes.yaml`` — and a suite whose stamps are all refused
+    would pass this fixture for a reason that has nothing to do with the loop
+    actually stamping.
+    """
+    producer = REPO_ROOT / "fleet" / "beats.py"
+    try:
+        beats = importlib.import_module("beats")
+    except ImportError:
+        if producer.exists():
+            pytest.fail(
+                f"{producer} exists but the producer module is not importable — "
+                "the beats cover cannot be assumed"
+            )
+        return
+    if not hasattr(beats, "ROOT"):
+        pytest.fail("fleet/beats.py no longer exposes ROOT — the beats cover cannot be assumed")
+    root = tmp_path / "fleet-beats"
+    registry = REPO_ROOT / "fleet" / "runtimes.yaml"
+    if registry.is_file():
+        (root / "fleet").mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(registry, root / "fleet" / "runtimes.yaml")
+    monkeypatch.setattr(beats, "ROOT", root)
 
 
 @pytest.fixture
@@ -72,7 +129,22 @@ def envelope_fields(tmp_path: Path) -> dict[str, Any]:
             "ttl_seconds": 900,
         },
         "verify": {"command": "bash scripts/check-spawn-envelope.sh", "source": "issue-verify-clause"},
-        "spawn": {"path": "fleet", "agent": "fixture-agent", "directive": "fixture-directive"},
+        "spawn": {
+            "path": "fleet",
+            "agent": "fixture-agent",
+            "directive": "fixture-directive",
+            # The admission inputs the three judges read (#1413): the fixture is a
+            # spawn that is admissible, so every refusal test below still removes
+            # exactly ONE thing.
+            "runtime": "claude-subagent",
+            "role": "fleet",
+            "tier": "L0",
+            "task_class": "code-author",
+            "actor": "claude-subagent",
+            "verbs": [],
+            "skills": [],
+            "secrets": [],
+        },
     }
 
 

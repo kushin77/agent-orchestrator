@@ -2,12 +2,35 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
+
+import pytest
+
 from datetime import date
 from pathlib import Path
 
 from governance.reconcile import orphans as o
 
 LANE = {"lane_id": "lane00000001", "session_id": "lane00000001", "issue": 1301, "branch": "issue-1301", "worktree": "/lanes/ao-1301"}
+
+
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    assert result.returncode == 0, f"git {args} failed: {result.stderr}"
+    return result.stdout
+
+
+def _scratch_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "main"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "master")
+    _git(repo, "config", "user.email", "gate@example.com")
+    _git(repo, "config", "user.name", "Gate")
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "seed")
+    return repo
 
 
 class FakeOps:
@@ -24,6 +47,8 @@ class FakeOps:
         self.directives: list[o.Directive] = []
         self.landed: set[str] = set()
         self.dirt: dict[str, list[str]] = {}
+        self.use: dict[str, o.Use] = {}
+        self.default_use = o.Use(o.NOT_IN_USE, "fake: no git lock, no holder, no venue record")
         self.calls: list[tuple] = []
         self.__dict__.update(overrides)
 
@@ -57,6 +82,9 @@ class FakeOps:
 
     def foreign_dirt(self, path):
         return self.dirt.get(path, [])
+
+    def in_use(self, entry):
+        return self.use.get(entry.path, self.default_use)
 
     def record_reaped(self, **kw):
         self.calls.append(("record_reaped", kw["head_sha"]))
@@ -129,6 +157,36 @@ def test_a_lane_whose_issue_is_closed_is_an_orphan_issue_lane():
     assert found[0].reclaimable is False, "a lane reaches terminal only through its own close-out"
 
 
+def test_the_walk_run_from_a_lane_worktree_reads_the_fleets_state(tmp_path: Path):
+    """#1436: ``.fleet/`` lives beside the MAIN checkout's git dir and is never
+    checked out into a linked worktree, so the two kinds read from it came back
+    **0** and the three read from git were *inflated* (nothing was left to
+    exclude) when the same walk was run from a lane — the disagreement between
+    the gate's walk and the issue's own ``Verify:`` command. The port's own
+    docstring already required the main checkout; this asserts it is true of a
+    caller that passes a lane.
+    """
+    repo = _scratch_repo(tmp_path)
+    lane = tmp_path / "lane"
+    _git(repo, "worktree", "add", "-q", "-b", "issue-1436", str(lane))
+    (repo / ".fleet" / "lanes").mkdir(parents=True)
+    (repo / ".fleet" / "lanes" / "lane00000001.json").write_text(
+        json.dumps({**LANE, "worktree": str(lane)}), encoding="utf-8"
+    )
+    # The premise the disagreement rests on: a linked worktree has no `.fleet`.
+    assert not (lane / ".fleet").exists()
+
+    assert o.fleet_root(repo) == repo.resolve()
+    assert o.fleet_root(lane) == repo.resolve(), "a lane resolves to the checkout that owns the state"
+    # ...and the consequence: the lane's port reads the FLEET's lane records, so
+    # the lane it names is excluded rather than counted as an orphan.
+    assert [record["lane_id"] for record in o.RepoOrphanOps(lane).lane_records()] == ["lane00000001"]
+    assert o.RepoOrphanOps(lane).root == repo.resolve()
+    # A root git cannot answer for is left alone rather than relocated.
+    stranger = tmp_path / "not-a-repo"
+    assert o.fleet_root(stranger) == stranger
+
+
 def test_a_directive_naming_a_closed_issue_is_an_orphan_directive():
     ops = FakeOps(states={1301: "open", 467: "closed"})
     ops.directives = [o.Directive("d-467", 467), o.Directive("d-1301", 1301), o.Directive("d-control", None)]
@@ -158,7 +216,11 @@ def test_reclaim_only_with_evidence_and_only_under_apply():
     assert by_name["/repo/.claude/worktrees/agent-dirty"].outcome == o.REPORTED
     assert by_name["issue-1267"].outcome == o.RECLAIMED
     order = [call[0] for call in ops.calls]
-    assert order == ["record_reaped", "remove_worktree", "record_reaped", "delete_local"], "the tip is recorded BEFORE removal"
+    # #1440: the reap is recorded only AFTER the removal it describes happened,
+    # so a removal that fails can never leave a ledger entry claiming a reap.
+    assert order == ["remove_worktree", "record_reaped", "delete_local", "record_reaped"], (
+        "the tip is recorded only after a removal that happened"
+    )
     assert ("remove_worktree", "/repo/.claude/worktrees/agent-dirty") not in ops.calls
 
 
@@ -195,3 +257,164 @@ def test_the_repos_declared_budget_is_readable_and_not_yet_expired():
     root = Path(__file__).resolve().parents[3]
     budget, expired = o.load_budget(root / o.BUDGET_PATH, today=date(2026, 9, 18))
     assert not expired and all(budget[kind] > 0 for kind in o.KINDS)
+
+
+# --- "is this IN USE?", the second question (#1440) --------------------------
+
+
+def test_judge_use_prefers_a_positive_signal_over_a_blind_one():
+    use = o.judge_use([
+        o.Signal("git-worktree-lock", True, hit="git holds this worktree's lock (reason: claude agent)"),
+        o.Signal("holder-process", False, note="no readable /proc on this platform"),
+    ])
+    assert use.verdict == o.IN_USE and use.in_use and use.known
+    assert "claude agent" in use.evidence
+
+
+def test_judge_use_is_not_in_use_only_when_every_signal_was_read_and_negative():
+    use = o.judge_use([
+        o.Signal("git-worktree-lock", True, note="git reports no worktree lock"),
+        o.Signal("holder-process", True, note="412 process(es) checked, none inside"),
+    ])
+    assert use.verdict == o.NOT_IN_USE and not use.in_use and use.known
+    assert "412" in use.evidence, "a clear verdict still reports the coverage it measured"
+
+
+def test_judge_use_never_reads_an_unreadable_signal_as_clear():
+    use = o.judge_use([o.Signal("holder-process", False, note="no readable /proc on this platform")])
+    assert use.verdict == o.LIVENESS_CANNOT_ASSESS and not use.known and not use.in_use
+    assert "no readable /proc" in use.evidence
+
+
+def test_judge_use_with_no_signal_at_all_is_cannot_assess():
+    use = o.judge_use([])
+    assert use.verdict == o.LIVENESS_CANNOT_ASSESS and "no liveness signal" in use.evidence
+
+
+def test_a_content_landed_worktree_that_is_in_use_is_refused_by_name_and_never_reclaimed():
+    """The measured case (#1440): the work IS landed, and the tree is still in use."""
+    ops = FakeOps()
+    tree = "/repo/.claude/worktrees/agent-live"
+    ops.trees.append(o.Worktree(tree, "issue-1265", "5" * 40))
+    ops.landed = {"5" * 40}
+    ops.use = {tree: o.Use(o.IN_USE, "holder-process: live process with a working directory inside it: 4242 (claude)")}
+
+    dry = o.walk(ops, apply=False, budget=BIG)
+    found = next(x for x in dry.by_kind(o.ORPHAN_WORKTREE) if x.name == tree)
+    assert found.reclaimable is False and found.outcome == o.REPORTED
+    assert "IN USE" in found.detail and "4242 (claude)" in found.detail, "the refusal names WHAT and WHY"
+    assert found.use.startswith(o.IN_USE), "and names it machine-readably too"
+    assert "left alone" in found.remedy and dry.assessable, "an in-use tree is a finding, not an unmeasured walk"
+
+    applied = o.walk(ops, apply=True, budget=BIG)
+    assert applied.by_kind(o.ORPHAN_WORKTREE)[0].outcome == o.REPORTED
+    assert ops.calls == [], "an in-use tree is never touched, not even to record a reap"
+
+
+def test_a_worktree_whose_liveness_could_not_be_measured_refuses_and_reds_the_walk():
+    ops = FakeOps()
+    tree = "/repo/.claude/worktrees/agent-blind"
+    ops.trees.append(o.Worktree(tree, "issue-1265", "5" * 40))
+    ops.landed = {"5" * 40}
+    ops.use = {tree: o.Use(o.LIVENESS_CANNOT_ASSESS, "holder-process: no readable /proc on this platform")}
+
+    report = o.walk(ops, apply=True, budget=BIG)
+    found = report.by_kind(o.ORPHAN_WORKTREE)[0]
+    assert found.reclaimable is False and found.outcome == o.REPORTED
+    assert "could NOT be measured" in found.detail
+    assert not report.assessable and not report.ok, "an unmeasured liveness read is CANNOT-ASSESS"
+    assert tree in report.unmeasured[o.LIVENESS_UNMEASURED]
+    assert o.LIVENESS_UNMEASURED not in o.KINDS, "the unmeasured key must not shadow a kind's budget"
+    assert ops.calls == [], "nothing unmeasured is ever reclaimed"
+
+
+def test_a_genuinely_dead_worktree_is_still_reclaimed():
+    """The negative that keeps the guard honest: a liveness check that refuses
+    everything is not a control (#1440)."""
+    ops = FakeOps()
+    tree = "/repo/.claude/worktrees/agent-dead"
+    ops.trees.append(o.Worktree(tree, "issue-1265", "5" * 40))
+    ops.landed = {"5" * 40}
+    assert ops.default_use.verdict == o.NOT_IN_USE and ops.use == {}
+
+    dry = o.walk(ops, apply=False, budget=BIG)
+    assert next(x for x in dry.by_kind(o.ORPHAN_WORKTREE) if x.name == tree).outcome == o.WOULD_RECLAIM
+    applied = o.walk(ops, apply=True, budget=BIG)
+    assert next(x for x in applied.by_kind(o.ORPHAN_WORKTREE) if x.name == tree).outcome == o.RECLAIMED
+    assert ("remove_worktree", tree) in ops.calls and ("record_reaped", "5" * 40) in ops.calls
+
+
+def test_a_failed_removal_records_no_reap():
+    """#1440 acceptance: ``record_reaped`` and the removal cannot disagree — a
+    removal that did not happen is not recorded as a reap."""
+
+    class Refusing(FakeOps):
+        def remove_worktree(self, path):
+            self.calls.append(("remove_worktree", path))
+            raise RuntimeError("fatal: cannot remove a locked working tree")
+
+    ops = Refusing()
+    tree = "/repo/.claude/worktrees/agent-landed"
+    ops.trees.append(o.Worktree(tree, "issue-1265", "5" * 40))
+    ops.landed = {"5" * 40}
+
+    report = o.walk(ops, apply=True, budget=BIG)
+    found = report.by_kind(o.ORPHAN_WORKTREE)[0]
+    assert found.outcome == o.FAILED and "reclaim failed" in found.detail
+    assert [call[0] for call in ops.calls] == ["remove_worktree"], (
+        "the removal was attempted and NO reap was recorded — the ledger cannot claim a reap that did not happen"
+    )
+
+
+def test_the_lock_reason_is_read_from_gits_own_porcelain():
+    """The measured shape, git 2.53.0 (module docstring, #1440)."""
+    porcelain = (
+        "worktree /tmp/exp1/main\nHEAD 350c18ed1fe6750c55e694559659fba1a455b7bf\nbranch refs/heads/master\n\n"
+        "worktree /tmp/exp1/locked-tree\nHEAD 350c18ed1fe6750c55e694559659fba1a455b7bf\n"
+        "branch refs/heads/issue-900\nlocked claude agent fixture holder\n\n"
+        "worktree /tmp/exp1/bare-lock\nHEAD 350c18ed1fe6750c55e694559659fba1a455b7bf\ndetached\nlocked\n"
+    )
+    assert o._lock_reasons(porcelain) == {
+        "/tmp/exp1/locked-tree": "claude agent fixture holder",
+        "/tmp/exp1/bare-lock": "",
+    }
+
+
+def test_a_venue_record_is_read_in_both_measured_shapes():
+    assert o._declared_paths("/home/akushnir/ao-worktrees/ao-master-1789820219\n") == [
+        "/home/akushnir/ao-worktrees/ao-master-1789820219"
+    ]
+    assert o._declared_paths('{"path": "/w/ao-1", "by": "lane"}', expect_json=True) == ["/w/ao-1"]
+    assert o._declared_paths('{"path": "/w/ao-1"}') == [], "a JSON blob is not read as a path line"
+    with pytest.raises(ValueError):
+        o._declared_paths("{not json", expect_json=True)
+
+
+def test_a_declared_venue_matches_through_a_trailing_slash_and_a_symlink(tmp_path):
+    target = tmp_path / "real"
+    target.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(target)
+    assert o._same_path(str(target) + "/", str(link))
+    assert not o._same_path(str(target), str(tmp_path / "other"))
+
+
+def test_a_venue_spool_that_does_not_exist_is_a_measured_zero_not_an_unreadable_signal(tmp_path):
+    ops = o.RepoOrphanOps(tmp_path, venue_roots=[tmp_path / "no-such-spool"])
+    naming, blind = ops._venue_declarations("/w/ao-1")
+    assert naming == [] and blind == [], "a store that does not exist is zero, never unreadable"
+
+
+def test_a_venue_record_that_cannot_be_parsed_is_unreadable_and_the_walk_cannot_assess(tmp_path):
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    (spool / "master-venue.json").write_text("{not json", encoding="utf-8")
+    ops = o.RepoOrphanOps(tmp_path, venue_roots=[spool])
+    naming, blind = ops._venue_declarations("/w/ao-1")
+    assert naming == [] and blind and "could not be parsed" in blind[0]
+    signals = [
+        o.Signal("git-worktree-lock", True, note="git reports no worktree lock"),
+        o.Signal("venue-record", False, note="; ".join(blind)),
+    ]
+    assert o.judge_use(signals).verdict == o.LIVENESS_CANNOT_ASSESS, "never 'not in use'"
+

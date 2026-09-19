@@ -31,9 +31,26 @@
 #      evidence: a leftover marker of a crashed run (loop pid alive, no child, a
 #      stale beat) must NOT hold the lock, a live child must, and a heartbeat
 #      saying `idle` beside a live child is REPORTED rather than silently losing.
+#   * The runtime-beat producer (#1412) posts a beat BEFORE the loop refuses or
+#     spawns, and `beats.ROOT` is a module constant pointing at this repository:
+#     both the suite below and the live-proof spike drive `terminal.run_once` for
+#     real, so un-redirected they would leave a beat here — where
+#     `scripts/check-runtime-liveness.sh` reads it and reports every OTHER
+#     registered runtime `runtime-stale`, making the composite's verdict depend on
+#     which check ran first (#1459). Both are pointed at a tree THIS check owns,
+#     the repository's own beats are snapshotted before and after, and the beat
+#     must be present in that tree — so the spawn path is still driven for real.
 #   6. The one-gate-per-worktree bound is provoked with a REAL second gate: the
 #      envelope names the worktree, and a second `scripts/gate-lock.sh acquire` in
 #      that same worktree must be REFUSED (rc 10) naming the holder.
+#   7. The three admission judges that landed outside this module (#1377
+#      allowlists, #1372 `tiering.judge`, #1371 `resolve_actor`) are CALLED, at
+#      this admission point, before anything is created: each has ONE negative
+#      control driven through the real CLI with minting ENABLED, and ONE mutation
+#      arm that removes that judge's call from a copy of `governance/spawn/model.py`
+#      and requires the control to STOP being refused. A refusal that survives its
+#      judge being deleted was never that judge's — a control that cannot fail is a
+#      formality (GR-12), so the gate measures the failure instead of asserting it.
 #
 # Every scratch artifact lives under a unique /tmp directory, and every gate-lock
 # call gets its own permit store via `AO_GATE_LOCK_ROOT`, so this gate never
@@ -54,12 +71,14 @@ cd "$root" || exit 2
 required_files=(
   "governance/spawn/__init__.py"
   "governance/spawn/model.py"
+  "governance/spawn/admission.py"
   "governance/spawn/sources.py"
   "governance/spawn/render.py"
   "governance/spawn/liveness.py"
   "governance/spawn/cli.py"
   "governance/spawn/README.md"
   "governance/spawn/tests/test_spawn_model.py"
+  "governance/spawn/tests/test_admission.py"
   "governance/spawn/tests/test_consumption.py"
   "fleet/terminal.py"
   "fleet/watchdog.py"
@@ -77,7 +96,39 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
+# One global scratch and one EXIT trap (SP-1): `work` is created in section 4,
+# the beat tree here, and nothing below can be reached without both being cleaned.
+beats_tree="/tmp/spawn-envelope-beats.$$.$(date +%s)"
+work=""
+cleanup() {
+  rm -rf "$beats_tree" || true
+  [ -n "$work" ] && rm -rf "$work" || true
+}
+trap cleanup EXIT
+
 fail=0
+
+beats_files() { # beats_files <tree> — each beat file with the size+mtime a rewrite would move
+  if [ -d "$1/.fleet/runtime-beats" ]; then
+    find "$1/.fleet/runtime-beats" -maxdepth 1 -type f -name '*.json' -printf '%f %s %T@\n' 2>/dev/null | sort
+  fi
+}
+
+# The tree this check's producers own: the registry travels with it, so the beat
+# the spawn path posts is really written — checked before it is reached for, and
+# never into the repository the judge reads.
+if ! mkdir -p "$beats_tree/fleet" "$beats_tree/.fleet/runtime-beats" 2>/dev/null; then
+  echo "check-spawn-envelope: CANNOT-ASSESS — cannot create $beats_tree" >&2
+  exit 2
+fi
+if [ -f fleet/runtimes.yaml ]; then
+  cp -a fleet/runtimes.yaml "$beats_tree/fleet/runtimes.yaml" || exit 2
+fi
+
+# The repository's own beats BEFORE anything below runs: compared again before the
+# verdict, so a leaked beat is a NAMED failure here instead of an order-dependent
+# `runtime-stale` in another check (#1459).
+repo_beats_before="$(beats_files "$root")"
 
 # --- 1. the contract is declared institutionally ---------------------------
 # The rule lives in the execution plan (the lane-ownership document), in the gate
@@ -139,7 +190,23 @@ else
   fail=$((fail + 1))
 fi
 
-if ! env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/spawn/tests >/dev/null 2>&1; then
+# The suite drives the REAL loop (`terminal.run_once`), which posts a runtime beat
+# (#1412) BEFORE it refuses or spawns. `beats.ROOT` is a module constant pointing
+# at this repository, so an un-redirected run leaves a beat where the liveness
+# judge reads it (#1459). The cover is the suite's OWN conftest
+# (`governance/spawn/tests/conftest.py` points `beats.ROOT` at the test's tmp dir
+# and carries the registry so the beat is really written), which is exactly what
+# `fleet/tests/conftest.py` does for the fleet suite — so this runs plain pytest,
+# the way the composite runs it, with NO in-process patch. A patch here would hide
+# the absence of that cover.
+#
+# `--basetemp` puts tmp_path under a tree THIS check owns, which is what makes the
+# beat a WITNESS below: present under that basetemp (the producer really ran) and
+# absent from the repository (the cover works).
+suite_base="$beats_tree/pytest-base"
+if ! env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q \
+  --basetemp="$suite_base" governance/spawn/tests >/dev/null 2>&1
+then
   echo "  FAIL  governance/spawn/tests does not pass (it carries the fleet-path equality proof)" >&2
   fail=$((fail + 1))
 else
@@ -152,9 +219,8 @@ if ! mkdir -p "$work" 2>/dev/null; then
   echo "check-spawn-envelope: CANNOT-ASSESS — cannot create a scratch directory" >&2
   exit 2
 fi
-trap 'rm -rf "$work"' EXIT
 
-if python3 - "$root" "$work" <<'PY'
+if python3 - "$root" "$work" "$beats_tree" <<'PY'
 """Live proofs for the spawn envelope (issue #793).
 
 Everything here drives the REAL entrypoints — `governance/spawn/cli.py` and
@@ -173,10 +239,23 @@ sys.dont_write_bytecode = True
 
 repo = Path(sys.argv[1]).resolve()
 work = Path(sys.argv[2]).resolve()
+beats_tree = Path(sys.argv[3]).resolve()
 
 sys.path.insert(0, str(repo))
 sys.path.insert(0, str(repo / "fleet"))
 sys.path.insert(0, str(repo / "governance" / "dispatch"))
+
+# The spawn path driven below posts a runtime beat (#1412) BEFORE it refuses or
+# spawns, and `beats.ROOT` is a module constant pointing at the repository `repo`
+# names: un-redirected, these probes leave a beat there and
+# `scripts/check-runtime-liveness.sh` then reports every other registered runtime
+# `runtime-stale` (#1459). Point it at this check's own tree — same redirection
+# `fleet/tests/conftest.py` gives every test.
+try:
+    import beats
+    beats.ROOT = beats_tree
+except ImportError:  # the producer (#1412) is not in this tree
+    pass
 
 from governance.spawn import model, render  # noqa: E402
 
@@ -360,6 +439,189 @@ check(
 )
 note("the refusal was", refused.stderr.strip().splitlines()[0] if refused.stderr.strip() else "")
 
+# --- 3g. the three judges are called AT the admission point (issue #1413) ---
+# Each judge has ONE negative control, driven through the REAL CLI — with minting
+# ENABLED, so the refusal has to happen before anything is created — and ONE
+# mutation arm that removes that judge's call from a copy of `model.py` and
+# requires the control to stop being refused. The arm is what makes the control a
+# control: the gate measures that its refusal DEPENDS on the call, rather than
+# asserting that a refusal happened.
+from governance.spawn import admission  # noqa: E402  (the admission inputs' one producer)
+
+judge_root = work / "judges"
+judge_root.mkdir(parents=True, exist_ok=True)
+scratch_board(judge_root)
+mint_root = work / "judge-worktrees"
+mint_root.mkdir(parents=True, exist_ok=True)
+
+MUTANT_RUNNER = '''"""Load a MUTATED governance/spawn/model.py and judge one record with it."""
+import importlib.util
+import json
+import sys
+
+mutant, record_path, repo_root = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, repo_root)
+import governance.spawn  # noqa: F401,E402  the package, so the mutant has a parent
+spec = importlib.util.spec_from_file_location("governance.spawn.model", mutant)
+module = importlib.util.module_from_spec(spec)
+sys.modules["governance.spawn.model"] = module
+spec.loader.exec_module(module)
+record = json.loads(open(record_path, encoding="utf-8").read())
+print(json.dumps([refusal.line() for refusal in module.admission_refusals({"spawn": record})]))
+'''
+runner = judge_root / "mutant-runner.py"
+runner.write_text(MUTANT_RUNNER, encoding="utf-8")
+
+
+def cli_refusal_lines(stderr: str) -> list[str]:
+    """The refusal lines the CLI printed, without its own prefix."""
+    prefix = "spawn: REFUSED — "
+    return [line[len(prefix):] for line in stderr.splitlines() if line.startswith(prefix)]
+
+
+def judge_arm(judge: str, label: str, declarations: list, expected: str, spawn_overrides: dict) -> None:
+    """One control: the CLI refuses by name, and the mutation flips that refusal."""
+    result = spawn_cli(
+        ["open", "--issue", str(ISSUE), "--lane", LANE, "--agent", AGENT,
+         "--root", str(judge_root), "--worktree", str(local_wt), "--worktree-root", str(mint_root),
+         "--no-claim", *declarations],
+        judge_root,
+        local_env,
+    )
+    record = admission.spawn_record(
+        path="local", agent=AGENT, env={**os.environ, **local_env}, **spawn_overrides
+    )
+    real = [refusal.line() for refusal in model.admission_refusals({"spawn": record})]
+    mutated = run_mutant(judge, spawn_overrides)
+    refused_by_name = any(expected in line for line in real)
+    control = (
+        result.returncode == model.EXIT_REFUSED
+        and any(expected in line for line in cli_refusal_lines(result.stderr))
+        and refused_by_name
+        and cli_refusal_lines(result.stderr) == real
+        and "lane not minted" not in result.stderr
+        and "no lane was provisioned" in result.stderr
+        and "ADMITTED" not in result.stderr
+        and list(mint_root.iterdir()) == []
+    )
+    load_bearing = not any(expected in line for line in mutated) and real != mutated
+    print(
+        f"  arm   {label}: expect=refused-by-name leashed   "
+        f"actual={'refused' if refused_by_name else 'ADMITTED'}/"
+        f"{'flipped-by-mutation' if load_bearing else 'unchanged-by-mutation'}   "
+        f"ok={'YES' if control and load_bearing else 'NO'}",
+        flush=True,
+    )
+    if not control:
+        problems.append(f"the {label} control did not hold")
+        print(f"  FAIL  {label}: rc={result.returncode} stderr={result.stderr.strip()[-300:]}", file=sys.stderr, flush=True)
+    if not load_bearing:
+        problems.append(f"the {label} control survived its judge being removed")
+        print(f"  FAIL  {label}: the control is not load-bearing (mutation changed nothing)", file=sys.stderr, flush=True)
+
+
+def run_mutant(judge: str, spawn_overrides: dict) -> list:
+    """The same record judged by a copy of model.py with ONE judge call removed."""
+    source = (repo / "governance" / "spawn" / "model.py").read_text(encoding="utf-8")
+    anchor = f"    findings += admission.{judge}_findings(record)  # ADMISSION-JUDGE-{judge.upper()}"
+    if source.count(anchor) != 1:
+        raise SystemExit(
+            f"check-spawn-envelope: CANNOT-ASSESS — the {judge!r} admission call anchor "
+            f"{anchor.strip()!r} appears {source.count(anchor)} time(s) in governance/spawn/model.py"
+        )
+    mutant = judge_root / f"model-mutant-{judge}.py"
+    mutant.write_text(
+        source.replace(
+            anchor,
+            f"    pass  # MUTANT: the ADMISSION-JUDGE-{judge.upper()} call was removed to prove "
+            "its control is load-bearing",
+        ),
+        encoding="utf-8",
+    )
+    record_path = judge_root / f"record-{judge}.json"
+    record_path.write_text(
+        json.dumps(
+            admission.spawn_record(
+                path="local", agent=AGENT, env={**os.environ, **local_env}, **spawn_overrides
+            )
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(runner), str(mutant), str(record_path), str(repo)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"check-spawn-envelope: CANNOT-ASSESS — the {judge!r} mutation runner failed: "
+            f"{result.stderr.strip()[-300:]}"
+        )
+    return json.loads(result.stdout)
+
+
+from governance.spawn import admission  # noqa: E402  (the admission inputs' one producer)
+
+judge_arm(
+    "actor",
+    "judge 1 — an undeclared actor cannot open a lane",
+    ["--actor", "definitely-not-declared-anywhere"],
+    "actor-unresolved:definitely-not-declared-anywhere",
+    {"actor": "definitely-not-declared-anywhere"},
+)
+judge_arm(
+    "tier",
+    "judge 2 — a spawn at the opus rung (L2) for an L0-capped class",
+    ["--model", "claude-opus-5", "--class", "code-author"],
+    "FINOPS-ROLE-NOT-ALLOWED",
+    {"model": "claude-opus-5", "task_class": "code-author"},
+)
+judge_arm(
+    "allowlist",
+    "judge 3 — a verb the runtime may not call",
+    ["--runtime", "deepseek-sister", "--actor", "deepseek-sister", "--verb", "closure.close"],
+    "verb-not-allowed:deepseek-sister:closure.close",
+    {"runtime": "deepseek-sister", "actor": "deepseek-sister", "verbs": ["closure.close"]},
+)
+
+# The vacuity guard: the same spawn with the offending declaration removed IS
+# admitted, and the mint IS attempted — so "the lane was never minted" above is
+# about the ORDER, not about minting being switched off.
+admitted_again = spawn_cli(
+    ["open", "--issue", str(ISSUE), "--lane", LANE, "--agent", AGENT,
+     "--root", str(judge_root), "--worktree", str(local_wt), "--worktree-root", str(mint_root),
+     "--no-claim", "--runtime", "claude-subagent", "--role", "claude-subagent", "--tier", "L0",
+     "--class", "code-author", "--actor", "claude-subagent", "--json"],
+    judge_root,
+    local_env,
+)
+check(
+    "the same spawn with nothing forbidden IS admitted, and the mint is attempted after admission",
+    admitted_again.returncode == model.EXIT_OK
+    and "lane not minted" in admitted_again.stderr,
+    f"rc={admitted_again.returncode} {admitted_again.stderr.strip()[-200:]}",
+)
+try:
+    admitted_document = json.loads(admitted_again.stdout)
+except json.JSONDecodeError:
+    admitted_document = {}
+    print("  FAIL  the admitted spawn printed no document (#1413 arm)", file=sys.stderr, flush=True)
+    problems.append("the admitted spawn printed no document (#1413 arm)")
+admitted_binding = admitted_document.get("spawn", {}) if isinstance(admitted_document, dict) else {}
+check(
+    "the admitted envelope stores the four lane-binding values (#1301: runtime, role, tier, actor)",
+    {key: admitted_binding.get(key) for key in ("runtime", "role", "tier", "actor")}
+    == {"runtime": "claude-subagent", "role": "claude-subagent", "tier": "L0", "actor": "claude-subagent"},
+    json.dumps(admitted_binding),
+)
+check(
+    "the admitted envelope validates, and its rendered block NAMES the admission it was granted",
+    bool(admitted_document)
+    and model.validate(admitted_document) == []
+    and "runtime=claude-subagent" in render.envelope_block(admitted_document)
+    and "tier=L0" in render.envelope_block(admitted_document),
+    str(model.validate(admitted_document))[:200] if admitted_document else "no document",
+)
 # --- 3c. EVERY required field is refused BY NAME, one at a time ------------
 if document:
     target = work / "envelope.json"
@@ -574,9 +836,42 @@ else
   fail=$((fail + 1))
 fi
 
+# --- 4b. the beats this check's own probes post land in a tree IT owns ---------
+#
+# The redirects above are only honest if the producer still RUNS: a probe that
+# skipped the spawn path would leak nothing and prove nothing. The spawn SUITE
+# drives that path for real, so its beat is witnessed here — under `--basetemp`,
+# the tree this check owns — while the repository's own beats must be exactly what
+# they were.
+#
+# Both arms falsify the suite's cover (`governance/spawn/tests/conftest.py`, which
+# points `beats.ROOT` at the test's tmp dir and carries the registry so the beat is
+# really written). Remove that cover and BOTH fail by name: the witness is gone,
+# and the beat appears in the repository. Measured: with the cover neutered, the
+# witness arm reds and the repository arm names `deepseek-executor.json`.
+suite_witness="$(find "$suite_base" -mindepth 1 -name 'deepseek-executor.json' -type f 2>/dev/null | head -3)"
+if [ -f fleet/beats.py ]; then
+  if [ -n "$suite_witness" ]; then
+    echo "  OK    [beats] the spawn suite posted its runtime beat (#1412) into the tree this check owns"
+  else
+    echo "  FAIL  [beats] no runtime beat under $suite_base — the spawn suite either did not drive the producer, or its conftest cover refuses the beat instead of redirecting it (a redirect carries fleet/runtimes.yaml, so the beat is really written)" >&2
+    fail=$((fail + 1))
+  fi
+else
+  echo "  OK    [beats] #1412's producer is not in this tree, so nothing here can post a beat"
+fi
+
+repo_beats_after="$(beats_files "$root")"
+if [ "$repo_beats_before" = "$repo_beats_after" ]; then
+  echo "  OK    [beats] this check left no runtime beat in the repository"
+else
+  echo "  FAIL  [beats] this check posted a runtime beat into $root/.fleet/runtime-beats/ (before=[$(printf '%s' "$repo_beats_before" | tr '\n' ' ')] after=[$(printf '%s' "$repo_beats_after" | tr '\n' ' ')]) — a stray beat engages scripts/check-runtime-liveness.sh, which then reports every OTHER registered runtime runtime-stale, so the composite's verdict depends on which check ran first (#1459)" >&2
+  fail=$((fail + 1))
+fi
+
 if [ "$fail" -gt 0 ]; then
   echo "check-spawn-envelope: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-spawn-envelope: OK — one versioned envelope from one producer is consumed by both spawn paths, every required field is refused BY NAME with its own exit code, the local path is admitted and refused for real against its own board, the fleet prompt IS that envelope's rendering, run_in_flight() decides on the marker's own evidence and reports the contradiction, and a real second gate in the envelope's worktree is refused (AO-GR-22)"
+echo "check-spawn-envelope: OK — one versioned envelope from one producer is consumed by both spawn paths, every required field is refused BY NAME with its own exit code, the local path is admitted and refused for real against its own board, the fleet prompt IS that envelope's rendering, run_in_flight() decides on the marker's own evidence and reports the contradiction, a real second gate in the envelope's worktree is refused (AO-GR-22), and each of the three admission judges (#1377 allowlists, #1372 tiering.judge, #1371 resolve_actor) is CALLED at the spawn point with one negative control that a mutation proves is load-bearing (issue #1413)"
 exit 0

@@ -42,7 +42,7 @@
 #    10 fixture-empty        no live pack registers anything  -> rc 1 (never 0)
 #    11 fixture-unreadable   the registry is removed          -> rc 2 (never 0)
 #    12 live-planted/acked   the REAL registry: nothing acked, then all acked
-#                                                             -> rc 1 naming all five, then rc 0
+#                                                             -> rc 1 naming all seven, then rc 0
 #    13 live-tree            this checkout, its live .fleet, its declaration -> rc 0
 #    14 suite                governance/notices/tests          -> rc 0
 #
@@ -401,6 +401,14 @@ run_eval "$unreadable_tree" "$fixture_fleet"
 expect "fixture-unreadable" 2 "CANNOT-ASSESS"
 
 echo "== 11-12. the REAL registry: nothing acked is refused, all acked is satisfied =="
+# The live registry is the CONTRACT (fleet/runtimes.yaml, issue #1412): seven
+# runtime ids, read through the one loader fleet/runtimes.py. This arm used to name
+# five identity ids (claude/deepseek/hermes/ollama/paperclip) that the notices
+# module derived for itself -- the second vocabulary #1385 measured. The ids below
+# are the contract's, so the arm now fails if the gate stops reading it (a
+# runtime the contract registers must be fanned out to and must owe an ack), and
+# `ollama` is deliberately absent: no row registers it.
+live_runtimes=(claude-session claude-subagent deepseek-sister deepseek-executor copilot-agent hermes paperclip)
 live_fleet="$scratch/live-fleet"
 live_notice="notice-live-planted"
 run_cli "$root" "$live_fleet" publish \
@@ -410,26 +418,26 @@ run_cli "$root" "$live_fleet" publish \
   --ref "kushin77/agent-orchestrator#1269"
 expect "live-publish" 0 "published $live_notice"
 unacked_lines=0
-for runtime in claude deepseek hermes ollama paperclip; do
+for runtime in "${live_runtimes[@]}"; do
   if contains "$out" "fanout $runtime ->"; then
     unacked_lines=$((unacked_lines + 1))
   fi
 done
-if [ "$unacked_lines" -eq 5 ]; then
-  printf '  OK    %-20s fanned out to all five registered runtimes\n' "live-publish-fanout"
+if [ "$unacked_lines" -eq "${#live_runtimes[@]}" ]; then
+  printf '  OK    %-20s fanned out to all %s contract-registered runtimes\n' "live-publish-fanout" "${#live_runtimes[@]}"
 else
-  printf '  FAIL  %-20s fanned out to %s of the 5 registered runtimes\n' \
-    "live-publish-fanout" "$unacked_lines" >&2
+  printf '  FAIL  %-20s fanned out to %s of the %s contract-registered runtimes\n' \
+    "live-publish-fanout" "$unacked_lines" "${#live_runtimes[@]}" >&2
   printf '%s\n' "$out" | sed 's/^/        /' >&2
   fail=$((fail + 1))
 fi
 run_eval "$root" "$live_fleet"
 expect "live-planted" 1 "notice-unacked:$live_notice:hermes"
-for runtime in claude deepseek ollama paperclip; do
+for runtime in "${live_runtimes[@]}"; do
   expect "live-planted-$runtime" 1 "notice-unacked:$live_notice:$runtime"
 done
 
-for runtime in claude deepseek hermes ollama paperclip; do
+for runtime in "${live_runtimes[@]}"; do
   run_cli "$root" "$live_fleet" ack --notice "$live_notice" --runtime "$runtime" \
     --evidence "read the notice; the rule is understood"
   if [ "$eval_rc" -ne 0 ]; then

@@ -12,6 +12,10 @@
 # `context=ao/gate-probe state=success` posted and read back on master.)
 #
 #   post    --sha <sha> --rc <0|1|2>     publish the gate's outcome for a commit
+#           [--detail <text>]            and --detail says WHY: the name of the
+#                                        check that failed, appended to the
+#                                        description as a SUFFIX (bounded to the
+#                                        API's 140-character description cap)
 #   post    --attestation <file>         publish the rc the GATE ITSELF recorded,
 #                                        bound to the commit it measured
 #   reconcile --sha <sha>                make the PUBLISHED context agree with the
@@ -78,6 +82,45 @@
 #     rather than free text; it is not an access boundary, because anyone
 #     holding the token can post a status directly, and this poster guards the
 #     AUTOMATIC second producer, not a forgery.
+#
+# VENUE DELIVERY (issue #1467): the ordering above binds only while the venue of
+# record can DELIVER its verdict, and that is a fact about the VENUE which is
+# MEASURED, never asserted. Measured 2026-09-19: that venue's runner image
+# carries neither `gh` nor `gcloud`, so its poster step exits 2 for want of a
+# credential and publishes NOTHING -- not even the red. The ordered rule then has
+# no satisfier at either end: the local producer "may not satisfy it FIRST", and
+# the venue cannot go at all, so the required context is unsatisfiable and every
+# PR head is BLOCKED behind an admin bypass (`enforce_admins=false`) that
+# scripts/check-branch-protection.sh exists to prevent.
+#
+# So a venue that concluded red against this commit loses its precedence ONLY
+# when the venue's OWN record for that run says it could not deliver -- read from
+# the venue's own build log, where its poster step either reached the API
+# (`gate-status: posted ...`) or said, in its own words, why it could not
+# (`gate-status: SKIPPED ...` / `gate-status: CANNOT-ASSESS ...`). The
+# classification is `scripts/gate-status-map.py`'s `venue_log_capability`, so all
+# three outcomes are provoked offline; the poster only fetches the record.
+#
+# What this does NOT do, stated because it is the direction that would be a false
+# green: a venue that CAN deliver keeps its precedence untouched, and a record
+# that could not be read is CANNOT-ASSESS and refuses -- "I could not read the
+# venue" must never become "therefore the venue does not matter". A green
+# published after a waiver still rests on the gate's OWN `.verify/attestation.json`
+# (the rc AND the sha, bound to the commit that was measured), so the requirement
+# is satisfied by a run that really assessed the tree, never by a claim.
+#
+# DETAIL SEAM (issue #1407): the description is a FIXED string per rc, so every
+# red PR page read `make verify: FAIL` and WHICH check failed was knowable only
+# by opening the build log -- a required check that cannot name its own refusal.
+# `post --detail <text>` appends the producer's answer to that string. A detail
+# is a SUFFIX and nothing else: the outcome comes from --rc (or from the gate's
+# own attestation), no detail is an input to it, so no detail can turn a
+# CANNOT-ASSESS into a pass -- the #739 false-green class. The suffix is bounded
+# in gate-status-map.py, which truncates it deliberately to fit the API's
+# 140-character cap and marks the cut, because the API would otherwise truncate
+# the overflow itself at a position this poster does not choose. Only the verb
+# that publishes an outcome from --rc takes a detail, so `--detail` on another
+# verb is REFUSED rather than accepted and dropped.
 #
 # `reconcile` is the other half of the same invariant, and it exists because the
 # halves are not symmetric in TIME: a green published before the venue produced
@@ -179,11 +222,16 @@ fetch_venue_runs() { # <sha> <out-file>
 }
 
 # Decide whether this commit's venue run AGREES with publishing `success`.
-# Prints THREE LINES -- verdict, reason, target URL -- never a TSV row: an empty
-# field in a TSV record collapses adjacent tabs and silently shifts every field
-# after it (docs/SHELL-PATTERNS.md SP-2), and this record has a field that is
-# EMPTY whenever the venue has no page to point at. `read_attestation` above
-# reads its fields the same way, for the same reason.
+# Prints SIX LINES -- verdict, reason, target URL, build id, region, project --
+# never a TSV row: an empty field in a TSV record collapses adjacent tabs and
+# silently shifts every field after it (docs/SHELL-PATTERNS.md SP-2), and this
+# record has a field that is EMPTY whenever the venue has no page to point at.
+# `read_attestation` above reads its fields the same way, for the same reason.
+#
+# The last three fields are the venue's OWN coordinates, parsed from its own
+# `details_url`, because the venue's ability to deliver is decided from THAT
+# build's record (#1467) -- and a build that cannot be located is `unassessable`,
+# never a silent "the venue does not matter".
 #
 # The conclusions that AGREE are named, and everything else is a contradiction:
 # an unknown conclusion must not be read as agreement (a control that cannot
@@ -197,10 +245,38 @@ import sys
 
 path, prefix = sys.argv[1], sys.argv[2]
 
-def answer(verdict, reason, url=""):
+
+def venue_where(run):
+    """The build, its region and its project, read from the run's OWN URL.
+
+    `details_url` is `<console>/builds;region=<r>/<uuid>?project=<p>`. All three
+    travel back to the caller rather than being re-derived downstream, so the
+    coordinates that decide the venue's ability to deliver are the same ones the
+    refusal quotes.
+    """
+    url = str(run.get("details_url") or "") if isinstance(run, dict) else ""
+    region = build = project = ""
+    matched = re.search(r"/builds;region=([^/?]+)/([0-9a-fA-F-]{36})", url)
+    if matched:
+        region, build = matched.group(1), matched.group(2)
+    else:
+        matched = re.search(r"/builds/([0-9a-fA-F-]{36})", url)
+        if matched:
+            build = matched.group(1)
+    matched = re.search(r"[?&]project=([^&]+)", url)
+    if matched:
+        project = matched.group(1)
+    return build, region, project
+
+
+def answer(verdict, reason, run=None):
+    build, region, project = venue_where(run)
     print(verdict)
     print(reason)
-    print(url)
+    print(str(run.get("details_url") or "") if isinstance(run, dict) else "")
+    print(build)
+    print(region)
+    print(project)
     raise SystemExit(0)
 
 try:
@@ -229,7 +305,7 @@ if reds:
     # publishes it with the withdrawal, so the operator lands on the run that
     # contradicts the green instead of hunting for it.
     answer("refuse", "the CI venue's own run for this commit concluded '%s' (%s, %s)"
-           % (run.get("conclusion"), run.get("name"), build_of(run)), str(run.get("details_url") or ""))
+           % (run.get("conclusion"), run.get("name"), build_of(run)), run)
 if live:
     run = live[0]
     # NOT settled yet -- which is NOT the same as a contradiction, and the two
@@ -243,9 +319,71 @@ if live:
 if venue:
     run = venue[-1]
     answer("allow", "the CI venue's own run for this commit concluded '%s' (%s, %s)"
-           % (run.get("conclusion"), run.get("name"), build_of(run)), str(run.get("details_url") or ""))
+           % (run.get("conclusion"), run.get("name"), build_of(run)), run)
 answer("allow", "the CI venue produced no run for this commit, so this post is the only producer it has")
 PY
+}
+
+# --- the venue of record's ability to DELIVER a verdict (issue #1467) --------
+# Whether the venue of record can deliver `ao/gate-of-record` at all is a fact
+# about the VENUE, and it is MEASURED from the venue's own record rather than
+# asserted here. The classification is `scripts/gate-status-map.py`'s
+# `venue_log_capability` -- provoked offline by that file's `--self-test` -- and
+# this function only FETCHES the record, refusing to pretend it read one.
+#
+# Prints TWO lines -- verdict, reason -- where `unassessable` leaves the venue
+# agreement guard exactly as it was: a record that could not be read is never
+# evidence that the venue does not matter (fail closed).
+#
+# The record is read from the venue's OWN build log, because that is where its
+# own poster step speaks. gcloud is the only reader of it, and its absence is
+# `unassessable` rather than a guess -- the CI venue itself has no gcloud, which
+# is the very fact this measures.
+venue_publish_capability() { # <build-id> <region> <project>
+  local bid="${1:-}" region="${2:-}" project="${3:-}" logf="" cap_rc=0
+  local log_args=() project_arg=()
+  if [ -z "$bid" ]; then
+    printf 'unassessable\nthe venue run for this commit names no build id, so its own record cannot be read\n'
+    return 0
+  fi
+  if ! command -v gcloud >/dev/null 2>&1; then
+    printf 'unassessable\nthe venue of record delivers from its own build, and gcloud -- the only reader of that record -- is not installed here\n'
+    return 0
+  fi
+  [ -n "$region" ] || region="${AO_VENUE_REGION:-us-central1}"
+  log_args=(builds log "$bid" "--region=$region")
+  # The venue's `details_url` carries its project as a NUMBER (measured:
+  # `?project=1056038104733`), and gcloud refuses a number for `--project`
+  # ("To use this command, set it to PROJECT ID instead"). So the project is
+  # passed only when it is genuinely an ID, and otherwise the reader's own gcloud
+  # configuration decides -- which is the reader's business, not this seam's.
+  case "$project" in
+    ''|*[!0-9]*) [ -n "$project" ] && project_arg=("--project=$project") ;;
+  esac
+  logf="$(mktemp /tmp/gs-vcap.XXXXXX)" || {
+    printf 'unassessable\nno scratch file for the venue of record own build log\n'
+    return 0
+  }
+  # The venue's poster step is the LAST thing its build runs, so the part of the
+  # record that decides this is at the END: the read is bounded to the tail on
+  # purpose, so a 219-check build does not stream through this poster in full.
+  # It is also bounded in TIME, because a poster that hangs is worse than one
+  # that refuses -- a hang is a deadlock with no name on it.
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "${AO_VENUE_LOG_TIMEOUT:-30}" gcloud "${log_args[@]}" "${project_arg[@]}" 2>/dev/null \
+      | tail -c 262144 >"$logf"
+  else
+    gcloud "${log_args[@]}" "${project_arg[@]}" 2>/dev/null | tail -c 262144 >"$logf"
+  fi
+  if [ ! -s "$logf" ]; then
+    rm -f "$logf"
+    printf 'unassessable\nthe venue of record own build log for %s could not be read here, so whether it can deliver its verdict cannot be decided\n' "${bid:0:8}"
+    return 0
+  fi
+  python3 "$MAPPER" --venue-capability "$logf"
+  cap_rc=$?
+  rm -f "$logf"
+  return "$cap_rc"
 }
 
 # The status this poster has already published for a commit under CONTEXT, as
@@ -402,6 +540,7 @@ rc=""
 sha=""
 attestation=""
 venue_run=""
+detail=""
 mode=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -411,8 +550,9 @@ while [ $# -gt 0 ]; do
     --rc)  rc="${2:-}";  shift ;;
     --attestation) attestation="${2:-}"; shift ;;
     --venue-run) venue_run="${2:-}"; shift ;;
+    --detail) detail="${2:-}"; shift ;;
     --repo) REPO="${2:-}"; shift ;;
-    -h|--help) sed -n '2,56p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,60p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" 1 ;;
   esac
   shift
@@ -428,7 +568,19 @@ fi
 
 [ "$mode" = "self-test" ] && { self_test; exit $?; }
 
-[ -n "$mode" ] || die "usage: $0 {post|reconcile|show|dry-run} --sha <sha> [--rc <0|1|2> | --attestation <file>] [--venue-run <build-id>] | --self-test" 2
+[ -n "$mode" ] || die "usage: $0 {post|reconcile|show|dry-run} --sha <sha> [--rc <0|1|2> | --attestation <file>] [--venue-run <build-id>] [--detail <text>] | --self-test" 2
+
+# A detail describes the outcome of a `post`. The other verbs publish a
+# description this command OWNS -- `reconcile` names the withdrawal it makes --
+# so a detail offered to one of them would be silently dropped, and a flag that
+# is accepted and ignored is worse than one that is refused: the producer would
+# believe it had reached the PR page. Checked here, before any read or write.
+if [ -n "$detail" ]; then
+  case "$mode" in
+    post|dry-run) ;;
+    *) die "REFUSED — --detail describes the description a 'post' publishes, and '$mode' publishes one this command owns; it would be silently dropped" 2 ;;
+  esac
+fi
 
 # Publish ONE status for ONE commit. Both verbs that write go through here, so
 # the venue-agreement guard and the reporting path cannot drift apart.
@@ -516,13 +668,17 @@ case "$mode" in
       success|failure|error|pending) ;;
       *) die "REFUSED — the mapper returned an invalid state: $state" 2 ;;
     esac
-    description="$(python3 - "$rc" <<'PY'
+    # The description is built by the mapper too -- the same function the
+    # checker provokes -- so a detail cannot be rendered by one path and posted
+    # by another. The detail is a SUFFIX: it is passed to `summarize` and reaches
+    # nothing else, which is why no detail can change the outcome above.
+    description="$(python3 - "$rc" "$detail" <<'PY'
 import sys
 sys.path.insert(0, "scripts")
 from importlib import util
 spec = util.spec_from_file_location("gsmap", "scripts/gate-status-map.py")
 mod = util.module_from_spec(spec); spec.loader.exec_module(mod)
-print(mod.summarize(int(sys.argv[1])))
+print(mod.summarize(int(sys.argv[1]), sys.argv[2] or None))
 PY
 )"
     if [ "$mode" = "dry-run" ]; then
@@ -553,17 +709,72 @@ PY
         fi
         agreement="$(venue_agreement "$venue_json")"
         rm -f "$venue_json"
+        # ONE field per line, and a trailing newline appended so even the LAST
+        # field has a terminator. Every field here can be EMPTY (the venue's URL,
+        # and all three of its coordinates when it produced no run), and without
+        # the terminator `${rest#*$'\n'}` is a no-op on the final one, shifting
+        # each later field onto the previous one's value (docs/SHELL-PATTERNS.md
+        # SP-2 -- measured while writing #1467: the no-run path published the
+        # REASON TEXT as the status's target_url).
+        agreement="${agreement}"$'\n'
         venue_verdict="${agreement%%$'\n'*}"
         venue_rest="${agreement#*$'\n'}"
         venue_reason="${venue_rest%%$'\n'*}"
-        venue_url="${venue_rest#*$'\n'}"
+        venue_rest="${venue_rest#*$'\n'}"
+        venue_url="${venue_rest%%$'\n'*}"
+        venue_rest="${venue_rest#*$'\n'}"
+        venue_build="${venue_rest%%$'\n'*}"
+        venue_rest="${venue_rest#*$'\n'}"
+        venue_region="${venue_rest%%$'\n'*}"
+        venue_rest="${venue_rest#*$'\n'}"
+        venue_project="${venue_rest%%$'\n'*}"
         case "$venue_verdict" in
           allow)
             target_url="$venue_url"
             echo "gate-status: venue agreement — $venue_reason" >&2
             ;;
-          refuse|unsettled)
+          unsettled)
+            # NOT settled yet -- and that still refuses. A run in flight may
+            # DELIVER, so the venue's precedence is meaningful here whatever its
+            # record would say about its image; the measured false green was
+            # published while the run was in flight, so this half is load-bearing
+            # and #1467 does not touch it.
             die "REFUSED — no green is published for ${sha:0:12}: $venue_reason; the required context '${CONTEXT}' must be derived from the venue of record's own verdict on this commit, and a second producer (this one) may not satisfy it first" 2
+            ;;
+          refuse)
+            # The venue's run concluded AGAINST this commit -- but a red is a
+            # verdict only if the venue can DELIVER one (#1467). Where it cannot,
+            # the ordering above is unsatisfiable by construction: the local
+            # producer may not go first and the venue cannot go at all, so the
+            # required context has no producer and every head is BLOCKED behind an
+            # admin bypass. So the capability is MEASURED from the venue's own
+            # record, and ONLY a venue measured unable to deliver loses its
+            # precedence: an unreadable record is not a measurement.
+            capability="$(venue_publish_capability "$venue_build" "$venue_region" "$venue_project")" || capability=""
+            cap_verdict="${capability%%$'\n'*}"
+            cap_rest="${capability#*$'\n'}"
+            cap_reason="${cap_rest%%$'\n'*}"
+            case "$cap_verdict" in
+              publishes|cannot) ;;
+              *)
+                cap_verdict="unassessable"
+                cap_reason="${cap_reason:-the venue of record own record could not be read here}"
+                ;;
+            esac
+            if [ "$cap_verdict" != "cannot" ]; then
+              die "REFUSED — no green is published for ${sha:0:12}: $venue_reason ($cap_reason); the required context '${CONTEXT}' must be derived from the venue of record's own verdict on this commit, and a second producer (this one) may not satisfy it first" 2
+            fi
+            # The venue cannot deliver, so it is not a second opinion -- it is a
+            # required context nothing can satisfy. THIS run is the gate of
+            # record, and its OWN attestation (the rc AND the sha, bound to the
+            # commit it measured) is the verdict that can be published. The
+            # venue's own words travel with it, and its build URL rides in
+            # target_url, so the red that was waived is one click away rather
+            # than erased.
+            target_url="$venue_url"
+            printf 'gate-status: VENUE UNABLE TO DELIVER — %s\n' "$cap_reason" >&2
+            printf 'gate-status: VENUE UNABLE TO DELIVER — the venue of record is not a producer of %s for this commit (%s), so this gate of record publishes its own attested verdict, which is the only one that can be delivered (issue #1467)\n' \
+              "$CONTEXT" "$venue_reason" >&2
             ;;
           *)
             die "CANNOT-ASSESS — the venue agreement could not be decided: $venue_reason" 2

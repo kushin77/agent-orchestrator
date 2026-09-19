@@ -84,6 +84,11 @@ touches none, is refused by name.
 
 Gate-changing: <no | yes — paths>
 
+## Surface class
+
+- [ ] This PR does not change a governed surface's measured class (docs/SURFACE-CLASS.md).
+- [ ] This PR changes one — I updated docs/SURFACE-CLASS.md in this same PR.
+
 ## Evidence
 
 ```

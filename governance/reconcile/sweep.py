@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -647,6 +648,12 @@ def _isolation_worktree():
     had already run, so every affected lane was left half-reclaimed, and the
     record it could not forget kept its finding open permanently.
     """
+    # The checkout goes ahead of the reconciled root on ``sys.path`` for this
+    # import, so a root that happens to carry its own ``governance/`` cannot
+    # shadow the collaborator: the module identity must be the *code* checkout's
+    # (the code-vs-data-root split ``active_claims`` makes for the claim ledger).
+    if str(CODE_ROOT) not in sys.path:
+        sys.path.insert(0, str(CODE_ROOT))
     try:
         from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415
     except Exception as exc:  # noqa: BLE001 - a refusal to report, not a crash
@@ -713,6 +720,26 @@ class RepoOps:
         # The lane record is the isolation module's, and this worker must not
         # reimplement what "forget a lane" means — but it must *load* that module
         # the way its own package expects (see `_isolation_worktree`).
+        #
+        # The *code* comes from this checkout; only the *data* — the lane record
+        # under ``<root>/.fleet/lanes`` — comes from the reconciled root, the same
+        # split ``active_claims`` makes for the claim ledger. Both halves of the
+        # previous form were wrong, and each was measured (issues #1444/#1446/#1452,
+        # reported by every sweep as a failed `forget-lane` step):
+        #
+        #   * putting ``governance/isolation`` on ``sys.path`` and importing
+        #     ``worktree`` as a TOP-LEVEL module leaves it with no parent package,
+        #     so its own ``from .identity import ...`` raises `ImportError:
+        #     attempted relative import with no known parent package`;
+        #   * resolving that directory under ``self.root`` also aimed the import at
+        #     the audited tree, which carries no ``governance/isolation`` at all
+        #     when the sweep is pointed at a scratch repository — the venue the
+        #     gate proves it on (`ModuleNotFoundError: No module named 'worktree'`).
+        #
+        # Importing the collaborator by its qualified package name keeps
+        # ``worktree.py``'s own relative imports resolvable, and keeps one module
+        # identity for the isolation package instead of a second copy loaded by
+        # filename.
         isolation_worktree = _isolation_worktree()
         record = isolation_worktree.record_dir(self.root) / f"{session_id}.json"
         existed = record.exists()

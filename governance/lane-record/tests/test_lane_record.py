@@ -37,7 +37,10 @@ def brief(**overrides):
         "kind": "brief",
         "issue": ISSUE,
         "lane": LANE,
-        "runtime": "claude",
+        # The contract's runtime ids (fleet/runtimes.yaml, #1412): the record names a
+        # REGISTERED runtime, and `runtime_ids()` now answers with the contract's rows
+        # rather than the identity names the notices rule used to derive for itself.
+        "runtime": "claude-session",
         "ts": "2026-09-18T20:00:00Z",
         "owned_files": list(OWNED),
         "scoped_gates": list(SCOPED),
@@ -55,7 +58,7 @@ def result(**overrides):
         "kind": "result",
         "issue": ISSUE,
         "lane": LANE,
-        "runtime": "claude",
+        "runtime": "claude-session",
         "ts": "2026-09-18T20:30:00Z",
         "sha": SHA,
         "files_touched": list(OWNED),
@@ -139,9 +142,17 @@ def test_finding_shape_matches_the_sibling_notice_rule():
 # the derived runtime set
 # --------------------------------------------------------------------------- #
 def test_the_runtime_set_is_derived_from_the_registry():
+    """The vocabulary is the CONTRACT's (#1412): seven ids, in the order it declares.
+
+    The set used to be the notices rule's own five-id derivation and this asserted
+    it came back sorted. It is now `fleet/runtimes.yaml`'s rows in contract order --
+    one list, read through one loader -- so the assertions are its size, its
+    uniqueness and its members, never an order this test would have invented.
+    """
     ids = lane_record.runtime_ids()
-    assert ids == tuple(sorted(ids))
-    for runtime in ("claude", "deepseek", "hermes", "paperclip"):
+    assert len(ids) == 7, "the contract registers seven runtimes"
+    assert len(set(ids)) == 7, "no runtime id is declared twice"
+    for runtime in ("claude-session", "claude-subagent", "deepseek-executor", "hermes", "paperclip"):
         assert runtime in ids
 
 
@@ -168,7 +179,7 @@ def test_a_clean_pair_evaluates_green(tmp_path):
 
 def test_the_same_shape_carries_every_runtime(tmp_path):
     """The record is ONE shape: the identical pair for another runtime is green."""
-    for runtime in ("claude", "deepseek", "paperclip"):
+    for runtime in ("claude-session", "deepseek-executor", "paperclip"):
         report = green(
             tmp_path / runtime,
             ("%d/%s.brief.json" % (ISSUE, LANE), brief(runtime=runtime)),
@@ -294,8 +305,8 @@ def test_an_unregistered_runtime_is_refused(tmp_path):
 def test_a_result_from_another_runtime_than_the_brief_is_refused(tmp_path):
     report = green(
         tmp_path,
-        ("%d/%s.brief.json" % (ISSUE, LANE), brief(runtime="claude")),
-        ("%d/%s.result.json" % (ISSUE, LANE), result(runtime="deepseek")),
+        ("%d/%s.brief.json" % (ISSUE, LANE), brief(runtime="claude-session")),
+        ("%d/%s.result.json" % (ISSUE, LANE), result(runtime="deepseek-executor")),
     )
     assert "lane-runtime-mismatch:%d/%s" % (ISSUE, LANE) in named(report)
 
