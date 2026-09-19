@@ -1000,6 +1000,19 @@ fi
 
 check_out_dir="$verify_dir/.check-out"
 mkdir -p "$check_out_dir"
+
+# --- the tree this run MEASURES (issue #1382) --------------------------------
+# The gate of record publishes a verdict FOR A COMMIT, so the commit has to be
+# the one the CHECKS ran against. `ATTEST_SHA` is read after the loop (it is the
+# commit the attestation carries), and on a shared box a lane's tree can move
+# under its own run: a commit landing mid-run leaves a run whose checks assessed
+# tree A while the record names tree B -- the #1310/#1356 class, measured here
+# (a gate admitted at 00:29:11Z, the lane's next commit 21 seconds later).
+# A status for B resting on a verdict reached on A is a fabricated green with a
+# producer attached, so the head is recorded HERE, before the first check, and
+# `publish_gate_of_record` refuses when the two disagree.
+publish_head_before="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+
 for entry in "${checks[@]}"; do
   name="${entry%%|*}"
   cmd="${entry#*|}"
@@ -1306,5 +1319,100 @@ else
     echo "GATE: FAIL" >&2
   fi
 fi
+
+# --- the gate of record publishes its own verdict (issue #1382) --------------
+# `ao/gate-of-record` is REQUIRED on `master`, and it had NO producer on the
+# ORDINARY LANE PATH. The Cloud Build verify trigger posts for a pull-request
+# HEAD and the PR runner posts for the head it verifies, but a lane running the
+# gate of record in its own worktree -- the path every lane takes -- published
+# nothing, and a SQUASH landing creates a commit that no pre-merge status can
+# ever describe. Measured 2026-09-19: `scripts/check-gate-status.sh` read the
+# live producer state on this repository and found the context observed on none
+# of the last 20 commits of `master` (REQUIRED-BUT-UNOBSERVED) while the branch
+# protection REQUIRED it -- a required check whose producer cannot cover the
+# landed history is not a control.
+#
+# So the gate publishes its OWN verdict, for the commit its OWN attestation
+# names, with the rc it is about to exit with. The three things it must never do
+# are named here, and each one is a guard below rather than a promise:
+#
+#   * NEVER publish a green the gate did not observe. The rc is `$overall` --
+#     this run's own tri-state verdict, the same value `exit` takes. The sha is
+#     `$ATTEST_SHA`, the commit the run's attestation carries. The attestation's
+#     own `exit_code` is deliberately NOT the source: it is written BEFORE the
+#     attestation is schema-validated (see the block above), so a run whose
+#     attestation fails that validation exits 1 while the record still reads 0 --
+#     publishing the record would be a fabricated green, the #739 class.
+#   * NEVER publish for a run that did not run the gate. A PARKED run (rc
+#     10/11/12) and a venue-invalid refusal exit ABOVE this block, so they cannot
+#     reach it; a run that discovered NO check at all (the whole list denylisted
+#     or undiscovered) and a run in which every check answered CANNOT-ASSESS both
+#     publish nothing, and say which of the two they were by name.
+#   * NEVER attest a tree that MOVED under the run. The verdict belongs to the
+#     commit the checks ran against (`publish_head_before`, recorded before the
+#     first check), never to whatever `HEAD` happens to be when the attestation is
+#     written -- a commit landing mid-run is the #1310/#1356 class, and a status
+#     for the later commit resting on a verdict reached on the earlier one is the
+#     fabricated green wearing a producer's clothes.
+#   * NEVER let publishing change the verdict. Whether a status can be POSTED is
+#     a fact about the VENUE (the CI container ships no `gh`), not about the code
+#     under test, so a refusal is reported BY NAME and the run still exits with
+#     its own rc -- never swallowed (a silent no-op is #1382 wearing a different
+#     hat) and never turned into a failure of the gate.
+#
+# `scripts/gate-status.sh` owns HOW a status is published, INCLUDING its own
+# refusals -- a green whose venue run is red or still running is refused there,
+# not here -- so this block calls it rather than re-implementing the API call.
+publish_gate_of_record() {
+  local psha="$1" prc="$2" ptotal="$3" pskipped="$4"
+  local passessed post_out post_rc post_reason
+  if [ -z "$psha" ] || [ "$psha" = "unknown" ]; then
+    printf 'verify: NOTE -- the gate of record was NOT published: this run measured no commit (git_sha is %s), so there is no commit to publish a verdict for\n' "${psha:-unset}"
+    return 0
+  fi
+  case "$prc" in
+    0|1) ;;
+    *)
+      printf 'verify: NOTE -- the gate of record was NOT published for %s: rc %s is not a gate verdict (0 PASS / 1 NOT-OK), and an outcome that is not a verdict must not become a status\n' "${psha:0:12}" "$prc"
+      return 0
+      ;;
+  esac
+  # The tree must not have MOVED under the run. A verdict reached on one commit
+  # and attested for another is the fabricated-green class with a producer
+  # attached, so it is refused by name rather than published (#1310/#1356).
+  if [ -z "${publish_head_before:-}" ] || [ "$publish_head_before" = "unknown" ]; then
+    printf 'verify: NOTE -- the gate of record was NOT published for %s: the commit this run started on could not be read before the first check ran, so no verdict can be attributed to a commit with confidence\n' "${psha:0:12}"
+    return 0
+  fi
+  if [ "$publish_head_before" != "$psha" ]; then
+    printf 'verify: NOTE -- the gate of record was NOT published: the tree MOVED under this run (HEAD was %s before the first check, and the attestation names %s), so this verdict was reached on a different commit than a status would name (#1310/#1356)\n' "${publish_head_before:0:12}" "${psha:0:12}"
+    return 0
+  fi
+  if [ "${ptotal:-0}" -le 0 ]; then
+    printf 'verify: NOTE -- the gate of record was NOT published for %s: this run discovered NO check at all (the whole check list is denylisted or undiscovered), so it judged nothing to publish for\n' "${psha:0:12}"
+    return 0
+  fi
+  passessed=$((ptotal - pskipped))
+  if [ "$passessed" -le 0 ]; then
+    printf 'verify: NOTE -- the gate of record was NOT published for %s: every check in this run was SKIPped (%s of %s), so the run assessed nothing and a status for it would rest on no observation\n' "${psha:0:12}" "$pskipped" "$ptotal"
+    return 0
+  fi
+  post_out="$(bash "$root/scripts/gate-status.sh" post --sha "$psha" --rc "$prc" 2>&1)"
+  post_rc=$?
+  printf '%s\n' "$post_out" >>"$log"
+  if [ "$post_rc" -eq 0 ]; then
+    printf '%s\n' "$post_out"
+  else
+    post_reason="$(printf '%s\n' "$post_out" | tail -n 1)"
+    printf 'verify: NOTE -- the gate of record was NOT published for %s (the poster exited %s): %s\n' \
+      "${psha:0:12}" "$post_rc" "${post_reason:-the poster printed no reason}"
+    printf 'verify: NOTE -- publishing is a separate fact from the verdict: this run still exits %s, and the refusal above is named rather than swallowed\n' "$prc"
+  fi
+  return 0
+}
+
+# The publish is deliberately the LAST step before the exit: every other way out
+# of this script is above it, so a run that did not run the gate cannot reach it.
+publish_gate_of_record "$ATTEST_SHA" "$overall" "$total" "$skipped"
 
 exit "$overall"

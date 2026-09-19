@@ -87,6 +87,16 @@ NESTED_REQUIRED: Mapping[str, tuple[str, ...]] = {
     "verify": ("command", "source"),
 }
 
+#: The spawn block's admission inputs (issue #1413). The three judges that
+#: landed for them (#1377 allowlists, #1372 ``tiering.judge``, #1371
+#: ``resolve_actor``) were called by nothing until this module called them HERE,
+#: which is the admission point: `render.py` only renders an already-admitted
+#: envelope. They are materialised by the producer (`sources.collect` →
+#: `admission.spawn_record`) into every document, so the envelope an auditor
+#: reads states the admission it was granted rather than leaving it to be
+#: inferred from the environment the spawn happened to run in.
+ADMISSION_FIELDS: tuple[str, ...] = ("runtime", "role", "tier", "task_class", "actor")
+
 #: The spawn paths that exist. A path outside this set is refused rather than
 #: treated as a third regime nobody governs.
 SPAWN_PATHS: tuple[str, ...] = ("fleet", "local")
@@ -289,6 +299,40 @@ def _shape_refusals(document: Mapping[str, Any]) -> list[Refusal]:
     return refusals
 
 
+def admission_refusals(document: Mapping[str, Any]) -> list[Refusal]:
+    """The three judges, called here — the spawn point — before anything exists.
+
+    An envelope is a REQUEST to spawn, so this is where the request is judged:
+    who is acting (``resolve_actor``, fail-closed on an undeclared actor), at
+    which FinOps tier (``tiering.judge`` against ``gateway/finops/tiers.yaml``),
+    with which capabilities (the per-runtime allowlists `fleet/channel.py` reads).
+    Each verdict is named in the refusal list exactly as its owning module names
+    it — ``actor-unresolved:<actor>``, ``FINOPS-ROLE-NOT-ALLOWED``,
+    ``verb-not-allowed:<runtime>:<verb>`` and its siblings — so a refused spawn
+    says which judge refused it and why.
+
+    A document with no ``spawn`` block carries no request to judge; the shape
+    validators already refuse the fields such a document is missing. A judge that
+    cannot be reached is a refusal, never a pass.
+
+    ``scripts/check-spawn-envelope.sh`` removes each of the three calls below, one
+    at a time, and requires that judge's negative control to stop being refused —
+    a control that cannot fail is not a control (GR-12).
+    """
+    record = document.get("spawn")
+    if not isinstance(record, Mapping) or not record:
+        return []
+    try:
+        from governance.spawn import admission  # noqa: PLC0415 - lazy, so this module stays importable alone
+    except (ImportError, OSError) as exc:
+        return [Refusal("spawn", f"admission-unavailable: {exc}")]
+    findings: list[tuple[str, str]] = []
+    findings += admission.actor_findings(record)  # ADMISSION-JUDGE-ACTOR
+    findings += admission.tier_findings(record)  # ADMISSION-JUDGE-TIER
+    findings += admission.allowlist_findings(record)  # ADMISSION-JUDGE-ALLOWLIST
+    return [Refusal(field, reason) for field, reason in findings]
+
+
 def validate(document: Any) -> list[Refusal]:
     """Every reason `document` is not a well-formed spawn envelope.
 
@@ -303,7 +347,12 @@ def validate(document: Any) -> list[Refusal]:
                 f"must be a JSON object, got {type(document).__name__}",
             )
         ]
-    return [*_absent(document), *_nested_missing(document), *_shape_refusals(document)]
+    return [
+        *_absent(document),
+        *_nested_missing(document),
+        *_shape_refusals(document),
+        *admission_refusals(document),
+    ]
 
 
 def assemble(

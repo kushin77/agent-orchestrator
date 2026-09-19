@@ -141,6 +141,11 @@
     },
     {
       "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae0c65f879c7b5e0a",
+      "reason": "measured 2026-09-19T14:45Z by the #1441 lane at origin/master d6b3eb8d: the MEASUREMENT VENUE of PR #1120, whose HEAD is preserved by name on the local branch pr1120head (that ref is the only thing that contains da85ac4cfcec; detached there, clean). PR #1120 MERGED as 2787ed8d8bf2, an ancestor of origin/master (`git merge-base --is-ancestor 2787ed8d8bf2 origin/master` = YES), so the venue's work is on the default branch by merge rather than pending on this box: 6 of the 7 paths it changes are BYTE-IDENTICAL to that landing's blobs — `git diff --name-only f2aff0a8ee33 da85ac4cfcec` names governance/lifecycle/{README.md,audit.py,cli.py,closeout.py,model.py,tests/conftest.py,tests/test_frozen_head.py}, and `git rev-parse <ref>:<path>` is equal for all of them except cli.py, the one file the PR re-head-ed to b85dee705273 after this venue was cut (PR head, and the PR carried that single commit). It holds nothing of its own: `git status --porcelain -uall` in the venue is empty, `isolation.worktree.foreign_uncommitted()` returns [], no record under .fleet/lanes names it, no declared-venue file names it, no /proc/<pid>/cwd matches it, and `git worktree list --porcelain` reports no lock on it (the strong signal #1440 measured for a claude agent's tree). Recorded, NOT removed: the repo's own reclaim predicate fails closed on it (`content_landed(<main>, da85ac4cfcec, origin/master)` = False — the audit's per-blob and reverse-patch proofs both decline once the default branch has touched the same files), so deleting another session's .claude agent venue from here would be an unreviewed act rather than a reclaim; and NOT quarantined, because rule 17's keep-and-report class (work that exists nowhere else) does not apply to work that merged. The audit keeps reporting it on every pass: it is listed here by name and counted among the baselined artifacts."
+    },
+    {
+      "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ae21c1b75566fee9b",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
     },
@@ -2808,6 +2813,291 @@
       "kind": "branch",
       "name": "issue-worktree-hygiene",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"
+    },
+    {
+      "kind": "branch",
+      "name": "issue-pcm-board-freshness",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the branch is on NO remote (`git ls-remote --heads origin refs/heads/issue-pcm-board-freshness` is empty) and carries 1 commit not on origin/master (d5d0a2657917, \"fix(paperclip): classify board.freshness, restoring the control-mapping gate\", 2026-09-18T13:12:33-04:00). Its whole committed work therefore exists only on this box, which is the AGENTS.md rule 17 keep-and-report class: recorded here (reviewed) rather than reclaimed, because discarding it is the worker's decision to have authorised, not a cleanup."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1310",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the local tip 16a4480eef23 is NOT an ancestor of origin/master and carries 2 commits not on it (latest \"Merge branch 'master' into issue-1310\", 2026-09-18T13:32:09-04:00). A remote `refs/heads/issue-1310` does exist but at a DIFFERENT tip (f627b824cb2a), so the local tip is not preserved by that ref and must not be discarded. Recorded reviewed, not reclaimed."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-ac93099db7773c3c9",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: HEAD 6c36900586f1 IS an ancestor of origin/master (its work landed as #1315, \"fix(paperclip): classify board.freshness in the control mapping table\") and its only dirty path is machine-managed (.board/focus.json), so it holds no uncommitted work of its own and nothing an exemption protects. Recorded here rather than reaped so the audit has a reviewed line for it; had it been reclaimed, its home would be this file either way."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1199",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1264",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1271",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1273",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1274",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1295",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1299",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1311",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1331",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1338",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1341",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1343",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1348",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1357",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1360",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1369",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1378",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1412",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1412-combined",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1415",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1424-cmr-submodule-init",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1429-check-python-patterns",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1440",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1444",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1446",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1459",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1460",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1467",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1471",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-967",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-reconcile-baseline",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a9b1179eb8003e339",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-aac613e97fbcf8b09",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1299-aa1d8bef",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1338-88e06a81",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1345-5ba3c12c",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1348-c78706c5",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1351-ef996e6d",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1369-5e4b818b",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1392-9c3cc8b8",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1412-947e2701",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1412-a65d08ed",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1415-618f7651",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1440-cea02aec",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1446-20f2b1c7",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1459-502bad45",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1467-17e6d18b",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1471-fe2fc174",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-gate-1354",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-rcfix",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-train-1344",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-train-fold2",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-train4-20260919T180519Z",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a85389963264be797",
+      "reason": "re-measured 2026-09-19 by the cleanup lane that cleared the box's clock-driven check-reconcile red: the real-tree audit reports this artifact unmatched \u2014 no record explains it \u2014 and the 24h grace would turn it into a box-wide red (verify is never attributable, so one violation refuses every landing on the box). Recorded reviewed, in bulk with the rest of the current unmatched set, rather than left to red the box on the clock one artifact at a time; reclaiming it instead is the worker's decision to have authorised, not a cleanup. The cadence that would keep this record fresh is issue #1338."
     }
   ]
 }
