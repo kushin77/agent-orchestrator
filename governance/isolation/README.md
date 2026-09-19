@@ -151,6 +151,42 @@ committing under a foreign pair inside a correctly signed lane and requiring the
 audit to refuse it by name. The clearing removes the ambient value; the
 provocation proves the rule still bites without it.
 
+### 3.2 The lane's session (issue #917)
+
+`open` does one more write than the lane record: it stamps the lane's **session
+beat** at `.fleet/sessions/<session_id>.json`, in `governance/reconcile`'s own
+vocabulary, recording the pid that owns the lane (`--pid`, default the parent of
+the mint — the mint exits as soon as it has printed the identity). Measured
+2026-09-16, the heartbeat plane was empty while 78 lane records existed, so the
+sweeper reported `0 orphan(s)` over a fleet full of them: session identity was
+invisible to the tool whose job is to sweep sessions. Stamping at the mint is the
+runtime-agnostic fix — a Claude session, the DeepSeek sister and a Copilot agent
+all mint through this verb, so every lane is visible to the sweep from the moment
+it exists. `close --session` clears the beat once the worktree is actually gone,
+and re-opening a lane refreshes its beat while keeping the original `opened_at`.
+`governance/isolation/session.py` owns the write and the `lane-session-gone`
+rule below; `scripts/check-session-isolation.sh` §3f provokes both.
+
+### 3.3 Bound at creation — `runtime`, `actor`, `brief_hash` (issue #1301)
+
+Every artifact an agent creates is bound to one lane at creation, and the lane
+record is where the binding lives. `open` records `{lane_id, issue, branch,
+worktree, runtime, actor, brief_hash, opened_at}` — `lane_id` **is** the session
+id (one mint, one name for every artifact), `--runtime <id>` is validated against
+the registry (`fleet/runtimes.yaml` when it exists — #1271's — else the seven
+ids the contract names, carried as a literal in `governance/isolation/runtimes.py`
+marked as retired by #1271), `--actor` is recorded, `--brief <file>` /
+`--brief-hash` records the sha256 of the brief the lane was dispatched with. A
+runtime the registry does not carry is refused **before anything is created**
+(`runtime-unregistered:<id>`), and the audit refuses a record that names one
+(`runtime-unregistered`). An absent runtime is not refused — the dispatchers that
+mint lanes today (`fleet/terminal.py`, `governance/spawn/cli.py`) pass none yet
+and refusing them would stop every dispatch — it is named `runtime-unrecorded`
+in `open`'s `binding` payload. Every field is read with a default, so a record
+written before the contract still reads. The lane's terminal verb is
+`governance/lifecycle/cli.py close --lane <lane_id>`; what has no lane is named
+by `governance/reconcile/cli.py sweep --orphans`.
+
 ## 4. Provisioning refusals — before anything is created
 
 `open` refuses **before** `git worktree add` runs, so a refused lane leaves no
@@ -237,6 +273,8 @@ test and would otherwise refuse after the module had already decided to proceed.
 | `commit-authorship-unmeasurable` | No base ref (`origin/master`, `master`, `origin/HEAD`) resolves, so the commits the lane *added* cannot be derived. Unproven, never satisfied (GR-12). |
 | `commit-missing-ticket-trailer` | A commit this session authored does not carry `Refs kushin77/agent-orchestrator#<n>` as a line of its *trailing trailer block*. The code is unchanged — the rule is one rule — and the detail quotes the shared predicate's own naming of the defect: `commit-ref-only-in-subject` (the subject is the only mention, e.g. `6d89618`), `commit-ref-outside-the-trailer-block` (a mention in prose), or `commit-missing-ticket-trailer` (no mention anywhere). |
 | `commit-trailer-check-unavailable` | The shared predicate could not be run, so this lane's history rule is **unproven**. An unevaluable rule is a violation, never a pass (no-false-green doctrine, GR-12). |
+| `runtime-unregistered` | The record names a runtime the registry does not carry (`fleet/runtimes.yaml`, or `runtimes.py`'s literal until #1271 lands). `open` refuses it before anything is created; the audit refuses a hand-written or since-deregistered record. An unreadable registry is unproven, never satisfied. |
+| `lane-session-gone` | The lane was minted **with a session** (its record carries `opened_at`, written by `open` since #917) and that session is gone: its beat under `.fleet/sessions/` is absent or older than the sweeper's TTL (`governance/policy/lease.SESSION_TTL_MINUTES`) **and** the process that owns it is dead. A stale beat behind a live pid is the sweeper's `suspect`, not a refusal. A record with no `opened_at` predates the session plane and owes no beat; the reconcile sweep classifies it instead. Remedy: `governance/lifecycle/cli.py close --lane <id>` finishes the lane from evidence. |
 
 **The history rule is historical.** The audit checks *every* commit the session
 authored, not just the branch tip, so a later well-formed commit does not repair

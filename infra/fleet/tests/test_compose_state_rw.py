@@ -120,6 +120,23 @@ def test_dry_run_stays_pinned_on_the_rw_service(compose: dict) -> None:
     assert rw["environment"]["AO_FLEET_DRY_RUN"] == "1"
 
 
+def test_docker_socket_mounted_on_rw_service_only(compose: dict) -> None:
+    """The promote-portal rung's Docker access (#1329/#1341), least-privilege:
+
+    only `agent-cron-rw` (flag-gated, credentialed) gets a path to the host's
+    Docker daemon; the dry-run-only `agent-cron` sibling never does.
+    """
+    rw = compose["services"]["agent-cron-rw"]
+    socket = _volume(rw, "/var/run/docker.sock")
+    assert socket["source"] == "/var/run/docker.sock"
+    assert socket["read_only"] is True
+    assert socket["bind"]["create_host_path"] is False
+
+    primary = compose["services"]["agent-cron"]
+    targets = {volume.get("target") for volume in primary.get("volumes") or [] if isinstance(volume, dict)}
+    assert "/var/run/docker.sock" not in targets
+
+
 def test_no_denylisted_credential_name_anywhere_in_infra_fleet() -> None:
     """Mirrors issue #711's own acceptance grep, run as a test rather than only CI evidence."""
     denylist = ("GH_" + "TOKEN", "DEEPSEEK_API_" + "KEY")

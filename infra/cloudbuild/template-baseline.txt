@@ -1,0 +1,45 @@
+# infra/cloudbuild/template-baseline.txt — ACCEPTED submission-template exceptions (#1369).
+#
+# One TAB-separated row per accepted exception. Read by
+# `scripts/check-cloudbuild.sh` (wired into `make verify`); the rule it excepts is
+# documented in that script's header: Cloud Build refuses a build AT SUBMISSION
+# when its config spells a bare `$NAME` that is neither a built-in substitution nor
+# one declared by the config or by a trigger whose `filename:` names it, and it
+# reads comments too (#1350 / PR #1354: two CI round trips).
+#
+# Format — exactly five columns, tab-separated, no globs and no wildcard prefixes
+# (a glob would absorb a newly planted token and quietly restore the hole this
+# rule closes):
+#
+#   path <TAB> $TOKEN <TAB> #tracker <TAB> 40-hex-sha <TAB> reason
+#
+# The honest part — what keeps this list from becoming a permanent excuse:
+#
+#   * a row is honoured ONLY while its finding is live. Declare the token (or
+#     remove it) and the row is STALE: this gate fails, naming it, until the row
+#     is deleted. The list can only shrink by fixing the finding.
+#   * the sha is an immutable ANCHOR, checked offline in three directions: the
+#     object exists; `<sha>:<path>` already carried `$TOKEN` (so the row proves the
+#     finding pre-dates it — a lane cannot quarantine a token it just wrote); and
+#     the sha is an ancestor of `origin/master`.
+#   * the tracker must be OPEN in the committed board snapshot (`.board/snapshot.json`,
+#     read offline). A tracker filed after that snapshot is accepted and REPORTED.
+#   * malformed, duplicated or glob-shaped rows FAIL rather than being skipped, and
+#     every honoured row is REPORTED by name in the gate's output.
+#
+# The rows below are therefore a NAMED, TRACKED gap, not a fix. They say: these two
+# build configs reference substitutions that nothing declares, so the pair cannot be
+# submitted as declared. The remedy is the rollout lane's — declaring the keys where
+# the validator reads them (the trigger's `substitutions:` map, mirroring
+# `apply-trigger.yaml`) — because the VALUES are a pipeline decision: an empty
+# placeholder is untested here, and a committed default for `_FLAG` / `_TO_STAGE`
+# would silently pick a promotion target.
+infra/cloudbuild/rollout-promote.yaml	$_ACTOR	#1389	4c7ab309ca49e9563af38a459ef19b3afa4409a1	undeclared-at-submission
+infra/cloudbuild/rollout-promote.yaml	$_APPROVAL_ID	#1389	4c7ab309ca49e9563af38a459ef19b3afa4409a1	undeclared-at-submission
+infra/cloudbuild/rollout-promote.yaml	$_APPROVALS_DIR	#1389	4c7ab309ca49e9563af38a459ef19b3afa4409a1	undeclared-at-submission
+infra/cloudbuild/rollout-promote.yaml	$_DEPLOYER_SA	#1389	4c7ab309ca49e9563af38a459ef19b3afa4409a1	undeclared-at-submission
+infra/cloudbuild/rollout-promote.yaml	$_FLAG	#1389	4c7ab309ca49e9563af38a459ef19b3afa4409a1	undeclared-at-submission
+infra/cloudbuild/rollout-promote.yaml	$_TO_STAGE	#1389	4c7ab309ca49e9563af38a459ef19b3afa4409a1	undeclared-at-submission
+infra/cloudbuild/rollout-rollback.yaml	$_CANARY_HEALTH	#1389	4c7ab309ca49e9563af38a459ef19b3afa4409a1	undeclared-at-submission
+infra/cloudbuild/rollout-rollback.yaml	$_DEPLOYER_SA	#1389	4c7ab309ca49e9563af38a459ef19b3afa4409a1	undeclared-at-submission
+infra/cloudbuild/rollout-rollback.yaml	$_FLAG	#1389	4c7ab309ca49e9563af38a459ef19b3afa4409a1	undeclared-at-submission

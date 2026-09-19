@@ -39,6 +39,7 @@ class FakeFiler:
     def __init__(self) -> None:
         self.created: list[dict] = []
         self.comments: list[dict] = []
+        self.closed: list[dict] = []
 
     def create(self, title: str, body: str, labels) -> int:
         self.created.append({"title": title, "body": body, "labels": list(labels)})
@@ -47,9 +48,26 @@ class FakeFiler:
     def comment(self, number: int, body: str) -> None:
         self.comments.append({"number": number, "body": body})
 
+    def close(self, number: int, comment: str) -> None:
+        self.closed.append({"number": number, "comment": comment})
+
+
+class FailingCloseFiler(FakeFiler):
+    """A board whose close is lost — the write that must keep the fingerprint."""
+
+    def close(self, number: int, comment: str) -> None:
+        raise RuntimeError("gh issue close failed (1): rate limited")
+
 
 def reporter(filer: FakeFiler, tmp_path) -> BoardReporter:
     return BoardReporter(filer, ledger=tmp_path / "reports.json")
+
+
+def ledger_keys(tmp_path) -> set[str]:
+    import json
+
+    path = tmp_path / "reports.json"
+    return set(json.loads(path.read_text(encoding="utf-8"))) if path.exists() else set()
 
 
 def test_a_non_terminal_artifact_files_a_board_finding(tmp_path):
@@ -202,3 +220,102 @@ def test_a_park_does_not_excuse_a_finding_that_is_really_broken(tmp_path):
     titles = " ".join(created["title"] for created in filer.created)
     assert "BRANCH_NOT_DELETED" in titles
     assert "VERIFY_EVIDENCE_MISSING" not in titles
+
+
+# --- #1299: a filed finding has a terminal move, and it is apply-gated ---------
+
+
+def _file_then_close_subject(rep: BoardReporter, apply: bool):
+    finding = Finding(code="VERIFY_EVIDENCE_MISSING", subject="#1247", detail="no attestation")
+    board_report_findings([finding], rep, apply=True, closed_subjects=frozenset())
+    return board_report_findings([finding], rep, apply=apply, closed_subjects=frozenset({"#1247"}))
+
+
+def test_the_terminal_move_closes_the_filed_issue_when_the_subject_closes(tmp_path):
+    """#1299: ``resolve`` is the terminal move — the board issue is CLOSED with the
+    measurement as evidence, and only then is the fingerprint retired."""
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    second = _file_then_close_subject(rep, apply=True)
+    assert second[0].action == "obsolete-by-close"
+    assert [entry["number"] for entry in filer.closed] == [2001], "the filed issue must be closed, not left open"
+    assert "obsolete-by-close" in filer.closed[0]["comment"]
+    assert filer.comments == [], "a close carries its own comment; a separate comment would outlive a failed close"
+    assert ledger_keys(tmp_path) == set(), "the fingerprint is retired so a genuine recurrence files afresh"
+
+
+def test_a_dry_run_resolve_writes_nothing_not_even_the_ledger(tmp_path):
+    """Measured before #1299: the dry run popped the fingerprint and SAVED the
+    ledger while skipping the board write — a dry run that wrote, and a silent
+    suppression: the issue stayed open and a recurrence would file a second one."""
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    second = _file_then_close_subject(rep, apply=False)
+    assert second[0].action == "obsolete-by-close"
+    assert filer.closed == [] and filer.comments == []
+    assert ledger_keys(tmp_path) == {"lifecycle:VERIFY_EVIDENCE_MISSING:#1247"}, (
+        "a dry run must not retire the fingerprint"
+    )
+    # The dry run only reported it; the apply pass then actually does it.
+    assert rep.resolve("lifecycle:VERIFY_EVIDENCE_MISSING:#1247", comment="x", apply=True, close=True)
+    assert [entry["number"] for entry in filer.closed] == [2001]
+    assert ledger_keys(tmp_path) == set()
+
+
+def test_a_lost_close_keeps_the_fingerprint_so_the_next_pass_retries(tmp_path):
+    """Negative control: the board write runs BEFORE the ledger save, so a failed
+    close leaves the fingerprint in place rather than an open issue nobody would
+    look at again."""
+    filer = FailingCloseFiler()
+    rep = reporter(filer, tmp_path)
+    try:
+        _file_then_close_subject(rep, apply=True)
+    except RuntimeError as exc:
+        assert "gh issue close failed" in str(exc)
+    else:  # pragma: no cover - the whole point of the control
+        raise AssertionError("a lost board write must surface, never be swallowed")
+    assert ledger_keys(tmp_path) == {"lifecycle:VERIFY_EVIDENCE_MISSING:#1247"}
+
+
+def test_resolve_without_close_only_comments(tmp_path):
+    """The comment-only shape is still available for a caller that retires a
+    fingerprint while the item is driven elsewhere (reconcile's shelved: key)."""
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    rep.report("reconcile:shelved:#7", title="t", body="b", apply=True)
+    assert rep.resolve("reconcile:shelved:#7", comment="landed", apply=True)
+    assert filer.closed == []
+    assert [entry["number"] for entry in filer.comments] == [2001]
+    assert ledger_keys(tmp_path) == set()
+    assert rep.resolve("reconcile:shelved:#7", comment="landed", apply=True) is False, "nothing left to resolve"
+
+
+def test_the_audit_verb_retires_a_filed_finding_whose_invariant_cleared(tmp_path, monkeypatch, capsys):
+    """#1299 end to end: ``lifecycle audit`` is where a finding filed by an earlier
+    pass reaches its terminal state once the audit no longer charges it — on the
+    hygienic path, which is exactly when every filed finding has cleared. Dry run
+    names it (``would-resolve``); ``--apply`` closes the issue and retires the key."""
+    import json
+
+    from governance.lifecycle import cli
+
+    filer = FakeFiler()
+    rep = reporter(filer, tmp_path)
+    monkeypatch.setattr(cli, "_reporter", lambda: rep)
+    # An earlier pass filed BRANCH_NOT_DELETED for #269; the branch has since gone.
+    rep.report("lifecycle:BRANCH_NOT_DELETED:#269", title="t", body="b", apply=True)
+    recorded = tmp_path / "record.json"
+    recorded.write_text(json.dumps(_conftest.record(clean_item())), encoding="utf-8")
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text("{}", encoding="utf-8")
+
+    assert cli.main(["audit", "--record", str(recorded), "--baseline", str(baseline)]) == 0
+    out = capsys.readouterr().out
+    assert "would-resolve" in out and "lifecycle:BRANCH_NOT_DELETED:#269" in out
+    assert ledger_keys(tmp_path) == {"lifecycle:BRANCH_NOT_DELETED:#269"}, "a dry run retires nothing"
+
+    assert cli.main(["audit", "--record", str(recorded), "--baseline", str(baseline), "--apply"]) == 0
+    out = capsys.readouterr().out
+    assert "resolved" in out
+    assert [entry["number"] for entry in filer.closed] == [2001]
+    assert ledger_keys(tmp_path) == set()

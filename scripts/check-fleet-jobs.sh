@@ -145,15 +145,27 @@ disabled = [j for j in jobs if j.get("enabled") is not True]
 # the gate's environment) and installed only on the shared-services primary.
 probe(
     "SHIP-GATED-OFF-SET",
-    [j.get("name") for j in disabled] == ["snapshot-refresh", "scan-pr-failures", "runner"]
+    [j.get("name") for j in disabled]
+    == ["snapshot-refresh", "promote-portal", "scan-pr-failures", "runner"]
     and [j.get("marker") for j in disabled]
-    == [cron.SNAPSHOT_REFRESH_MARKER, cron.SCAN_PR_FAILURES_MARKER, cron.RUNNER_MARKER],
+    == [
+        cron.SNAPSHOT_REFRESH_MARKER,
+        cron.PROMOTE_MARKER,
+        cron.SCAN_PR_FAILURES_MARKER,
+        cron.RUNNER_MARKER,
+    ],
     "disabled=%s" % [j.get("name") for j in disabled],
 )
 probe(
     "DECLARED-MARKERS-COMPLETE",
     cron.declared_markers(manifest)
-    == cron.MARKERS + (cron.SNAPSHOT_REFRESH_MARKER, cron.SCAN_PR_FAILURES_MARKER, cron.RUNNER_MARKER),
+    == cron.MARKERS
+    + (
+        cron.SNAPSHOT_REFRESH_MARKER,
+        cron.PROMOTE_MARKER,
+        cron.SCAN_PR_FAILURES_MARKER,
+        cron.RUNNER_MARKER,
+    ),
 )
 # The role-gated rung is reachable ONLY through the env contract's variable:
 # with the role set the SAME renderer emits its line (carrying the role

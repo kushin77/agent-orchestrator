@@ -29,10 +29,13 @@ from service.catalog import (
 )
 
 from service.errors import (
+    ActorResolutionError,
+    ActorUnresolvedError,
     AgentAlreadyRegisteredError,
     AgentNotActiveError,
     AgentRegistrationError,
     CrossTenantDenied,
+    DelegationUndeclaredError,
     IdentityError,
     InvalidAgentIdError,
     InvalidCredentialError,
@@ -59,6 +62,7 @@ from service.identity import (
     DEFAULT_ROLE,
     AgentSession,
     IdentityService,
+    resolve_actor,
 )
 
 from service.model import (
@@ -85,7 +89,11 @@ from service.store import RegistryStore
 
 __all__ = [
     "Agent",
+    "ActorResolutionError",
+    "ActorUnresolvedError",
     "AgentRegistry",
+    "DelegationUndeclaredError",
+    "resolve_actor",
     "AgentRegistrationError",
     "AgentSession",
     "AgentAlreadyRegisteredError",

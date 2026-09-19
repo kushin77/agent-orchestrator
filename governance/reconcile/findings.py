@@ -37,12 +37,14 @@ entry:
   closed with the re-measurement as its evidence, and only then is the ledger
   entry retired, so a new occurrence files afresh.
 
-**Only ``apply`` resolves anything.** ``BoardReporter.resolve`` retires the ledger
-entry whether or not ``apply`` is set — it guards the *board* write, not the ledger
-save — so a dry run that called it would drop the dedupe entry with no comment and
-no close: the finding would vanish silently, which is the defect this module
-removes rather than a way to remove it. Every retirement therefore goes through
-:func:`resolve_key`, which refuses while ``apply`` is false.
+**Only ``apply`` resolves anything.** ``BoardReporter.resolve`` used to retire the
+ledger entry whether or not ``apply`` was set — it guarded the *board* write, not
+the ledger save — so a dry run that called it dropped the dedupe entry with no
+comment and no close: the finding vanished silently, which is the defect this
+module removes rather than a way to remove it. Since #1299 ``resolve`` itself
+gates the ledger save on ``apply`` too; every retirement here still goes through
+:func:`resolve_key`, which refuses while ``apply`` is false, so this module's
+guarantee does not depend on the reporter's.
 
 **The order is load-bearing.** The board close happens *before* the ledger is
 retired. The ledger entry is what makes the finding retryable, so retiring it first
@@ -224,10 +226,11 @@ def lifecycle_entries(ledger: dict) -> tuple[list[Entry], list[str]]:
 def resolve_key(reporter: BoardReporter, key: str, *, comment: str, apply: bool) -> bool:
     """Retire one dedupe entry — **only** under ``apply``.
 
-    ``BoardReporter.resolve`` saves the ledger unconditionally and gates only the
-    comment, so calling it on a dry run drops the entry with no board write at all.
-    That is a silent suppression of a finding, and it is why this wrapper — not
-    ``resolve`` — is the only way this package retires an entry.
+    ``BoardReporter.resolve`` once saved the ledger unconditionally and gated only
+    the comment, so calling it on a dry run dropped the entry with no board write
+    at all — a silent suppression of a finding. The reporter now gates its own
+    save (#1299); this wrapper stays the only way this package retires an entry,
+    so the refusal is provable here without trusting the reporter's.
     """
     if not apply:
         return False

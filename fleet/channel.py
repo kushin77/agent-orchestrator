@@ -170,6 +170,101 @@ THINKING_LEVELS = ("none", "low", "medium", "high")
 TASK_KINDS = ("work", "status", "report", "ping", "steer")
 NON_WORK_KINDS = ("status", "report", "ping", "steer")
 
+# ── per-runtime allowlists for verbs, skills and secrets (issue #1273, parent
+# #1268) ─────────────────────────────────────────────────────────────────────
+# The closed runtime vocabulary. Another lane declares these same seven ids in
+# fleet/runtimes.yaml (do not re-declare that file here); this tuple is the
+# wire-value contract `message.schema.json::runtime`/`on_behalf_of` also names.
+RUNTIME_IDS = (
+    "claude-session",
+    "claude-subagent",
+    "deepseek-sister",
+    "deepseek-executor",
+    "copilot-agent",
+    "hermes",
+    "paperclip",
+)
+
+_VERBS_YAML = ROOT / "control-plane" / "control" / "verbs.yaml"
+_SKILLS_REGISTRY = ROOT / "integrations" / "paperclip" / "adapters" / "skills" / "registry.json"
+_SECRETS_CATALOG = ROOT / "integrations" / "paperclip" / "adapters" / "secrets" / "catalog" / "secrets.json"
+
+_VERB_ALLOWLIST: dict[str, tuple[str, ...]] | None = None
+_SKILL_ALLOWLIST: dict[str, tuple[str, ...]] | None = None
+_SECRET_ALLOWLIST: dict[str, tuple[str, ...]] | None = None
+
+
+def _verb_allowlist() -> dict[str, tuple[str, ...]]:
+    """``{verb id: allowed_runtimes}`` from control-plane/control/verbs.yaml.
+
+    Resolved lazily and cached, mirroring ``board_snapshot()`` above: this
+    module must still import when ``control-plane/`` is not a sibling (a
+    scratch copy of ``fleet/`` alone), and a verb absent from the registry (or
+    the registry itself absent) is simply not restricted — the allowlist is an
+    ADDITIVE narrowing on top of ``capability``, never the only gate.
+    """
+    global _VERB_ALLOWLIST
+    if _VERB_ALLOWLIST is None:
+        allowlist: dict[str, tuple[str, ...]] = {}
+        if _VERBS_YAML.is_file():
+            try:
+                import yaml  # noqa: PLC0415 - optional dependency, resolved on demand
+
+                doc = yaml.safe_load(_VERBS_YAML.read_text(encoding="utf-8")) or {}
+                for entry in doc.get("verbs") or []:
+                    vid = entry.get("id")
+                    runtimes = entry.get("allowed_runtimes")
+                    if isinstance(vid, str) and isinstance(runtimes, list):
+                        allowlist[vid] = tuple(runtimes)
+            except Exception:  # noqa: BLE001 - degrade to unrestricted, never crash
+                allowlist = {}
+        _VERB_ALLOWLIST = allowlist
+    return _VERB_ALLOWLIST
+
+
+def _skill_allowlist() -> dict[str, tuple[str, ...]]:
+    """``{skill id: allowed_runtimes}`` from the paperclip skills registry."""
+    global _SKILL_ALLOWLIST
+    if _SKILL_ALLOWLIST is None:
+        allowlist: dict[str, tuple[str, ...]] = {}
+        if _SKILLS_REGISTRY.is_file():
+            try:
+                doc = json.loads(_SKILLS_REGISTRY.read_text(encoding="utf-8"))
+                for entry in doc.get("declarations") or []:
+                    sid = entry.get("id")
+                    runtimes = entry.get("allowed_runtimes")
+                    if isinstance(sid, str) and isinstance(runtimes, list):
+                        allowlist[sid] = tuple(runtimes)
+            except Exception:  # noqa: BLE001
+                allowlist = {}
+        _SKILL_ALLOWLIST = allowlist
+    return _SKILL_ALLOWLIST
+
+
+def _secret_allowlist() -> dict[str, tuple[str, ...]]:
+    """``{gsm_path: allowed_runtimes}`` from the paperclip secrets catalog."""
+    global _SECRET_ALLOWLIST
+    if _SECRET_ALLOWLIST is None:
+        allowlist: dict[str, tuple[str, ...]] = {}
+        if _SECRETS_CATALOG.is_file():
+            try:
+                doc = json.loads(_SECRETS_CATALOG.read_text(encoding="utf-8"))
+                for entry in doc.get("secrets") or []:
+                    path = entry.get("gsm_path")
+                    runtimes = entry.get("allowed_runtimes")
+                    if isinstance(path, str) and isinstance(runtimes, list):
+                        allowlist[path] = tuple(runtimes)
+            except Exception:  # noqa: BLE001
+                allowlist = {}
+        _SECRET_ALLOWLIST = allowlist
+    return _SECRET_ALLOWLIST
+
+
+def reset_runtime_allowlist_cache() -> None:
+    """Test/self-test hook: force the three allowlists above to reload."""
+    global _VERB_ALLOWLIST, _SKILL_ALLOWLIST, _SECRET_ALLOWLIST
+    _VERB_ALLOWLIST = _SKILL_ALLOWLIST = _SECRET_ALLOWLIST = None
+
 # ── the declared role vocabulary (issue #777) ───────────────────────────────
 # The role names are WIRE VALUES, not comments: the envelope carries them, this
 # module refuses any sender or recipient outside the closed set, and
@@ -954,6 +1049,48 @@ def validate(message: dict) -> list[str]:
                     problems.append(f"task.{field} must be a positive integer")
     if "body" in message and not isinstance(message["body"], str):
         problems.append("body must be a string")
+
+    # ── per-runtime allowlists for verbs, skills and secrets (issue #1273) ──
+    # `runtime` is the SENDER's runtime id; `on_behalf_of` names a second
+    # runtime the action is really being carried out for (the laundering
+    # case — a denied runtime asking a permitted one to do it instead). Both
+    # are optional: a message naming neither is judged only on role/hierarchy,
+    # exactly as before this issue.
+    runtime = message.get("runtime")
+    if runtime is not None and runtime not in RUNTIME_IDS:
+        problems.append(f"runtime must be one of {', '.join(RUNTIME_IDS)}")
+    on_behalf_of = message.get("on_behalf_of")
+    if on_behalf_of is not None and on_behalf_of not in RUNTIME_IDS:
+        problems.append(f"on_behalf_of must be one of {', '.join(RUNTIME_IDS)}")
+    if isinstance(task, dict) and runtime in RUNTIME_IDS:
+        verb = task.get("verb")
+        if isinstance(verb, str):
+            allowed = _verb_allowlist().get(verb)
+            if allowed is not None and runtime not in allowed:
+                problems.append(f"verb-not-allowed:{runtime}:{verb}")
+            if (
+                on_behalf_of in RUNTIME_IDS
+                and allowed is not None
+                and on_behalf_of not in allowed
+            ):
+                # Laundering: the runtime actually asking (on_behalf_of) is not
+                # itself allowed the verb, even though the sender/intermediary
+                # is. Refused under its OWN name, not the intermediary's.
+                problems.append(f"laundering:{on_behalf_of}:{verb}")
+        skill = task.get("skill")
+        if isinstance(skill, str):
+            allowed = _skill_allowlist().get(skill)
+            if allowed is not None and runtime not in allowed:
+                problems.append(f"skill-not-allowed:{runtime}:{skill}")
+            if on_behalf_of in RUNTIME_IDS and allowed is not None and on_behalf_of not in allowed:
+                problems.append(f"laundering:{on_behalf_of}:{skill}")
+        secret = task.get("secret")
+        if isinstance(secret, str):
+            allowed = _secret_allowlist().get(secret)
+            if allowed is not None and runtime not in allowed:
+                problems.append(f"secret-not-allowed:{runtime}:{secret}")
+            if on_behalf_of in RUNTIME_IDS and allowed is not None and on_behalf_of not in allowed:
+                problems.append(f"laundering:{on_behalf_of}:{secret}")
     return problems
 
 

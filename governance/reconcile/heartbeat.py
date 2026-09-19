@@ -226,6 +226,38 @@ def clear(session_id: str, root: Path | str) -> bool:
     return True
 
 
+#: Where ``governance/isolation`` writes a lane record — read here by NAME only,
+#: never through that package, so the sweeper's view of the lane plane cannot
+#: depend on importing the mint.
+LANES_DIR = ".fleet/lanes"
+
+
+def lane_records_without_beat(root: Path | str, beating: set[str] | None = None) -> tuple[int, list[str]]:
+    """``(lane record count, session ids of the records with no beat)`` (#917).
+
+    The sweeper's input is the session plane; the lane plane is what it was
+    blind to. A record it cannot parse still counts as a record (the file is
+    there) and is listed by file name, so an unreadable lane never reads as
+    absent. ``beating`` defaults to every session id with a beat on disk.
+    """
+    directory = Path(root) / LANES_DIR
+    if not directory.exists():
+        return 0, []
+    if beating is None:
+        beating = {session.session_id for session in list_sessions(root)}
+    total = 0
+    unbeaten: list[str] = []
+    for path in sorted(directory.glob("*.json")):
+        total += 1
+        try:
+            session_id = str(json.loads(path.read_text(encoding="utf-8")).get("session_id") or path.stem)
+        except (OSError, ValueError, AttributeError):
+            session_id = path.stem
+        if session_id not in beating:
+            unbeaten.append(session_id)
+    return total, unbeaten
+
+
 def age_seconds(session: Session, at: float | None = None) -> float:
     return (now_epoch() if at is None else at) - session.at
 

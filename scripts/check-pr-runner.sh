@@ -14,12 +14,15 @@
 #   one; this gate PROVOKES every one.
 #
 # WHAT IS MEASURED
-#   A. lessons 1-7 as PLAN FIXTURES (`fleet/runner/fixtures/*.json`) driven
+#   A. lessons 1-8 as PLAN FIXTURES (`fleet/runner/fixtures/*.json`) driven
 #      through the real cli (`plan --fixture`, width PINNED): each must refuse BY
 #      NAME — `stale-head:`, `requeue:expired:`, `merged-tree-stale:`,
 #      `via scripts/merge-pr.sh`, `requeue:cannot-assess:`, `green:cloud-build:`,
 #      `capacity:`, `gatelock-prune-failed:` — and never emit the action the
-#      lesson forbids.
+#      lesson forbids. Lesson 8 (#1378) is the mirror image: a foreign
+#      (cloud-build/gate-status) red with NO local-marker record is re-queued
+#      (`requeue:foreign-red:`), while one WITH a local-marker record (even if
+#      also red) stays refused (`verify-red:<pr>:local-marker`).
 #   B. lessons 6-9 as the named negative controls in
 #      `fleet/runner/tests/test_transports.py` (held-and-removed worktree,
 #      prune-before-run, serialised fetch, status-from-ledger), run with pytest's
@@ -27,13 +30,15 @@
 #      CANNOT-ASSESS, 5 = nothing collected is FAIL) and the rootdir pinned.
 #   C. lesson 10: the runner's context, the poster's, the mapper's and the branch
 #      protection's are ONE string (reusing `check-gate-status.sh`'s parity).
-#   D. THREE MUTANTS of a scratch copy, each of which must RED the same control
+#   D. FOUR MUTANTS of a scratch copy, each of which must RED the same control
 #      the real tree passes: (1) the stale-head skip dropped in plan.py -> the
 #      old head's build is no longer cancelled; (2) the merged-tree check dropped
 #      in merge.py -> a red merged tree reaches the merge verb; (3) the fan-out
 #      bound dropped in plan.py -> a head the width cannot take is no longer
-#      DEFERred by name. A mutation that did not change the file is reported as
-#      such (a no-op proves nothing).
+#      DEFERred by name; (4) the local-marker distinction dropped in plan.py's
+#      foreign-red check -> a red the runner already ran locally is wrongly
+#      re-queued forever instead of staying refused. A mutation that did not
+#      change the file is reported as such (a no-op proves nothing).
 #
 # Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. No network access.
 #
@@ -137,6 +142,10 @@ fixture_controls() {
   expect "lesson-6 the fan-out width is a bound: the extra head is deferred by name" "$out" "capacity:41:no-evidence" "requeue:no-evidence:41"
   out="$(plan_fixture "$tree" "$FIX/lesson-7-prune-failed.json")"
   expect "lesson-7 a failed gate-lock prune plans no verify" "$out" "gatelock-prune-failed:" "verify "
+  out="$(plan_fixture "$tree" "$FIX/lesson-8-foreign-red.json")"
+  expect "lesson-8 a foreign red with no local run is re-queued, not refused forever" "$out" "requeue:foreign-red:16:cloud-build" "verify-red"
+  out="$(plan_fixture "$tree" "$FIX/lesson-8b-local-red.json")"
+  expect "lesson-8 a foreign red WITH a local-marker record stays refused" "$out" "verify-red:17:local-marker" "requeue:foreign-red"
 }
 
 echo "== A. plan fixtures (lessons 1-7) refuse by name =="
@@ -181,7 +190,9 @@ for control in test_a_pushed_head_invalidates_prior_evidence_and_cancels_the_sta
                test_status_answers_what_is_verifying_merged_and_blocked_from_the_ledger \
                test_a_parked_verify_is_never_posted \
                test_a_backed_off_width_defers_the_extra_head_by_name_and_never_loses_it \
-               test_poster_protection_mapper_and_runner_name_the_same_context; do
+               test_poster_protection_mapper_and_runner_name_the_same_context \
+               test_a_foreign_red_with_no_local_record_is_requeued \
+               test_a_foreign_red_with_a_local_red_record_stays_refused; do
   if ! grep -q "def $control(" fleet/runner/tests/test_plan.py fleet/runner/tests/test_transports.py; then
     bad "named control missing: $control"
   fi
@@ -308,6 +319,22 @@ if mutate "$m3_plan" 's/        if slots > 0:/        if True:/' "MUTANT-3 capac
   fi
 fi
 
+# MUTANT 4 (#1378) — drop the local-marker distinction in plan.py's foreign-red
+# check: every red is treated as foreign (never refused-for-having-a-local-run),
+# so a head the runner already ran locally and got red on is re-queued forever
+# instead of staying refused.
+m4_plan="$mutant_tree/fleet/runner/plan.py"
+if mutate "$m4_plan" 's/if basis_source != SOURCE_LOCAL and not verdict.has_local_record:/if True:/' "MUTANT-4 local-marker-distinction-dropped"; then
+  rm -rf "$mutant_tree/fleet/runner/__pycache__"
+  CONTROL_FAILS=0
+  m4_out="$(plan_fixture "$mutant_tree" "$FIX/lesson-8b-local-red.json")"
+  if contains "$m4_out" "verify-red:17:local-marker"; then
+    bad "MUTANT-4 local-marker-distinction-dropped was NOT caught: still refuses by name :: $(printf '%s' "$m4_out" | tr '\n' ' ')"
+  else
+    ok "MUTANT-4 local-marker-distinction-dropped is caught (a local-run red is now wrongly re-queued forever)"
+  fi
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo "check-pr-runner: NOT-OK — $fail finding(s); the runner's controls are not all provable" >&2
   exit 1
@@ -316,5 +343,5 @@ if [ "$cannot" -ne 0 ]; then
   echo "check-pr-runner: CANNOT-ASSESS — the transport suite could not run to completion"
   exit 2
 fi
-echo "check-pr-runner: OK — lessons 1-7 refuse by name from fixtures, 6-9 hold under fakes, the context is one string, and all three mutants are caught"
+echo "check-pr-runner: OK — lessons 1-8 refuse/re-queue by name from fixtures, 6-9 hold under fakes, the context is one string, and all four mutants are caught"
 exit 0

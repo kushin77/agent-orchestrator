@@ -164,6 +164,27 @@ if ! bash "$pr_queue_script" --check-merged-tree "$pr_number" --head "$pr_head_o
   exit 1
 fi
 
+# --- approval record (issue #1272) — behind AO_APPROVAL_REQUIRED, default off
+# so this lands without blocking the runner; the runner rung flips it later.
+if [ "${AO_APPROVAL_REQUIRED:-0}" = "1" ]; then
+  approvals_cli="$(dirname "${BASH_SOURCE[0]}")/../integrations/paperclip/adapters/approvals/record_cli.py"
+  if [ ! -f "$approvals_cli" ]; then
+    echo "merge-pr: CANNOT-ASSESS — approvals record_cli.py is missing: $approvals_cli" >&2
+    exit 2
+  fi
+  if ! python3 "$approvals_cli" check --scope "merge:pr#$pr_number" >/tmp/mp-approval.txt 2>&1; then
+    approval_rc=$?
+    cat /tmp/mp-approval.txt >&2
+    if [ "$approval_rc" = "2" ]; then
+      echo "merge-pr: CANNOT-ASSESS — approval check reached no verdict for #$pr_number; gh pr merge was NOT invoked" >&2
+      exit 2
+    fi
+    echo "merge-pr: REFUSED — approval-missing:merge:pr#$pr_number — gh pr merge was NOT invoked" >&2
+    exit 1
+  fi
+  echo "merge-pr: approval record verified for #$pr_number"
+fi
+
 echo "merge-pr: merging #$pr_number (gh pr merge --squash --delete-branch); the message was verified above"
 # A non-zero exit here is a refusal to RE-CHECK, not proof that nothing landed:
 # `gh pr merge --delete-branch` can exit rc 1 after the merge actually succeeded

@@ -32,6 +32,8 @@ KNOWN_CODES = frozenset(
         "speculative-base-not-landed",
         "speculative-base-stale-merge-base",
         "speculative-base-unmeasurable",
+        "lane-session-gone",
+        "runtime-unregistered",
     }
 )
 

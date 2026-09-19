@@ -222,6 +222,22 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # The Docker socket — #1329/#1341, mounted on THIS service ONLY, never
+      # the sibling `agent-cron` (dev-run) service above. Least privilege: the
+      # promote-portal rung this service exists for (still `enabled: false` in
+      # config/fleet-jobs.json pending the AR credential, docs/AGENTCONSOLE-
+      # HOSTING.md §5c) is the one caller that ever needs to recreate the host's
+      # agentconsole container, so only this flag-gated, credentialed service
+      # gets a path to the daemon. Read-only: the socket itself grants no extra
+      # write beyond what talking to dockerd already implies, and a read-only
+      # bind is the minimum this compose file can assert without a second,
+      # narrower proxy in front of the daemon (out of this lane's scope).
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+        bind:
+          create_host_path: false
     cpus: 1.0
     mem_limit: 512m
     stop_grace_period: 20s

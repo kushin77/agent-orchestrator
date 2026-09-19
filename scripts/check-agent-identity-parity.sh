@@ -46,6 +46,19 @@ set -u
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 2
 
+if [ "${1:-}" = "--self-test" ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "check-agent-identity-parity --self-test: CANNOT-ASSESS — python3 not found" >&2
+    exit 2
+  fi
+  if [ ! -f "registry/service/parity_actor_walk.py" ]; then
+    echo "check-agent-identity-parity --self-test: CANNOT-ASSESS — registry/service/parity_actor_walk.py is missing" >&2
+    exit 2
+  fi
+  python3 registry/service/parity_actor_walk.py --self-test --repo-root "$root"
+  exit $?
+fi
+
 profiles="registry/profiles"
 schema="$profiles/agent-identity.schema.json"
 profile_schema="$profiles/agent-profile.schema.json"
@@ -234,4 +247,44 @@ fi
 
 seed_count="$(find "$seeds" -maxdepth 1 -name '*.yaml' | wc -l)"
 echo "check-agent-identity-parity: OK — the shared schema's closed vocabularies reconcile with agent-profile.schema.json and catalog.yaml, $seed_count seed(s) satisfy it as projected identities, and 6 negative control(s) held"
+
+# --- 3. actor identity parity (issue #1275) ---------------------------------
+# One identity per actor across GitHub, the mailbox, paperclip and hermes:
+# walk the last N records of each kind (PR authors, directives, approvals,
+# heartbeats) and resolve every actor string against
+# registry/service/actors.yaml via resolve_actor(). Every source is read-only
+# (files/gh); a source that is simply absent on this checkout is named
+# CANNOT-ASSESS, never FAIL.
+echo
+echo "== actor identity parity (last N records per kind) =="
+
+actor_n="${AGENT_IDENTITY_PARITY_N:-20}"
+actors_yaml="registry/service/actors.yaml"
+identity_py="registry/service/identity.py"
+walker="registry/service/parity_actor_walk.py"
+
+actor_rc=0
+if [ ! -f "$actors_yaml" ] || [ ! -f "$identity_py" ]; then
+  echo "actor-identity-parity: CANNOT-ASSESS — $actors_yaml or $identity_py is missing" >&2
+  actor_rc=2
+elif [ ! -f "$walker" ]; then
+  echo "actor-identity-parity: CANNOT-ASSESS — $walker is missing" >&2
+  actor_rc=2
+else
+  actor_out="$(python3 "$walker" --n "$actor_n" --repo-root "$root")"
+  actor_rc=$?
+  printf '%s\n' "$actor_out"
+fi
+
+case "$actor_rc" in
+  0) ;;
+  2)
+    echo "check-agent-identity-parity: CANNOT-ASSESS — actor identity parity could not be assessed (see above)" >&2
+    exit 2 ;;
+  *)
+    echo "check-agent-identity-parity: NOT-OK — an actor string did not resolve to one declared identity" >&2
+    exit 1 ;;
+esac
+
+echo "check-agent-identity-parity: OK — schema parity and actor identity parity both hold"
 exit 0

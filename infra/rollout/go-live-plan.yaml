@@ -121,6 +121,11 @@ phases:
         go_live_stage: full
       - flag: surfaces.erp_module
         go_live_stage: full
+      # Edge fronting for ai.purebliss.app (issue #935, child of #731). Planned
+      # in phase 7 because the registry files it under `service: portal`, same
+      # as the other portal surfaces above.
+      - flag: surfaces.edge_cutover
+        go_live_stage: full
   "8":
     name: autonomous operations and governance
     note: This rollout pipeline (dogfooded first) and merge governance.

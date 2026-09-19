@@ -134,6 +134,15 @@ flags:
     stage: "off"
     rollout_pct: 0
     targeted: []
+  # Edge fronting for ai.purebliss.app (issue #935, child of #731). The
+  # registry row declares WHAT is gated (infra/feature-flags/registry.yaml
+  # surfaces.edge_cutover); this row is what makes the surface drivable and
+  # withdrawable — the engine refuses a flag this file does not carry
+  # (`unknown flag 'surfaces.edge_cutover' (not declared in rollout state)`).
+  surfaces.edge_cutover:
+    stage: "off"
+    rollout_pct: 0
+    targeted: []
   rollout.pipeline:
     stage: "off"
     rollout_pct: 0

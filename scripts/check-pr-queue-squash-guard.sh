@@ -278,8 +278,98 @@ EOF
   fi
 fi
 
+# --- scripts/merge-pr.sh's approval consumer (issue #1272) --------------
+# Negative control: AO_APPROVAL_REQUIRED=1 with no record refuses by name
+# (approval-missing:merge:pr#N) and never reaches gh pr merge; a grant first
+# makes the same call merge. Offline: fake `gh` + fake check-squash-message.sh
+# (already OK) + a scratch AO_APPROVALS_HMAC_KEY and .fleet/approvals store.
+merge_pr_target="scripts/merge-pr.sh"
+if [ ! -f "$merge_pr_target" ]; then
+  echo "check-pr-queue-squash-guard: CANNOT-ASSESS — $merge_pr_target is missing" >&2
+  exit 2
+fi
+AP_SCRATCH="$(mktemp -d "$root/.ao1272-approval-guard.XXXXXX")" || {
+  echo "check-pr-queue-squash-guard: CANNOT-ASSESS — no in-repo scratch directory for the approval controls" >&2
+  exit 2
+}
+ap_squash_stub="$TMPD/check-squash-message-approval.sh"
+cat > "$ap_squash_stub" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$ap_squash_stub"
+ap_scripts="$AP_SCRATCH/scripts"
+mkdir -p "$ap_scripts"
+cp "$root/$merge_pr_target" "$ap_scripts/merge-pr.sh"
+cp "$ap_squash_stub" "$ap_scripts/check-squash-message.sh"
+cp "$root/scripts/pr-queue.sh" "$ap_scripts/pr-queue.sh"
+ln -s "$root/integrations" "$AP_SCRATCH/integrations"
+ap_view_calls="$TMPD/ap-view.json"
+printf '{"baseRefName":"master","headRefOid":"%s"}' "$RUN_CASE_TIP" > "$ap_view_calls"
+ap_fakebin="$TMPD/ap-bin"
+mkdir -p "$ap_fakebin"
+cat > "$ap_fakebin/gh" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "pr" ] && [ "\$2" = "view" ]; then
+  cat "$ap_view_calls"
+  exit 0
+fi
+if [ "\$1" = "pr" ] && [ "\$2" = "merge" ]; then
+  echo "\$3" >> "$TMPD/ap-merge-calls.txt"
+  exit 0
+fi
+echo "fake gh: unexpected invocation: \$*" >&2
+exit 1
+EOF
+chmod +x "$ap_fakebin/gh"
+: > "$TMPD/ap-merge-calls.txt"
+ap_key="ao1272-self-test-key-not-a-secret"
+ap_store_dir="$root/.fleet/approvals"
+ap_record_file="$ap_store_dir/merge__pr_4321.json"
+ap_preexisting=0
+[ -e "$ap_record_file" ] && ap_preexisting=1
+
+ap_missing_out="$TMPD/ap-missing-out.txt"
+if [ "$ap_preexisting" -eq 0 ]; then
+  AO_APPROVAL_REQUIRED=1 AO_MERGE_APPLY=1 AO_QUEUE_VERIFY_MERGED=1 AO_QUEUE_VERIFY_CMD="exit 0" \
+    PATH="$ap_fakebin:$PATH" \
+    bash "$ap_scripts/merge-pr.sh" --pr 4321 >"$ap_missing_out" 2>&1
+  ap_missing_rc=$?
+  if [ "$ap_missing_rc" -eq 1 ] && grep -q "approval-missing:merge:pr#4321" "$ap_missing_out"; then
+    ok "approval missing: merge-pr.sh refuses approval-missing:merge:pr#4321"
+  else
+    fail "approval missing: exit=$ap_missing_rc, expected 1 with approval-missing:merge:pr#4321 — $(cat "$ap_missing_out")"
+  fi
+  if [ -s "$TMPD/ap-merge-calls.txt" ]; then
+    fail "approval missing: gh pr merge was called despite no approval record"
+  else
+    ok "approval missing: gh pr merge was NOT invoked"
+  fi
+else
+  echo "  skip  approval missing: $ap_record_file already exists (pre-existing local .fleet state) — not overwritten"
+fi
+
+AO_APPROVALS_HMAC_KEY="$ap_key" python3 "$root/integrations/paperclip/adapters/approvals/record_cli.py" \
+  grant --actor operator --scope "merge:pr#4321" --ttl-seconds 900 >/dev/null 2>"$TMPD/ap-grant-err.txt" \
+  || fail "approval granted: grant CLI failed — $(cat "$TMPD/ap-grant-err.txt")"
+: > "$TMPD/ap-merge-calls.txt"
+ap_granted_out="$TMPD/ap-granted-out.txt"
+AO_APPROVAL_REQUIRED=1 AO_MERGE_APPLY=1 AO_QUEUE_VERIFY_MERGED=1 AO_QUEUE_VERIFY_CMD="exit 0" \
+  AO_APPROVALS_HMAC_KEY="$ap_key" PATH="$ap_fakebin:$PATH" \
+  bash "$ap_scripts/merge-pr.sh" --pr 4321 >"$ap_granted_out" 2>&1
+ap_granted_rc=$?
+if [ "$ap_granted_rc" -eq 0 ] && grep -q "^4321$" "$TMPD/ap-merge-calls.txt"; then
+  ok "approval granted: merge-pr.sh merges #4321 after grant"
+else
+  fail "approval granted: exit=$ap_granted_rc, expected 0 with gh pr merge called — $(cat "$ap_granted_out")"
+fi
+if [ "$ap_preexisting" -eq 0 ]; then
+  rm -f "$ap_record_file"
+fi
+rm -rf "$AP_SCRATCH"
+
 if [ "$FAILED" -eq 0 ]; then
-  echo "check-pr-queue-squash-guard: OK — refused NOT-OK without merging, merged on OK; merged-tree evidence controls proven"
+  echo "check-pr-queue-squash-guard: OK — refused NOT-OK without merging, merged on OK; merged-tree and approval-record evidence controls proven"
   exit 0
 fi
 echo "check-pr-queue-squash-guard: NOT-OK — $FAILED finding(s)" >&2

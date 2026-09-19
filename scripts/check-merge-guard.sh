@@ -110,9 +110,25 @@ view_good="$TMPD/view-good.json"
 # step 6, wired into merge-pr.sh's apply path by #1332) computes a real
 # merge-base against origin/master, so the fixture must name a commit that
 # actually exists in this checkout rather than a placeholder string.
-head_oid_for_fixture="$(git rev-parse HEAD 2>/dev/null)"
+#
+# It must NOT be `git rev-parse HEAD` of the invoking checkout: merge-pr.sh's
+# apply path refuses (merged-tree-unverified) unless the fixture's head is a
+# DESCENDANT of origin/master's current tip, and whatever checkout `make
+# verify` happens to be running from is not guaranteed to be at or ahead of
+# that tip (a lane worktree, a detached older commit, a stale local clone all
+# reproduce the refusal offline — measured on the shared-services runner,
+# issue #1233 follow-up). Build a throwaway commit ON TOP of the CURRENT
+# origin/master tip instead, so the fixture is hermetic regardless of what
+# the ambient HEAD happens to be.
+git fetch --quiet origin master >/dev/null 2>&1 || true
+master_tip_for_fixture="$(git rev-parse origin/master 2>/dev/null)"
+if [ -z "$master_tip_for_fixture" ]; then
+  echo "check-merge-guard: CANNOT-ASSESS — could not resolve origin/master for the scratch fixtures" >&2
+  exit 2
+fi
+head_oid_for_fixture="$(git commit-tree "$master_tip_for_fixture^{tree}" -p "$master_tip_for_fixture" -m "check-merge-guard scratch fixture (offline, never pushed)" 2>/dev/null)"
 if [ -z "$head_oid_for_fixture" ]; then
-  echo "check-merge-guard: CANNOT-ASSESS — could not resolve HEAD for the scratch fixtures" >&2
+  echo "check-merge-guard: CANNOT-ASSESS — could not build the scratch fixture commit" >&2
   exit 2
 fi
 python3 - "$view_bad" "$view_good" "$head_oid_for_fixture" <<'PY'

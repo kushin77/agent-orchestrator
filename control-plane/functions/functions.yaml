@@ -353,7 +353,7 @@ functions:
     kind: view
     endpoints: [closure/status, closure/collect]
     parameters:
-      - {name: issue, type: integer, required: true, default: null}
+      - {name: issue, type: integer, required: false, default: null}
       - {name: out, type: string, required: true, default: null}
     scope: {capability: board:read, level: org, tenant: platform}
     effect_class: read
@@ -767,7 +767,7 @@ functions:
     kind: command
     endpoints: [closure/close]
     parameters:
-      - {name: issue, type: integer, required: true, default: null}
+      - {name: issue, type: integer, required: false, default: null}
       - {name: evidence, type: string, required: false, default: ""}
       - {name: apply, type: boolean, required: false, default: false}
     scope: {capability: board:close, level: org, tenant: platform}

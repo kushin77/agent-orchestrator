@@ -314,6 +314,24 @@ surfaces:
       substring — the measured rung does not depend on it. There is no test suite
       and no README.md under the path, and the ladder's `tests`/`contract`
       evidence is directory-shaped, so the measured rung is the base one.
+  - surface: edge-cutover
+    path: docs/EDGE-CUTOVER.md
+    declared_class: template
+    class_ceiling: template
+    ceiling_reason: >-
+      The path is a single file (issue #935/#731); every rung above `template`
+      requires an artifact *under* the path, which a file cannot hold. The
+      declaration is enforced by scripts/check-edge-cutover.sh instead. Owner
+      to confirm.
+    notes: >-
+      The edge-fronting declaration for ai.purebliss.app: what fronts the
+      hostname, the retired GCP edge route, and the residual boundary between
+      this repo and the run half (docs/EDGE-CUTOVER.md). The path is a single
+      file, so `tests` and `contract` — measured as artifacts *under* the
+      path — cannot exist; the measured rung is the base one. Registered as a
+      go-live surface by infra/feature-flags/registry.yaml
+      surfaces.edge_cutover / infra/rollout/rollout-state.yaml /
+      infra/rollout/go-live-plan.yaml (issue #935).
   - surface: commit-contract
     path: .gitmessage
     declared_class: template

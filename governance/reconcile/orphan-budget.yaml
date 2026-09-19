@@ -1,0 +1,34 @@
+# orphan-budget.yaml — the declared orphan allowance for the orphan walk
+# (`governance/reconcile/cli.py sweep --orphans`, `scripts/check-reconcile-orphans.sh`,
+# issue #1301 step 3).
+#
+# The contract's target is ZERO orphans of every kind: an artifact with no live
+# lane and no evidenced close-out is a finding by name. The box was NOT at zero
+# the day the walk shipped, and gating straight to zero would red `make verify`
+# on a pile this change did not create and cannot clear by itself (the same
+# shape as governance/isolation/worktree-cap.yaml's ratchet, #1335). So the
+# walk is held to the counts MEASURED on the declaring host, plus a small churn
+# headroom, until `expires`; after that date the budget is 0 for every kind and
+# every orphan is red. The code never re-measures or renews this — raising a
+# number here is a reviewed edit, and the pile has to shrink, not be re-excused.
+#
+# Measured 2026-09-18 on ElevatedIQ-AK (dry-run walk, `RepoOrphanOps` over the
+# shared checkout): worktree=44 (31 of them `.claude/worktrees/agent-*` subagent
+# trees no lane record knows), branch=85, pr=11 (open PRs with no `lane:` line
+# and no lane record for their branch), issue-lane=19 (lane records whose issue
+# is closed), directive=111 (`.fleet/sent/` orders naming a closed issue).
+# Reclaimable with evidence on that day: 9 worktrees + 1 branch (content-landed).
+budget:
+  orphan-worktree: 55      # measured 44 + 11 churn headroom
+  orphan-branch: 95        # measured 85 + 10
+  orphan-pr: 20            # measured 11 + 9 (a wave of lanes opens PRs before `lane:` is composed, #1254)
+  orphan-issue-lane: 25    # measured 19 + 6
+  orphan-directive: 115    # measured 111 + 4
+measured:
+  host: ElevatedIQ-AK
+  date: "2026-09-18"
+expires: "2026-10-02"
+note: >-
+  Seeded from the first measured walk; the OWNER re-measures and approves these
+  numbers once (`sweep --orphans` on the shared checkout), then they only go down.
+  After `expires` the allowance is 0 and the walk reds on the first orphan.

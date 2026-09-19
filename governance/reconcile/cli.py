@@ -63,10 +63,12 @@ from governance.reconcile.heartbeat import (  # noqa: E402
     SHELVED,
     clear,
     judge,
+    lane_records_without_beat,
     list_sessions,
     read,
     stamp,
 )
+from governance.reconcile import orphans  # noqa: E402
 from governance.reconcile.sweep import (  # noqa: E402
     FAILED_OUTCOME,
     RepoOps,
@@ -175,14 +177,29 @@ def cmd_status(args: argparse.Namespace) -> int:
         )
     disk = audit(args.root, ops=RepoOps(args.root)) if args.disk else None
     live_rows = project_live(args.root) if getattr(args, "live", False) else None
-    orphans = [row for row in rows if row["status"] == ORPHAN]
-    summary = f"reconcile-status: {len(rows)} session(s), {len(orphans)} orphan(s)"
+    orphan_rows = [row for row in rows if row["status"] == ORPHAN]
+    # #917: `status` reads the SESSION plane; the LANE plane (`.fleet/lanes/`)
+    # is what the sweeper was blind to when it printed `0 session(s), 0
+    # orphan(s)` over 78 lane records. The two counts are printed side by side,
+    # and a lane record with no beat is said out loud — never folded into the
+    # session count as if it were live, never dropped as if it were absent.
+    lanes_total, lanes_unbeaten = lane_records_without_beat(args.root, {row["session_id"] for row in rows})
+    summary = (
+        f"reconcile-status: {len(rows)} session(s), {len(orphan_rows)} orphan(s); "
+        f"{lanes_total} lane record(s), {len(lanes_unbeaten)} without a session beat"
+    )
     if args.json:
         # Measured while adding --disk: this summary line used to follow the JSON
         # document on stdout, so `status --json` was not parseable as JSON at all.
         # stdout is now the document alone; the human line goes to stderr and the
         # counts are in the payload, so no information is lost either way.
-        payload: dict = {"sessions": rows, "session_count": len(rows), "orphan_count": len(orphans)}
+        payload: dict = {
+            "sessions": rows,
+            "session_count": len(rows),
+            "orphan_count": len(orphan_rows),
+            "lane_record_count": lanes_total,
+            "lane_records_without_beat": lanes_unbeaten,
+        }
         if disk is not None:
             payload["disk"] = disk.to_json()
         if live_rows is not None:
@@ -197,6 +214,14 @@ def cmd_status(args: argparse.Namespace) -> int:
         if live_rows is not None:
             print(describe_live(live_rows))
         print(summary)
+    if lanes_unbeaten:
+        print(
+            f"reconcile-status: NOTE — {len(lanes_unbeaten)} lane record(s) under .fleet/lanes carry no "
+            "session beat, so the session sweep cannot see them; the orphan walk "
+            "(`sweep --orphans`) classifies them by name: " + ", ".join(lanes_unbeaten[:8])
+            + (" …" if len(lanes_unbeaten) > 8 else ""),
+            file=sys.stderr,
+        )
     if disk is not None:
         # The disk audit reports; it never removes. Its refusal is named here in
         # the same words the audit uses, and its verdict is folded into the exit
@@ -222,7 +247,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             "disk disagree",
             file=sys.stderr,
         )
-    if orphans or (disk is not None and disk.unmatched) or drifted:
+    if orphan_rows or (disk is not None and disk.unmatched) or drifted:
         return EXIT_NOT_OK
     return EXIT_OK
 
@@ -253,6 +278,20 @@ def _cmd_status_prune_stale(args: argparse.Namespace) -> int:
     return EXIT_OK if verdict.ok else EXIT_NOT_OK
 
 
+def _orphan_walk(args: argparse.Namespace) -> "orphans.OrphanReport":
+    """The runtime-independent orphan walk (#1301 step 3), over the five
+    artifact kinds, against the declared budget. Reads files, git and the
+    board through the port; reclaims only a content-landed worktree or branch,
+    tip recorded first, and only under ``--apply``."""
+    budget, expired = orphans.load_budget(args.orphan_budget)
+    return orphans.walk(
+        orphans.RepoOrphanOps(args.root),
+        apply=args.apply,
+        budget=budget,
+        budget_expired=expired,
+    )
+
+
 def cmd_sweep(args: argparse.Namespace) -> int:
     report = sweep(
         args.root,
@@ -262,12 +301,28 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         reporter=_reporter(args.root),
         recheck=_recheck(args),
     )
+    orphan_report = _orphan_walk(args) if args.orphans else None
     if args.json:
-        print(json.dumps(report.to_json(), indent=2))
+        payload = report.to_json()
+        if orphan_report is not None:
+            payload["orphans"] = orphan_report.to_json()
+        print(json.dumps(payload, indent=2))
     else:
         print(describe(report))
         _print_board_reports(report.board_reports)
         _print_finding_states(report.finding_states)
+        if orphan_report is not None:
+            print(orphans.describe(orphan_report))
+    if orphan_report is not None:
+        # The walk's verdict is folded in before the session verdicts below:
+        # an unmeasured kind is CANNOT-ASSESS (never zero orphans), and a kind
+        # over its declared budget is NOT-OK by name.
+        if not orphan_report.assessable:
+            for kind, reason in orphan_report.unmeasured.items():
+                print(f"reconcile: CANNOT-ASSESS — {kind} could not be measured: {reason}", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+        for name in orphan_report.exceeded:
+            print(f"reconcile: NOT-OK — {name}", file=sys.stderr)
     if report.failed:
         print(f"reconcile: NOT-OK — {len(report.failed)} session(s) could not be reconciled", file=sys.stderr)
         return EXIT_NOT_OK
@@ -281,6 +336,8 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         print(f"reconcile: {len(report.shelved)} lane(s) shelved (unmerged work kept)", file=sys.stderr)
     if not args.apply and (report.reclaimed or report.parked or report.shelved):
         print("reconcile: NOT-OK — orphaned session(s) present; re-run with --apply", file=sys.stderr)
+        return EXIT_NOT_OK
+    if orphan_report is not None and orphan_report.exceeded:
         return EXIT_NOT_OK
     print("reconcile: OK")
     return EXIT_OK
@@ -429,6 +486,20 @@ def build_parser() -> argparse.ArgumentParser:
     sweep_cmd.add_argument("--ttl-minutes", type=float, default=DEFAULT_TTL_MINUTES)
     sweep_cmd.add_argument("--apply", action="store_true", help="act instead of planning")
     sweep_cmd.add_argument("--json", action="store_true")
+    sweep_cmd.add_argument(
+        "--orphans",
+        action="store_true",
+        help=(
+            "also walk every artifact kind (#1301): orphan-worktree / -branch / -pr / -issue-lane / "
+            "-directive, named and held to governance/reconcile/orphan-budget.yaml; reclaims only a "
+            "content-landed worktree or branch (tip recorded first) and only with --apply"
+        ),
+    )
+    sweep_cmd.add_argument(
+        "--orphan-budget",
+        default=str(ROOT / orphans.BUDGET_PATH),
+        help="the declared orphan budget the walk is held to (default: the repo's)",
+    )
     sweep_cmd.set_defaults(func=cmd_sweep)
 
     watch_cmd = sub.add_parser("watch", help="the reconciliation worker (daemon)")
