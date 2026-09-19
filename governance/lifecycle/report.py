@@ -18,6 +18,17 @@ The dedupe ledger is a JSON document keyed by fingerprint. A finding that is no
 longer unresolved (a shelved lane whose work landed) is dropped via ``resolve``:
 the entry is removed, so a genuinely new occurrence of the same violation files
 again rather than being silently swallowed.
+
+``resolve`` is the finding's **terminal move** (issue #1299), and it is held to
+the same two rules as ``report``: ``apply`` gates *every* write — the board
+comment or close AND the ledger save — and the move is terminal, so the board
+issue is closed (``close=True``), not merely commented, when the subject the
+finding names has itself closed. Measured before this rule: ``lifecycle audit``
+without ``--apply`` re-observed a ``VERIFY_EVIDENCE_MISSING`` finding for a
+closed subject, ``resolve`` popped the fingerprint and saved the ledger while
+skipping the comment, so the filed issue stayed open with no note and a genuine
+recurrence would file a second issue — a dry run that wrote, and a resolution
+that was not terminal.
 """
 
 from __future__ import annotations
@@ -70,6 +81,13 @@ class IssueFiler(Protocol):
 
     def comment(self, number: int, body: str) -> None:
         """Add a comment to an existing issue."""
+
+    def close(self, number: int, comment: str) -> None:
+        """Close an existing issue with ``comment`` as its closing evidence.
+
+        One call on purpose (issue #1299): a comment written first and a close
+        that then failed would leave an open issue whose text says it is resolved.
+        """
 
 
 class FindingLike(Protocol):
@@ -151,21 +169,39 @@ class BoardReporter:
         self._save(data)
         return BoardReport(key, FILED, number)
 
-    def resolve(self, key: str, *, comment: str = "", apply: bool = False) -> bool:
-        """Drop a finding from the ledger: it is no longer unresolved.
+    def resolve(
+        self, key: str, *, comment: str = "", apply: bool = False, close: bool = False
+    ) -> bool:
+        """The finding's terminal move: retire it from the ledger and from the board.
 
-        A comment is added to the filed issue only when ``apply`` is true (it is a
-        board write). The ledger entry is removed either way, so a genuinely new
-        occurrence of the same violation files again.
+        Returns whether an entry for ``key`` exists (and so was — or on a dry run,
+        would be — resolved). ``apply`` gates **every** write, the ledger save
+        included: a dry run reports and changes nothing, exactly as ``report``
+        does. Retiring the fingerprint without ``apply`` was measured to drop the
+        dedupe entry while the filed issue stayed open and uncommented (#1299) —
+        a genuine recurrence then filed a second issue beside the stale one.
+
+        ``close`` makes the move terminal on the board: the filed issue is closed
+        with ``comment`` as its closing evidence (one call, so a comment can never
+        outlive a failed close). Without it the issue is only commented, which is
+        what a caller wants when the finding is retired but the item it names is
+        still being driven elsewhere. The board write runs **before** the ledger
+        save, so a lost write keeps the fingerprint and the next pass retries it
+        rather than leaving an open issue nobody would look at again.
         """
         data = self._load()
-        entry = data.pop(key, None)
+        entry = data.get(key)
         if entry is None:
             return False
-        if apply and comment:
-            number = entry.get("number")
-            if number:
+        if not apply:
+            return True
+        number = entry.get("number")
+        if number:
+            if close:
+                self.filer.close(int(number), comment or _closing_comment(key))
+            elif comment:
                 self.filer.comment(int(number), comment)
+        data.pop(key, None)
         self._save(data)
         return True
 
@@ -202,13 +238,20 @@ def board_report_findings(
         key = finding_key(f"lifecycle:{code}", subject)
 
         if code in OPEN_ONLY_CODES and subject in closed_subjects:
+            # The terminal move (#1299): the finding resolves when its subject
+            # closes — the filed board issue is CLOSED with the measurement as
+            # evidence, under the same ``apply`` gate as every other board write.
             reporter.resolve(
                 key,
                 comment=(
                     f"obsolete-by-close: {subject} is closed, so this {code} finding is no "
-                    f"longer a live board item.\n\n- detail: {finding.detail}\n"
+                    f"longer a live board item.\n\n- detail: {finding.detail}\n\n"
+                    "Closed by `governance/lifecycle` (issue #1299): the fingerprint is "
+                    "retired from the dedupe ledger, so a genuine recurrence on a reopened "
+                    "item files afresh rather than being swallowed by this issue.\n"
                 ),
                 apply=apply,
+                close=True,
             )
             reports.append(BoardReport(key, OBSOLETE_BY_CLOSE))
             continue
@@ -227,6 +270,15 @@ def board_report_findings(
 
 def _with_marker(body: str, key: str) -> str:
     return f"{body}\n\n<!-- {MARKER_PREFIX}: {key} -->\n"
+
+
+def _closing_comment(key: str) -> str:
+    """The evidence a close carries when the caller supplied none (#1299)."""
+    return (
+        f"Resolved: the finding `{key}` is no longer unresolved, and its fingerprint is "
+        "retired from the dedupe ledger so a genuine recurrence files afresh.\n\n"
+        "Closed by `governance/lifecycle` (issue #1299).\n"
+    )
 
 
 def _finding_body(finding: FindingLike) -> str:
@@ -272,6 +324,18 @@ class GhFiler:
         if result.returncode != 0:
             raise RuntimeError(
                 f"gh issue comment failed ({result.returncode}): "
+                f"{(result.stderr or result.stdout).strip()[-200:]}"
+            )
+
+    def close(self, number: int, comment: str) -> None:
+        """``gh issue close --comment``: one call, so the comment cannot outlive a
+        failed close (#1299) — the same shape ``governance/reconcile/findings.py``'s
+        ``GhCloser`` uses, so the two terminal moves cannot drift apart."""
+        cmd = self._args(["gh", "issue", "close", str(number), "--comment", comment])
+        result = self._run(cmd)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"gh issue close failed ({result.returncode}): "
                 f"{(result.stderr or result.stdout).strip()[-200:]}"
             )
 

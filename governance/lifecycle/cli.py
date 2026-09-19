@@ -1325,6 +1325,35 @@ class GhOps:
         return item
 
 
+def _retire_cleared_findings(record: dict, quarantine, *, apply: bool, quiet: bool) -> None:
+    """The audit's own terminal move for a finding it FILED earlier (#1299).
+
+    A finding is filed when the audit charges it and — until this step — had no
+    mechanised way back: ``BoardReporter.resolve`` existed and nothing in this
+    command called it, so a ``[lifecycle] VERIFY_EVIDENCE_MISSING`` issue outlived
+    the invariant it named and its fingerprint kept a genuine recurrence deduped.
+    The re-measurement is ``governance/reconcile/findings.recheck_findings`` — the
+    same function the scheduled reconcile pass runs — over the SAME record this
+    audit just read, so the two can never disagree about what is still owed; the
+    board write is the reporter's own filer, ``--apply``-gated like every other.
+    A recheck that cannot run is named, never a crash of the audit that owns it.
+    """
+    from governance.reconcile.findings import recheck_findings  # noqa: PLC0415 - keeps the CLI import-light
+
+    reporter = _reporter()
+    try:
+        states = recheck_findings(
+            reporter, root=ROOT, apply=apply, record=record, quarantine=quarantine, closer=reporter.filer
+        )
+    except Exception as exc:  # noqa: BLE001 - the recheck is data, not the audit's crash
+        print(f"finding: unmeasured — the filed-finding recheck did not run: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return
+    if quiet:
+        return
+    for state in states:
+        print(f"finding: {state.outcome:<14} {state.key} — {state.detail}")
+
+
 def cmd_audit(args: argparse.Namespace) -> int:
     record = json.loads(Path(args.record).read_text(encoding="utf-8")) if args.record else collect_from_github()
     quarantine = load_quarantine(read_baseline(args.baseline))
@@ -1337,6 +1366,10 @@ def cmd_audit(args: argparse.Namespace) -> int:
         for finding in report["findings"]:
             print(f"  {finding['code']:<26} {finding['subject']:<8} {finding['detail']}")
             print(f"    -> {finding['remediation']}")
+    # #1299: a finding filed by an earlier pass whose invariant is no longer
+    # charged reaches its terminal state HERE, on the hygienic path included —
+    # a clean audit is exactly when every filed finding has cleared.
+    _retire_cleared_findings(record, quarantine, apply=args.apply, quiet=args.json)
     if report["hygienic"]:
         print(f"lifecycle-hygiene: OK ({report['items']} item(s), 0 finding(s))")
         return EXIT_OK

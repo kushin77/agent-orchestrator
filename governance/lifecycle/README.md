@@ -651,4 +651,18 @@ named violation and its remediation (`report.py`, issue #321).
   prints `board: dry-run — would file for …`.
 - **Offline-testable.** The board effects are an injected port, exercised by
   `governance/lifecycle/tests/test_boardreport.py` with no network.
+- **Terminal (issue #1299).** A filed finding has one way back, and it is
+  mechanised: `BoardReporter.resolve(key, comment=…, apply=…, close=True)` closes
+  the board issue with the measurement as evidence and only then retires the
+  fingerprint, so a genuine recurrence files afresh. Two callers drive it:
+  `board_report_findings` when a finding's subject has itself closed
+  (`obsolete-by-close`, #1266), and `cli.py audit` on **every** pass — the
+  hygienic one included — through `governance/reconcile/findings.recheck_findings`
+  over the same record the audit just read (`finding: would-resolve …` on a dry
+  run, `finding: resolved …` under `--apply`). `apply` gates every write, the
+  ledger save included: measured before this rule, a dry-run audit popped the
+  fingerprint and saved the ledger while skipping the board write, so the issue
+  stayed open and uncommented and the dedupe entry was gone — a dry run that
+  wrote. The board write runs before the ledger save, so a lost close keeps the
+  fingerprint and the next pass retries it.
 
