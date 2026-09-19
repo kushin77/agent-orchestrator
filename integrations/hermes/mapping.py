@@ -34,6 +34,19 @@ from .._seam.yaml_subset import load_yaml, load_yaml_file  # noqa: F401
 from . import audit as audit_mod
 from . import policy as policy_mod
 
+# governance/spawn/tiering is the tier-PARITY consumer hook (issue #1274): the
+# same gateway/finops/tiers.yaml window that judges a fleet or Claude subagent
+# spawn also judges a hermes persona's assigned tier, so a persona cannot carry
+# a tier the table forbids for its capability's task class. This module only
+# exposes the check to callers of this mapping (``judge_persona_tier`` below);
+# it is NOT wired into ``build_projection`` or the render path
+# (``governance/spawn/render.py`` is owned by another lane this wave — see the
+# PR's "Wiring needed" section).
+try:  # pragma: no cover - import guarded so a missing sibling can't be silent
+    from governance.spawn import tiering as tiering_mod
+except ImportError:  # pragma: no cover
+    tiering_mod = None  # type: ignore[assignment]
+
 #: The frozen source files the projection reads (hermes's declared surface).
 PERSONA_PATH = "registry/personas/cards/hermes.yaml"
 PROFILE_PATH = "registry/profiles/seeds/hermes.1.0.0.yaml"
@@ -267,6 +280,25 @@ def build_projection(root: Path) -> Dict[str, Any]:
             "role": "namesake inference endpoint (excluded from the routing contract)",
         },
     }
+
+
+def judge_persona_tier(capability: str, tier: str):
+    """Tier-parity consumer hook (issue #1274).
+
+    Judges a hermes persona's assigned ``tier`` for one ``capability`` against
+    the SAME ``gateway/finops/tiers.yaml`` window the fleet and Claude
+    subagent spawn paths are judged against (``governance.spawn.tiering``).
+    Returns the ``tiering.Judgment`` (``.allowed`` / ``.finding`` /
+    ``str(judgment)`` carrying ``FINOPS-ROLE-NOT-ALLOWED`` on refusal).
+
+    Raises ``RuntimeError`` if ``governance.spawn.tiering`` cannot be
+    imported (a packaging problem, not a tiering verdict — callers should not
+    treat that as "allowed"). Callers own wiring this into an actual gate;
+    this function only exposes the check.
+    """
+    if tiering_mod is None:
+        raise RuntimeError("governance.spawn.tiering is not importable")
+    return tiering_mod.judge("hermes-persona", capability, tier)
 
 
 def canonical_document(projection: Dict[str, Any]) -> str:

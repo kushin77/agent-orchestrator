@@ -1,0 +1,60 @@
+# registry/service/actors.yaml — declared actor -> identity map (issue #1275)
+#
+# One identity per actor across GitHub, the mailbox, paperclip and hermes.
+# Every actor string seen in a PR author, a directive sender, an approval
+# signer or a heartbeat source MUST resolve to exactly one record here, or
+# `resolve_actor()` fails closed with `actor-unresolved:<string>`.
+#
+# A record may declare `delegatesTo: <identity>` when one actor acts on
+# another's behalf (e.g. a build service account delegating to the runner
+# that actually executes). An undeclared delegation (an actor claiming to act
+# for a target not listed here) is refused as
+# `delegation-undeclared:<actor>-><target>`.
+identities:
+  kushin77:
+    kind: human
+    aliases: [kushin77]
+
+  github-actions[bot]:
+    kind: ci
+    aliases: ["github-actions[bot]"]
+
+  claude-session:
+    kind: runtime
+    aliases: [claude-session]
+
+  claude-subagent:
+    kind: runtime
+    aliases: [claude-subagent]
+
+  deepseek-sister:
+    kind: runtime
+    aliases: [deepseek-sister]
+
+  deepseek-executor:
+    kind: runtime
+    aliases: [deepseek-executor]
+
+  copilot-agent:
+    kind: runtime
+    aliases: [copilot-agent]
+
+  hermes:
+    kind: runtime
+    aliases: [hermes]
+
+  paperclip:
+    kind: runtime
+    aliases: [paperclip]
+
+  # Example declared delegation chain (extend per real cloud-build/tf-runner
+  # pairs as they appear in PRs/directives; unknown pairs stay unresolved).
+  cloud-build-purebliss-api@example.iam.gserviceaccount.com:
+    kind: service-account
+    aliases:
+      - "cloud-build-purebliss-api@example.iam.gserviceaccount.com"
+    delegatesTo: tf-runner-purebliss-api
+
+  tf-runner-purebliss-api:
+    kind: runtime
+    aliases: [tf-runner-purebliss-api]

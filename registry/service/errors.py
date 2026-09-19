@@ -137,3 +137,32 @@ class SessionExpiredError(InvalidCredentialError):
 
 class ToolNotAllowedError(IdentityError):
     """The requested tool is not in the session's scoped allowed-tool set."""
+
+
+# -- actor identity resolution (issue #1275) ------------------------------- #
+class ActorResolutionError(IdentityError):
+    """Base for actor-string resolution errors."""
+
+
+class ActorUnresolvedError(ActorResolutionError):
+    """An actor string does not match any declared identity record.
+
+    Raised as ``actor-unresolved:<string>`` per the fail-closed doctrine: an
+    actor seen in a PR, directive, approval or heartbeat that is not in
+    ``registry/service/actors.yaml`` is refused, never guessed at.
+    """
+
+    def __init__(self, actor: str) -> None:
+        self.actor = actor
+        super().__init__(f"actor-unresolved:{actor}")
+
+
+class DelegationUndeclaredError(ActorResolutionError):
+    """An actor delegates to another actor, but the chain is not declared."""
+
+    def __init__(self, actor: str, target: str) -> None:
+        self.actor = actor
+        self.target = target
+        super().__init__(
+            f"delegation-undeclared:{actor}->{target}"
+        )

@@ -157,6 +157,25 @@ make verify   # repo gate must stay green (YAML/JSON parse, docs, markers, secre
   audit log (tamper detection) that every registry operation writes to.
 - `make verify` → green.
 
+## Actor identity resolution (issue #1275)
+
+Every actor string that shows up in a PR author, a directive sender, an
+approval signer or a heartbeat source — across GitHub, the mailbox, paperclip
+and hermes — resolves to exactly one declared identity record via
+`resolve_actor()` (`registry/service/identity.py`), backed by the closed
+alias map in `registry/service/actors.yaml` (which also declares delegation
+chains, e.g. a cloud-build service account delegating to its tf-runner). An
+undeclared actor string fails closed as `actor-unresolved:<string>`; a
+delegation whose target is not itself declared fails as
+`delegation-undeclared:<actor>-><target>`.
+`scripts/check-agent-identity-parity.sh` walks the last N records of each
+kind (read-only, via `gh`/`.fleet/*`) and calls `resolve_actor()` on every one
+it finds, naming a missing source CANNOT-ASSESS rather than failing on it.
+`resolve_actor()` is the function other lanes (`fleet/channel.py`,
+`governance/spawn/render.py`, the paperclip approvals adapters) should call
+at their own actor-identification points — wiring those call sites is a
+follow-up, not part of this change.
+
 ## Provenance (cannibalized and adapted)
 
 Adapted from the sources indexed in

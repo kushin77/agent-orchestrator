@@ -86,7 +86,7 @@ ROOT = lifecycle_root()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from governance.lifecycle import directive, gate, ledger, live  # noqa: E402
+from governance.lifecycle import directive, gate, lane_closeout, ledger, live  # noqa: E402
 from governance.lifecycle.audit import audit, hygiene, in_scope, load_quarantine  # noqa: E402
 from governance.lifecycle.closeout import CloseOutResult, closeout, describe  # noqa: E402
 from governance.lifecycle.model import STAGES, stage_of  # noqa: E402
@@ -1325,6 +1325,35 @@ class GhOps:
         return item
 
 
+def _retire_cleared_findings(record: dict, quarantine, *, apply: bool, quiet: bool) -> None:
+    """The audit's own terminal move for a finding it FILED earlier (#1299).
+
+    A finding is filed when the audit charges it and — until this step — had no
+    mechanised way back: ``BoardReporter.resolve`` existed and nothing in this
+    command called it, so a ``[lifecycle] VERIFY_EVIDENCE_MISSING`` issue outlived
+    the invariant it named and its fingerprint kept a genuine recurrence deduped.
+    The re-measurement is ``governance/reconcile/findings.recheck_findings`` — the
+    same function the scheduled reconcile pass runs — over the SAME record this
+    audit just read, so the two can never disagree about what is still owed; the
+    board write is the reporter's own filer, ``--apply``-gated like every other.
+    A recheck that cannot run is named, never a crash of the audit that owns it.
+    """
+    from governance.reconcile.findings import recheck_findings  # noqa: PLC0415 - keeps the CLI import-light
+
+    reporter = _reporter()
+    try:
+        states = recheck_findings(
+            reporter, root=ROOT, apply=apply, record=record, quarantine=quarantine, closer=reporter.filer
+        )
+    except Exception as exc:  # noqa: BLE001 - the recheck is data, not the audit's crash
+        print(f"finding: unmeasured — the filed-finding recheck did not run: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return
+    if quiet:
+        return
+    for state in states:
+        print(f"finding: {state.outcome:<14} {state.key} — {state.detail}")
+
+
 def cmd_audit(args: argparse.Namespace) -> int:
     record = json.loads(Path(args.record).read_text(encoding="utf-8")) if args.record else collect_from_github()
     quarantine = load_quarantine(read_baseline(args.baseline))
@@ -1337,6 +1366,10 @@ def cmd_audit(args: argparse.Namespace) -> int:
         for finding in report["findings"]:
             print(f"  {finding['code']:<26} {finding['subject']:<8} {finding['detail']}")
             print(f"    -> {finding['remediation']}")
+    # #1299: a finding filed by an earlier pass whose invariant is no longer
+    # charged reaches its terminal state HERE, on the hygienic path included —
+    # a clean audit is exactly when every filed finding has cleared.
+    _retire_cleared_findings(record, quarantine, apply=args.apply, quiet=args.json)
     if report["hygienic"]:
         print(f"lifecycle-hygiene: OK ({report['items']} item(s), 0 finding(s))")
         return EXIT_OK
@@ -1376,6 +1409,176 @@ def cmd_status(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+class RepoLaneOps:
+    """The real effects and reads the LANE close-out needs (#1301), over this
+    checkout's git, ``gh``, and the runtime state under ``ROOT``.
+
+    Every read that can fail for a reason that is not evidence — ``gh`` absent
+    or unauthenticated, the trailer predicate unable to run — raises
+    :class:`lane_closeout.LaneUnavailable`, so the verb reports CANNOT-ASSESS
+    instead of a refusal nobody measured.
+    """
+
+    def __init__(self, root: Path | None = None) -> None:
+        self.root = root or ROOT
+
+    def _git(self, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", "-C", str(self.root), *args], capture_output=True, text=True)
+
+    def _gh_json(self, args: list[str]):
+        try:
+            result = subprocess.run(["gh", *args], cwd=str(self.root), capture_output=True, text=True, timeout=120)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise lane_closeout.LaneUnavailable(f"gh could not be run: {exc}") from exc
+        if result.returncode != 0:
+            raise lane_closeout.LaneUnavailable(f"gh {' '.join(args[:2])} failed: {(result.stderr or result.stdout).strip()[-200:]}")
+        try:
+            return json.loads(result.stdout or "null")
+        except json.JSONDecodeError as exc:
+            raise lane_closeout.LaneUnavailable(f"gh {' '.join(args[:2])} returned unreadable JSON") from exc
+
+    def pull_request_for(self, branch: str) -> lane_closeout.PullRequest | None:
+        rows = self._gh_json(["pr", "list", "--head", branch, "--state", "all", "--limit", "20",
+                              "--json", "number,state,mergeCommit,mergedAt"]) or []
+        merged = [row for row in rows if str(row.get("state") or "").upper() == "MERGED"]
+        chosen = merged[0] if merged else (rows[0] if rows else None)
+        if chosen is None:
+            return None
+        merge_commit = str(((chosen.get("mergeCommit") or {}) if isinstance(chosen.get("mergeCommit"), dict) else {}).get("oid") or "")
+        return lane_closeout.PullRequest(int(chosen["number"]), str(chosen.get("state") or "").lower(), merge_commit)
+
+    def trailer_finding(self, sha: str) -> str | None:
+        from governance.isolation.trailer import PredicateUnavailable, classify_commit  # noqa: PLC0415
+
+        if self._git("rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}").returncode != 0:
+            self._git("fetch", "-q", "origin", "master")
+        try:
+            return classify_commit(self.root, sha)
+        except PredicateUnavailable as exc:
+            raise lane_closeout.LaneUnavailable(f"the trailer predicate could not classify {sha[:12]}: {exc}") from exc
+
+    def issue_state(self, issue: int) -> str:
+        payload = self._gh_json(["issue", "view", str(issue), "--json", "state"]) or {}
+        return str(payload.get("state") or "").lower()
+
+    def local_tip(self, branch: str) -> str:
+        result = self._git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}")
+        return result.stdout.strip() if result.returncode == 0 else ""
+
+    def remote_tip(self, branch: str) -> str:
+        result = self._git("ls-remote", "--heads", "origin", branch)
+        if result.returncode != 0:
+            raise lane_closeout.LaneUnavailable(f"origin could not be read for {branch}: {result.stderr.strip()[-200:]}")
+        line = result.stdout.strip().splitlines()
+        return line[0].split()[0] if line else ""
+
+    def content_landed(self, ref: str) -> bool:
+        from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415
+
+        return isolation_worktree.content_landed(self.root, ref, "origin/master")
+
+    def record_reaped(self, *, branch: str, head_sha: str, worktree: str, reason: str) -> None:
+        from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415
+
+        isolation_worktree.record_reaped(self.root, branch=branch, head_sha=head_sha, worktree=worktree, reason=reason)
+
+    def delete_local_branch(self, branch: str) -> str:
+        result = self._git("branch", "-D", branch)
+        if result.returncode != 0:
+            raise RuntimeError(f"git branch -D {branch}: {result.stderr.strip()[-200:]}")
+        return f"deleted local {branch}"
+
+    def delete_remote_branch(self, branch: str) -> str:
+        result = self._git("push", "origin", "--delete", branch)
+        if result.returncode != 0 and "remote ref does not exist" not in (result.stderr or ""):
+            raise RuntimeError(f"git push origin --delete {branch}: {result.stderr.strip()[-200:]}")
+        return f"deleted origin/{branch}"
+
+    def worktree_present(self, path: str) -> bool:
+        return bool(path) and Path(path).exists()
+
+    def foreign_dirt(self, path: str) -> list[str]:
+        from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415
+
+        return isolation_worktree.foreign_uncommitted(path)
+
+    def machine_dirt(self, path: str) -> list[str]:
+        from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415
+
+        return isolation_worktree.machine_managed_uncommitted(path)
+
+    def remove_worktree(self, path: str) -> str:
+        result = self._git("worktree", "remove", "--force", path)
+        if result.returncode != 0:
+            raise RuntimeError(f"git worktree remove {path}: {result.stderr.strip()[-200:]}")
+        return f"removed {path}"
+
+    def gate_tails(self, issue: int, lane: str) -> dict:
+        path = self.root / ".fleet" / "lane-records" / str(issue) / f"{lane}.result.json"
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        tails = payload.get("gate_tails") if isinstance(payload, dict) else None
+        return dict(tails) if isinstance(tails, dict) else {}
+
+    def archive(self, lane_id: str, bundle: dict) -> str:
+        return str(lane_closeout.write_archive(self.root, lane_id, bundle))
+
+    def forget_lane(self, lane_id: str) -> None:
+        (self.root / ".fleet" / "lanes" / f"{lane_id}.json").unlink(missing_ok=True)
+
+    def clear_session(self, lane_id: str) -> None:
+        from governance.reconcile import heartbeat  # noqa: PLC0415
+
+        heartbeat.clear(lane_id, self.root)
+
+
+def _lane_record(lane_id: str, root: Path | None = None) -> dict | None:
+    path = (root or ROOT) / ".fleet" / "lanes" / f"{lane_id}.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def cmd_close_lane(args: argparse.Namespace) -> int:
+    """``close --lane <id>``: the lane's terminal verb (#1301).
+
+    A flag on ``close`` rather than a verb of its own, for the reason
+    ``governance/reconcile/cli.py`` gives for ``status --disk``: a new CLI verb is
+    a control-plane surface change (`control-plane/control/verbs.yaml`), and that
+    contract is not this lane's to edit. Exit: 0 when every step is evidenced (or
+    planned, on a dry run), 1 when a step is ``closeout-blocked``, 2 when a source
+    could not be read.
+    """
+    record = _lane_record(args.lane)
+    if record is None:
+        print(f"close: CANNOT-ASSESS — no lane record {args.lane} under {ROOT / '.fleet' / 'lanes'}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    try:
+        result = lane_closeout.closeout_lane(record, RepoLaneOps(ROOT), apply=args.apply)
+    except lane_closeout.LaneUnavailable as exc:
+        print(f"close: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    if args.json:
+        print(json.dumps(result.to_json(), indent=2))
+    else:
+        print(lane_closeout.describe(result))
+    ledger.record_decision(
+        ROOT,
+        action="close-lane",
+        subject=f"#{result.issue}",
+        outcome=ledger.OUTCOME_OK if result.ok else ledger.OUTCOME_REFUSED,
+        detail=lane_closeout.describe(result),
+        code=result.blocked[0] if result.blocked else "",
+    )
+    return EXIT_OK if result.ok else EXIT_NOT_OK
+
+
 def cmd_close(args: argparse.Namespace) -> int:
     """Drive an item to hygiene; the verdict decides the exit code.
 
@@ -1383,6 +1586,11 @@ def cmd_close(args: argparse.Namespace) -> int:
     broken, and CANNOT-ASSESS (2) when nothing is known broken but something could
     not be measured — a parked verification is the case this exists for (#840).
     """
+    if getattr(args, "lane", ""):
+        return cmd_close_lane(args)
+    if args.issue is None:
+        print("close: CANNOT-ASSESS — pass --issue <n> or --lane <id>", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
     record = collect_from_github()
     item = next((entry for entry in record["items"] if entry["issue"] == args.issue), None)
     if item is None:
@@ -1541,7 +1749,18 @@ def build_parser() -> argparse.ArgumentParser:
     status_cmd.set_defaults(func=cmd_status)
 
     close_cmd = sub.add_parser("close", help="drive one item to hygiene, in dependency order")
-    close_cmd.add_argument("--issue", type=int, required=True)
+    close_cmd.add_argument("--issue", type=int, default=None, help="the item to close out (required unless --lane is given)")
+    close_cmd.add_argument(
+        "--lane",
+        default="",
+        help=(
+            "the LANE's terminal verb (#1301): verify PR merged + trailer clean, issue closed, then reap the "
+            "branch (tips recorded first, content-landed only), remove the worktree (machine-managed dirt only) "
+            "and archive the lane to .fleet/lifecycle/lanes/<lane>.json; any step it cannot evidence stays "
+            "open as closeout-blocked:<step>. Dry-run unless --apply"
+        ),
+    )
+    close_cmd.add_argument("--json", action="store_true", help="with --lane: print the close-out as JSON")
     close_cmd.add_argument("--evidence", default="", help="the evidence to record when closing")
     close_cmd.add_argument("--apply", action="store_true", help="file remaining findings on the board (default: dry-run)")
     close_cmd.set_defaults(func=cmd_close)

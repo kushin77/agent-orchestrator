@@ -76,6 +76,40 @@ pre-close item would report a fully successful close as NOT-OK — the inverse o
 the false green this module exists to prevent, and a bug the third end-to-end run
 caught.
 
+### 3.0 The lane's close-out — `close --lane <id>` (issue #1301)
+
+The steps above are the **item's**. The lane's is the one terminal verb for
+every artifact a lane bound at creation, whatever runtime opened it:
+
+```bash
+python3 governance/lifecycle/cli.py close --lane <lane_id>            # dry run: evidence + plan
+python3 governance/lifecycle/cli.py close --lane <lane_id> --apply    # retire the artifacts
+```
+
+`governance/lifecycle/lane_closeout.py` verifies, in order, `pr-merged` (a PR
+for the lane branch is MERGED and its landing classifies clean under the shared
+trailer predicate), `issue-closed`, then acts: `branch-reaped` (local + remote,
+each tip recorded to `.fleet/reaped-branches.jsonl` **first** and only when
+content-landed — `governance/isolation/worktree.content_landed`, #1335),
+`worktree-removed` (machine-managed dirt only, #1285/#834), `lane-archived`
+(the record, the evidence bundle — PR, landing SHA, reaped tips, the lane
+result's `gate_tails` (#1270) — to `.fleet/lifecycle/lanes/<lane_id>.json`;
+the live record and the session beat are removed). Any step it cannot evidence
+stays open and names itself — `closeout-blocked:pr-merged`, `:issue-closed`,
+`:branch-reaped`, `:worktree-removed` — and every step after it is **withheld**:
+a branch is never reaped for an unmerged PR, a worktree never removed over the
+lane's own uncommitted work, an unlanded tip never deleted. It reads only
+files, git and the board, so a lane opened by DeepSeek is closed by a Claude
+session and a dead runtime's lanes are still closable. A flag on `close`
+rather than a verb of its own because a new verb is a control-plane surface
+change (`control-plane/control/verbs.yaml`), the same reason
+`governance/reconcile/cli.py status --disk` gives. The archive lives in a
+subdirectory because `governance/reconcile/audit.py::landed_issues` reads every
+`.fleet/lifecycle/*.json` as an issue journal and refuses a non-numeric stem.
+Gate: `scripts/check-lifecycle-closeout.sh` — every refusal on an injected
+port, and a real scratch repository where a squash-landed lane is reaped for
+real and an unlanded one survives `--apply` by name.
+
 ### 3.1 The directive's terminal move
 
 Step 4 is owned **here**, not delegated to a mailbox CLI. A brain-minted
@@ -651,4 +685,18 @@ named violation and its remediation (`report.py`, issue #321).
   prints `board: dry-run — would file for …`.
 - **Offline-testable.** The board effects are an injected port, exercised by
   `governance/lifecycle/tests/test_boardreport.py` with no network.
+- **Terminal (issue #1299).** A filed finding has one way back, and it is
+  mechanised: `BoardReporter.resolve(key, comment=…, apply=…, close=True)` closes
+  the board issue with the measurement as evidence and only then retires the
+  fingerprint, so a genuine recurrence files afresh. Two callers drive it:
+  `board_report_findings` when a finding's subject has itself closed
+  (`obsolete-by-close`, #1266), and `cli.py audit` on **every** pass — the
+  hygienic one included — through `governance/reconcile/findings.recheck_findings`
+  over the same record the audit just read (`finding: would-resolve …` on a dry
+  run, `finding: resolved …` under `--apply`). `apply` gates every write, the
+  ledger save included: measured before this rule, a dry-run audit popped the
+  fingerprint and saved the ledger while skipping the board write, so the issue
+  stayed open and uncommented and the dedupe entry was gone — a dry run that
+  wrote. The board write runs before the ledger save, so a lost close keeps the
+  fingerprint and the next pass retries it.
 

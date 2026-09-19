@@ -167,6 +167,17 @@ pre-existing-red checks are unaffected and keep enforcing unconditionally.
 Enforcement flips in a later PR, once every open PR carries the block —
 flipping it early would red every PR opened before this one merged.
 
+The same warn-only classification block also carries two lessons from the
+2026-09-18 PR wave (governance/lessons ledger `RCA-0020`): `duplicate-pr-for-
+issue:<n>` — the PR's `Closes`/`Refs` trailer or `issue-<n>` head branch
+resolves to an issue another OPEN PR already resolves (`gh pr list` live, or
+`AO_PR_CONTRACT_OPEN_PRS_JSON` for a fixture), naming both so neither wins a
+silent race; and `review-required-for-semantic-merge:<sha>` — a merge commit
+in the PR's own range that changed more than 200 lines (`git show --shortstat`)
+must be matched by a non-empty `## Review` section in the body naming the
+reviewer's verdict. Both are provoked, with a positive and a negative control,
+by `scripts/check-pr-contract.sh --self-test`.
+
 `python3 governance/tagging/cli.py pr-labels --pr N` derives the
 `class:`/`posture:`/`lifecycle:`/`pillar:` labels the block implies; `--apply`
 sets them on the PR via `gh`. A hand-applied label that disagrees with the
@@ -178,3 +189,12 @@ Self-test both gates directly:
 bash scripts/check-pr-contract.sh --selftest
 python3 -m pytest governance/tagging/tests -k pr_labels
 ```
+
+**Wired into the runner (issue #1341).** `scripts/verify.sh` is discovered by
+`scripts/check-pr-contract.sh` (a plain `scripts/check-*.sh`) already; a local
+`make verify` sets no PR context, so the check answers its own rc 2
+`pr-context-missing` there — a SKIP, never a fail. On the Cloud Build verify
+trigger (`infra/cloudbuild/verify.yaml`), the runner's own `$_PR_NUMBER`
+substitution is exported as `AO_PR_NUMBER`, and `scripts/verify.sh` forwards it
+to `PR_NUMBER` before the discovered checks run — so on a PR build the gate
+runs with real PR context (still warn-only, per the enforcement flag above).

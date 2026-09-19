@@ -54,6 +54,18 @@ refusals:
 # ---------------------------------------------------------------------------
 # The verbs.
 # ---------------------------------------------------------------------------
+# allowed_runtimes  the closed set of runtime ids permitted to invoke this verb
+#              (issue #1273, parent #1268). The vocabulary is the seven ids
+#              fleet/runtimes.yaml declares: claude-session, claude-subagent,
+#              deepseek-sister, deepseek-executor, copilot-agent, hermes,
+#              paperclip. `fleet/channel.py::validate` and the Claude
+#              subagent-dispatch wrapper (`governance/spawn/render.py`) refuse a
+#              directive/spawn naming a verb outside its sender runtime's list,
+#              by name (`verb-not-allowed:<runtime>:<verb>`) — a runtime cannot
+#              launder a denied verb through another runtime's session
+#              (`laundering:<runtime>:<verb>`). This is additive on top of
+#              `capability` (identity/rbac); a runtime still needs the
+#              capability AND to be in this list.
 # capability   the identity/rbac capability the caller must hold (ADR-0025 D2);
 #              the scope gate is applied first, per call.
 # audit        the action name recorded on the EXISTING rails
@@ -69,6 +81,7 @@ verbs:
     source: fleet/control.py
     local: status
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -79,6 +92,7 @@ verbs:
     source: fleet/control.py
     local: health
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -89,6 +103,7 @@ verbs:
     source: control-plane/control/verbs.yaml
     local: verbs
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -103,6 +118,7 @@ verbs:
     source: fleet/control.py
     local: debug
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -114,6 +130,7 @@ verbs:
     source: fleet/control.py
     local: watch
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -125,6 +142,7 @@ verbs:
     source: fleet/control.py
     local: cron
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -135,6 +153,7 @@ verbs:
     source: fleet/control.py
     local: live
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -150,6 +169,7 @@ verbs:
     source: fleet/control.py
     local: attach
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -165,6 +185,7 @@ verbs:
     source: fleet/control.py
     local: start
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.start
     idempotent: true
@@ -175,6 +196,7 @@ verbs:
     source: fleet/control.py
     local: pause
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.pause
     idempotent: true
@@ -185,6 +207,7 @@ verbs:
     source: fleet/control.py
     local: resume
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.resume
     idempotent: true
@@ -195,6 +218,7 @@ verbs:
     source: fleet/control.py
     local: restart
     effect_class: stop
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.restart
     idempotent: false
@@ -205,6 +229,7 @@ verbs:
     source: fleet/control.py
     local: stop
     effect_class: stop
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.stop
     idempotent: true
@@ -215,6 +240,7 @@ verbs:
     source: fleet/control.py
     local: kill
     effect_class: stop
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.kill
     idempotent: true
@@ -230,6 +256,7 @@ verbs:
     source: fleet/control.py
     local: halt
     effect_class: stop
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.halt
     idempotent: true
@@ -242,6 +269,7 @@ verbs:
     source: fleet/control.py
     local: refresh
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.refresh
     idempotent: true
@@ -252,6 +280,7 @@ verbs:
     source: fleet/control.py
     local: update
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.update
     idempotent: true
@@ -262,6 +291,7 @@ verbs:
     source: fleet/control.py
     local: poke
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:operate
     audit: fleet.poke
     idempotent: true
@@ -272,6 +302,7 @@ verbs:
     source: fleet/control.py
     local: override
     effect_class: irreversible
+    allowed_runtimes: [claude-session, claude-subagent]
     capability: fleet:override
     audit: fleet.override
     idempotent: false
@@ -288,6 +319,7 @@ verbs:
     source: fleet/control.py
     local: drop
     effect_class: irreversible
+    allowed_runtimes: [claude-session, claude-subagent]
     capability: fleet:operate
     audit: fleet.drop
     idempotent: true
@@ -308,6 +340,7 @@ verbs:
     source: fleet/control.py
     local: dead-letter
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -323,6 +356,7 @@ verbs:
     source: fleet/channel.py
     local: verify
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -334,6 +368,7 @@ verbs:
     source: fleet/channel.py
     local: status
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -344,6 +379,7 @@ verbs:
     source: fleet/channel.py
     local: send
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:steer
     audit: channel.send
     idempotent: false
@@ -354,6 +390,7 @@ verbs:
     source: fleet/channel.py
     local: order
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:steer
     audit: channel.order
     idempotent: false
@@ -365,6 +402,7 @@ verbs:
     source: fleet/channel.py
     local: escalate
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:steer
     audit: channel.escalate
     idempotent: false
@@ -375,6 +413,7 @@ verbs:
     source: fleet/channel.py
     local: report
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:steer
     audit: channel.report
     idempotent: false
@@ -386,6 +425,7 @@ verbs:
     source: fleet/channel.py
     local: wait
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -397,6 +437,7 @@ verbs:
     source: fleet/channel.py
     local: watch
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -408,6 +449,7 @@ verbs:
     source: fleet/channel.py
     local: listen
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -418,6 +460,7 @@ verbs:
     source: fleet/channel.py
     local: brain-inbox
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -429,6 +472,7 @@ verbs:
     source: fleet/channel.py
     local: brain-outbox
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -439,6 +483,7 @@ verbs:
     source: fleet/channel.py
     local: head-commit
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -450,6 +495,7 @@ verbs:
     source: fleet/channel.py
     local: consume
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:steer
     audit: channel.consume
     idempotent: true
@@ -461,6 +507,7 @@ verbs:
     source: fleet/channel.py
     local: log
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -472,6 +519,7 @@ verbs:
     source: fleet/channel.py
     local: follow
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -483,6 +531,7 @@ verbs:
     source: fleet/channel.py
     local: kb
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -494,6 +543,7 @@ verbs:
     source: fleet/channel.py
     local: steer
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:steer
     audit: channel.steer
     idempotent: false
@@ -506,6 +556,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: status
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -516,6 +567,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: held
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -526,6 +578,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: eligible
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -536,6 +589,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: audit
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -546,6 +600,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: liveness
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -561,6 +616,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: dangling
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -575,6 +631,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: focus
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -586,6 +643,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: pool
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -601,6 +659,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: claim
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: board:claim
     audit: board.claim
     idempotent: true
@@ -611,6 +670,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: dispatch
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -622,6 +682,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: release
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: board:claim
     audit: board.release
     idempotent: true
@@ -632,6 +693,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: reap
     effect_class: stop
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: board:admin
     audit: board.reap
     idempotent: true
@@ -643,6 +705,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: snapshot
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: board:admin
     audit: board.snapshot
     idempotent: true
@@ -653,6 +716,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: trigger
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: board:admin
     audit: board.trigger
     idempotent: true
@@ -664,6 +728,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: queue
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -681,6 +746,7 @@ verbs:
     source: governance/dispatch/cli.py
     local: freshness
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -701,6 +767,7 @@ verbs:
     source: governance/reconcile/cli.py
     local: status
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -711,6 +778,7 @@ verbs:
     source: governance/reconcile/cli.py
     local: sweep
     effect_class: stop
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:recover
     audit: recover.sweep
     idempotent: true
@@ -721,6 +789,7 @@ verbs:
     source: governance/reconcile/cli.py
     local: stamp
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:recover
     audit: recover.stamp
     idempotent: true
@@ -731,6 +800,7 @@ verbs:
     source: governance/reconcile/cli.py
     local: clear
     effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
     capability: fleet:recover
     audit: recover.clear
     idempotent: true
@@ -741,6 +811,7 @@ verbs:
     source: governance/reconcile/cli.py
     local: watch
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: fleet:read
     audit: null
     idempotent: true
@@ -753,6 +824,7 @@ verbs:
     source: governance/lifecycle/cli.py
     local: status
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -763,6 +835,7 @@ verbs:
     source: governance/lifecycle/cli.py
     local: audit
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -773,6 +846,7 @@ verbs:
     source: governance/lifecycle/cli.py
     local: collect
     effect_class: read
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, deepseek-executor, copilot-agent, hermes, paperclip]
     capability: board:read
     audit: null
     idempotent: true
@@ -783,6 +857,7 @@ verbs:
     source: governance/lifecycle/cli.py
     local: close
     effect_class: irreversible
+    allowed_runtimes: [claude-session, claude-subagent]
     capability: board:close
     audit: closure.close
     idempotent: false
@@ -797,6 +872,7 @@ verbs:
     source: governance/lifecycle/cli.py
     local: retire
     effect_class: irreversible
+    allowed_runtimes: [claude-session, claude-subagent]
     capability: board:admin
     audit: closure.retire
     idempotent: true

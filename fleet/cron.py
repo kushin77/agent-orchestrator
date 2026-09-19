@@ -19,9 +19,10 @@ hand-edited.
 * the **prune** line — once a day it runs `fleet/prune.py run --apply`, which
   ages out the answered mailbox entries and rotates the append-only ledgers so
   `.fleet/` cannot grow without bound (issue #280); and
-* the **reap** line — once a day it runs `scripts/prune-worktrees.sh --apply`,
-  which reclaims stale LANE WORKTREES (issue #207, #516) so the pile that #516
-  measured does not silently rebuild (issue #830). The tool itself is fail
+* the **reap** line — once a day it runs `scripts/prune-worktrees.sh --branches
+  --apply`, which reclaims stale LANE WORKTREES (issue #207, #516) so the pile
+  that #516 measured does not silently rebuild (issue #830), AND drains LANDED
+  LANE BRANCHES (issue #1118, scheduled by #1360). The tool itself is fail
   closed — claimed, dirty, in-use and unpreserved worktrees are always kept —
   so scheduling it daily is the whole fix; nothing here re-implements its
   judgment.
@@ -144,13 +145,47 @@ SCAN_PR_FAILURES_MARKER = "ao-fleet-scan-pr-failures"
 #: reconciler (so a stale line for it is removed), but never installed.
 MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER, REAP_MARKER)
 
+# The PATH line (issue #1370): when AO_FLEET_CRON_PATH is set, `install`
+# emits exactly one `PATH=...` line at the top of the managed block so every
+# rung — not just the ones this module renders inline — inherits it (the
+# runner rung needs `gh`/`gcloud` from /snap/bin; cron's own PATH does not
+# have it). Unset, no PATH= line is emitted: current behaviour is unchanged.
+PATH_MARKER = "ao-fleet-path"
+PATH_ENV = "AO_FLEET_CRON_PATH"
+
 #: Every marker this module has ever owned, enabled or not. `_is_ours` matches
 #: against these so `uninstall`/`reconcile` remove a line whose job is now
 #: disabled or dropped, not just one whose schedule drifted.
-DECLARED_MARKERS = MARKERS + (SNAPSHOT_REFRESH_MARKER, SCAN_PR_FAILURES_MARKER, PROMOTE_MARKER, RUNNER_MARKER)
+DECLARED_MARKERS = MARKERS + (
+    SNAPSHOT_REFRESH_MARKER,
+    SCAN_PR_FAILURES_MARKER,
+    PROMOTE_MARKER,
+    RUNNER_MARKER,
+    PATH_MARKER,
+)
 
-INTERPRETER = "/usr/bin/python3"
+#: The interpreter every job's command is rendered with, resolved at INSTALL
+#: TIME (never frozen at import) from AO_FLEET_PYTHON — issue #1370: the
+#: runner rung needs the ~/ao-verify-venv Python 3.14 venv (3.12's
+#: `Path.glob("**")` silently skips files — #1245's knowledge-index red — and
+#: 3.14 is what the venv ships), not the box's system `/usr/bin/python3`.
+#: Unset, behaviour is unchanged: every job still renders with the literal
+#: default below.
+DEFAULT_INTERPRETER = "/usr/bin/python3"
 FLOCK = "/usr/bin/flock"
+
+
+def interpreter() -> str:
+    """The interpreter to render jobs with, read from the environment NOW
+    (install time), not cached — so a changed AO_FLEET_PYTHON is picked up on
+    the next `install`/`reconcile`/`status` without restarting anything."""
+    return os.environ.get("AO_FLEET_PYTHON", DEFAULT_INTERPRETER)
+
+
+#: Back-compat alias: some callers/tests still refer to INTERPRETER as a
+#: constant. It is the DEFAULT only — the actual render always calls
+#: `interpreter()` so AO_FLEET_PYTHON is honoured.
+INTERPRETER = DEFAULT_INTERPRETER
 
 
 # The three enabled jobs, re-expressed here so the module still works (and the
@@ -162,7 +197,7 @@ _LEGACY_JOBS = (
         "name": "watchdog",
         "marker": MARKER,
         "interval": 2,
-        "command": f"{INTERPRETER} fleet/watchdog.py run",
+        "command": f"{DEFAULT_INTERPRETER} fleet/watchdog.py run",
         "user": "",
         "log": "watchdog.log",
         "singleton": True,
@@ -172,7 +207,7 @@ _LEGACY_JOBS = (
         "name": "prune",
         "marker": PRUNE_MARKER,
         "schedule": PRUNE_SCHEDULE,
-        "command": f"{INTERPRETER} fleet/prune.py run --apply",
+        "command": f"{DEFAULT_INTERPRETER} fleet/prune.py run --apply",
         "user": "",
         "log": "prune.log",
         "singleton": True,
@@ -182,7 +217,7 @@ _LEGACY_JOBS = (
         "name": "reconcile",
         "marker": RECONCILE_MARKER,
         "interval": 2,
-        "command": f"{INTERPRETER} governance/reconcile/cli.py watch --once --apply",
+        "command": f"{DEFAULT_INTERPRETER} governance/reconcile/cli.py watch --once --apply",
         "user": "",
         "log": "reconcile.log",
         "singleton": True,
@@ -192,7 +227,7 @@ _LEGACY_JOBS = (
         "name": "reap",
         "marker": REAP_MARKER,
         "schedule": REAP_SCHEDULE,
-        "command": "bash scripts/prune-worktrees.sh --apply",
+        "command": "bash scripts/prune-worktrees.sh --branches --apply",
         "user": "",
         "log": "reap.log",
         "singleton": False,
@@ -202,7 +237,7 @@ _LEGACY_JOBS = (
         "name": "promote-portal",
         "marker": PROMOTE_MARKER,
         "schedule": PROMOTE_SCHEDULE,
-        "command": "/usr/bin/python3 infra/fleet/promote_portal.py run --apply",
+        "command": f"{DEFAULT_INTERPRETER} infra/fleet/promote_portal.py run --apply",
         "user": "",
         "log": "promote-portal.log",
         "singleton": True,
@@ -216,7 +251,7 @@ _LEGACY_JOBS = (
         "name": "runner",
         "marker": RUNNER_MARKER,
         "schedule": RUNNER_SCHEDULE,
-        "command": "/usr/bin/python3 fleet/runner/cli.py run --once --apply",
+        "command": f"{DEFAULT_INTERPRETER} fleet/runner/cli.py run --once --apply",
         "user": "",
         "log": "runner.log",
         "singleton": True,
@@ -373,7 +408,14 @@ def render_job(
         # host whose environment satisfied the condition at install time, and
         # cron's own environment is empty, so the command must restate it.
         parts.append(f"env {condition['env']}={condition['equals']}")
-    parts.append(str(job["command"]))
+    command = str(job["command"])
+    # The manifest (config/fleet-jobs.json) and the legacy fallback both spell
+    # a python job's command with the literal default interpreter; substitute
+    # AO_FLEET_PYTHON's value here, at render time, so every job — manifest-
+    # driven or not — inherits it without templating the manifest itself.
+    if command == DEFAULT_INTERPRETER or command.startswith(DEFAULT_INTERPRETER + " "):
+        command = interpreter() + command[len(DEFAULT_INTERPRETER):]
+    parts.append(command)
     return " ".join(parts) + f" >> {log_path} 2>&1 # {marker}"
 
 
@@ -430,14 +472,38 @@ def _marker_of(entry: str) -> str:
 def reap_line() -> str:
     """The worktree-reap line: daily, applying, shelling out to the tool #207 shipped.
 
+    RENDERED FROM THE MANIFEST — never re-spelled here — exactly like `line`,
+    `prune_line` and `reconcile_line` above it. It was the one builder that
+    hard-coded its own command, so the same rung had two declarations that could
+    drift apart, and issue #1360 measured the drift: adding `--branches` to the
+    manifest left this copy re-spelling the old command, and
+    `scripts/check-fleet-jobs.sh` refused it by name (LEGACY-BUILDERS-LOCKSTEP,
+    and CLEAN-TREE-NOOP, which saw a permanently `refreshed` reap line).
+    `_job_by_name` prefers the manifest and falls back to `_LEGACY_JOBS` when it
+    cannot be read, so both paths still render a line.
+
     `prune-worktrees.sh` is fail-closed on its own (claimed/dirty/in-use/
     unpreserved worktrees are always kept), so `--apply` here is safe on the
-    same grounds the daily prune line already relies on.
+    same grounds the daily prune line already relies on — and `--branches` is
+    the half that drains LANDED LANE BRANCHES, without which every landed branch
+    eventually ages past `check-reconcile`'s 24h grace and reds the gate of
+    record for every lane (#1360).
     """
-    return (
-        f"{REAP_SCHEDULE} cd {ROOT} && bash scripts/prune-worktrees.sh --apply "
-        f">> {REAP_LOG} 2>&1 # {REAP_MARKER}"
-    )
+    return render_job(_job_by_name("reap"))
+
+
+def path_line(env: dict[str, str] | None = None) -> str | None:
+    """The managed `PATH=...` line, or None when AO_FLEET_CRON_PATH is unset.
+
+    Rendered with the same trailing-marker convention as a job line so
+    `_is_ours`/`_marker_of` recognise, refresh and remove it like any other
+    managed line — it is just not tied to a manifest job.
+    """
+    source = os.environ if env is None else env
+    value = source.get(PATH_ENV, "")
+    if not value:
+        return None
+    return f"PATH={value} # {PATH_MARKER}"
 
 
 def _is_ours(entry: str) -> bool:
@@ -452,13 +518,18 @@ def reconcile_lines(
     root: Path | None = None,
     current_user: str | None = None,
     interval: int | None = None,
+    env: dict[str, str] | None = None,
 ) -> tuple[list[str], dict[str, list[str]]]:
     """The crontab after reconciliation, and what changed.
 
     Pure, so drift is testable without touching the real crontab: foreign lines
     are kept; a declared job whose line is missing is installed, one whose line
     differs is refreshed, and a marked line whose job is no longer declared is
-    reported stale and removed.
+    reported stale and removed. When AO_FLEET_CRON_PATH (`env`, default
+    `os.environ`) is set, a single `PATH=...` line (issue #1370) is kept at
+    the TOP of the managed block, ahead of every job line, so every rung
+    inherits it; unset, no such line is installed and a leftover one from a
+    prior install is reported stale and removed — same lifecycle as a job.
     """
     base = Path(root) if root is not None else ROOT
     user = current_user if current_user is not None else _current_user()
@@ -469,6 +540,20 @@ def reconcile_lines(
     kept = [entry for entry in lines if not _is_ours(entry)]
     report: dict[str, list[str]] = {"installed": [], "stale": [], "refreshed": [], "clean": []}
     ordered: list[str] = []
+
+    wanted_path = path_line(env)
+    present_path = [entry for entry in lines if _marker_of(entry) == PATH_MARKER]
+    if wanted_path is not None:
+        if not present_path:
+            report["installed"].append(PATH_MARKER)
+        elif present_path == [wanted_path]:
+            report["clean"].append(PATH_MARKER)
+        else:
+            report["refreshed"].append(PATH_MARKER)
+        ordered.append(wanted_path)
+    elif present_path:
+        report["stale"].extend(present_path)
+
     for job in jobs:
         marker = str(job["marker"])
         wanted = desired[marker]
@@ -481,7 +566,10 @@ def reconcile_lines(
             report["refreshed"].append(marker)
         ordered.append(wanted)
     for entry in lines:
-        if _is_ours(entry) and _marker_of(entry) not in desired:
+        marker = _marker_of(entry)
+        if marker == PATH_MARKER:
+            continue  # handled above, whichever way it went
+        if _is_ours(entry) and marker not in desired:
             report["stale"].append(entry)
     return kept + ordered, report
 
@@ -493,12 +581,16 @@ def _enabled_jobs_safe() -> list[dict]:
         return [dict(job) for job in _LEGACY_JOBS]
 
 
-def install_lines(lines: list[str], interval: int | None = None) -> list[str]:
+def install_lines(
+    lines: list[str], interval: int | None = None, env: dict[str, str] | None = None
+) -> list[str]:
     """The crontab after an install: our lines refreshed, every other line kept.
 
-    Pure, so the merge is testable without touching the real crontab.
+    Pure, so the merge is testable without touching the real crontab. `env`
+    defaults to the real process environment (AO_FLEET_PYTHON/AO_FLEET_CRON_PATH
+    included); tests pass an explicit dict instead.
     """
-    return reconcile_lines(lines, _enabled_jobs_safe(), interval=interval)[0]
+    return reconcile_lines(lines, _enabled_jobs_safe(), interval=interval, env=env)[0]
 
 
 def remove_lines(lines: list[str]) -> tuple[list[str], list[str]]:
@@ -541,6 +633,49 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
     return 0
 
 
+def config_drift(lines: list[str]) -> list[str]:
+    """Named drift between the installed crontab and what AO_FLEET_PYTHON /
+    AO_FLEET_CRON_PATH would currently render (issue #1370) — one string per
+    variable that differs, empty when both are in sync.
+
+    `AO_FLEET_PYTHON` and `AO_FLEET_CRON_PATH` are declared config (see
+    `infra/fleet/env_contract.py`), so `status` treats them the same as any
+    manifest job: rendered from the CURRENT environment and compared against
+    what is actually installed.
+    """
+    findings: list[str] = []
+    wanted_interp = interpreter()
+    own = [entry for entry in lines if _marker_of(entry) and _marker_of(entry) != PATH_MARKER]
+    for entry in own:
+        marker = _marker_of(entry)
+        try:
+            job = next(j for j in _enabled_jobs_safe() if str(j["marker"]) == marker)
+        except StopIteration:
+            continue
+        wanted = render_job(job)
+        if entry != wanted and wanted_interp in wanted and wanted_interp not in entry:
+            findings.append(
+                f"AO_FLEET_PYTHON drift: {marker} installed with a different interpreter "
+                f"than the current env would render ({wanted_interp!r})"
+            )
+            break
+    wanted_path = path_line()
+    present_path = [entry for entry in lines if _marker_of(entry) == PATH_MARKER]
+    if wanted_path is None and present_path:
+        findings.append(
+            f"AO_FLEET_CRON_PATH drift: a PATH= line is installed but {PATH_ENV} is now unset"
+        )
+    elif wanted_path is not None and not present_path:
+        findings.append(
+            f"AO_FLEET_CRON_PATH drift: {PATH_ENV} is set but no PATH= line is installed"
+        )
+    elif wanted_path is not None and present_path != [wanted_path]:
+        findings.append(
+            f"AO_FLEET_CRON_PATH drift: installed PATH= line does not match the current {PATH_ENV}"
+        )
+    return findings
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     lines = read_crontab()
     own = installed_lines(lines)
@@ -550,6 +685,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"cron: installed ({len(own)} line(s))")
     for entry in own:
         print(f"  {entry}")
+    drift = config_drift(lines)
+    if drift:
+        for finding in drift:
+            print(f"cron: DRIFT: {finding}")
+    else:
+        print("cron: AO_FLEET_PYTHON / AO_FLEET_CRON_PATH in-sync with the installed crontab")
     for job in _enabled_jobs_safe():
         path = runtime.FLEET_DIR / str(job["log"])
         if path.exists():

@@ -288,6 +288,16 @@ that repo):
       separate, opt-in `agentconsole-dev-build` service
       (`--profile dev-build`). ONE OWNER ACTION REMAINS: place the Artifact
       Registry read credential on the shared-services pair — see §5c.
+      **Scheduled but disabled (issue #1341):** `config/fleet-jobs.json`
+      declares the `promote-portal` rung with `enabled: false`; flipping it to
+      `true` is the owner's one-line follow-up once the §5c credential is
+      placed. The rung's eventual `--apply` needs a Docker client talking to
+      the host daemon, which `infra/fleet/inventory.yaml`'s `state_rw` section
+      records as a wiring gap: the shared cron image installs no Docker CLI
+      yet (`infra/fleet/Dockerfile`, out of that lane's file scope), and
+      `infra/fleet/docker-compose.agent-cron.yml` mounts `/var/run/docker.sock`
+      read-only on the `agent-cron-rw` (`state-rw` profile) service only —
+      never its dry-run-only sibling.
 - [ ] Re-check the host port, then publish `${AGENTCONSOLE_PORT:-18286}`.
 - [ ] Seed the state mounts from the host checkout's `.fleet`,
       `.portal/control/ledger` and `.board`, and make the two read-write ones

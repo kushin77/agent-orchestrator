@@ -26,6 +26,18 @@ a dispatched lane that is the subagent, not the loop that spawned it; recording
 the loop's pid would make every lane look alive for as long as the loop runs,
 which is exactly the signal the sweep needs to be able to lose.
 
+**Who writes the first beat (issue #917).** Measured 2026-09-16 on the shared
+checkout: `.fleet/sessions/` held 0 beats while `.fleet/lanes/` held 78 records
+and the worktree list 110 entries, so `status` printed `0 session(s), 0
+orphan(s)` and the sweep had nothing to sweep — a vacuously green control. The
+first beat is now written by the mint itself: `governance/isolation/cli.py open`
+stamps the lane's session (`governance/isolation/session.py`) with the pid that
+owns the lane, and `close` clears it, so every lane is in this plane from the
+moment it exists whatever runtime opened it. `status` reads the lane plane
+beside the session plane and says out loud when a record carries no beat
+(`N lane record(s), K without a session beat`, plus a `NOTE` naming them) — the
+sweep's input is never silently smaller than the lanes on disk.
+
 ## 2. Two signals, deliberately not one
 
 | Status | When | Reclaimable |
@@ -456,4 +468,39 @@ out of this change on purpose: it is a policy value, not part of the defect.
 python3 governance/reconcile/cli.py sweep --root <repo>            # names what would resolve
 python3 governance/reconcile/cli.py sweep --root <repo> --apply    # closes + retires
 ```
+
+## 11. The orphan walk — five kinds, named, budgeted (#1301)
+
+Sessions that beat (§1–3) and artifacts a beat, claim or landing explains (§6)
+still leave the contract's question unanswered: **which artifacts have no live
+lane and no evidenced close-out?** Measured 2026-09-18 on this box: 47
+worktrees no lane record names (31 of them `.claude/worktrees/agent-*` subagent
+trees), 85 local `issue-*` branches with no lane, no recorded worktree and no
+open PR, 11 open PRs bound to no lane, 19 lane records whose issue is closed,
+111 `.fleet/sent/` orders naming a closed issue.
+
+```bash
+python3 governance/reconcile/cli.py sweep --orphans                 # walk + hold to the budget
+python3 governance/reconcile/cli.py sweep --orphans --apply         # reclaim only with evidence
+```
+
+`governance/reconcile/orphans.py` walks all five kinds from files, git and the
+board (the committed snapshot first, `gh` for what it lacks) and names each:
+
+| finding | an artifact that | reclaim |
+|---|---|---|
+| `orphan-worktree` | a linked worktree no lane record names | under `--apply`, only when HEAD is content-landed and it holds no lane-authored dirt; tip recorded to `.fleet/reaped-branches.jsonl` first |
+| `orphan-branch` | a local `issue-*` branch with no lane, no recorded worktree, no open PR — **its SHA is in the finding** | under `--apply`, only when content-landed; tip recorded first; never otherwise |
+| `orphan-pr` | an open PR whose head is no lane's branch and whose body has no `lane: <lane_id>` line | never — add the line or open the lane |
+| `orphan-issue-lane` | a lane record whose issue is closed | never here — `lifecycle close --lane <id>` is the evidence |
+| `orphan-directive` | a `.fleet/sent/` order naming a closed issue | never here — `lifecycle close --issue n` / `retire` |
+
+The counts are held to `governance/reconcile/orphan-budget.yaml` — the counts
+measured the day the walk shipped plus churn headroom, and an `expires` date
+after which the budget is 0 (the ratchet shape of `worktree-cap.yaml`, #1335).
+Above it the sweep is NOT-OK by name, `orphan-budget-exceeded:<kind>:<n>/<budget>`;
+a kind whose source could not be read is `unmeasured` and the sweep is
+CANNOT-ASSESS, never zero. `scripts/check-reconcile-orphans.sh` proves every
+finding on an injected port, reaps and refuses on a real scratch repository,
+and walks the real tree from the main checkout against the declared budget.
 

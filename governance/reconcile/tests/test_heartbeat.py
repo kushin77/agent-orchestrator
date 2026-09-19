@@ -158,3 +158,18 @@ def test_a_shelved_session_keeps_its_record(root: Path):
     session = read(SESSION, root)
     assert session.state == SHELVED
     assert session.note == "unmerged"
+
+
+def test_lane_records_without_a_beat_are_counted_and_named(root: Path):
+    """#917: the lane plane the sweeper was blind to is read beside the session
+    plane — a record with no beat is named, an unreadable one still counts."""
+    from governance.reconcile.heartbeat import lane_records_without_beat
+
+    assert lane_records_without_beat(root) == (0, [])
+    lanes = root / ".fleet" / "lanes"
+    lanes.mkdir(parents=True)
+    (lanes / "aaa.json").write_text(json.dumps({"session_id": "aaa", "issue": 1}))
+    (lanes / "bbb.json").write_text(json.dumps({"session_id": "bbb", "issue": 2}))
+    (lanes / "ccc.json").write_text("{not json")
+    stamp("aaa", issue=1, agent="a", root=root)
+    assert lane_records_without_beat(root) == (3, ["bbb", "ccc"])

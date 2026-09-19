@@ -152,6 +152,14 @@ variables:
     secret: false
     required_by: [deploy, local-run]
     readers: [portal/server/surface_state.py, e2e/go_live_delivery.py]
+  - name: AO_ROLLOUT_LIVE_STATE
+    purpose: >-
+      the rollout live-state.yaml document the fleet surface reader projects
+      into a surface's effective default (issue #967); absent, it falls back
+      to the repo-relative infra/rollout/live-state.yaml.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/fleet.py]
   - name: AO_PORTAL_CHAT_STORE
     purpose: the transcript store directory the console's chat surface reads.
     secret: false
@@ -208,6 +216,26 @@ variables:
     secret: true
     required_by: [deploy, local-run]
     readers: [guardrails/dlp/hmac_audit.py]
+
+  # -- approvals: a signed record, not a chat word (issue #1272) --------------
+  - name: AO_APPROVAL_REQUIRED
+    purpose: >-
+      gates scripts/merge-pr.sh's approval-record check before a squash merge;
+      default off (0) so this lands without blocking the runner — a later
+      wiring lane flips it to 1.
+    secret: false
+    required_by: [ops]
+    readers: [scripts/merge-pr.sh]
+
+  - name: AO_APPROVALS_HMAC_KEY
+    purpose: >-
+      the HMAC key that signs and verifies approval records (merge/delete/
+      pause/flip scopes) in integrations/paperclip/adapters/approvals; secret
+      material, so a literal in the tree is refused (GR-6).
+    secret: true
+    required_by: [deploy, local-run]
+    readers:
+      - integrations/paperclip/adapters/approvals/record.py
 
   # -- the execution engine ----------------------------------------------------
   - name: AO_QUEUE_STORE
@@ -287,6 +315,28 @@ variables:
     secret: false
     required_by: [ops]
     readers: [fleet/runner/capacity.py, infra/fleet/env_contract.py]
+  # -- cron interpreter/PATH (issue #1370, parent #1295) ------------------------
+  - name: AO_FLEET_PYTHON
+    purpose: >-
+      the interpreter `fleet/cron.py install` renders every managed crontab
+      line with. Default `/usr/bin/python3`; the shared-services runner host
+      sets it to the ~/ao-verify-venv Python 3.14 venv the PR-runner rung's
+      verify needs (3.12's `Path.glob("**")` silently skips files, #1245's
+      knowledge-index red). `status` reports drift by name when the installed
+      crontab no longer matches what the current value would render.
+    secret: false
+    required_by: [ops]
+    readers: [fleet/cron.py, infra/fleet/env_contract.py]
+  - name: AO_FLEET_CRON_PATH
+    purpose: >-
+      when set, `fleet/cron.py install` emits exactly one `PATH=...` line at
+      the top of the managed crontab block so every rung inherits it (the
+      PR-runner rung needs `gh`/`gcloud` from /snap/bin). Empty (default)
+      installs no PATH= line — current behaviour unchanged. `status` reports
+      drift by name when the installed PATH= line no longer matches.
+    secret: false
+    required_by: [ops]
+    readers: [fleet/cron.py, infra/fleet/env_contract.py]
 
   - name: KEYDB_HOST
     purpose: >-

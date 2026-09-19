@@ -26,6 +26,18 @@ THE RULES, EACH A MEASURED LESSON FROM THE 2026-09-18 PROTOTYPE
      outranks a local red (evidence.py's ranking); the planner reports both.
   7. A failed gate-lock prune (`PruneResult.ok == False`) plans NO new verify:
      `gatelock-prune-failed` is a refusal, not a warning.
+  8. Lesson 5, mirrored: CANNOT-ASSESS is never green, and a Cloud Build green
+     outranks a local red — but the mirror image also holds. A RED whose
+     basis is a FOREIGN source (cloud-build / gate-status) and for which the
+     runner has no local-marker record at all for this (pr, sha) is a head
+     the runner has never itself verified; since the runner is now the sole
+     producer of the required `ao/gate-of-record`, such a head can never turn
+     green on its own. It is re-queued (`requeue:foreign-red:<pr>:<source>`,
+     subject to the same running/capacity rules as `requeue:no-evidence`),
+     never refused forever. A RED with a local-marker record present — as
+     basis or alongside — stays refused (`verify-red:<pr>:local-marker`): the
+     runner already ran it and got red. A green from any source still wins
+     first (lesson 5, lesson 3's staleness check still applies to it).
 """
 
 from __future__ import annotations
@@ -46,6 +58,7 @@ from fleet.runner.model import (
     REFUSE,
     REQUEUE_STATES,
     SKIP,
+    SOURCE_LOCAL,
     VERIFY,
     Action,
     LiveBuild,
@@ -139,7 +152,25 @@ def plan(
             continue
 
         if verdict.state == RED:
-            actions.append(Action(REFUSE, number, sha, reason=f"verify-red:{number}:{verdict.basis.source if verdict.basis else ''}"))
+            basis_source = verdict.basis.source if verdict.basis else ""
+            # lesson 8 (#1378): a RED the runner never itself verified — basis
+            # is a foreign source (cloud-build / gate-status) AND there is no
+            # local-marker record for this (pr, sha) at all — is re-queued,
+            # not refused forever: the runner is now the producer of the
+            # required gate-of-record, so a head it never ran can never turn
+            # green on its own. A RED with a local-marker record (basis or
+            # not) stays refused.
+            if basis_source != SOURCE_LOCAL and not verdict.has_local_record:
+                if not prune.ok:
+                    actions.append(Action(REFUSE, number, sha, reason=f"gatelock-prune-failed:{prune.detail or 'unknown'}"))
+                    continue
+                if slots > 0:
+                    slots -= 1
+                    actions.append(Action(VERIFY, number, sha, reason=f"requeue:foreign-red:{number}:{basis_source}"))
+                else:
+                    actions.append(Action(DEFER, number, sha, reason=f"capacity:{number}:foreign-red:{basis_source}"))
+                continue
+            actions.append(Action(REFUSE, number, sha, reason=f"verify-red:{number}:local-marker"))
             continue
 
         # No verdict for this head. Running for the current head -> await.
