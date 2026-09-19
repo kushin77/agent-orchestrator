@@ -10,11 +10,13 @@ body paragraph, is a mention rather than a trailer (issue #287).
 
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 
 from governance.isolation import cli, trailer
 from governance.isolation.audit import audit_all, audit_lane
-from governance.isolation.identity import SessionIdentity, mint
+from governance.isolation.identity import GIT_IDENTITY_VARS, SessionIdentity, mint
 from governance.isolation.worktree import (
     git,
     provision,
@@ -39,6 +41,33 @@ _conftest_spec = _importlib_util.spec_from_file_location(
 _conftest = _importlib_util.module_from_spec(_conftest_spec)
 _conftest_spec.loader.exec_module(_conftest)
 commit = _conftest.commit
+
+
+def git_as(identity: SessionIdentity, cwd: Path | str, *args: str) -> subprocess.CompletedProcess:
+    """Run git signing as *this lane*, never as the shell that started pytest.
+
+    ``worktree.git`` deliberately inherits its caller's environment, which is
+    right for provisioning and wrong for a commit: AGENTS.md rule 15 exports the
+    four identity variables into every agent shell, and they outrank ``git
+    config --worktree`` (measured for #934 — and they beat a per-commit ``-c
+    user.email=`` too, so pinning the environment is the only form that wins).
+
+    Inheriting them does not merely fail an assertion: ``audit_lane`` selects a
+    lane's commits *by author address*, so a commit signed by the shell's
+    session vanishes from the rule being tested and the assertion above it
+    passes vacuously. Setting the four variables for this one process replaces
+    the caller's pair rather than losing to it (issue #1404).
+    """
+    signature = {name: identity.env()[name] for name in GIT_IDENTITY_VARS}
+    result = subprocess.run(
+        ["git", "-C", str(cwd), *args],
+        capture_output=True,
+        text=True,
+        env={**os.environ, **signature, "GIT_CONFIG_GLOBAL": os.devnull},
+    )
+    if result.returncode != 0:
+        raise AssertionError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+    return result
 
 
 def codes(problems) -> set[str]:
@@ -91,8 +120,9 @@ def test_a_ref_paragraph_that_is_not_trailing_is_a_violation(lane, repo: Path):
 def test_a_trailer_followed_by_another_trailer_is_accepted(lane, repo: Path):
     """The shape of the repository's own exemplary commit `8b97ab6`."""
     (lane.worktree / "work.txt").write_text("work\n", encoding="utf-8")
-    git(lane.worktree, "add", "work.txt")
-    git(
+    git_as(lane, lane.worktree, "add", "work.txt")
+    git_as(
+        lane,
         lane.worktree,
         "commit",
         "-q",
@@ -114,13 +144,45 @@ def test_a_merge_commit_is_exempt_from_the_trailer_rule(lane, repo: Path):
     lane that merges `origin/master` must not fail a rule its own history cannot
     satisfy.
     """
-    git(lane.worktree, "checkout", "-q", "-b", "side")
+    git_as(lane, lane.worktree, "checkout", "-q", "-b", "side")
     commit(lane.worktree, "side.txt", "side work", trailer=lane.trailer)
-    git(lane.worktree, "checkout", "-q", lane.branch)
-    git(lane.worktree, "merge", "-q", "--no-ff", "-m", "Merge side into the lane", "side")
-    merge_author = git(lane.worktree, "log", "-1", "--format=%ae").stdout.strip()
+    git_as(lane, lane.worktree, "checkout", "-q", lane.branch)
+    git_as(lane, lane.worktree, "merge", "-q", "--no-ff", "-m", "Merge side into the lane", "side")
+    merge_author = git_as(lane, lane.worktree, "log", "-1", "--format=%ae").stdout.strip()
     assert merge_author == lane.author_email, "the merge must be authored by the session for this to prove anything"
     assert audit_lane(lane, repo) == []
+
+
+def test_the_lane_signs_its_own_commits_even_when_the_shell_carries_another_pair(lane, repo: Path, monkeypatch):
+    """The environment is an input, not a property of whoever ran pytest (#1404).
+
+    Rule 15 exports the four identity variables into every agent shell, so a
+    commit made through the inheriting helper is signed by the *shell's* session
+    — and the audit attributes commits by author address, so it is not the
+    assertion that breaks but the measurement: the commit disappears from the
+    rule and the lane audits squeaky clean.
+
+    Provoking the pair IN the test is what makes this property falsifiable on a
+    machine that exports nothing at all, which is why CI never saw the defect.
+    """
+    ambient_name = "agent-mechanical-sme"
+    ambient_email = f"agent+{ambient_name}@agents.invalid"
+    for name in GIT_IDENTITY_VARS:
+        monkeypatch.setenv(name, ambient_email if name.endswith("_EMAIL") else ambient_name)
+
+    (lane.worktree / "work.txt").write_text("work\n", encoding="utf-8")
+    git_as(lane, lane.worktree, "add", "work.txt")
+    git_as(lane, lane.worktree, "commit", "-q", "-m", "do the work", "-m", lane.trailer)
+    signed = git_as(lane, lane.worktree, "log", "-1", "--format=%ae").stdout.strip()
+    assert signed == lane.author_email, "the caller's shell signed the lane's commit"
+    assert audit_lane(lane, repo) == []
+
+    # The half a foreign signature hides: an untrailed commit the rule must still
+    # be able to SEE. Signed by another session, it is invisible and audits clean.
+    (lane.worktree / "untrailed.txt").write_text("untrailed\n", encoding="utf-8")
+    git_as(lane, lane.worktree, "add", "untrailed.txt")
+    git_as(lane, lane.worktree, "commit", "-q", "-m", "no ticket reference here")
+    assert "commit-missing-ticket-trailer" in codes(audit_lane(lane, repo))
 
 
 def test_an_unassessable_history_rule_is_a_violation_not_a_pass(lane, repo: Path, monkeypatch):

@@ -108,7 +108,9 @@
 #     never false-red for a missing PR body.
 #   * Landed history — `bash scripts/check-pr-contract.sh --landed` audits every
 #     merged (non-merge) commit reachable from the range (default: HEAD) for the
-#     trailing `Refs` trailer. `AI-assistance:` and `Closes #<n>` are PR-BODY
+#     trailing `Refs` trailer, and books the findings it measures against the
+#     recorded-legacy record (see "THE RECORDED LEGACY" below). `AI-assistance:`
+#     and `Closes #<n>` are PR-BODY
 #     obligations and are enforced at PR time only — the squash-merge commit
 #     body does not reliably carry them (measured on the repo's own standard
 #     commit `8b97ab6`), so a landed audit cannot check them.
@@ -118,13 +120,63 @@
 #   `a7e7312991ae24b1047363ff36627060a810fdd8` (PR #308). Every commit strictly
 #   before it predates the contract and is grandfathered as a class — measured:
 #   all 37 commits that lack the trailer (e.g. `061690c`, the commit the #288
-#   review named) are strictly before the boundary, and 0 commits after it lack
-#   one. A boundary is provably frozen: a new commit is always a descendant,
-#   never an ancestor, so the grandfathering cannot grow silently. The audit
+#   review named) are strictly before the boundary. What is strictly AFTER it is
+#   not clean, and this file asserted otherwise as a MEASUREMENT for a year:
+#   re-measured 2026-09-19 on a pristine `origin/master`, **39** post-boundary
+#   commits lack the trailer (39 of 39 findings after the boundary, measured in
+#   `--range` mode). The claim is restated here to match what this check
+#   measures rather than what it was written to say. A boundary is provably
+#   frozen: a new commit is always a descendant, never an ancestor, so the
+#   grandfathering cannot grow silently. The audit
 #   also refuses a boundary commit that itself lacks the trailer
 #   (`enforcement-gate-missing-trailer`). Override with
 #   `--enforcement-gate <sha>` / `AO_PR_ENFORCEMENT_GATE` to prove the audit
 #   fails on a pre-boundary commit (see the non-vacuity proof in the PR).
+#
+# THE RECORDED LEGACY, AND THE TWO CONTRACTS OF `--landed` (issue #1402)
+#   Post-boundary residue has a record: `governance/isolation/landed-baseline.json`
+#   (issues #287/#836/#1249), the file `scripts/check-isolation-landed.sh` — which
+#   IS in `make verify` — is green against. So one rule had two answers, and one
+#   of them was a permanent, unactionable 39: residue on a protected branch whose
+#   message can never be corrected (history is never rewritten, hard floor),
+#   reported as a failure forever by a surface nobody can act on. This check now
+#   reads that same record — **through that module's own loader**
+#   (`governance/isolation/landed.py: load_baseline`), so the record has one home
+#   and one parser — and `--landed` has two named contracts:
+#
+#     * `--landed` (no range named) — the REPOSITORY VERDICT. It measures the
+#       same findings as before, books each against the record, prints the
+#       recorded ones as `NOTE  recorded legacy` (named on every run, never
+#       hidden — the same treatment `governance/isolation/cli.py enforce` gives
+#       them), and FAILS by name only for findings that are NOT recorded. This
+#       is the surface #1402 is about: rc 0 with an honest number instead of a
+#       permanent 39.
+#     * `--landed --range <r>` — the PREDICATE RE-CHECK, verbatim: the findings
+#       for `<r>` with the record deliberately NOT applied, rc 1 when there are
+#       any. That is not an oversight, it is the contract every programmatic
+#       consumer of this check already depends on, and each of them names a
+#       range: `governance/isolation/trailer.py`'s `run_landed`/`classify_commit`
+#       and `scripts/check-session-isolation.sh`. `landed.assess` derives
+#       "recorded legacy" FROM the findings it parses, so a predicate that
+#       pre-filtered them would book all 39 as `quarantine-entry-stale` —
+#       turn `check-isolation-landed.sh` red, and redden `make verify` for every
+#       lane. Pre-filtering that path is therefore not a tightening of the rule,
+#       it is a break of the reader that enforces it. `--selftest` asserts the
+#       seam in both directions, so it is a checked property rather than a
+#       comment (GR-29). The discriminant is the argv `--range`, never
+#       `AO_PR_RANGE` (which this mode has always ignored) — so the seam cannot
+#       be flipped by an ambient variable.
+#
+#   Grandfathering here only ever REMOVES a finding this check actually measured
+#   for the commit the record names, matched on the commit alone (the record's
+#   own semantics — one recorded commit already carries a code the predicate has
+#   since changed), so this reader can never invent a pass for a commit it did
+#   not check. An entry that no longer matches anything is not this reader's
+#   business: the record's integrity (stale entries, entries outside the assessed
+#   range) is enforced by the isolation surface in `make verify`, which owns it.
+#   A missing or malformed record is NOT-OK (rc 1), never a skip — otherwise
+#   deleting the file would be a way to switch this check off, the rule
+#   `governance/isolation/landed.py` applies to its own baseline.
 #
 # NOT WIRED INTO `make verify` — deliberately, and this is the honest reason:
 # in an ordinary working checkout there is no PR body and the range
@@ -178,7 +230,8 @@
 # Usage:
 #   bash scripts/check-pr-contract.sh --body-file <path> [--range <git-range>]
 #   bash scripts/check-pr-contract.sh --pr <number>      # PR-time hook (via gh)
-#   bash scripts/check-pr-contract.sh --landed           # landed-history audit
+#   bash scripts/check-pr-contract.sh --landed           # landed verdict (record applied)
+#   bash scripts/check-pr-contract.sh --landed --range <r>  # predicate re-check, verbatim
 #   bash scripts/check-pr-contract.sh --selftest         # build mutants, prove it fails
 set -u
 
@@ -195,6 +248,13 @@ trailer_pattern="${AO_TRAILER_PATTERN:-Refs:?\\s+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+
 # boundary itself is checked explicitly, everything after must carry the trailer.
 default_gate="a7e7312991ae24b1047363ff36627060a810fdd8"
 gate="${AO_PR_ENFORCEMENT_GATE:-$default_gate}"
+# The recorded-legacy record (#1402): the same file, read through the same loader,
+# that `governance/isolation/landed.py` owns and `scripts/check-isolation-landed.sh`
+# enforces in `make verify`. Resolved beside THIS script's own checkout, exactly as
+# that module resolves it beside itself, so the record has one home and one parser,
+# and a change to the repo under test cannot move either.
+baseline_default="${AO_PR_CONTRACT_BASELINE:-$root/governance/isolation/landed-baseline.json}"
+baseline_file="$baseline_default"
 RANGE_SET=0
 # Did ARGV itself name the subject to judge? See "PRECEDENCE" in the header
 # (#1396): `--pr`, `--body-file` and `--range` all state what to judge, and
@@ -204,6 +264,8 @@ PR_ARG_SET=0
 
 usage() {
   printf 'usage: %s --body-file <path> [--range <git-range>] | --pr <number> | --landed [--range <git-range>] | --selftest\n' "$0" >&2
+  printf '       --landed alone is the repository verdict (the recorded legacy is applied);\n' >&2
+  printf '       --landed --range <r> is the predicate re-check for <r>, verbatim (#1402).\n' >&2
 }
 
 # The `## Classification` block (issue #1254 step 5 / #1328). Vocabularies are
@@ -895,7 +957,13 @@ run_checks() { # <body-file> <range> [<head-branch>] [<surfaces-yaml>]
 # PR-BODY obligations (Closes, AI-assistance, pre-existing red) live at PR time;
 # the landed audit enforces the one obligation a commit can carry on its own —
 # the trailing `Refs` trailer — over every non-merge commit since the boundary.
-landed_audit() { # <range> <gate>
+#
+# `landed_collect` MEASURES; `landed_audit` reports the predicate's answer
+# verbatim (the contract its programmatic consumers depend on; see "THE TWO
+# CONTRACTS OF `--landed`" in the header); `landed_verdict` books those same
+# measurements against the recorded-legacy record. The split is what lets the
+# record apply to one reader without changing the other.
+landed_collect() { # <range> <gate> — fills `findings`; rc 0 clean / 1 findings / 2 CANNOT-ASSESS
   local rang="${1:-HEAD}" g="${2:-$default_gate}"
   findings=()
 
@@ -909,7 +977,7 @@ landed_audit() { # <range> <gate>
   gate_finding="$(commit_finding "$gate_msg" "$gate_subj")"
   [ -z "$gate_finding" ] || findings+=("enforcement-gate-missing-trailer:${g:0:12}")
 
-  local shas sha message subject finding bad=0
+  local shas sha message subject finding
   shas="$(git -C "$repo" rev-list --no-merges "$rang" 2>/dev/null)"
   if [ -z "$shas" ]; then
     echo "check-pr-contract: CANNOT-ASSESS — no commits in landed range $rang" >&2
@@ -926,14 +994,97 @@ landed_audit() { # <range> <gate>
     finding="$(commit_finding "$message" "$subject")"
     if [ -n "$finding" ]; then
       findings+=("$finding:${sha:0:12}")
-      bad=$((bad + 1))
     fi
   done <<<"$shas"
-  if [ "${#findings[@]}" -gt 0 ]; then
+  [ "${#findings[@]}" -gt 0 ] && return 1
+  return 0
+}
+
+landed_audit() { # <range> <gate> — the predicate's findings for <range>, verbatim
+  local rang="${1:-HEAD}" g="${2:-$default_gate}" rc
+  landed_collect "$rang" "$g"; rc=$?
+  [ "$rc" -eq 2 ] && return 2
+  if [ "$rc" -eq 1 ]; then
     report "check-pr-contract: LANDED"
     return 1
   fi
   echo "check-pr-contract: LANDED OK — every merged commit since the enforcement gate carries the ticket trailer"
+  return 0
+}
+
+# The record, through the isolation module's own loader: it owns the path
+# convention and the parse (a 40-hex commit id, a code, a `why`; a duplicate or a
+# malformed entry is refused), so nothing about the record is re-implemented here.
+record_entries() { # "<40hex>\t<code>" per entry; rc 1 when the record cannot be trusted
+  PR_CONTRACT_ROOT="$root" PR_CONTRACT_BASELINE="$baseline_file" python3 - <<'PY'
+import os
+import sys
+
+sys.path.insert(0, os.environ["PR_CONTRACT_ROOT"])
+try:
+    from governance.isolation.landed import BaselineMalformed, load_baseline
+except ImportError as exc:
+    # The module owns the record. Without it nothing about the record is proven,
+    # and an unprovable input is refused rather than skipped.
+    print(f"baseline-loader-unavailable: {exc}")
+    sys.exit(1)
+try:
+    baseline = load_baseline(os.environ["PR_CONTRACT_BASELINE"])
+except BaselineMalformed as exc:
+    print(str(exc))
+    sys.exit(1)
+for entry in baseline.entries:
+    print(f"{entry.sha}\t{entry.code}")
+PY
+}
+
+landed_verdict() { # <range> <gate> — the repository verdict, with the recorded legacy
+  local rang="${1:-HEAD}" g="${2:-$default_gate}" rc entries f code fsha hit entry_sha entry_code
+  local -a unrecorded=()
+  local recorded=0
+  landed_collect "$rang" "$g"; rc=$?
+  [ "$rc" -eq 2 ] && return 2
+
+  # `2>&1` because on success the loader prints nothing to stderr, and on failure
+  # its own message is the honest reason this check cannot answer.
+  if ! entries="$(record_entries 2>&1)"; then
+    printf 'check-pr-contract: LANDED FAIL — the recorded-legacy record %s cannot be read, so the verdict is unproven; deleting the record is not a way to switch this check off\n' "$baseline_file" >&2
+    [ -n "$entries" ] && printf '%s\n' "$entries" | sed 's/^/  /' >&2
+    return 1
+  fi
+
+  # A finding is recorded legacy when the record names ITS COMMIT — matched on the
+  # commit alone, which IS the record's own semantics (`landed.Baseline.find`), and
+  # deliberately not on the code: one recorded commit (`4986cb636344`) already
+  # carries a code the predicate has since changed, and a record that stopped
+  # applying because the predicate's wording moved would un-grandfather a commit
+  # nobody re-decided. Grandfathering only ever removes a finding this run
+  # MEASURED for that commit, so no pass can be invented for an unmeasured one.
+  for f in "${findings[@]}"; do
+    code="${f%%:*}"; fsha="${f#*:}"
+    hit=""
+    while IFS=$'\t' read -r entry_sha entry_code; do
+      [ -n "$entry_sha" ] || continue
+      case "$entry_sha" in "$fsha"*) hit="$entry_sha"; break ;; esac
+    done <<<"$entries"
+    if [ -n "$hit" ]; then
+      printf '  NOTE  recorded legacy  %s\n' "$f"
+      recorded=$((recorded + 1))
+    else
+      unrecorded+=("$f")
+    fi
+  done
+
+  if [ "${#unrecorded[@]}" -gt 0 ]; then
+    for f in "${unrecorded[@]}"; do
+      printf '  FAIL  %s\n' "$f" >&2
+    done
+    printf 'check-pr-contract: LANDED: FAIL (%s unrecorded finding(s), %s recorded legacy) — an unrecorded finding is a commit that landed after the boundary without the trailer: if it has not MERGED yet, put the reference in a trailing trailer paragraph and re-push; if it is already on a protected branch its message can never be corrected (history is never rewritten), so record it in %s by an explicit reviewed commit carrying this measured finding — never automatically, and never to silence a run (#836)\n' \
+      "${#unrecorded[@]}" "$recorded" "${baseline_file#"$root"/}" >&2
+    return 1
+  fi
+  printf 'check-pr-contract: LANDED OK — 0 unrecorded finding(s) after the enforcement gate; %s recorded legacy commit(s) in %s, named above and never hidden (#1402)\n' \
+    "$recorded" "${baseline_file#"$root"/}"
   return 0
 }
 
@@ -1357,6 +1508,140 @@ Refs kushin77/agent-orchestrator#835" >/dev/null 2>&1
     printf '  FAIL  a trailer-less enforcement gate went undetected\n%s\n' "$out" >&2
     ok=1
   fi
+
+  # --- the recorded legacy: one rule, one record, two readers (#1402) ---------
+  # `landed_verdict` books the findings it MEASURED against the record
+  # `governance/isolation/landed.py` owns, read through that module's own loader.
+  # Four directions are asserted: a recorded finding is booked (rc 0), an
+  # UNRECORDED one is still refused by name, an unreadable record is NOT-OK
+  # rather than a skip, and — the seam — the record does NOT reach the predicate
+  # path its programmatic consumers read. If the last arm ever passes while the
+  # first fails, the record has been applied one reader too far.
+  #
+  # The record is built from the findings THIS run measures, expanded to full
+  # commit ids (the loader refuses anything but a 40-hex id), so the arms cannot
+  # drift when an earlier arm adds a commit to the range.
+  recorded_baseline="$work/landed-baseline.json"
+  empty_baseline="$work/landed-baseline-empty.json"
+  partial_baseline="$work/landed-baseline-partial.json"
+  malformed_baseline="$work/landed-baseline-malformed.json"
+  findings_tsv="$work/landed-findings.tsv"
+  : >"$findings_tsv"
+  landed_collect "$base..HEAD" "$a_sha" >/dev/null 2>&1
+  for f in "${findings[@]}"; do
+    printf '%s\t%s\n' "$(git -C "$scratch" rev-parse "${f#*:}")" "${f%%:*}" >>"$findings_tsv"
+  done
+  python3 - "$findings_tsv" "$recorded_baseline" "$empty_baseline" "$partial_baseline" \
+    "$malformed_baseline" "$b_sha" <<'PY'
+import json
+import sys
+
+tsv, recorded, empty, partial, malformed, keep = sys.argv[1:7]
+entries = []
+with open(tsv, encoding="utf-8") as fh:
+    for line in fh:
+        sha, _, code = line.strip().partition("\t")
+        if sha and code:
+            entries.append({"sha": sha, "code": code, "why": "provoked by --selftest"})
+
+
+def write(path, payload):
+    json.dump(
+        {"measured_at": "2026-09-19", "measured_head": "", "entries": payload},
+        open(path, "w", encoding="utf-8"),
+        indent=2,
+    )
+
+
+write(recorded, entries)
+write(empty, [])
+write(partial, [entry for entry in entries if entry["sha"] == keep])
+# The loader rejects an unparseable record, and a rejected record must not be a
+# way to switch the check off (the rule `landed.py` applies to its own baseline).
+json.dump(
+    {"measured_at": "2026-09-19", "measured_head": "", "entries": "not-a-list"},
+    open(malformed, "w", encoding="utf-8"),
+    indent=2,
+)
+PY
+
+  # NOTE the containment form: bash-native `[[ … == *"needle"* ]]`, never a pipe
+  # into `grep -q`. `check-verdict-contains` counts the pipe idiom per file and its
+  # record is shrink-only, so a new `printf | grep -q` here REFUSES the whole gate
+  # (measured: nine of them took this file 15 -> 24 against a recorded 15).
+  # 12. a MEASURED finding the record names is booked as recorded legacy and the
+  #     repository verdict is OK — with the residue named, never hidden.
+  baseline_file="$recorded_baseline"
+  out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
+  if [ $? -eq 0 ] \
+     && [[ "$out" == *"recorded legacy  commit-missing-ticket-trailer:${c_sha:0:12}"* ]] \
+     && [[ "$out" == *"LANDED OK"* ]]; then
+    printf '  OK    a recorded post-boundary finding is booked as recorded legacy, not refused\n'
+  else
+    printf '  FAIL  a recorded post-boundary finding was not booked as recorded legacy\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 13. per-commit precision, in both directions at once: with ONLY `b` recorded,
+  #     `b` is booked and the unrecorded `c` is still refused BY NAME — the record
+  #     grandfathers the commits it names, never the run. The unrecorded COUNT is
+  #     whatever the earlier arms left in the range, so it is not asserted; the
+  #     recorded count is exactly the one entry this arm planted.
+  baseline_file="$partial_baseline"
+  out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
+  if [ $? -eq 1 ] \
+     && [[ "$out" == *"  FAIL  commit-missing-ticket-trailer:${c_sha:0:12}"* ]] \
+     && [[ "$out" == *"recorded legacy  commit-ref-only-in-subject:${b_sha:0:12}"* ]] \
+     && [[ "$out" == *", 1 recorded legacy)"* ]]; then
+    printf '  OK    an unrecorded finding is refused while a recorded one is booked, in one run\n'
+  else
+    printf '  FAIL  the record did not book/refuse per commit\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 13b. …and an EMPTY record grandfathers nothing at all.
+  baseline_file="$empty_baseline"
+  out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
+  if [ $? -eq 1 ] && [[ "$out" == *"commit-missing-ticket-trailer:${c_sha:0:12}"* ]]; then
+    printf '  OK    an empty record grandfathers nothing (the record is the act)\n'
+  else
+    printf '  FAIL  an empty record was treated as a pass\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 14. THE SEAM. With the record that grandfathers every finding in the range
+  #     still in force, the predicate path (`landed_audit`, the shape every
+  #     programmatic consumer asks for with an explicit --range) must keep
+  #     refusing them: the record applies to the repository verdict, never to the
+  #     verbatim re-check.
+  baseline_file="$recorded_baseline"
+  out="$(landed_audit "$base..HEAD" "$a_sha" 2>&1)"
+  if [ $? -eq 1 ] && [[ "$out" == *"commit-missing-ticket-trailer:${c_sha:0:12}"* ]]; then
+    printf '  OK    the record does not weaken the predicate path its consumers read\n'
+  else
+    printf '  FAIL  the record leaked into the predicate path (explicit --range)\n%s\n' "$out" >&2
+    ok=1
+  fi
+
+  # 15. an unreadable record is NOT-OK (rc 1), never a skip: otherwise deleting
+  #     the file would be a way to switch the check off. Both shapes are provoked.
+  baseline_file="$work/absent-baseline.json"
+  out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
+  if [ $? -eq 1 ] && [[ "$out" == *"baseline-missing"* ]]; then
+    printf '  OK    a missing record is refused (rc 1, never a skip)\n'
+  else
+    printf '  FAIL  a missing record was not refused as NOT-OK\n%s\n' "$out" >&2
+    ok=1
+  fi
+  baseline_file="$malformed_baseline"
+  out="$(landed_verdict "$base..HEAD" "$a_sha" 2>&1)"
+  if [ $? -eq 1 ] && [[ "$out" == *"baseline-malformed"* ]]; then
+    printf '  OK    a malformed record is refused by name\n'
+  else
+    printf '  FAIL  a malformed record was not refused by name\n%s\n' "$out" >&2
+    ok=1
+  fi
+  baseline_file="$baseline_default"
 
   # --- Gate-changing plants (issue #1054) -------------------------------------
   # plant (a): missing/placeholder `Gate-changing:` line is refused by name.
@@ -1998,8 +2283,13 @@ if [ -n "${SELFTEST:-}" ]; then
 fi
 
 if [ -n "${LANDED:-}" ]; then
+  # Two named contracts, and the discriminant is the argv `--range` — never an
+  # ambient variable. No range named is the repository verdict (the recorded
+  # legacy applied); an explicit range is the predicate re-check, verbatim, which
+  # is what every programmatic consumer of this check asks for. See "THE RECORDED
+  # LEGACY, AND THE TWO CONTRACTS OF `--landed`" in the header (#1402).
   if [ "$RANGE_SET" -eq 0 ]; then
-    landed_audit "HEAD" "$gate"
+    landed_verdict "HEAD" "$gate"
   else
     landed_audit "$range" "$gate"
   fi

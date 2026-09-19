@@ -145,12 +145,32 @@ SCAN_PR_FAILURES_MARKER = "ao-fleet-scan-pr-failures"
 #: reconciler (so a stale line for it is removed), but never installed.
 MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER, REAP_MARKER)
 
-# The PATH line (issue #1370): when AO_FLEET_CRON_PATH is set, `install`
+# The PATH block (issue #1370): when AO_FLEET_CRON_PATH is set, `install`
 # emits exactly one `PATH=...` line at the top of the managed block so every
 # rung — not just the ones this module renders inline — inherits it (the
 # runner rung needs `gh`/`gcloud` from /snap/bin; cron's own PATH does not
 # have it). Unset, no PATH= line is emitted: current behaviour is unchanged.
+#
+# The marker rides on its OWN line, directly ABOVE the assignment, and never as
+# a trailing comment on it (issue #1416). Cron does not strip a trailing
+# comment from an environment-setting line — everything after `=` is the VALUE
+# — so the form #1370 shipped, `PATH=/a:/b # ao-fleet-path`, installs
+# `PATH=/a:/b # ao-fleet-path`, whose LAST `:`-element is the corrupted
+# `/a # ao-fleet-path`-shaped string and is therefore never a directory.
+# Measured on the shared-services primary: the corrupted element was `/usr/bin`,
+# so every binary that lives only there vanished from cron's PATH — the runner
+# rung's role-inline `env` prefix died `flock: failed to execute env: Permission
+# denied`, and `fleet/watchdog.py`'s by-name `git` reads all returned nothing so
+# every pass was refused `source: CANNOT-ASSESS`. A PATH line that silently
+# drops a directory is worse than no PATH line at all: it is a managed line that
+# cannot do its job, and its failure is attributed to whatever needed the lost
+# binary.
 PATH_MARKER = "ao-fleet-path"
+#: The block's first line — a crontab comment, recognised by `_marker_of` like
+#: any other managed line. The assignment below it carries NO marker, so cron
+#: reads exactly the declared value; see `_path_block_indices` for how the pair
+#: is kept together.
+PATH_COMMENT = f"# {PATH_MARKER}"
 PATH_ENV = "AO_FLEET_CRON_PATH"
 
 #: Every marker this module has ever owned, enabled or not. `_is_ours` matches
@@ -492,18 +512,45 @@ def reap_line() -> str:
     return render_job(_job_by_name("reap"))
 
 
-def path_line(env: dict[str, str] | None = None) -> str | None:
-    """The managed `PATH=...` line, or None when AO_FLEET_CRON_PATH is unset.
+def path_lines(env: dict[str, str] | None = None) -> list[str] | None:
+    """The managed PATH block — the marker comment, then the assignment — or
+    None when AO_FLEET_CRON_PATH is unset.
 
-    Rendered with the same trailing-marker convention as a job line so
-    `_is_ours`/`_marker_of` recognise, refresh and remove it like any other
-    managed line — it is just not tied to a manifest job.
+    TWO crontab lines carrying ONE `PATH=` line. The assignment is clean because
+    it has to be: cron's environment-setting line has no comment syntax, so
+    anything after the value becomes part of the value (PATH_MARKER). The
+    marker therefore leads, on a line of its own, and `_marker_of` recognises it
+    by the same trailing-marker convention every other managed line uses.
     """
     source = os.environ if env is None else env
     value = source.get(PATH_ENV, "")
     if not value:
         return None
-    return f"PATH={value} # {PATH_MARKER}"
+    return [PATH_COMMENT, f"PATH={value}"]
+
+
+def _path_block_indices(lines: list[str]) -> set[int]:
+    """The indices of the managed PATH block: the marker line, plus the `PATH=`
+    assignment directly below it.
+
+    The assignment carries no marker — it must not (PATH_MARKER) — so position
+    is the only thing that can identify it: a `PATH=` line that does NOT
+    immediately follow our marker is foreign, and is left exactly where it is.
+    """
+    found: set[int] = set()
+    for index, entry in enumerate(lines):
+        if _marker_of(entry) != PATH_MARKER:
+            continue
+        found.add(index)
+        if index + 1 < len(lines) and lines[index + 1].strip().startswith("PATH="):
+            found.add(index + 1)
+    return found
+
+
+def _path_block(lines: list[str]) -> list[str]:
+    """The installed PATH block as it stands, in place — `[]` when there is none."""
+    indices = _path_block_indices(lines)
+    return [entry for index, entry in enumerate(lines) if index in indices]
 
 
 def _is_ours(entry: str) -> bool:
@@ -526,10 +573,11 @@ def reconcile_lines(
     are kept; a declared job whose line is missing is installed, one whose line
     differs is refreshed, and a marked line whose job is no longer declared is
     reported stale and removed. When AO_FLEET_CRON_PATH (`env`, default
-    `os.environ`) is set, a single `PATH=...` line (issue #1370) is kept at
-    the TOP of the managed block, ahead of every job line, so every rung
-    inherits it; unset, no such line is installed and a leftover one from a
-    prior install is reported stale and removed — same lifecycle as a job.
+    `os.environ`) is set, one `PATH=...` line (issue #1370) is kept at the TOP
+    of the managed block, ahead of every job line, so every rung inherits it —
+    preceded by the block's own marker comment (`path_lines`); unset, no such
+    line is installed and a leftover block from a prior install is reported
+    stale and removed — same lifecycle as a job.
     """
     base = Path(root) if root is not None else ROOT
     user = current_user if current_user is not None else _current_user()
@@ -537,20 +585,25 @@ def reconcile_lines(
         str(job["marker"]): render_job(job, root=base, current_user=user, interval=interval)
         for job in jobs
     }
-    kept = [entry for entry in lines if not _is_ours(entry)]
+    path_indices = _path_block_indices(lines)
+    kept = [
+        entry
+        for index, entry in enumerate(lines)
+        if not _is_ours(entry) and index not in path_indices
+    ]
     report: dict[str, list[str]] = {"installed": [], "stale": [], "refreshed": [], "clean": []}
     ordered: list[str] = []
 
-    wanted_path = path_line(env)
-    present_path = [entry for entry in lines if _marker_of(entry) == PATH_MARKER]
+    wanted_path = path_lines(env)
+    present_path = _path_block(lines)
     if wanted_path is not None:
         if not present_path:
             report["installed"].append(PATH_MARKER)
-        elif present_path == [wanted_path]:
+        elif present_path == wanted_path:
             report["clean"].append(PATH_MARKER)
         else:
             report["refreshed"].append(PATH_MARKER)
-        ordered.append(wanted_path)
+        ordered.extend(wanted_path)
     elif present_path:
         report["stale"].extend(present_path)
 
@@ -594,9 +647,24 @@ def install_lines(
 
 
 def remove_lines(lines: list[str]) -> tuple[list[str], list[str]]:
-    """Split a crontab into (foreign lines kept, our lines removed)."""
-    ours = [entry for entry in lines if _is_ours(entry)]
-    return [entry for entry in lines if not _is_ours(entry)], ours
+    """Split a crontab into (foreign lines kept, our lines removed).
+
+    The PATH block's assignment has no marker of its own (PATH_MARKER), so it is
+    removed by position with the marker line above it; leaving it behind would
+    keep a PATH export alive after `uninstall`.
+    """
+    path_indices = _path_block_indices(lines)
+    ours = [
+        entry
+        for index, entry in enumerate(lines)
+        if _is_ours(entry) or index in path_indices
+    ]
+    kept = [
+        entry
+        for index, entry in enumerate(lines)
+        if not _is_ours(entry) and index not in path_indices
+    ]
+    return kept, ours
 
 
 def read_crontab() -> list[str]:
@@ -612,13 +680,28 @@ def write_crontab(lines: list[str]) -> None:
 
 
 def installed_lines(lines: list[str]) -> list[str]:
-    return [entry for entry in lines if _is_ours(entry)]
+    """Our managed lines, the PATH block included.
+
+    The block's assignment carries no marker (PATH_MARKER), so it is added by
+    position — otherwise `status` would print the marker comment and silently
+    omit the line that actually sets the PATH, which is the line a principal
+    reads to check the install.
+    """
+    path_indices = _path_block_indices(lines)
+    return [
+        entry
+        for index, entry in enumerate(lines)
+        if _is_ours(entry) or index in path_indices
+    ]
 
 
 def cmd_install(args: argparse.Namespace) -> int:
     lines = read_crontab()
     merged = install_lines(lines, args.interval)
     write_crontab(merged)
+    block = path_lines()
+    if block is not None:
+        print(f"cron: installed — PATH block ({PATH_ENV}): {block[1]}")
     for job in _enabled_jobs_safe():
         print(f"cron: installed — {job['name']} ({_schedule_of(job, args.interval)}): "
               f"{render_job(job, interval=args.interval)}")
@@ -659,8 +742,8 @@ def config_drift(lines: list[str]) -> list[str]:
                 f"than the current env would render ({wanted_interp!r})"
             )
             break
-    wanted_path = path_line()
-    present_path = [entry for entry in lines if _marker_of(entry) == PATH_MARKER]
+    wanted_path = path_lines()
+    present_path = _path_block(lines)
     if wanted_path is None and present_path:
         findings.append(
             f"AO_FLEET_CRON_PATH drift: a PATH= line is installed but {PATH_ENV} is now unset"
@@ -669,7 +752,7 @@ def config_drift(lines: list[str]) -> list[str]:
         findings.append(
             f"AO_FLEET_CRON_PATH drift: {PATH_ENV} is set but no PATH= line is installed"
         )
-    elif wanted_path is not None and present_path != [wanted_path]:
+    elif wanted_path is not None and present_path != wanted_path:
         findings.append(
             f"AO_FLEET_CRON_PATH drift: installed PATH= line does not match the current {PATH_ENV}"
         )
@@ -702,8 +785,13 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_render(args: argparse.Namespace) -> int:
-    """Print the rendered crontab — what `install` would write."""
-    for entry in render_lines(_enabled_jobs_safe()):
+    """Print the rendered crontab — what `install` would write.
+
+    The PATH block is part of that, and its absence here (#1416) was how a
+    render could look right while `install` wrote a different crontab: the
+    block is rendered by `path_lines`, not by a manifest job.
+    """
+    for entry in (path_lines() or []) + render_lines(_enabled_jobs_safe()):
         print(entry)
     return 0
 

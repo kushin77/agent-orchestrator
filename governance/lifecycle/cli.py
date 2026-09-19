@@ -83,8 +83,19 @@ def lifecycle_root() -> Path:
 
 
 ROOT = lifecycle_root()
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+
+#: The code root is THIS checkout — never the override. ``governance/`` is a
+#: namespace package, so its ``__path__`` is recomputed from ``sys.path`` on every
+#: submodule import: inserting the *state* root there made ``governance.isolation``
+#: and ``governance.lifecycle`` resolve out of the override, so a lane's fixed copy
+#: imported a stranger's modules instead of its own (#1438 — measured: the shared
+#: checkout's branch has no ``lifecycle.lane_closeout`` and no
+#: ``isolation.worktree.content_landed``, and the verb died with ``ImportError`` /
+#: ``AttributeError`` instead of running the code it was invoked from). The override
+#: says where the state is read and written; it must not say what code runs.
+CODE_ROOT = Path(__file__).resolve().parents[2]
+if str(CODE_ROOT) not in sys.path:
+    sys.path.insert(0, str(CODE_ROOT))
 
 from governance.lifecycle import directive, gate, lane_closeout, ledger, live  # noqa: E402
 from governance.lifecycle.audit import audit, hygiene, in_scope, load_quarantine  # noqa: E402
@@ -1495,7 +1506,51 @@ class RepoLaneOps:
         return f"deleted origin/{branch}"
 
     def worktree_present(self, path: str) -> bool:
-        return bool(path) and Path(path).exists()
+        """Is the path a worktree — one GIT knows about, not merely a directory?
+
+        ``Path(path).exists()`` answered a different question. Another lane's reaper
+        prunes the admin entry under ``.git/worktrees/`` and can leave the directory
+        dangling, so "the directory is there" was true while ``git worktree remove``
+        refused with ``fatal: '<path>' is not a working tree``. That refusal blocked
+        ``worktree-removed``, which withheld ``lane-archived``, which meant
+        ``forget_lane`` never ran: the record could never reach a terminal state, and
+        7 of 32 records were wedged that way (#1441/#1443).
+
+        Membership in ``git worktree list`` is the SAME notion
+        ``governance/reconcile/orphans.py`` and ``governance/isolation`` already use,
+        so the terminal verb and the walk that prescribes it now agree on what
+        "present" means.
+
+        An unreadable worktree list is CANNOT-ASSESS, never a verdict: reporting
+        "no worktree on disk" because git could not be run would archive a record on
+        the strength of a measurement that never happened.
+        """
+        return bool(path) and path in self._worktrees()
+
+    def worktree_leftover(self, path: str) -> bool:
+        """Does a directory sit at the path without git knowing it as a worktree?
+
+        The shape a reclaim leaves behind. There is no working tree to remove, and the
+        directory is never deleted: with the admin entry gone there is no way to
+        measure what is inside it, and rule 17 forbids trading work for a tidier box.
+        """
+        return bool(path) and Path(path).exists() and path not in self._worktrees()
+
+    def _worktrees(self) -> set[str]:
+        """Every path ``git worktree list`` reports, by absolute path."""
+        try:
+            result = self._git("worktree", "list", "--porcelain")
+        except OSError as exc:
+            raise lane_closeout.LaneUnavailable(f"git could not be run: {exc}") from exc
+        if result.returncode != 0:
+            raise lane_closeout.LaneUnavailable(
+                f"git worktree list failed: {result.stderr.strip()[-200:]}"
+            )
+        return {
+            line[len("worktree ") :]
+            for line in result.stdout.splitlines()
+            if line.startswith("worktree ")
+        }
 
     def foreign_dirt(self, path: str) -> list[str]:
         from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415
