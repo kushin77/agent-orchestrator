@@ -121,6 +121,13 @@ repo_beats_before="$(beats_files "$root")"
 fail=0
 note_fail() { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
 
+contains() { # contains <haystack> <needle> — bash-native, so it cannot SIGPIPE a producer
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # --- 1. the declarations -----------------------------------------------------
 # Each name is the mechanism, not the wording: removing it fails this gate.
 
@@ -440,7 +447,7 @@ fi
 # must be present, in the tree this check owns.
 producer_beats="$(beats_files "$beats_tree")"
 if [ -f fleet/beats.py ]; then
-  if printf '%s\n' "$producer_beats" | grep -q '^deepseek-executor\.json '; then
+  if contains "$producer_beats" "deepseek-executor.json "; then
     echo "  OK    [beats] the spawn path posted its runtime beat (#1412) into this check's own tree"
   else
     note_fail "[beats] the spawn path's runtime beat is not in $beats_tree/.fleet/runtime-beats/ — the redirect is not reaching the producer"
