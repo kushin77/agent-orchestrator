@@ -36,6 +36,7 @@ and how its own runtime state stays bounded — without a human.
     python3 fleet/cron.py respawn                    # force-respawn the rungs
     python3 fleet/cron.py prune [--apply]            # run the pruner once (dry-run first)
     python3 fleet/cron.py reap [--apply]             # run the worktree reaper once (dry-run first)
+    python3 fleet/cron.py runner [--apply]           # run the PR-runner rung once (issue #1343)
     python3 fleet/cron.py uninstall                  # remove the fleet lines
 
 Each line is identifiable by its trailing marker (`# ao-fleet-watchdog`,
@@ -53,6 +54,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -100,6 +102,25 @@ PROMOTE_MARKER = "ao-fleet-promote-portal"
 PROMOTE_LOG = runtime.FLEET_DIR / "promote-portal.log"
 PROMOTE_SCHEDULE = "*/10 * * * *"
 
+# The PR-runner rung (issue #1343, parent #1295): every N minutes it runs
+# `fleet/runner/cli.py run --once --apply`, which verifies every open PR head
+# lacking evidence, posts `ao/gate-of-record`, and merges the greens through
+# `scripts/merge-pr.sh` once the merged tree is proven (docs/PR-RUNNER.md).
+# It replaces the nohup prototypes in ~/ao-runner on 192.168.168.42. It is
+# ROLE-GATED, not flag-gated: the manifest entry carries
+# `enabled_when: {env: AO_RUNNER_HOST_ROLE, equals: primary}` — the env contract
+# (infra/fleet/env_contract.py) declares that variable, `enabled_jobs()` reads
+# it, and only the shared-services primary renders the line. Everywhere else
+# (this box, the image's gate, a standby) the job is declared, recognised by the
+# reconciler, and never installed; `cli.py` refuses `host-role-not-primary` as a
+# second wall. The rendered line carries the role assignment inline so the
+# rung's own log shows which role installed it.
+RUNNER_MARKER = "ao-fleet-runner"
+RUNNER_LOG = runtime.FLEET_DIR / "runner.log"
+RUNNER_SCHEDULE = "*/3 * * * *"
+RUNNER_ROLE_ENV = "AO_RUNNER_HOST_ROLE"
+RUNNER_ROLE_PRIMARY = "primary"
+
 # The fifth job the manifest declares, ship-gated OFF (issue #241): refreshing
 # the committed board snapshot is the one network-touching cron path, so it does
 # not change installed behaviour until a principal flips `enabled: true`.
@@ -126,7 +147,7 @@ MARKERS = (MARKER, PRUNE_MARKER, RECONCILE_MARKER, REAP_MARKER)
 #: Every marker this module has ever owned, enabled or not. `_is_ours` matches
 #: against these so `uninstall`/`reconcile` remove a line whose job is now
 #: disabled or dropped, not just one whose schedule drifted.
-DECLARED_MARKERS = MARKERS + (SNAPSHOT_REFRESH_MARKER, SCAN_PR_FAILURES_MARKER, PROMOTE_MARKER)
+DECLARED_MARKERS = MARKERS + (SNAPSHOT_REFRESH_MARKER, SCAN_PR_FAILURES_MARKER, PROMOTE_MARKER, RUNNER_MARKER)
 
 INTERPRETER = "/usr/bin/python3"
 FLOCK = "/usr/bin/flock"
@@ -191,6 +212,17 @@ _LEGACY_JOBS = (
         # a follow-up lane flips it on there — see PROMOTE_MARKER's comment.
         "enabled": False,
     },
+    {
+        "name": "runner",
+        "marker": RUNNER_MARKER,
+        "schedule": RUNNER_SCHEDULE,
+        "command": "/usr/bin/python3 fleet/runner/cli.py run --once --apply",
+        "user": "",
+        "log": "runner.log",
+        "singleton": True,
+        "enabled": False,
+        "enabled_when": {"env": RUNNER_ROLE_ENV, "equals": RUNNER_ROLE_PRIMARY},
+    },
 )
 
 
@@ -211,9 +243,40 @@ def manifest_jobs(manifest: dict) -> list[dict]:
     return list(manifest.get("jobs", []))
 
 
-def enabled_jobs(manifest: dict) -> list[dict]:
-    """Only the jobs whose `enabled` flag is set — what gets installed."""
-    return [job for job in manifest_jobs(manifest) if job.get("enabled") is True]
+def job_enabled(job: dict, env: dict[str, str] | None = None) -> bool:
+    """Is this job installed HERE? `enabled: true`, or an `enabled_when` env
+    condition (`{"env": NAME, "equals": VALUE}`) that the environment satisfies.
+
+    `env` is the environment the condition is judged against. It defaults to
+    EMPTY — the flag-only reading — so every reader that does not pass one
+    (`infra/fleet/healthz.py`, `scripts/check-fleet-jobs.sh`, the image's
+    inventory) derives the same four-rung set on every host regardless of the
+    ambient environment; only the installer paths (`install`, `render`,
+    `reconcile`, `status`) pass `os.environ` and become role-aware. A malformed
+    condition enables nothing: a job that cannot say when it runs does not run.
+    """
+    if job.get("enabled") is True:
+        return True
+    condition = job.get("enabled_when")
+    if not isinstance(condition, dict):
+        return False
+    name = str(condition.get("env") or "")
+    wanted = condition.get("equals")
+    if not name or wanted is None:
+        return False
+    source = {} if env is None else env
+    return source.get(name) == str(wanted)
+
+
+def enabled_jobs(manifest: dict, env: dict[str, str] | None = None) -> list[dict]:
+    """Only the jobs installed here: `enabled: true` or an `enabled_when` that
+    `env` satisfies (see `job_enabled`; no `env` = the flag-only set)."""
+    return [job for job in manifest_jobs(manifest) if job_enabled(job, env)]
+
+
+def ambient_env() -> dict[str, str]:
+    """The installer's environment — the one place `os.environ` is read here."""
+    return dict(os.environ)
 
 
 def validate_manifest(manifest: dict) -> list[str]:
@@ -248,6 +311,11 @@ def validate_manifest(manifest: dict) -> list[str]:
             problems.append(f"{label}: missing schedule (need 'interval' or 'schedule')")
         if not str(job.get("log") or "").strip():
             problems.append(f"{label}: missing log")
+        condition = job.get("enabled_when")
+        if condition is not None and (
+            not isinstance(condition, dict) or not str(condition.get("env") or "") or condition.get("equals") is None
+        ):
+            problems.append(f"{label}: malformed enabled_when (need {{'env': NAME, 'equals': VALUE}})")
     return problems
 
 
@@ -299,6 +367,12 @@ def render_job(
     if job.get("singleton") is True:
         lock = runtime.FLEET_DIR / (Path(log_name).stem + ".lock")
         parts.append(f"{FLOCK} -n -E 99 {lock}")
+    condition = job.get("enabled_when")
+    if isinstance(condition, dict) and condition.get("env") and condition.get("equals") is not None:
+        # A role-gated job carries its role inline: the line only exists on a
+        # host whose environment satisfied the condition at install time, and
+        # cron's own environment is empty, so the command must restate it.
+        parts.append(f"env {condition['env']}={condition['equals']}")
     parts.append(str(job["command"]))
     return " ".join(parts) + f" >> {log_path} 2>&1 # {marker}"
 
@@ -414,7 +488,7 @@ def reconcile_lines(
 
 def _enabled_jobs_safe() -> list[dict]:
     try:
-        return enabled_jobs(load_manifest())
+        return enabled_jobs(load_manifest(), env=ambient_env())
     except (OSError, json.JSONDecodeError, ValueError, TypeError):
         return [dict(job) for job in _LEGACY_JOBS]
 
@@ -505,7 +579,7 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         print(f"reconcile: CANNOT-ASSESS — the manifest could not be read ({exc})", file=sys.stderr)
         return 2
-    jobs = enabled_jobs(manifest)
+    jobs = enabled_jobs(manifest, env=ambient_env())
     lines = read_crontab()
     merged, report = reconcile_lines(lines, jobs)
     for change in ("installed", "refreshed"):
@@ -586,6 +660,14 @@ def cmd_promote(args: argparse.Namespace) -> int:
     return subprocess.call(command, cwd=ROOT)
 
 
+def cmd_runner(args: argparse.Namespace) -> int:
+    """Run the PR-runner rung once, now — merges are dry-run unless `--apply`."""
+    command = ["python3", str(ROOT / "fleet" / "runner" / "cli.py"), "run", "--once"]
+    if args.apply:
+        command.append("--apply")
+    return subprocess.call(command, cwd=ROOT)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fleet-cron", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -615,6 +697,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     promote.add_argument("--apply", action="store_true", help="perform the promotion (default: dry-run)")
     promote.set_defaults(func=cmd_promote)
+    runner = sub.add_parser("runner", help="run the PR-runner rung once (merges dry-run unless --apply)")
+    runner.add_argument("--apply", action="store_true", help="really merge (default: verify + post, merges dry-run)")
+    runner.set_defaults(func=cmd_runner)
     return parser
 
 

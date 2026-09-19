@@ -1,0 +1,18 @@
+{
+  "doc": "lesson 4: a merge goes through scripts/merge-pr.sh (squash guard first), never a bare merge",
+  "master_tip": "cccccccccccccccccccccccccccccccccccccccc",
+  "prs": [
+    {
+      "number": 10,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "evidence": [
+    {
+      "pr": 10,
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "cloud-build",
+      "state": "green"
+    }
+  ]
+}

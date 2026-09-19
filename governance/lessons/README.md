@@ -261,7 +261,7 @@ than stored again here.
 
 ## The incidents recorded so far
 
-Eighteen real incidents from this repository's own history, each with an
+Nineteen real incidents from this repository's own history, each with an
 artifact, a corrective action and a lesson — a `LESSON-*` once the change has
 landed, a `SUGGEST-*` while it is still in flight — the eleven recorded below,
 and the six the EPIC #708 wave registered in its own section. That count is
