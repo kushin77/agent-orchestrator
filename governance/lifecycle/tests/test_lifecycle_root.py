@@ -97,3 +97,47 @@ def test_a_missing_directory_is_refused_like_any_other_non_repository(value):
 
     assert done.returncode != 0
     assert "is not a repository root" in done.stderr
+
+
+#: The seam's other half, and the defect #1438 measured: the override must not
+#: decide which code runs. ``governance/`` is a namespace package, so its
+#: ``__path__`` is recomputed from ``sys.path`` on every submodule import — with the
+#: override inserted there, a state root that is *another checkout* of this
+#: repository wins the import.
+_RUN_CLI = "close --lane deadbeefcafe"
+
+
+def test_the_override_decides_the_state_and_never_which_code_runs(tmp_path):
+    """The one use the seam exists for: the FIXED code against the fleet's state.
+
+    Measured on this box with the shared checkout as the override (#1438): the verb
+    imported the state root's ``governance.lifecycle`` (its older branch has no
+    ``lane_closeout``, and its ``isolation.worktree`` has no ``content_landed``), so a
+    lane's fixed copy died with ``ImportError`` / ``AttributeError`` instead of closing
+    anything — the fixed code was unreachable through the seam that exists to reach it.
+    The override is a data root: it may not say what code runs.
+    """
+    other = tmp_path / "other-checkout"
+    (other / ".git").mkdir(parents=True)
+    (other / "governance" / "lifecycle").mkdir(parents=True)
+    # The state root's copy of this package, older than ours: a `lifecycle` package
+    # with no `lane_closeout` module in it.
+    (other / "governance" / "lifecycle" / "__init__.py").write_text("", encoding="utf-8")
+    assert not (other / "governance" / "lifecycle" / "lane_closeout.py").exists()
+
+    env = {k: v for k, v in os.environ.items() if k != "AO_LIFECYCLE_ROOT"}
+    env["AO_LIFECYCLE_ROOT"] = str(other)
+
+    done = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "governance" / "lifecycle" / "cli.py"), *_RUN_CLI.split()],
+        cwd=str(REPO_ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    # The verb REFUSES BY NAME (an unknown lane is CANNOT-ASSESS, rc 2) instead of
+    # tracebacking out of somebody else's tree.
+    assert "Traceback" not in done.stderr, done.stderr
+    assert done.returncode == 2, (done.returncode, done.stdout, done.stderr)
+    assert "CANNOT-ASSESS" in done.stdout + done.stderr

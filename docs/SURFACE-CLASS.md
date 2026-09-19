@@ -6,6 +6,28 @@ declaration. This is the surface counterpart to the issue-class gate in
 [`governance/conformance/`](../governance/conformance/README.md) (issue #140):
 that gate classifies a piece of *work*, this one classifies a *surface*.
 
+**Ceiling rule, stated up front:** not every row can honestly reach `elite`.
+A handful of rows carry an explicit `class_ceiling` below the top rung
+because their *shape* — a static asset bundle, repository metadata, a
+single file — cannot hold the upper rungs' artifacts (see
+[Class ceilings](#class-ceilings-non-product-rows) below). Every *other*
+row is a product row, and product rows are held to the rung their own
+evidence **measures** (`bash scripts/check-surface-class.sh` /
+`python3 governance/conformance/surfaces.py check`, reproducible on demand),
+never to a blanket "every row is `elite`" target: the module's own
+`solution_class` is the **floor** over the measured product rows, not
+their ceiling, so a product row measuring below `elite` is a legitimate,
+currently correct state, not a defect to explain away. Which rows those
+are is printed by the gate on every run (the `module` / `floor=` line) and
+shown in the measured table below — deliberately not restated here,
+because a hard-coded row list in prose is exactly what went stale in
+EPIC #878. Read any closed epic's "every row `elite`" framing (e.g. EPIC
+#878, whose own table has since gone stale as lanes landed) as shorthand
+for
+"every product row measures its declared rung and every non-product row
+measures its ceiling" — this doc's own ceiling and
+measurement rules below are canonical over that shorthand.
+
 ## The ladder
 
 ```

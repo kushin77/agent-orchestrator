@@ -278,9 +278,24 @@ Stated plainly, because a gap named is a gap that can be closed:
   board-metadata audit closes them).
 - `board` validation reads the **offline snapshot** (`.board/snapshot.json`), so
   it needs `python3 governance/dispatch/cli.py snapshot --from-github` to be
-  fresh. It is deliberately *not* in the default `make verify` path, which stays
-  network-free; `--max-stale-minutes` is the one place the staleness policy lives,
-  and it refuses rather than reporting a stale board as a clean one.
+  fresh. Refreshing that snapshot is still a manual, explicit step — the
+  `make verify` runner's image (`python:3.14`, see
+  `infra/cloudbuild/verify.yaml`) has no `gh` and makes no network calls, so
+  live-fetching a fresh snapshot at check-time is not feasible there.
+  `scripts/check-tagging.sh`'s `tagging-freshness` check (issue #1427) closes
+  the other half instead: it now runs `cli.py board --live` in the default
+  `make verify` path (still fully offline — it reads the committed snapshot,
+  it does not fetch one) and FAILS by name once that snapshot is older than
+  `--max-stale-minutes` (default `TAGGING_BOARD_STALENESS_MINUTES`, one
+  week — not the 15-minute claim-freshness bar `governance/dispatch/
+  snapshot.py` uses for a live dispatch claim, which would make this check
+  permanently red: the refresh cadence here is manual, ridden in on whatever
+  other PR happens to touch `.board/snapshot.json` (real gaps over 48h in the
+  commit history), and the `ao-fleet-snapshot-refresh` cron rung that would
+  auto-refresh it is declared but off by default). Past that threshold,
+  `check-tagging.sh` goes red until someone runs `python3
+  governance/dispatch/cli.py snapshot --from-github` and commits the
+  refreshed file — a declared forcing function, not an ambush.
 - The label vocabulary must be **minted on the board** before the new dimensions
   can be used: `python3 governance/tagging/cli.py labels` emits the exact
   `gh label create` commands.
