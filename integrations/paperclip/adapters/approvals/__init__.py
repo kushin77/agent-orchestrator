@@ -15,6 +15,7 @@ the kind -> authority mapping and the refused cases.
 
 from __future__ import annotations
 
+from . import record  # noqa: F401  (issue #1272: the signed-record authority; see record.py)
 from .model import (
     AUTHORITIES,
     KIND_HIRE,
@@ -34,6 +35,7 @@ from .model import (
 )
 
 __all__ = [
+    "record",
     "AUTHORITIES",
     "KIND_HIRE",
     "KIND_OVERRIDE",

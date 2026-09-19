@@ -209,6 +209,26 @@ variables:
     required_by: [deploy, local-run]
     readers: [guardrails/dlp/hmac_audit.py]
 
+  # -- approvals: a signed record, not a chat word (issue #1272) --------------
+  - name: AO_APPROVAL_REQUIRED
+    purpose: >-
+      gates scripts/merge-pr.sh's approval-record check before a squash merge;
+      default off (0) so this lands without blocking the runner — a later
+      wiring lane flips it to 1.
+    secret: false
+    required_by: [ops]
+    readers: [scripts/merge-pr.sh]
+
+  - name: AO_APPROVALS_HMAC_KEY
+    purpose: >-
+      the HMAC key that signs and verifies approval records (merge/delete/
+      pause/flip scopes) in integrations/paperclip/adapters/approvals; secret
+      material, so a literal in the tree is refused (GR-6).
+    secret: true
+    required_by: [deploy, local-run]
+    readers:
+      - integrations/paperclip/adapters/approvals/record.py
+
   # -- the execution engine ----------------------------------------------------
   - name: AO_QUEUE_STORE
     purpose: the durable queue store the engine's queue CLI dispatches from.
