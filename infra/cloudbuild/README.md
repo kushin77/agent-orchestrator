@@ -62,6 +62,139 @@ containers. When a real GCP project exists (a later deploy concern), the
 only way infrastructure changes reach GCP — executed by the deployer SA, never
 by a human in a console.
 
+## The verify runner posts `ao/gate-of-record` (issue #1350)
+
+The now-required status check `ao/gate-of-record` (#1342) needs a producer on
+the PR head. `verify.yaml`'s `verify` step runs the gate of record (via
+`scripts/verify.sh verify` — the same entrypoint `make verify` uses), captures
+its rc, publishes it with `scripts/gate-status.sh post --attestation
+.verify/attestation.json`, and then exits with that same `$rc`. Publishing can
+therefore never turn a red gate green, and the check-run stays truthful to the
+gate.
+
+### The commit under review comes from the gate's own record, not the trigger
+
+`$COMMIT_SHA` is a built-in Cloud Build populates for **push/tag** triggers; on
+a `pull_request`-triggered build it is **empty**. Measured on build
+`e6df118d-a395-477d-957b-9603be327b86`: the build's own checkout log reads
+`GitCommit: df02b015...` while the step saw the built-in empty — so the earlier
+config skipped the POST and reported that the commit under review was
+unresolvable when it was in fact perfectly well known. Requiring that built-in
+withdrew the producer at exactly the moment the check became required.
+
+`make verify` writes `.verify/attestation.json`, which holds **the sha it
+measured** and **the rc it reached**, and Cloud Build's `FETCHSOURCE` checks out
+that same commit. The poster therefore takes both from the record:
+
+- a PARKED or crashed gate writes no attestation, so there is no verdict to
+  publish and the step exits `2` by name rather than inventing one;
+- when `$COMMIT_SHA` *is* populated (push/tag triggers) it is passed alongside
+  as a **cross-check** — a disagreement is refused, because an rc belongs only
+  to the commit that was measured;
+- the step resolves the record with a `dry-run` **before** the token boundary is
+  consulted, so the sha this run is about is readable in the build log instead of
+  merely claimed.
+
+`scripts/gate-status.sh` owns the tri-state mapping (0 OK / 1 NOT-OK /
+2 CANNOT-ASSESS → success / failure / error; CANNOT-ASSESS is never posted as
+success). Cloud Build has no `gh` login, so the `verify` step reads the PAT from
+Secret Manager (`gcloud secrets versions access`) and exports it as `GH_TOKEN`
+for the poster, which falls back from `gh` to a raw authenticated `curl` call
+when `gh` is absent.
+
+### An unreadable token skips the POST — the gate still runs and still reports its rc
+
+The build must not spend the gate's verdict to publish it. Cloud Build resolves
+`availableSecrets` **before any step runs**, so declaring the PAT there made an
+absent secret fail the whole build at step 0: `make verify` never ran, and the
+red build said nothing about the code under review (measured: build
+`27b692b8-0da5-483b-89d9-8f4e348dd806`, `Secret [ao-gate-status-token] not found
+or has no versions`). Issue #1350 settles the order: the gate always runs and
+always reports its own rc, and a token that cannot be read is logged and skipped
+— without failing the step. The step exits with the **gate's** rc, so a skipped
+POST is never mistaken for a verdict on the code, and a red gate still fails the
+build (a POST can never turn one green). The one path that stays CANNOT-ASSESS
+is the opposite case: a token that *was* available and a POST that then failed
+produced no check where one was possible, so that exits `2` by name.
+
+**There are TWO independent boundaries, and the step names the one that blocked
+it** — an unqualified "no secret" message would become false the moment the
+secret exists on a runner that cannot read it:
+
+| message | meaning | remedy |
+|---|---|---|
+| `SKIPPED -- this runner image carries no gcloud, so the token cannot be read here at all` | the step's image is `python:3.14`, which has **no gcloud** (measured: `docker run --rm python:3.14 bash -lc 'command -v gcloud'` → empty) | a step/image change, i.e. the **venue shape** tracked by #1361 — *not* creating the secret |
+| `SKIPPED -- no ao-gate-status-token secret` | gcloud is present, the secret could not be read | create the secret + grant the build SA (below) |
+
+The image is deliberately **not** changed here. The step's image decides which
+checks can assess in this venue, and that shape is #1361's, not this change's:
+swapping it to a cloud-sdk image to pick up gcloud would change which of the 12
+venue-limited checks answer `CANNOT-ASSESS` in CI.
+
+
+The trade is named rather than hidden: **while the secret is absent, this build
+produces no `ao/gate-of-record` status**, so the required check has no
+*automatic* producer and merges ride the operator override — the gap recorded in
+`docs/RELEASE-PLAN.md` §4/§5.
+
+### Ordering: what has to exist before the check can be relied on
+
+1. **secret** — create `ao-gate-status-token` and grant the build SA read
+   access (commands below);
+2. **a runner that can read it** — the `verify` step's image must carry
+   `gcloud`, which `python:3.14` does not (see the table above). That is a venue
+   question, tracked by #1361, so creating the secret alone does **not** give
+   this build a producer;
+3. **trigger** — promote the `verify` trigger out of `disabled: true`
+   (the existing flag-gate, unchanged by this change);
+4. **observation** — read the posted status back with
+   `bash scripts/gate-status.sh show --sha <sha>`.
+
+Until all four hold, this repository's `ao/gate-of-record` check has no
+*automatic* producer, and the fleet merges under the documented operator
+override (`enforce_admins: false` in
+`governance/platform/branch-protection.yaml`) rather than by satisfying it.
+That gap is recorded in `docs/RELEASE-PLAN.md` §4/§5, not hidden here.
+
+### The same producer, run locally (no GH_TOKEN needed)
+
+The poster is the producer; the runner only supplies the rc. Locally (where
+`gh` is already authenticated) the identical, repeatable sequence is:
+
+```bash
+bash scripts/verify.sh verify                                    # the gate, in a lane worktree
+bash scripts/gate-status.sh post --attestation .verify/attestation.json
+bash scripts/gate-status.sh show --sha "$(git rev-parse HEAD)"   # read it BACK
+```
+
+`post --attestation` takes **both** the rc and the sha from the gate's own
+record (`.verify/attestation.json`), so no rc is ever typed by hand: an
+attestation for a different commit, recording something that is not an outcome
+(a PARKED run writes none), or older than `AO_ATTEST_MAX_AGE` (default 6h) is
+refused by name. `--self-test` proves those refusals offline, in dry-run.
+
+### Owner step — create the token secret ONCE (not run by this task)
+
+A fine-grained GitHub PAT scoped to `statuses:write` on this repo only:
+
+```bash
+# 1. Create the secret from the PAT (read from stdin, never as a CLI arg/file):
+echo -n "<the fine-grained PAT>" | gcloud secrets create ao-gate-status-token \
+  --data-file=- --replication-policy=automatic
+
+# 2. Grant the Cloud Build service account read access to it:
+gcloud secrets add-iam-policy-binding ao-gate-status-token \
+  --member="serviceAccount:1056038104733-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+```
+
+Do (1) **before** relying on the check: without the secret the `verify` build
+still runs the gate and still reports its own rc, but it posts nothing (the
+`SKIPPED` line above), so the required status has to come from somewhere else —
+a lane invoking the poster locally, or the operator override. With the secret in
+place the build supplies the status itself.
+
+
 ## Web surface (issue #258)
 
 The public web UI served at ai.purebliss.app (`infra/terraform/modules/web-surface`, flag `enable_web`, OFF by default) rides the **same** `apply.yaml`
