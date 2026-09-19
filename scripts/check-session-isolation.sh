@@ -517,6 +517,37 @@ else
 fi
 expect_ok "the re-opened lane is isolated again (its session is live)" "$a_sid"
 
+# --- 3g. bound at creation: the runtime is validated against the registry (#1301)
+output="$(python3 "$cli" open --issue 998 --agent probe --lane runtime-probe --runtime not-a-runtime \
+  --main "$scratch" --root "$lanes" --base HEAD --allow-tmpfs-root 2>&1)"
+rc=$?
+if [ "$rc" -eq 1 ] && contains "$output" "runtime-unregistered:not-a-runtime" && [ ! -e "$lanes/ao-998-"* ]; then
+  echo "  OK    an unregistered runtime is refused by name before anything is created (runtime-unregistered)"
+else
+  echo "  FAIL  an unregistered runtime exited $rc (expected 1, named, nothing created)" >&2
+  printf '%s\n' "$output" | sed 's/^/        /' >&2
+  fail=$((fail + 1))
+fi
+output="$(python3 "$cli" open --issue 998 --agent probe --lane runtime-probe --runtime claude-subagent --actor gate \
+  --main "$scratch" --root "$lanes" --base HEAD --allow-tmpfs-root 2>/dev/null)"
+rc=$?
+bound_runtime="$(printf '%s' "$output" | python3 -c 'import json,sys; b=json.load(sys.stdin)["binding"]; print(b["runtime"], b["actor"], b["lane_id"])' 2>/dev/null)"
+if [ "$rc" -eq 0 ] && [ "$bound_runtime" = "claude-subagent gate $(printf '%s' "$output" | jfield session_id)" ]; then
+  echo "  OK    vacuity control: a registered runtime is accepted and the record is bound (runtime, actor, lane_id)"
+else
+  echo "  FAIL  vacuity control: a registered runtime exited $rc with binding '$bound_runtime'" >&2
+  fail=$((fail + 1))
+fi
+runtime_sid="$(printf '%s' "$output" | jfield session_id)"
+python3 - "$scratch/.fleet/lanes/$runtime_sid.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+record = json.load(open(path, encoding="utf-8"))
+record["runtime"] = "deregistered-runtime"
+json.dump(record, open(path, "w", encoding="utf-8"))
+PY
+expect_fail "a record hand-edited to name a runtime the registry lacks" "$runtime_sid" "runtime-unregistered"
+
 # --- 3b. the audit does not read the ambient identity -----------------------
 # The control that makes the clearing at the top of this file an assertion rather
 # than a hope (issue #934). The same lane, audited from a shell that exports a

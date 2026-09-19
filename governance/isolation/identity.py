@@ -155,6 +155,21 @@ class SessionIdentity:
     #: legacy record owes none and is classified by the reconcile sweep instead,
     #: so 33 pre-existing records (measured 2026-09-18) do not turn red at once.
     opened_at: str = ""
+    #: The contract fields (#1301): the registry id of the runtime that opened
+    #: the lane (validated by ``governance/isolation/runtimes.py``), the actor
+    #: it resolves to, and the sha256 of the brief the lane was dispatched
+    #: with. All three default to ``""`` so a record written before the
+    #: contract still reads; the sweep names what they lack, the reader never
+    #: refuses to read.
+    runtime: str = ""
+    actor: str = ""
+    brief_hash: str = ""
+
+    @property
+    def lane_id(self) -> str:
+        """The lane's id IS its session id: one mint, one identity, one name for
+        every artifact bound to it (#1301 binds by ``lane_id``)."""
+        return self.session_id
 
     @property
     def author_name(self) -> str:
@@ -251,6 +266,13 @@ class SessionIdentity:
         }
         if self.opened_at:
             payload["opened_at"] = self.opened_at
+            # A record minted with a session is a record minted under the
+            # contract: it carries its binding fields even when empty, so a
+            # reader can tell "unrecorded" from "predates the field".
+            payload["lane_id"] = self.lane_id
+            payload["runtime"] = self.runtime
+            payload["actor"] = self.actor
+            payload["brief_hash"] = self.brief_hash
         return payload
 
     @classmethod
@@ -267,6 +289,9 @@ class SessionIdentity:
             worktree=Path(str(payload["worktree"])),
             repo_slug=str(payload.get("repo_slug", REPO_SLUG_DEFAULT)),
             opened_at=str(payload.get("opened_at") or ""),
+            runtime=str(payload.get("runtime") or ""),
+            actor=str(payload.get("actor") or ""),
+            brief_hash=str(payload.get("brief_hash") or ""),
         )
 
 

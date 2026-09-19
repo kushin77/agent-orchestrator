@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import hashlib
 import json
 import shlex
 import sys
@@ -41,7 +42,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from governance.isolation import journal, live, session, speculative  # noqa: E402
+from governance.isolation import journal, live, runtimes, session, speculative  # noqa: E402
 from governance.isolation.audit import Violation, audit_lane  # noqa: E402
 from governance.isolation.identity import (  # noqa: E402
     IDENTITY_DOMAIN,
@@ -201,7 +202,25 @@ def audit_lane_full(identity: SessionIdentity, main: Path | str) -> list[Violati
         *audit_lane(identity, main),
         *foreign_authored_commits(identity, main),
         *session.session_gone(identity, main),
+        *unregistered_runtime(identity, main),
     ]
+
+
+def unregistered_runtime(identity: SessionIdentity, main: Path | str) -> list[Violation]:
+    """``runtime-unregistered`` for a record naming a runtime the registry lacks (#1301).
+
+    A record written by hand, or by a runtime whose row was since removed, is
+    refused here the same way ``open`` refuses it up front — the registry is
+    the vocabulary for both, so the two can never disagree. An unreadable
+    registry is unproven, never satisfied.
+    """
+    try:
+        refusal = runtimes.unregistered(identity.runtime, main)
+    except runtimes.RegistryUnreadable as exc:
+        return [Violation("runtime-unregistered", f"the runtime registry could not be read, so {identity.runtime!r} is unproven: {exc}")]
+    if not refusal:
+        return []
+    return [Violation("runtime-unregistered", refusal.split(": ", 1)[-1] if ": " in refusal else refusal)]
 
 
 def _mint(args: argparse.Namespace) -> SessionIdentity:
@@ -228,6 +247,26 @@ def cmd_open(args: argparse.Namespace) -> int:
     if not main.exists():
         print(f"open: CANNOT-ASSESS — {main} does not exist", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
+    # #1301: the binding fields are validated BEFORE anything is created. A
+    # runtime the registry does not carry is refused by name and nothing is
+    # provisioned; an absent runtime is named in the payload, not refused (the
+    # dispatchers that mint lanes today do not pass one yet — see runtimes.py).
+    runtime = (args.runtime or "").strip()
+    try:
+        refusal = runtimes.unregistered(runtime, main)
+    except runtimes.RegistryUnreadable as exc:
+        print(f"open: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    if refusal:
+        print(f"open: NOT-OK — {refusal}", file=sys.stderr)
+        return EXIT_NOT_OK
+    brief_hash = (args.brief_hash or "").strip()
+    if args.brief:
+        try:
+            brief_hash = hashlib.sha256(Path(args.brief).read_bytes()).hexdigest()
+        except OSError as exc:
+            print(f"open: CANNOT-ASSESS — the brief {args.brief} could not be read: {exc}", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
     try:
         result = provision(
             identity,
@@ -247,7 +286,13 @@ def cmd_open(args: argparse.Namespace) -> int:
     # existing lane keeps its original `opened_at` and refreshes the beat.
     existing = read_record(identity.session_id, main)
     opened_at = existing.opened_at if existing is not None and existing.opened_at else _utc_now()
-    identity = dataclasses.replace(identity, opened_at=opened_at)
+    identity = dataclasses.replace(
+        identity,
+        opened_at=opened_at,
+        runtime=runtime or (existing.runtime if existing is not None else ""),
+        actor=(args.actor or "").strip() or (existing.actor if existing is not None else ""),
+        brief_hash=brief_hash or (existing.brief_hash if existing is not None else ""),
+    )
     write_record(identity, main)
     beat = session.stamp_for(identity, main, pid=args.pid)
     if args.speculative_base:
@@ -281,6 +326,15 @@ def cmd_open(args: argparse.Namespace) -> int:
             else {"stamped": False, "reason": "unstamped: governance.reconcile is not importable from this root"}
         ),
         "problems": [str(problem) for problem in problems],
+        # #1301: what the lane is bound to. `runtime-unrecorded` is a NOTE, never
+        # a refusal — see runtimes.py for why.
+        "binding": {
+            "lane_id": identity.lane_id,
+            "runtime": identity.runtime or None,
+            "actor": identity.actor or None,
+            "brief_hash": identity.brief_hash or None,
+            "notes": [] if identity.runtime else [f"{runtimes.RUNTIME_UNRECORDED}: pass --runtime <id> so the lane is bound to a registered runtime"],
+        },
     }
     print(json.dumps(payload, indent=2))
     if problems:
@@ -525,6 +579,18 @@ def build_parser() -> argparse.ArgumentParser:
     open_cmd.add_argument("--main", default=default_main(), help="the repository to add the worktree to")
     open_cmd.add_argument("--base", default="origin/master", help="the commit the lane branches from")
     open_cmd.add_argument("--fetch", action="store_true", help="fetch origin/master first")
+    open_cmd.add_argument(
+        "--runtime",
+        default="",
+        help=(
+            "the registry id of the runtime opening this lane (#1301) — one of fleet/runtimes.yaml's "
+            "rows, or until that file lands: " + ", ".join(runtimes.FALLBACK_RUNTIME_IDS) + ". An "
+            "unregistered id is refused by name (runtime-unregistered) before anything is created"
+        ),
+    )
+    open_cmd.add_argument("--actor", default="", help="the identity the runtime acts as (resolved by #1275); recorded, not validated here")
+    open_cmd.add_argument("--brief", default="", help="the brief file this lane was dispatched with; its sha256 is recorded as brief_hash")
+    open_cmd.add_argument("--brief-hash", dest="brief_hash", default="", help="the brief's sha256, when the caller already has it")
     open_cmd.add_argument(
         "--pid",
         type=int,

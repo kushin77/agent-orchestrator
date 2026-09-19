@@ -469,3 +469,38 @@ python3 governance/reconcile/cli.py sweep --root <repo>            # names what 
 python3 governance/reconcile/cli.py sweep --root <repo> --apply    # closes + retires
 ```
 
+## 11. The orphan walk — five kinds, named, budgeted (#1301)
+
+Sessions that beat (§1–3) and artifacts a beat, claim or landing explains (§6)
+still leave the contract's question unanswered: **which artifacts have no live
+lane and no evidenced close-out?** Measured 2026-09-18 on this box: 47
+worktrees no lane record names (31 of them `.claude/worktrees/agent-*` subagent
+trees), 85 local `issue-*` branches with no lane, no recorded worktree and no
+open PR, 11 open PRs bound to no lane, 19 lane records whose issue is closed,
+111 `.fleet/sent/` orders naming a closed issue.
+
+```bash
+python3 governance/reconcile/cli.py sweep --orphans                 # walk + hold to the budget
+python3 governance/reconcile/cli.py sweep --orphans --apply         # reclaim only with evidence
+```
+
+`governance/reconcile/orphans.py` walks all five kinds from files, git and the
+board (the committed snapshot first, `gh` for what it lacks) and names each:
+
+| finding | an artifact that | reclaim |
+|---|---|---|
+| `orphan-worktree` | a linked worktree no lane record names | under `--apply`, only when HEAD is content-landed and it holds no lane-authored dirt; tip recorded to `.fleet/reaped-branches.jsonl` first |
+| `orphan-branch` | a local `issue-*` branch with no lane, no recorded worktree, no open PR — **its SHA is in the finding** | under `--apply`, only when content-landed; tip recorded first; never otherwise |
+| `orphan-pr` | an open PR whose head is no lane's branch and whose body has no `lane: <lane_id>` line | never — add the line or open the lane |
+| `orphan-issue-lane` | a lane record whose issue is closed | never here — `lifecycle close --lane <id>` is the evidence |
+| `orphan-directive` | a `.fleet/sent/` order naming a closed issue | never here — `lifecycle close --issue n` / `retire` |
+
+The counts are held to `governance/reconcile/orphan-budget.yaml` — the counts
+measured the day the walk shipped plus churn headroom, and an `expires` date
+after which the budget is 0 (the ratchet shape of `worktree-cap.yaml`, #1335).
+Above it the sweep is NOT-OK by name, `orphan-budget-exceeded:<kind>:<n>/<budget>`;
+a kind whose source could not be read is `unmeasured` and the sweep is
+CANNOT-ASSESS, never zero. `scripts/check-reconcile-orphans.sh` proves every
+finding on an injected port, reaps and refuses on a real scratch repository,
+and walks the real tree from the main checkout against the declared budget.
+
