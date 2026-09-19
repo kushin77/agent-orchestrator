@@ -1,0 +1,213 @@
+# governance/lane-record/controls.yaml -- the lane record's declared vocabulary.
+#
+# Issue #1270, EPIC #1268. This file is the DECLARATION; the code is the machine.
+# The repository's own pattern for that split is governance/vocabulary/fleet.yaml,
+# and the sibling notice rule (governance/notices/controls.yaml) is the same
+# shape one lane over: the vocabulary is declared here, mirrored as constants in
+# governance/lane-record/lane_record.py, and
+#
+#   python3 governance/lane-record/cli.py controls
+#
+# FAILS when the two stop agreeing -- so a lane cannot mint a second vocabulary
+# by editing one side (`controls-mirror-drift`), and a refusal cannot be declared
+# without a provocation on a non-comment line of the script that carries its name
+# (`refusal-not-provoked`).
+#
+# Why the declaration is load-bearing rather than documentation: a rule only prose
+# carries is advice (GR-29 / AO-GR-4). Each `refusals` entry below is checked
+# against the gate that provokes it, so adding a refusal here without arming it
+# fails, and arming a refusal the gate does not name fails too.
+
+schema: lane-record-controls/v1
+
+# The record version. It is a CONST in the frozen schema and a constant in the
+# module: a record at another version cannot be assessed against this one, and
+# says so by name rather than being read as a malformed lane-record/v1.
+version: lane-record/v1
+
+# The two halves of the ONE record. `kind` selects the shape, so a runtime
+# writing a third kind is refused rather than quietly admitted.
+kinds:
+  - brief
+  - result
+
+# The shared skeleton: what makes a brief and a result the same record. Both
+# halves declare all of these, which is why a brief and a result are readable by
+# one reader.
+record_required:
+  - schema
+  - kind
+  - issue
+  - lane
+  - runtime
+  - ts
+
+# Carried by both halves when present, required by neither.
+record_optional:
+  - refs
+
+# The dispatch half.
+brief_required:
+  - owned_files
+  - scoped_gates
+  - forbidden_verbs
+  - assigned_worktree
+  - report_shape
+
+# The report half.
+result_required:
+  - sha
+  - files_touched
+  - gate_tails
+  - mergeable
+  - squash_rc
+  - worktree
+
+# Where the records live, under the fleet's runtime state. They are written by
+# the runtimes and are never committed; the shipped half is the schema, the
+# module, this declaration and the gate.
+records_subdir: lane-records
+
+# The bounds this rule holds itself to. Each is enforced somewhere NAMED, never
+# stated and left to drift.
+limits:
+  - id: no-hand-maintained-runtime-list
+    rule: >
+      Which runtimes exist is DERIVED from the registry the repository already
+      owns (a live AgentPack identity the gateway catalog carries a transport
+      for), never typed into this rule or into the schema. The schema declares
+      `runtime` as a plain string and the machine refuses a runtime the derived
+      set does not carry, so registering a runtime makes it writable without a
+      schema edit, and a list typed once cannot become the set.
+    enforced_by: governance/lane-record/lane_record.py
+  - id: no-unenforced-schema-keyword
+    rule: >
+      The shape is validated by the repository's stdlib-only subset validator,
+      which REFUSES a keyword it does not implement. A requirement that is
+      written but not measured therefore cannot enter the schema at all -- the
+      failure mode where a gate certifies a shape nobody checks.
+    enforced_by: governance/modules/schema.py
+  - id: no-pass-on-an-unreadable-records-tree
+    rule: >
+      A records directory that cannot be read is CANNOT-ASSESS and is never an
+      empty set, because "no records" and "the records could not be read" must
+      not read the same. A quiet successful read still reports its counts, so an
+      empty tree cannot look like a tree nobody opened.
+    enforced_by: governance/lane-record/lane_record.py
+  - id: no-prose-between-the-halves
+    rule: >
+      Everything a lane is given and everything it returns is a FIELD. The
+      result's runtime is the brief's, its worktree is the assigned one, its
+      files are inside the owned set, every scoped gate carries a tail, and
+      squash_rc is 0 before anything may claim it is mergeable -- so a hand-back
+      that omits a fact is refused by name instead of being read as agreement.
+    enforced_by: governance/lane-record/lane_record.py
+  - id: no-frozen-schema-that-drifts
+    rule: >
+      The schema lists the shared skeleton three times (once for the record,
+      once for each half) because the subset validator implements no `allOf` and
+      no `unevaluatedProperties`. That duplication is only safe while it is
+      checked, so the schema and the module's constants are held equal in both
+      directions and a field belonging to one half is refused on the other.
+    enforced_by: governance/lane-record/lane_record.py
+
+# Every refusal this rule reports, each with the gate that provokes it. The gate
+# is read mechanically: the id must appear on a NON-COMMENT line of the script
+# named here, so a refusal cannot be declared while nothing can make it fire.
+refusals:
+  - id: lane-record-set-unreadable
+    rule: the records directory named cannot be read
+    names_in_the_finding: the directory
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-record-unreadable
+    rule: a record file cannot be read
+    names_in_the_finding: the record path
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-record-not-json
+    rule: a record file is not a JSON object
+    names_in_the_finding: the record path
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-record-naming
+    rule: a file in the records tree is not <issue>/<lane>.{brief,result}.json
+    names_in_the_finding: the path inside the records tree
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-record-filename-mismatch
+    rule: the file name and the record disagree about issue, lane or kind
+    names_in_the_finding: the record path
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-record-schema-version
+    rule: the record declares a version this schema does not carry
+    names_in_the_finding: the version it declares
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-record-kind-unknown
+    rule: a runtime wrote a shape the schema does not allow
+    names_in_the_finding: the kind it wrote
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-record-malformed
+    rule: the record does not satisfy the frozen shape
+    names_in_the_finding: the field, by JSON path
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-result-no-brief
+    rule: a result exists for a brief that does not
+    names_in_the_finding: the issue and the lane
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-runtime-unregistered
+    rule: the record names a runtime the derived registry does not carry
+    names_in_the_finding: the runtime id
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-runtime-mismatch
+    rule: the result's runtime is not the runtime the brief was dispatched to
+    names_in_the_finding: the issue and the lane
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-file-outside-scope
+    rule: the result touched a file the brief does not own
+    names_in_the_finding: the file
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-file-path-invalid
+    rule: an owned or touched path is not repo-relative
+    names_in_the_finding: the path
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-worktree-mismatch
+    rule: the lane ran somewhere other than the worktree it was assigned
+    names_in_the_finding: the worktree the result names
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-worktree-shared
+    rule: the lane ran in the shared checkout, or was assigned it
+    names_in_the_finding: the worktree
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-gate-tail-missing
+    rule: a gate the brief scoped carries no tail in the result
+    names_in_the_finding: the gate
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-gate-tail-unscoped
+    rule: the result carries a tail for a gate the brief never scoped
+    names_in_the_finding: the gate
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-gate-tail-empty
+    rule: a gate tail is empty, so it is not evidence of a run
+    names_in_the_finding: the gate
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-report-shape-unallowed
+    rule: a brief demands a result field the schema does not allow
+    names_in_the_finding: the field
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-report-field-missing
+    rule: a result omits a field its own brief demanded
+    names_in_the_finding: the field
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-squash-not-green
+    rule: a result claims it is mergeable while its squash was not green
+    names_in_the_finding: the squash exit code
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-sha-malformed
+    rule: the result's sha is not 40 lowercase hex
+    names_in_the_finding: the sha as written
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-timestamp-malformed
+    rule: the record's timestamp carries no UTC zone
+    names_in_the_finding: the timestamp as written
+    provoked_by: scripts/check-lane-record.sh
+  - id: lane-schema-mirror-drift
+    rule: the frozen schema and the module's constants have stopped agreeing
+    names_in_the_finding: the schema location that drifted
+    provoked_by: scripts/check-lane-record.sh
