@@ -97,6 +97,12 @@ ALLOWLIST_READERS: tuple[tuple[str, str], ...] = (
     ("secrets", "_secret_allowlist"),
 )
 
+#: The reader ``fleet/channel.py`` exposes for the closed runtime vocabulary.
+#: #1412 replaced its module-level ``RUNTIME_IDS`` literal with this lazy
+#: accessor, so the ids come from the ONE authority (``fleet/runtimes.yaml``,
+#: read by ``fleet/runtimes.py``) and the vocabulary is never re-declared here.
+RUNTIME_IDS_READER = "runtime_ids"
+
 Finding = tuple[str, str]
 
 
@@ -246,6 +252,9 @@ def _allowlists() -> tuple[tuple[str, ...], dict[str, dict[str, tuple[str, ...]]
     siblings: ``governance/spawn`` must stay importable where ``fleet/`` is not a
     sibling (a scratch copy), and the failure is then a refusal this module names
     rather than an import-time crash.
+
+    The vocabulary is read the same way as the tables — through the accessor the
+    module exposes, never a copy of the ids held here.
     """
     try:
         import channel  # noqa: PLC0415 - fleet/channel.py, the tables' ONE reader (#1273)
@@ -260,7 +269,24 @@ def _allowlists() -> tuple[tuple[str, ...], dict[str, dict[str, tuple[str, ...]]
                 "allowlist has no reader — refusing rather than assuming no restriction"
             )
         tables[label] = dict(reader())
-    return tuple(channel.RUNTIME_IDS), tables
+    ids_reader = getattr(channel, RUNTIME_IDS_READER, None)
+    if not callable(ids_reader):
+        raise AdmissionUnavailable(
+            f"fleet/channel.py no longer exposes {RUNTIME_IDS_READER}(), so the runtime "
+            "vocabulary has no reader — refusing rather than assuming no restriction"
+        )
+    try:
+        runtime_ids = tuple(ids_reader())
+    except Exception as exc:  # noqa: BLE001 - fail CLOSED: an unreadable registry refuses
+        # ``fleet/runtimes.py`` REFUSES an absent, unreadable or empty registry
+        # rather than returning an empty vocabulary (an empty one would make every
+        # runtime-bearing spawn valid by accident). That refusal is a NAMED verdict
+        # here, never a traceback at the spawn point.
+        raise AdmissionUnavailable(
+            f"fleet/channel.py's {RUNTIME_IDS_READER}() could not read the runtime "
+            f"registry: {type(exc).__name__}: {exc}"
+        ) from exc
+    return runtime_ids, tables
 
 
 def allowlist_findings(record: Mapping[str, Any]) -> list[Finding]:
