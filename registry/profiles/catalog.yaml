@@ -12,6 +12,32 @@
 #
 # Every entry records provenance (repo/path it was derived from) per the repo
 # provenance doctrine (GR-10, docs/CANNIBALIZATION.md).
+#
+# ── MODEL-TIER VOCABULARY AUTHORITY (issue #1494) ────────────────────────────
+# The `tiers:` mapping below is THE declared authority for the platform's model
+# tier ids. It used to be re-declared as a literal tuple in five modules --
+# gateway/providers/contract.py, governance/authority/model.py,
+# identity/onboarding/model.py, integrations/hermes/mapping.py and
+# portal/server/chat.py -- five copies that happened to agree, so nothing failed
+# when one of them drifted. Those five now READ this mapping through its one
+# reader, registry/profiles/tiers.py, and scripts/check-tier-vocabulary.sh
+# refuses a sixth copy by name.
+#
+# The tier ladder's boundaries, recorded here so "which list is the source" is
+# never a question:
+#   * governance/cto-overlay/overlay.py declares `TIERS` as
+#     experimental|standard|critical -- those are EVIDENCE tiers, a different
+#     concept. OUT OF SCOPE: deliberately not folded into this vocabulary.
+#   * the FinOps tier NAMES flash|pro|auditor are declared by
+#     governance/finops/policy.json (`vocabulary.tiers` + `tier_rank`) and read
+#     through governance/finops/chooser.py. registry/chat/labels.py and
+#     fleet/channel.py consume THAT authority, not this one.
+#   * gateway/finops/tiers.yaml carries the L0/L1/L2 cheapest-capable ladder and
+#     maps it onto these ids via each row's `registryTier`; it consumes this
+#     vocabulary and never redefines it.
+#   * fleet/profiles/routing.policy.json `finops.tier_map` projects these ids
+#     onto the FinOps names; it is data read by fleet/routing.py, and its
+#     agreement is checked by fleet/tests/test_routing.py.
 
 schemaVersion: 1
 
