@@ -370,10 +370,19 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 2
 fi
 
-pr_json="$(gh pr view "$pr_number" --json title,body,headRefName 2>&1)"
+# REST (issue #1567): `gh pr view` is GraphQL, so this guard went blind — and with it
+# EVERY merge (`merge-pr.sh` refuses CANNOT-ASSESS when the guard reaches no verdict) —
+# whenever the box's shared GraphQL budget was exhausted. REST is not gated the same way
+# (docs/SHELL-PATTERNS.md SP-8: read the board through REST).
+repo="${AO_REPO:-$(git remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')}"
+if [ -z "$repo" ]; then
+  echo "check-squash-message: CANNOT-ASSESS — cannot resolve the repository for #$pr_number (set AO_REPO)" >&2
+  exit 2
+fi
+pr_json="$(gh api "repos/$repo/pulls/$pr_number" --jq '{title, body, headRefName: .head.ref}' 2>&1)"
 gh_rc=$?
 if [ "$gh_rc" -ne 0 ]; then
-  echo "check-squash-message: CANNOT-ASSESS — gh pr view $pr_number failed: $pr_json" >&2
+  echo "check-squash-message: CANNOT-ASSESS — reading PR $pr_number through REST failed: $pr_json" >&2
   exit 2
 fi
 
