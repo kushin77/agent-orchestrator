@@ -174,19 +174,75 @@ Exit-code contract is unchanged from the rest of `governance/pmo`: `0` OK /
 non-deterministic render) / `2` CANNOT-ASSESS (the graph or `policy.yaml`
 itself could not be built — never reported as a pass).
 
-## 6. What was scoped out
+## 6. Persona routing (ADR-0012), and what stayed scoped out
 
-An "owner directive" arrived mid-implementation asking this engine to make
-Hermes the default dispatch executor and couple the paperclip ticket to it as
-an authoritative sink. That is the **opposite** of this repo's own ratified
-decision — [ADR-0012](decision-records/ADR-0012-hermes-paperclip-boundary.md)
-("Hermes/Paperclip ownership boundary"), amended specifically to make explicit
-that the accepted path is *"map the policy, do not couple the runtime"* — and
-it arrived through an unverified channel, not the task's own brief. It was not
-implemented; see the PR description for the full reasoning. A `--by-cluster`
-grouping mode and a `governance/pmo/clusters.json` sidecar contract were
-requested in the same message, contingent on a `board-triage` lane's output
-that does not exist in this checkout; both are out of scope for the same
-reason (no committed source to derive from — see §2's own rule about
-`unsourced` terms) and are left for a follow-up issue if a real, committed
-cluster ledger lands.
+An initial mid-implementation message asked this engine to make Hermes an
+**authoritative runtime sink** the paperclip ticket feeds into — a live
+service dependency. That reading was declined: it is the opposite of this
+repo's own ratified decision,
+[ADR-0012](decision-records/ADR-0012-hermes-paperclip-boundary.md), whose §(e)
+is explicit that the accepted path is *"map the policy, do not couple the
+runtime"* — no service call, no availability dependency on Hermes.
+
+A follow-up correctly pointed at ADR-0012's own **Decision (b)**, which this
+package had not yet implemented: *"Work is routed by capability from the
+registry personas… code / test / PR authoring routes to the `hermes` persona
+at MED… research / docs / reporting routes to the `paperclip` persona at
+LOW."* That is **persona routing** — a declared registry vocabulary lookup
+(`registry/profiles/seeds/hermes.1.0.0.yaml`'s `capabilitySet: [code-author,
+test-author, test-run, …]` vs. `registry/profiles/seeds/paperclip.1.1.0.yaml`'s
+`capabilitySet: [research, docs-authoring, …]`), not a runtime call — and is
+exactly what (e)'s boundary permits. `dispatch` now implements it:
+
+* **`executor`** on every per-issue assignment is `"hermes"` or `"paperclip"`,
+  chosen from the ticket's `kind` facet (a real, committed ADR-0014 contract
+  field, never an invented text-keyword heuristic): the lessons/RCA/decision
+  family (`incident`/`rca`/`corrective-action`/`lesson`/`suggestion`) is the
+  research/reporting half → `paperclip`; the default `task` kind is the
+  code-author/test/PR half → `hermes`. A lane's declared `executor:` override
+  in `policy.yaml` (SME-ROUTING-style) wins outright when present — none of
+  the shipped lanes declare one, so today every assignment follows the
+  kind-based default. The tier/model assignment (`L0`/`L1`/`L2`, the
+  high-floor rule for security/identity lanes) is a completely orthogonal
+  field and is untouched by this addition.
+* **`paperclip_ticket`** on every per-issue assignment is the reporting half:
+  a record shaped to `docs/contracts/paperclip/ticket.schema.json` (ADR-0014's
+  join node), containing only the contract's own keys
+  (`id`/`owner`/`status`/`blocked_by`/`goal`/`kind`/`facets`) and only the ones
+  the graph actually populates — a dispatch-ready, unclaimed ticket
+  legitimately has no `owner`/`status`/`goal` yet, and inventing one to
+  satisfy the contract's `required` list would be exactly the fabrication
+  GR-12 forbids (§2's rule about `unsourced` terms, applied to a whole
+  record instead of one score term). This is a **projection written to
+  stdout only** — `dispatch` still adds no ledger.
+
+### `dispatch --by-cluster`
+
+The same follow-up asked for a mode that dispatches one agent per group of
+similar ready issues, so a wave can batch N similar RCA-family backfills in
+tandem instead of one agent per issue. Because no committed source for that
+grouping exists in this repo (`board-triage` is a proposed sibling lane, not a
+landed one), the grouping itself is **out of scope for `governance/pmo` to
+invent** — the same "no term without a committed source" rule from §2 applies
+to a whole clustering, not just a score term. What *is* in scope, and shipped:
+a contract the PMO validates and consumes, never authors —
+`governance/pmo/clusters.schema.json` — plus `governance/pmo/clusters.py`
+(load + validate) and `dispatch --by-cluster`, which:
+
+* with **no** `governance/pmo/clusters.json` committed, falls back to the
+  per-issue plan, byte-for-byte unchanged (`by_cluster: false` in the
+  document) — this is the state today, and what the gate exercises;
+* with a **schema-invalid** `clusters.json`, is CANNOT-ASSESS (rc 2) — an
+  input that claims to be a cluster proposal but is not shaped like one is
+  never silently accepted or silently dropped (`scripts/check-pmo-rollup.sh`
+  control 12 provokes this for real);
+* with a **valid** `clusters.json`, dispatches one assignment per
+  `batchable: true` cluster whose `wave` matches `--wave`, sorted by
+  `priority_rank`, each with one `agent_brief` naming every member issue and
+  the cluster's own `recipe`, `sme` and `tier` (control 13 provokes the
+  positive path over a fixture).
+
+`governance/pmo/clusters.schema.json` is the contract a `board-triage` lane
+(or any other producer) must conform to; this package does not depend on that
+lane landing, does not read anything from it beyond the committed file, and
+never writes `clusters.json` itself.
