@@ -14,10 +14,10 @@ import pytest
 
 from budget import (
     BudgetBlocked,
-    BudgetEnforcer,
+    BudgetDecisionMaker,
     BudgetLedger,
     BudgetPolicy,
-    TenantBudget,
+    TenantBudgetLine,
 )
 from chooser import ModelChooser
 from metering import CallRecord, JsonlMeteringSink, ListMeteringSink
@@ -81,8 +81,8 @@ def test_blocked_call_emits_no_record(table) -> None:
     sink = ListMeteringSink()
     ledger = BudgetLedger()
     ledger.add_spend("tenant-tight", 100.0)  # hard cap reached on a $100 budget
-    enforcer = BudgetEnforcer(ledger=ledger)
-    enforcer.add_budget(TenantBudget("tenant-tight", 100.0, BudgetPolicy.WARN))
+    enforcer = BudgetDecisionMaker(ledger=ledger)
+    enforcer.add_budget(TenantBudgetLine("tenant-tight", 100.0, BudgetPolicy.WARN))
     chooser = ModelChooser(table=table, budget_enforcer=enforcer, sink=sink)
     with pytest.raises(BudgetBlocked):
         chooser.choose(task_class="code-author", tenant_id="tenant-tight", complexity=5.0)

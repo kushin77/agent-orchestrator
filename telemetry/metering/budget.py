@@ -40,7 +40,7 @@ DEFAULT_BUDGET_CONFIG = Path(__file__).resolve().parent / "config" / "budgets.ya
 
 
 @dataclass(frozen=True)
-class BudgetPolicy:
+class DailyTokenBudgetPolicy:
     """One tenant's daily token budget + rollout mode."""
 
     tenant_id: str
@@ -83,19 +83,19 @@ class BudgetVerdict:
         }
 
 
-def load_budget_config(path: Path = DEFAULT_BUDGET_CONFIG) -> Dict[str, BudgetPolicy]:
+def load_budget_config(path: Path = DEFAULT_BUDGET_CONFIG) -> Dict[str, DailyTokenBudgetPolicy]:
     """Load per-tenant budget policies from the YAML config (fail closed)."""
     raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     if not isinstance(raw, Mapping):
         raise ValueError(f"{path}: budget config root must be a mapping")
-    policies: Dict[str, BudgetPolicy] = {}
+    policies: Dict[str, DailyTokenBudgetPolicy] = {}
     for entry in raw.get("policies", []) or []:
         if not isinstance(entry, Mapping):
             raise ValueError(f"{path}: each policy must be a mapping")
         tenant_id = str(entry.get("tenantId") or "")
         if not tenant_id:
             raise ValueError(f"{path}: policy missing tenantId")
-        policies[tenant_id] = BudgetPolicy(
+        policies[tenant_id] = DailyTokenBudgetPolicy(
             tenant_id=tenant_id,
             daily_token_limit=int(entry.get("dailyTokenLimit") or 0),
             mode=str(entry.get("mode") or BUDGET_MODE_OBSERVE),
@@ -107,7 +107,7 @@ class DailyTokenBudget:
     """Per-tenant daily token budget with an observe->enforce toggle.
 
     ``reporter`` supplies the durable daily token totals from the usage
-    store; ``policies`` maps tenant id -> ``BudgetPolicy`` (loadable from
+    store; ``policies`` maps tenant id -> ``DailyTokenBudgetPolicy`` (loadable from
     YAML).  ``default_mode`` and ``default_limit`` apply to tenants without
     an explicit policy; with no limit at all the budget is unlimited and
     always allows (still reported as observe).
@@ -116,7 +116,7 @@ class DailyTokenBudget:
     def __init__(
         self,
         reporter: UsageReporter,
-        policies: Optional[Mapping[str, BudgetPolicy]] = None,
+        policies: Optional[Mapping[str, DailyTokenBudgetPolicy]] = None,
         *,
         default_mode: str = BUDGET_MODE_OBSERVE,
         default_limit: Optional[int] = None,
@@ -126,11 +126,11 @@ class DailyTokenBudget:
         if default_limit is not None and default_limit <= 0:
             raise ValueError("default_limit must be a positive integer")
         self.reporter = reporter
-        self.policies: Dict[str, BudgetPolicy] = dict(policies or {})
+        self.policies: Dict[str, DailyTokenBudgetPolicy] = dict(policies or {})
         self.default_mode = default_mode
         self.default_limit = default_limit
 
-    def policy_for(self, tenant_id: str) -> Optional[BudgetPolicy]:
+    def policy_for(self, tenant_id: str) -> Optional[DailyTokenBudgetPolicy]:
         """The effective policy for a tenant, or ``None`` when unlimited.
 
         An explicit policy wins; otherwise a default policy is synthesized
@@ -142,7 +142,7 @@ class DailyTokenBudget:
             return policy
         if self.default_limit is None:
             return None
-        return BudgetPolicy(
+        return DailyTokenBudgetPolicy(
             tenant_id=tenant_id,
             daily_token_limit=self.default_limit,
             mode=self.default_mode,
