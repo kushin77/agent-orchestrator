@@ -68,10 +68,11 @@ classifier reads only the three YAML documents above.
 
 The review the card produces is the per-PR report the merge contract asks for (a
 `path:line: severity: problem. fix.` finding list); the routing above decides
-which chain and tier *run* it, not what it is allowed to report. Adding a
-persona does not add a domain: `code-review-sme` is deliberately **not** a
-`DOMAIN_SME` value, because the review rule is a task type, not a keyword
-classifier arm.
+which chain and tier *run* it, not what it is allowed to report. The
+`code-review-sme` row is mirrored as `registry/personas/cards/code-review-sme.yaml`
+(issue #1555). Adding a persona does not add a domain: `code-review-sme` is
+deliberately **not** a `DOMAIN_SME` value, because the review rule is a task
+type, not a keyword classifier arm.
 
 ### Squads (board lens)
 
