@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PMO board-triage clusters sidecar",
+  "type": "object",
+  "required": ["generated_at", "source_repos", "clusters", "unclustered", "hygiene"],
+  "properties": {
+    "generated_at": {"type": "string", "format": "date-time"},
+    "source_repos": {"type": "array", "items": {"type": "string"}},
+    "clusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "family", "title", "recipe", "sme", "tier", "batchable", "wave", "priority_rank", "evidence", "issues"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^c-[a-z0-9-]+-\\d+$"},
+          "family": {"type": "string"},
+          "title": {"type": "string"},
+          "recipe": {"type": "string"},
+          "sme": {"type": "string"},
+          "tier": {"type": "string", "enum": ["L0", "L1", "L2"]},
+          "batchable": {"type": "boolean"},
+          "wave": {"type": "integer"},
+          "priority_rank": {"type": "integer"},
+          "evidence": {"type": "string"},
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["repo", "number", "title", "labels", "age_days", "parent"],
+              "properties": {
+                "repo": {"type": "string"},
+                "number": {"type": "integer"},
+                "title": {"type": "string"},
+                "labels": {"type": "array", "items": {"type": "string"}},
+                "age_days": {"type": "integer"},
+                "parent": {"type": ["integer", "null"]}
+              }
+            }
+          }
+        }
+      }
+    },
+    "unclustered": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["repo", "number", "title", "reason"],
+        "properties": {
+          "repo": {"type": "string"},
+          "number": {"type": "integer"},
+          "title": {"type": "string"},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "hygiene": {
+      "type": "object",
+      "required": ["duplicates", "orphan_children", "empty_epics", "template_gaps"],
+      "properties": {
+        "duplicates": {"type": "array"},
+        "orphan_children": {"type": "array"},
+        "empty_epics": {"type": "array"},
+        "template_gaps": {"type": "array"}
+      }
+    }
+  }
+}
