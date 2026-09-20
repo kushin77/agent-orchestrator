@@ -23,15 +23,21 @@ ONE CYCLE (`run --once`)
   4. gather: open non-draft PRs + heads (gh), evidence per (pr, head) from
      check-runs + the gate-of-record status + local markers, live builds
      (gcloud), the hold set.
-  5. `plan()` (pure), printed and recorded.
-  6. execute: cancel stale builds, verify up to `--capacity` heads in parallel
+  5. `conclude` the heads that carry NO gate-of-record at all (#1506): the CI
+     venue of record's own concluded verdict is published for them, from the
+     poster, and read back into the evidence table — so this step runs BEFORE
+     the plan is drawn. It is the half that `--apply` gates, because it exists
+     only to change what a head carries (see verify.py's convergence pass).
+  6. `plan()` (pure), printed and recorded.
+  7. execute: cancel stale builds, verify up to `--capacity` heads in parallel
      (each in its own held worktree), then merge the greens through the
      merged-tree seam and `scripts/merge-pr.sh` — stopping on a non-compliant
      landed tip.
 
 Every step writes `.fleet/runner/ledger.jsonl` (lesson 9); `status` answers
-from it. Dry-run by default: `--apply` is what merges (the verify + post
-half is always real: a verify writes nothing to the repository but a status).
+from it. Dry-run by default: `--apply` is what merges and what concludes (the
+verify + post half is always real: a verify writes nothing to the repository
+but a status).
 
 Tri-state exit: 0 OK / 1 NOT-OK (a refusal or a red) / 2 CANNOT-ASSESS.
 """
@@ -178,6 +184,18 @@ def list_open_prs(gh: Command) -> list[OpenPR] | None:
     ]
 
 
+def read_status_evidence(table: ev.EvidenceTable, gh: Command, pr: int, sha: str) -> None:
+    """Add this head's own `ao/gate-of-record` status to `table`, when it has one."""
+    status = gh(["api", f"repos/{REPO_SLUG}/commits/{sha}/status"])
+    if not status.ok:
+        return
+    try:
+        for record in ev.from_commit_status(pr, sha, json.loads(status.out or "{}"), context=GATE_CONTEXT):
+            table.add(record)
+    except ValueError:
+        pass
+
+
 def gather_evidence(gh: Command, prs: list[OpenPR], marker_dir: Path) -> ev.EvidenceTable:
     table = ev.EvidenceTable(ev.from_local_markers(marker_dir))
     for pr in prs:
@@ -188,13 +206,7 @@ def gather_evidence(gh: Command, prs: list[OpenPR], marker_dir: Path) -> ev.Evid
                     table.add(record)
             except ValueError:
                 pass
-        status = gh(["api", f"repos/{REPO_SLUG}/commits/{pr.head_sha}/status"])
-        if status.ok:
-            try:
-                for record in ev.from_commit_status(pr.number, pr.head_sha, json.loads(status.out or "{}"), context=GATE_CONTEXT):
-                    table.add(record)
-            except ValueError:
-                pass
+        read_status_evidence(table, gh, pr.number, pr.head_sha)
     return table
 
 
@@ -295,6 +307,22 @@ def cycle(
         print(f"  NOTE  {note}", file=out)
         ledger.record("note", detail=note)
     holds = read_holds(base)
+
+    # #1506: settle the context of every head BEFORE the plan is drawn from it.
+    # `conclude` is the verb nothing scheduled until this pass existed, and the
+    # filter is this cycle's own evidence table, so an already-converged head
+    # costs no call (verify.py, "the verdict-convergence pass").
+    if execute and apply:
+        for number, sha in verify_mod.publish_concluded(
+            [(pr.number, pr.head_sha) for pr in prs if not pr.draft],
+            already_carrying=verify_mod.heads_carrying_the_context(table),
+            conclude=verify_mod.real_conclude_status(transports.sh, ROOT),
+            ledger=ledger,
+            out=out,
+        ):
+            # the plan reads THIS table, so the verdicts just published are read
+            # back into it rather than left for the next cycle to discover
+            read_status_evidence(table, transports.gh, number, sha)
 
     actions = plan(prs, table, builds, holds, prune, tip, capacity)
     for line in explain(actions):
