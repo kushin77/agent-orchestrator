@@ -89,15 +89,16 @@
 # both-directions rule: naming a suite made its row STALE, so the gate failed by
 # name until the row was removed -- the list cannot grow an excuse and cannot
 # keep a dead one.
-# LANDED (#1497, 2026-09-19), measured against origin/master a9f63bf4: the 51
-# `swept-only` rows that stood there are TWELVE. THIRTY-NINE were retired the only
-# way this file allows — by NAMING each suite as a pytest target the gate of
-# record runs: `scripts/check-pytest-suites.sh`, auto-discovered into `make
-# verify` by `scripts/discover-checks.sh` (#698), runs each of them in
-# isolation. Naming a suite made its row STALE, which is the both-directions
-# rule above doing exactly what it promises. A second, independent half landed
+# LANDED (#1497, 2026-09-19), measured against origin/master a9f63bf4, and
+# carried to its end by #1509 (2026-09-20): the 51 `swept-only` rows that stood
+# there are NINE. FORTY-TWO were retired the only way this file allows — by
+# NAMING each suite as a pytest target the gate of record runs:
+# `scripts/check-pytest-suites.sh`, auto-discovered into `make verify` by
+# `scripts/discover-checks.sh` (#698), runs each of them in isolation. Naming a
+# suite made its row STALE, which is the both-directions rule above doing
+# exactly what it promises. A second, independent half landed
 # with it: the closed/unknown-tracker rule now covers EVERY live row, so the
-# twelve rows that remain cannot be deferred to a closed issue either.
+# nine rows that remain cannot be deferred to a closed issue either.
 # THE NINE LANE-VENUE ROWS ARE OWNED, NOT EXCUSED. Each is a declared suite that
 # fails, hangs, or cannot run in a lane venue (each measured ALONE, its own
 # pytest process): portal (rc 124 after 240s, 3 failures), scripts (18 failed),
@@ -111,17 +112,35 @@
 # in the committed board snapshot for this rule to read its state OFFLINE, so
 # this lane spliced an entry into `.board/snapshot.json` for it.
 #
-# THREE CI-VENUE ROWS WERE ADDED BY THE SAME LANE when the first CI run of the
-# wired list (Cloud Build python:3.14, build 6845d8ad) reded the gate of record:
-# `check-pytest-suites.sh` had named 42 suites, and three of them failed in the
-# CI venue while passing alone in a lane worktree. They are baselined here
-# rather than named by the check, each tracked by #1509 (OPEN, spliced into
-# `.board/snapshot.json` alongside #1501):
-#   guardrails/honesty       CI pytest exit 1 (74 passed alone in a lane worktree)
-#   governance/lifecycle     CI pytest exit 1 (259 passed alone in a lane worktree)
-#   governance/reconcile     CI pytest exit 1 — test_the_shipped_document_re_measures_its_own_rows
-#                            re-measures the shipped quarantine document against its recorded
-#                            git common dir, which differs in a fresh CI checkout (reproduced)
+# THE THREE CI-VENUE ROWS THAT STOOD HERE ARE GONE (#1509, 2026-09-20), and they
+# were retired the same way the thirty-nine before them were: naming each suite
+# in `scripts/check-pytest-suites.sh` made each row STALE, so each row is removed
+# in the same edit. They existed because the first CI run of the wired list
+# (Cloud Build python:3.14, build 6845d8ad) reded the gate of record: three of
+# its 42 suites failed in the CI venue while passing alone in a lane worktree.
+# Each cause was then measured IN THE VENUE ITSELF — `python:3.14` at
+# `/workspace`, uid 0, LANG=C.UTF-8, deps where
+# `infra/cloudbuild/requirements-verify.txt` puts them — and after that
+# measurement none of the three was a deferral:
+#   guardrails/honesty       uid 0 READS a mode-000 file, so the arm's own
+#                            pre-condition (a file this process cannot read)
+#                            could not exist and it reported NOT-OK about a state
+#                            it never created. It now skips BY NAME there — the
+#                            remedy telemetry/ledger's suite already carries for
+#                            the same pre-condition — and still measures in every
+#                            non-root run.
+#   governance/reconcile     the arm asserted this checkout IS the repository
+#                            instance the shipped quarantine document names
+#                            (/home/akushnir/agent-orchestrator/.git). A foreign
+#                            instance is a DESIGNED, non-fatal state (#1321) — the
+#                            document is simply not in force there — so the arm
+#                            failed in every venue but the machine the rows were
+#                            measured on, which a pristine CI clone never is. It
+#                            now asserts that out-of-force contract, by name,
+#                            against the SHIPPED document.
+#   governance/lifecycle     no repair: green in the venue (258 passed, 1 skipped,
+#                            its own named arm). Its five apparent CI failures were
+#                            the MEASURING harness's, not the suite's.
 suite	portal	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	governance/knowledge	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	governance/conformance	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
@@ -131,6 +150,3 @@ suite	governance/authority	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e
 suite	scripts	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	integrations/paperclip/reporting	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	governance/modules	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	guardrails/honesty	swept-only	#1509	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	governance/lifecycle	swept-only	#1509	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	governance/reconcile	swept-only	#1509	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
