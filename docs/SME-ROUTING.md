@@ -52,6 +52,27 @@ An empty `module` is a declared "no authoritative module owns this domain" — a
 verdict, not an omission. A non-empty module must exist in the ported authority
 matrix, or the loader refuses the policy.
 
+### Persona-card ids (`registry/personas/cards/`) — the second id space
+
+The **SME profile** column above names *gateway policy ids*: the harvested
+`DOMAIN_SME` vocabulary declared in `policies/capability-registry.yaml`. The
+dispatchable personas the fleet actually runs as are a **separate id space** —
+the persona cards under `registry/personas/cards/`, each mirrored from a
+`~/.copilot/agents/<id>.agent.md` card. Both spaces are declared; this section
+maps them and never merges them. A row here changes no policy value: the
+classifier reads only the three YAML documents above.
+
+| Persona card | Posture | Selected by | Routing rule |
+|---|---|---|---|
+| `code-review-sme` | `reviewer` | the task type `code_review` (`dispatch_defaults`) | `route: strict` → chain `planner,executor,verifier,critic`, tier `auditor`; the tier override `code-review: auditor` agrees, so the review runs on the top rung. The card is a `reviewer` by posture, so it never executes the change it reviews |
+
+The review the card produces is the per-PR report the merge contract asks for (a
+`path:line: severity: problem. fix.` finding list); the routing above decides
+which chain and tier *run* it, not what it is allowed to report. Adding a
+persona does not add a domain: `code-review-sme` is deliberately **not** a
+`DOMAIN_SME` value, because the review rule is a task type, not a keyword
+classifier arm.
+
 ### Squads (board lens)
 
 Declaration order is load-bearing: the classifier takes the first squad with a
