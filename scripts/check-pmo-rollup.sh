@@ -364,7 +364,48 @@ else
   unproven=$((unproven + 1))
 fi
 
-expected_controls=11
+# --- 13. dispatch --by-cluster: a schema-invalid clusters.json is
+# CANNOT-ASSESS (rc 2), never a pass, and a valid one dispatches by cluster --
+byclust="$scratch/byclust"
+make_fixture "$byclust" || { echo "check-pmo-rollup: CANNOT-ASSESS — fixture" >&2; exit 2; }
+write_board "$byclust" "2026-09-14T00:00:00Z" \
+  '[{"number": 10, "title": "one", "state": "OPEN", "labels": [], "parent": null, "blocked_by": [], "closed_at": ""}]'
+mkdir -p "$byclust/governance/pmo"
+printf '{"generated_at": "2026-09-14T00:00:00Z"}\n' > "$byclust/governance/pmo/clusters.json"  # missing required keys
+rc=0
+pmo dispatch --root "$byclust" --by-cluster --check > "$scratch/byclust-invalid.out" 2>&1 || rc=$?
+controls=$((controls + 1))
+if [ "$rc" -eq 2 ] && grep -qF "CANNOT-ASSESS" "$scratch/byclust-invalid.out"; then
+  echo "  OK    control a schema-invalid clusters.json is CANNOT-ASSESS (rc=2), never a pass"
+else
+  printf '  FAIL  control a schema-invalid clusters.json exited %s, expected 2\n' "$rc" >&2
+  cat "$scratch/byclust-invalid.out" | sed 's/^/        /' >&2
+  unproven=$((unproven + 1))
+fi
+
+cat > "$byclust/governance/pmo/clusters.json" <<'JSON'
+{"generated_at": "2026-09-14T00:00:00Z",
+ "source_repos": ["kushin77/agent-orchestrator"],
+ "clusters": [{"id": "c-rca-backfill-1", "family": "RCA backfill", "title": "Backfill RCA docs",
+   "recipe": "apply the standard RCA template", "sme": "sniper-generic", "tier": "L0",
+   "batchable": true, "wave": 1, "priority_rank": 1,
+   "evidence": "1 open issue matched family 'rca' by label scan",
+   "issues": [{"repo": "kushin77/agent-orchestrator", "number": 100, "title": "rca 100",
+     "labels": ["type:task"], "age_days": 10, "parent": null}]}],
+ "unclustered": [],
+ "hygiene": {"duplicates": [], "orphan_children": [], "empty_epics": [], "template_gaps": []}}
+JSON
+controls=$((controls + 1))
+by_cluster_flag="$(pmo dispatch --root "$byclust" --by-cluster --json 2>/dev/null \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["by_cluster"], len(d["assignments"]))')"
+if [ "$by_cluster_flag" = "True 1" ]; then
+  echo "  OK    control a valid clusters.json dispatches one agent per batchable cluster"
+else
+  echo "  FAIL  control a valid clusters.json produced: $by_cluster_flag (expected 'True 1')" >&2
+  unproven=$((unproven + 1))
+fi
+
+expected_controls=13
 if [ "$controls" -ne "$expected_controls" ]; then
   echo "check-pmo-rollup: FAIL — expected $expected_controls controls, ran $controls" >&2
   unproven=$((unproven + 1))
