@@ -234,6 +234,41 @@ def test_the_budget_reds_by_name_and_a_reclaimed_orphan_does_not_count():
     assert o.walk(ops, apply=True, budget=budget).exceeded == [], "reclaimed with evidence, so under budget"
 
 
+# --- venue_classify (#1620): box-wide counts are advisory in the lane venue -
+
+
+def test_venue_classify_downgrades_box_wide_kinds_in_the_lane_venue():
+    exceeded = [
+        "orphan-budget-exceeded:orphan-worktree:50/36",
+        "orphan-budget-exceeded:orphan-branch:99/95",
+        "orphan-budget-exceeded:orphan-issue-lane:42/25",
+        "orphan-budget-exceeded:orphan-pr:5/3",
+        "orphan-budget-exceeded:orphan-directive:120/115",
+    ]
+    blocking, advisory = o.venue_classify(exceeded, "lane")
+    assert advisory == exceeded[:3], "worktree/branch/issue-lane are box-wide, advisory in the lane venue"
+    assert blocking == exceeded[3:], "pr/directive are per-artifact facts, blocking everywhere"
+
+
+def test_venue_classify_blocks_everything_in_the_attestation_venue():
+    exceeded = [
+        "orphan-budget-exceeded:orphan-worktree:50/36",
+        "orphan-budget-exceeded:orphan-branch:99/95",
+        "orphan-budget-exceeded:orphan-issue-lane:42/25",
+        "orphan-budget-exceeded:orphan-pr:5/3",
+        "orphan-budget-exceeded:orphan-directive:120/115",
+    ]
+    blocking, advisory = o.venue_classify(exceeded, "attestation")
+    assert blocking == exceeded, "the serial post-merge attestation enforces every kind for real"
+    assert advisory == []
+
+
+def test_venue_classify_treats_any_non_attestation_string_as_lane():
+    exceeded = ["orphan-budget-exceeded:orphan-worktree:2/1"]
+    blocking, advisory = o.venue_classify(exceeded, "")
+    assert advisory == exceeded and blocking == [], "unset/unknown AO_GATE_VENUE defaults to lane behaviour"
+
+
 def test_an_unmeasured_source_is_cannot_assess_never_zero():
     report = o.walk(FakeOps(prs=None), budget=BIG)
     assert not report.assessable and o.ORPHAN_PR in report.unmeasured
