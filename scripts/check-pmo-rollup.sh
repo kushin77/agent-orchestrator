@@ -62,6 +62,13 @@ json_ok() {
   python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$1" >/dev/null 2>&1
 }
 
+contains() { # contains <haystack> <needle> — the bash-native containment test (#852)
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # --- the real graph: every view runs, tri-state, never a pass on CANNOT-ASSESS
 echo "== views over the committed graph =="
 views=0
@@ -138,7 +145,7 @@ check_refused() {
     unproven=$((unproven + 1))
     return
   fi
-  if ! printf '%s\n' "$out" | grep -qF -- "$needle"; then
+  if ! contains "$out" "$needle"; then
     printf '  FAIL  control %s refused without naming %s\n' "$label" "$needle" >&2
     printf '%s\n' "$out" | sed 's/^/        /' >&2
     unproven=$((unproven + 1))
@@ -311,7 +318,7 @@ assert "#10" in detail and "#11" in detail, detail
 print("dispatch-lane-collision: " + detail)
 PY
 )"
-if [ $? -eq 0 ] && printf '%s' "$collision_out" | grep -qF "dispatch-lane-collision"; then
+if [ $? -eq 0 ] && contains "$collision_out" "dispatch-lane-collision"; then
   echo "  OK    control dispatch refuses a real lane collision, naming both tickets"
 else
   echo "  FAIL  control dispatch did not refuse a crafted lane collision:" >&2
@@ -338,7 +345,7 @@ assert detail_subject == "kushin77/agent-orchestrator#99", detail_subject
 print("dispatch-unowned-risk: " + detail_subject)
 PY
 )"
-if [ $? -eq 0 ] && printf '%s' "$dropped_out" | grep -qF "dispatch-unowned-risk"; then
+if [ $? -eq 0 ] && contains "$dropped_out" "dispatch-unowned-risk"; then
   echo "  OK    control dispatch refuses a silently dropped unowned risk, naming it"
 else
   echo "  FAIL  control dispatch did not refuse a crafted unowned-risk drop:" >&2
