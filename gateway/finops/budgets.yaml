@@ -35,6 +35,14 @@ defaultPolicy: warn
 # Per-tenant budgets. The chooser consults these through budget.py before any
 # model call and records every decision in the metering store.
 budgets:
+  # purebliss (single-tenant org, CEO/CFO/CTO/PMO offices): fallback to local
+  # ollama beyond the soft threshold rather than stopping the org outright,
+  # since purebliss always has a free local-inference floor.
+  tenant-purebliss:
+    monthlyBudgetUsd: 750.00
+    policy: fallback
+    warnAtPct: 80
+    hardCapPct: 100
   tenant-acme:
     monthlyBudgetUsd: 100.00
     policy: fallback

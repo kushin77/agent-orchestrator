@@ -9,6 +9,9 @@
 schemaVersion: 1
 defaultMode: observe
 policies:
+  - tenantId: purebliss
+    dailyTokenLimit: 3000000
+    mode: enforce
   - tenantId: acme
     dailyTokenLimit: 2000000
     mode: observe
