@@ -117,16 +117,21 @@ BUDGET_EXCEEDED = "orphan-budget-exceeded"
 BUDGET_PATH = "governance/reconcile/orphan-budget.yaml"
 
 #: Kinds whose budget-exceeded finding is advisory in the default "lane"
-#: venue (#1620): each is counted against the WHOLE box's state (every
-#: concurrent session's worktrees/branches/lane records), not this
-#: checkout's own diff, so it is non-deterministic under concurrent load —
-#: measured swinging orphan-branch 107->97, orphan-issue-lane 44->45 and
-#: orphan-worktree 46->54 between two runs with no action taken in between.
-#: orphan-pr / orphan-directive are per-artifact facts (one open PR, one
-#: directive for one closed issue), not a box-wide census, so they stay
-#: blocking in every venue. See check-reconcile-orphans.sh and
-#: check-worktree-cap.sh (the identical thesis for worktree-cap-exceeded).
-ADVISORY_IN_LANE_VENUE = (ORPHAN_WORKTREE, ORPHAN_BRANCH, ORPHAN_ISSUE_LANE)
+#: venue (#1620, #1655): each is counted against the WHOLE box's state
+#: (every concurrent session's worktrees/branches/lane records/open PRs),
+#: not this checkout's own diff, so it is non-deterministic under concurrent
+#: load — measured swinging orphan-branch 107->97, orphan-issue-lane 44->45
+#: and orphan-worktree 46->54 between two runs with no action taken in
+#: between, and orphan-pr climbing 20->29->30 across ~20 minutes of ordinary
+#: fleet churn (opening/closing PRs, including the merge trains themselves —
+#: see #1655) with none of it stale or closeable. orphan-pr joined this set
+#: 2026-09-20 by explicit owner decision: it is the same box-wide census as
+#: its three siblings, not a per-artifact fact — a PR without a `lane:` line
+#: is common for perfectly live work (#1655 is the fix for THAT gap).
+#: orphan-directive is the one kind that stays blocking in every venue: one
+#: directive names one closed issue, a fact this checkout can settle on its
+#: own without racing any other session.
+ADVISORY_IN_LANE_VENUE = (ORPHAN_WORKTREE, ORPHAN_BRANCH, ORPHAN_ISSUE_LANE, ORPHAN_PR)
 
 
 def venue_classify(exceeded: Iterable[str], venue: str) -> tuple[list[str], list[str]]:

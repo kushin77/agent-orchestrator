@@ -476,11 +476,13 @@ import sys
 from pathlib import Path
 from governance.reconcile import orphans
 
-# #1620: orphan-worktree / orphan-branch / orphan-issue-lane are counted
-# against the WHOLE box's state (every concurrent session's worktrees,
-# branches, lane records), so they swing with unrelated fleet activity, not
-# this checkout's own diff — orphans.venue_classify() is the single source
-# of truth for which kinds are advisory in the default "lane" venue.
+# #1620/#1655: orphan-worktree / orphan-branch / orphan-issue-lane / orphan-pr
+# are counted against the WHOLE box's state (every concurrent session's
+# worktrees, branches, lane records, open PRs — including the merge trains
+# themselves), so they swing with unrelated fleet activity, not this
+# checkout's own diff — orphans.venue_classify() is the single source of
+# truth for which kinds are advisory in the default "lane" venue.
+# orphan-directive is the one kind that stays blocking everywhere.
 venue = os.environ.get("AO_GATE_VENUE", "lane")
 
 budget, expired = orphans.load_budget(sys.argv[2])

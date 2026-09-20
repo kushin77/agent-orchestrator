@@ -234,7 +234,13 @@ def test_the_budget_reds_by_name_and_a_reclaimed_orphan_does_not_count():
     assert o.walk(ops, apply=True, budget=budget).exceeded == [], "reclaimed with evidence, so under budget"
 
 
-# --- venue_classify (#1620): box-wide counts are advisory in the lane venue -
+# --- venue_classify (#1620, #1655): box-wide counts are advisory in the lane
+# venue. orphan-pr joined worktree/branch/issue-lane 2026-09-20 by explicit
+# owner decision — it counts every open PR without a lane record across the
+# WHOLE box (including the merge trains themselves), the same box-wide census
+# its three siblings already are, not a per-artifact fact. orphan-directive
+# is the only kind left blocking everywhere: one directive names one closed
+# issue, settleable from this checkout alone.
 
 
 def test_venue_classify_downgrades_box_wide_kinds_in_the_lane_venue():
@@ -242,12 +248,12 @@ def test_venue_classify_downgrades_box_wide_kinds_in_the_lane_venue():
         "orphan-budget-exceeded:orphan-worktree:50/36",
         "orphan-budget-exceeded:orphan-branch:99/95",
         "orphan-budget-exceeded:orphan-issue-lane:42/25",
-        "orphan-budget-exceeded:orphan-pr:5/3",
+        "orphan-budget-exceeded:orphan-pr:30/20",
         "orphan-budget-exceeded:orphan-directive:120/115",
     ]
     blocking, advisory = o.venue_classify(exceeded, "lane")
-    assert advisory == exceeded[:3], "worktree/branch/issue-lane are box-wide, advisory in the lane venue"
-    assert blocking == exceeded[3:], "pr/directive are per-artifact facts, blocking everywhere"
+    assert advisory == exceeded[:4], "worktree/branch/issue-lane/pr are box-wide, advisory in the lane venue"
+    assert blocking == exceeded[4:], "directive is the one per-artifact fact, blocking everywhere"
 
 
 def test_venue_classify_blocks_everything_in_the_attestation_venue():
@@ -255,7 +261,7 @@ def test_venue_classify_blocks_everything_in_the_attestation_venue():
         "orphan-budget-exceeded:orphan-worktree:50/36",
         "orphan-budget-exceeded:orphan-branch:99/95",
         "orphan-budget-exceeded:orphan-issue-lane:42/25",
-        "orphan-budget-exceeded:orphan-pr:5/3",
+        "orphan-budget-exceeded:orphan-pr:30/20",
         "orphan-budget-exceeded:orphan-directive:120/115",
     ]
     blocking, advisory = o.venue_classify(exceeded, "attestation")
@@ -267,6 +273,12 @@ def test_venue_classify_treats_any_non_attestation_string_as_lane():
     exceeded = ["orphan-budget-exceeded:orphan-worktree:2/1"]
     blocking, advisory = o.venue_classify(exceeded, "")
     assert advisory == exceeded and blocking == [], "unset/unknown AO_GATE_VENUE defaults to lane behaviour"
+
+
+def test_venue_classify_orphan_directive_stays_blocking_in_the_lane_venue():
+    exceeded = ["orphan-budget-exceeded:orphan-directive:120/115"]
+    blocking, advisory = o.venue_classify(exceeded, "lane")
+    assert blocking == exceeded and advisory == [], "orphan-directive is a per-artifact fact, never advisory"
 
 
 def test_an_unmeasured_source_is_cannot_assess_never_zero():
