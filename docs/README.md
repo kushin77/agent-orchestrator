@@ -84,6 +84,7 @@ reachable from this index.
 | [`EDGE-CUTOVER.md`](EDGE-CUTOVER.md) | Edge cutover — how `ai.purebliss.app` is fronted and what is retired; a declaration, not a deployment (issue #731). |
 | [`CHAT-MOUNT.md`](CHAT-MOUNT.md) | The chat mount contract — how the conversational surface appears in the OS shell (issue #511, EPIC #500). |
 | [`CODEIDX-CAPABILITY-REGISTER.md`](CODEIDX-CAPABILITY-REGISTER.md) | What the fleet needs from `kushin77/code-indexing`, per capability, and how we know we have it. |
+| [`CODE-HEADER-STANDARD.md`](CODE-HEADER-STANDARD.md) | The machine-parseable knowledge block every source file carries, and the fields the indexer reads (issue #1535, EPIC #1510). |
 | [`DIAGRAMS-CAPABILITY-REGISTER.md`](DIAGRAMS-CAPABILITY-REGISTER.md) | What "fully capable" means for the fleet's diagrams surface (issue #467). |
 | [`erp-finops/compliance-audit.md`](erp-finops/compliance-audit.md) | ERP/FinOps compliance audit — phase-4 validation & governance (issue #676, EPIC #665). |
 | [`erp-finops/current-state.md`](erp-finops/current-state.md) | Current-state money map — subscription flows and the manual reconciliation points (PF-1, issue #666, EPIC #665). |
