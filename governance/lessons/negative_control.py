@@ -220,6 +220,7 @@ class _StubProbe:
 
     available = True
     shallow = False
+    narrow = False
 
     def tracked(self, relative_path: str) -> bool:
         return True
