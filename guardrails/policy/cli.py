@@ -79,6 +79,9 @@ def _build_parser() -> argparse.ArgumentParser:
                           choices=("block", "warn", "log"),
                           help="decision when no active policy governs the action "
                                "(default: block — fail closed)")
+    evaluate.add_argument("--audit", default=None,
+                          help="append the decision to this JSON-lines audit ledger "
+                               "(default: in-memory only, nothing persisted)")
 
     controls = sub.add_parser("controls", help="list the controls registry")
     controls.add_argument("--controls", default=default_controls_file())
@@ -120,11 +123,23 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
         print("evaluate: --context must be a JSON object", file=sys.stderr)
         return EXIT_INVALID
 
+    from policy.audit import JsonlAuditLog
     from policy.startup import build_engine
 
-    engine = build_engine([args.bundle_dir], controls=controls, uncovered_decision=args.uncovered)
+    # With --audit the decision is appended to a real ledger by the real
+    # audit.py sink, so a caller can read the record back from disk. The
+    # confirmation line goes to stderr to keep stdout pure JSON for parsers.
+    ledger = JsonlAuditLog(args.audit) if args.audit else None
+    engine = build_engine(
+        [args.bundle_dir],
+        controls=controls,
+        uncovered_decision=args.uncovered,
+        audit_log=ledger,
+    )
     result = engine.evaluate(args.action, subject=args.subject, tenant=args.tenant, context=context)
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+    if ledger is not None:
+        print(f"audit: appended 1 record to {args.audit}", file=sys.stderr)
     if result.blocked:
         return EXIT_BLOCKED
     return EXIT_OK
