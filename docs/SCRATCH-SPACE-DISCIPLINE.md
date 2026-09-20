@@ -149,7 +149,13 @@ Exit contract, shared with the rest of the fleet's guards: `0` OK / `1` NOT-OK /
   NOTE, and never honoured past its own `expires` date)
   (`governance/isolation/worktree-cap.yaml`), and `reaper-unscheduled` when
   nothing actually installs `prune-worktrees.sh` in the crontab a scheduler
-  reads — a declaration is not an installation.
+  reads — a declaration is not an installation. `worktree-cap-exceeded` counts
+  the WHOLE box (every concurrent session's worktrees), so under heavy
+  concurrent fleet load it is advisory (`NOTE`, rc 0) in the default
+  `AO_GATE_VENUE=lane` a plain `make verify` runs in — it only blocks under
+  `AO_GATE_VENUE=attestation` (`make verify-attestation`, used right before
+  `make master-attestation`); `reaper-unscheduled` stays blocking everywhere,
+  since it is a static finding, not a concurrency race (#1620).
 - **It does not lint untracked scratch.** The gating `--lint` covers the repo's
   tracked `*.sh`. A scratch driver in `/tmp` is linted only when someone runs
   `--lint <dir>` — which the discipline above tells agents to do.
