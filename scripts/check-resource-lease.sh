@@ -78,6 +78,23 @@ fail=0
 note() { printf '  OK    %s\n' "$1"; }
 problem() { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
 
+# The presence test is computed by bash itself — no second process, no pipe.
+# `printf '%s' "$out" | grep -qF -- "$needle"` is NOT a containment test under
+# `set -o pipefail`: `grep -q` exits on its FIRST match, SIGPIPE then terminates
+# the producer, and pipefail promotes that 141 to the status of the whole
+# pipeline — so the test can report ABSENT for text that IS PRESENT. The defect
+# is latent (it appears once the report outgrows the 64 KiB pipe buffer) and the
+# condition fails OPEN, which is worse than no check. `grep` is also an extra
+# process that under load can fail to start or be killed, the same false verdict
+# by another route. Bash substring matching cannot fail that way.
+# (`scripts/check-verdict-contains.sh` refuses the piped form by name.)
+contains() { # contains <haystack> <needle>
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 if ! python3 "$module" self-control >"$work/self-control.out" 2>&1; then
   problem "the module's own self-control failed: $(tail -n 3 "$work/self-control.out" | tr '\n' ' ')"
 else
@@ -186,12 +203,12 @@ led="$work/tf.jsonl"
 python3 "$module" acquire --resource tf-state:onprem --holder '#1545' --ledger "$led" >/dev/null 2>&1
 second_out="$(python3 "$module" acquire --resource tf-state:onprem --holder '#1546' --ledger "$led" 2>&1)"
 second_rc=$?
-if [ "$second_rc" -eq 1 ] && printf '%s' "$second_out" | grep -q '#1545'; then
+if [ "$second_rc" -eq 1 ] && contains "$second_out" '#1545'; then
   note "a second holder is refused (exit ${second_rc}) quoting the holder: $(printf '%s' "$second_out" | sed 's/^resource-lease: //')"
 else
   problem "the second holder was not refused quoting the holder (rc=${second_rc}): ${second_out}"
 fi
-if printf '%s' "$second_out" | grep -q 'expires 20'; then
+if contains "$second_out" 'expires 20'; then
   note "the refusal quotes the lease's expiry, so the refused caller knows how long to wait"
 else
   problem "the refusal does not quote the expiry: ${second_out}"
@@ -202,7 +219,7 @@ else
   problem "the refused claim still wrote to the ledger: $(grep -c 'acquire' "$led") acquires"
 fi
 renew_out="$(python3 "$module" acquire --resource tf-state:onprem --holder '#1545' --ledger "$led" 2>&1)"
-if [ "$?" -eq 0 ] && printf '%s' "$renew_out" | grep -q 'renewed by its own holder'; then
+if [ "$?" -eq 0 ] && contains "$renew_out" 'renewed by its own holder'; then
   note "the SAME holder re-acquires as a renewal, not a refusal (one owner, not two)"
 else
   problem "the same holder was not allowed to renew: ${renew_out}"
@@ -211,7 +228,7 @@ fi
 echo "== the negative control: an unleased resource proceeds =="
 free_out="$(python3 "$module" acquire --resource tf-state:staging --holder '#1546' --ledger "$led" 2>&1)"
 free_rc=$?
-if [ "$free_rc" -eq 0 ] && printf '%s' "$free_out" | grep -q 'ACQUIRED tf-state:staging'; then
+if [ "$free_rc" -eq 0 ] && contains "$free_out" 'ACQUIRED tf-state:staging'; then
   note "an unleased resource proceeds (exit ${free_rc}), so the refusal above cannot be 'it refuses everything'"
 else
   problem "an unleased resource did not proceed (rc=${free_rc}): ${free_out}"
