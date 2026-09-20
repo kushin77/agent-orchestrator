@@ -1388,6 +1388,406 @@ else
   echo "  OK    so (f2)'s CANNOT-ASSESS comes from that guard, and not from the file existing"
 fi
 
+# 4g. THE VENUE OF RECORD'S OWN VERDICT IS PUBLISHED (#1504).
+#
+#     THE MEASUREMENT THIS SECTION EXISTS FOR. On four live pull requests the
+#     venue's check-run `control-plane-verify (purebliss-ghl)` said `success`
+#     while the required context `ao/gate-of-record` said something else, or
+#     nothing at all:
+#
+#       #1466  `failure`, created 22:52:01, on a head whose own run completed
+#              `success` at 22:56:50 -- a red posted FOUR MINUTES BEFORE the run
+#              it belonged to finished, and never replaced by that run's outcome;
+#       #1489  the same shape (red 22:07:01, its run completed success 22:17:43);
+#       #1493  a run that completed success and published NOTHING;
+#       #1498  ... so the head carried no status for its REQUIRED context at all,
+#              and a head in that state can never merge, whatever its content.
+#
+#     `post` publishes the GATE's own verdict, and it refuses while the venue's
+#     run is still in flight (right -- and it publishes NOTHING in that state);
+#     `reconcile` WITHDRAWS a green the venue contradicts. Neither of them can
+#     publish the venue's own CONCLUDED verdict, so the state above had no
+#     producer at all. `conclude` is that producer, and both shapes of the defect
+#     are provoked here:
+#
+#       SHAPE A -- a passing run must end with `success` ON THE HEAD IT MEASURED,
+#                  superseding whatever stood before, and publishing it must be
+#                  PROVEN to be the claim that stands (a status POST is a claim;
+#                  the NEWEST claim for the commit is what branch protection
+#                  reads);
+#       SHAPE B -- a run that has not reached a verdict must publish NOTHING: an
+#                  in-flight run, an absent run, and a conclusion that is neither
+#                  a pass nor a fail are each refused BY NAME.
+#
+#     Every arm is offline. `gh` is shadowed at the API boundary (the technique
+#     section 4f uses for the walk, section 3c for the poster) and the stub
+#     MAINTAINS the status store, so the poster's read-back is a real read of what
+#     the poster wrote rather than a canned answer. Four arms drive MUTANTS of a
+#     COPY of the poster -- without them the arms above would be assertions that
+#     nothing proves are load-bearing, which is the formality GR-12 refuses. The
+#     number of arms is DECLARED and asserted, so a control cannot quietly
+#     disappear in a later edit.
+cg_fx="$live_fx/conclude"
+mkdir -p "$cg_fx/bin" "$cg_fx/tree/scripts"
+cp "$POSTER" "$cg_fx/tree/scripts/gate-status.sh"
+cp "$MAPPER" "$cg_fx/tree/scripts/gate-status-map.py"
+cg_sha="4a6eae8800000000000000000000000000000000"
+cg_build="11111111-2222-3333-4444-555555555555"
+cg_run_id="105834977659"
+cg_url="https://console.cloud.google.com/cloud-build/builds;region=us-central1/$cg_build?project=1056038104733"
+
+# The stub is the API and nothing else: the poster's own reading, deciding and
+# read-back all execute. It records every POST (both argv and the parsed fields),
+# serves the check-runs fixture, and serves `commits/<sha>/status` from the
+# fixture entries PLUS everything that has been POSTed -- newest first, exactly
+# as the API answers -- so "the claim that stands" is measured rather than
+# asserted. STUB_INJECT_STATE models a PEER posting after us.
+cat > "$cg_fx/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${STUB_ARGV:?}"
+case "${1:-}" in
+  auth) exit 0 ;;
+  api) ;;
+  *) printf 'stub gh: unexpected invocation: %s\n' "$*" >&2; exit 1 ;;
+esac
+shift
+method="GET"; path=""
+f_state=""; f_context=""; f_desc=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -X) method="${2:-}"; shift ;;
+    -f)
+      kv="${2:-}"; shift
+      printf '%s\n' "$kv" >> "${STUB_FIELDS:?}"
+      case "$kv" in
+        state=*) f_state="${kv#state=}" ;;
+        context=*) f_context="${kv#context=}" ;;
+        description=*) f_desc="${kv#description=}" ;;
+      esac
+      ;;
+    *) [ -n "$path" ] || path="$1" ;;
+  esac
+  shift
+done
+case "$path" in
+  */check-runs) cat "${STUB_CHECKRUNS:?}"; exit 0 ;;
+  */status) python3 "$STUB_STATUS_PY" "${STUB_STATUS:?}" "${STUB_POSTS:?}"; exit 0 ;;
+  */statuses/*)
+    [ "$method" = "POST" ] || exit 1
+    printf '%s\t%s\t%s\n' "$f_context" "$f_state" "$f_desc" >> "${STUB_POSTS:?}"
+    exit 0 ;;
+esac
+printf 'stub gh: unhandled path: %s\n' "$path" >&2
+exit 1
+STUB
+chmod +x "$cg_fx/bin/gh"
+
+cat > "$cg_fx/status.py" <<'PY'
+#!/usr/bin/env python3
+"""Serve `commits/<sha>/status` from the fixture PLUS everything POSTed so far.
+
+Newest first, as the API answers: posts are appended in order, so they are
+reversed and placed ahead of the fixture entries, which stand for claims that
+were already standing (the 22:52 red of #1466). A peer posting after us is
+modelled by STUB_INJECT_STATE.
+"""
+import json
+import os
+import sys
+
+base = json.load(open(sys.argv[1])).get("statuses", [])
+posted = []
+try:
+    for line in open(sys.argv[2]):
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) == 3:
+            posted.append({"context": parts[0], "state": parts[1], "description": parts[2]})
+except OSError:
+    pass
+statuses = list(reversed(posted)) + base
+inject = os.environ.get("STUB_INJECT_STATE", "")
+if inject and posted:
+    statuses = [{"context": os.environ.get("STUB_INJECT_CONTEXT", "ao/gate-of-record"),
+                 "state": inject, "description": "a peer posted after us"}] + statuses
+print(json.dumps({"state": statuses[0]["state"] if statuses else "pending", "statuses": statuses}))
+PY
+
+# The venue of record's ability to DELIVER is read from its own build log (#1467),
+# so the reader is shadowed too: the two logs are the venue's own words, quoted
+# from the real build that could not post (see the arm in the sibling gate).
+cat > "$cg_fx/bin/gcloud" <<'STUB'
+#!/usr/bin/env bash
+printf 'gcloud %s\n' "$*" >> "${STUB_EVENTS:?}"
+case "${1:-} ${2:-}" in
+  "builds log") [ "${STUB_VENUE_LOG:-none}" != "none" ] || exit 1; cat "$STUB_VENUE_LOG"; exit 0 ;;
+esac
+exit 1
+STUB
+chmod +x "$cg_fx/bin/gcloud"
+printf 'gate-status: posted ao/gate-of-record=failure for f300954d8a5c (make verify: FAIL)\n' \
+  > "$cg_fx/venue-delivered.log"
+printf 'gate-status: SKIPPED -- this runner image carries no gcloud, so the token cannot be read here at all\n' \
+  > "$cg_fx/venue-unable.log"
+
+cg_runs() { # cg_runs <file> <status> <conclusion>
+  python3 - "$1" "$2" "$3" "$cg_build" "$cg_url" "$cg_run_id" <<'PY'
+import json
+import sys
+
+path, status, conclusion, build, url, run_id = sys.argv[1:7]
+runs = [] if status == "none" else [{
+    "id": int(run_id),
+    "name": "control-plane-verify (purebliss-ghl)",
+    "status": status,
+    "conclusion": None if conclusion == "none" else conclusion,
+    "started_at": "2026-09-19T22:32:50Z",
+    "completed_at": None if status != "completed" else "2026-09-19T22:56:50Z",
+    "details_url": url,
+    "app": {"slug": "google-cloud-build"},
+}]
+json.dump({"check_runs": runs}, open(path, "w"))
+PY
+}
+
+cg_status() { # cg_status <file> <state|none>
+  python3 - "$1" "$2" <<'PY'
+import json
+import sys
+
+path, state = sys.argv[1:3]
+statuses = [] if state == "none" else [{
+    "context": "ao/gate-of-record",
+    "state": state,
+    "description": "make verify: FAIL -- board-gate",
+    "created_at": "2026-09-19T22:52:01Z",
+}]
+json.dump({"state": state, "statuses": statuses}, open(path, "w"))
+PY
+}
+
+cg_runs "$cg_fx/success.json"   completed success
+cg_runs "$cg_fx/inflight.json"  in_progress none
+cg_runs "$cg_fx/none.json"      none        none
+cg_runs "$cg_fx/skipped.json"   completed   skipped
+cg_runs "$cg_fx/red.json"       completed   failure
+cg_status "$cg_fx/stale-red.json" failure
+cg_status "$cg_fx/green.json"     success
+
+# The gate's OWN attestation, for the box-side half of the shape (ask 1 of the
+# issue: the run's own verdict is published too, and it supersedes an earlier
+# claim). Fresh, or the poster refuses it as a record that does not describe this
+# commit's verdict.
+cg_att="$cg_fx/attestation.json"
+python3 - "$cg_att" "$cg_sha" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+
+json.dump({
+    "exit_code": 0,
+    "git_sha": sys.argv[2],
+    "result": "PASS",
+    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+}, open(sys.argv[1], "w"))
+PY
+
+cg_run() { # cg_run <runs-fixture> <status-fixture> <poster[.sh]> <extra...>
+  local runs="$1" status="$2" poster="$3"
+  shift 3
+  : > "$cg_fx/posts"; : > "$cg_fx/fields"; : > "$cg_fx/argv"
+  PATH="$cg_fx/bin:$PATH" \
+  STUB_ARGV="$cg_fx/argv" STUB_FIELDS="$cg_fx/fields" STUB_POSTS="$cg_fx/posts" \
+  STUB_STATUS_PY="$cg_fx/status.py" STUB_CHECKRUNS="$cg_fx/$runs" \
+  STUB_STATUS="$cg_fx/$status" STUB_EVENTS="$cg_fx/events" \
+  STUB_VENUE_LOG="${CG_VENUE_LOG:-$cg_fx/venue-delivered.log}" \
+  STUB_INJECT_STATE="${CG_INJECT:-}" \
+    bash "$poster" "$@" > "$cg_fx/out.txt" 2>&1
+}
+
+cg_last_state() {
+  local s
+  s="$(tail -1 "$cg_fx/posts" 2>/dev/null | cut -f2)"
+  printf '%s' "${s:-none}"
+}
+cg_field_count() { wc -l < "$cg_fx/fields" 2>/dev/null | tr -d ' '; }
+cg_out() { cat "$cg_fx/out.txt"; }
+
+# The declared count. A control that vanishes must RED this gate rather than
+# silently shrink the provocation -- a mutant that fails to apply deletes its own
+# arm, and that shows up here as well as in its own refusal above.
+expected_controls=19
+controls=0
+carm() { # <label> <want-rc> <needle> <forbid> <out> <rc>
+  controls=$((controls + 1))
+  arm "$@"
+}
+# An arm whose evidence is the POSTED PAYLOAD rather than the poster's words.
+# The expectation is stated beside what was actually recorded, so the arm can be
+# audited without re-running it (the doctrine `arm` above follows).
+cg_extra() { # <label> <expectation> <true|false>
+  controls=$((controls + 1))
+  _cx_actual="posted-state=$(cg_last_state) fields=$(cg_field_count)"
+  if [ "$3" = "true" ]; then
+    echo "  OK    $1"
+    echo "        expect: $2"
+    echo "        actual: $_cx_actual"
+  else
+    echo "check-gate-status: FAIL — $1" >&2
+    echo "        expect: $2" >&2
+    echo "        actual: $_cx_actual" >&2
+    fail=1
+  fi
+}
+
+echo "== 4g. the venue of record's own verdict is PUBLISHED, and proven to stand (#1504) =="
+
+# SHAPE A. A passing run ends with `success` on the head it measured, over a
+# standing red: the #1466 shape, where the red was 4 minutes older than the run
+# that contradicted it and nothing ever replaced it.
+cg_run success.json stale-red.json "$cg_fx/tree/scripts/gate-status.sh" conclude --sha "$cg_sha"
+cg_rc=$?
+carm "a CONCLUDED SUCCESS publishes its own verdict over a standing red" \
+    0 'conclude OK' 'REFUSED' "$(cg_out)" "$cg_rc"
+cg_extra "and the POSTED claim is the run's own verdict, named by its run" \
+    "last state=success, description names run $cg_run_id and 'concluded success'" \
+    "$([ "$(cg_last_state)" = success ] && case "$(cat "$cg_fx/posts")" in *"run $cg_run_id concluded success"*) echo true ;; *) echo false ;; esac || echo false)"
+cg_extra "and the claim carries the venue's own evidence URL, as ONE field" \
+    "target_url is the run's URL on a single line (4 fields posted)" \
+    "$([ "$(cg_field_count)" = 4 ] && case "$(cat "$cg_fx/fields")" in *"target_url=$cg_url"*) echo true ;; *) echo false ;; esac || echo false)"
+
+# ...and the claim is only a claim until the API reports it as the NEWEST one.
+# A peer posting after us leaves a state that is NOT the run's verdict, and the
+# verb must refuse to call that a conclusion: this is what makes the read-back
+# load-bearing rather than decorative (#739's class).
+CG_INJECT=error
+cg_run success.json stale-red.json "$cg_fx/tree/scripts/gate-status.sh" conclude --sha "$cg_sha"
+cg_rc=$?
+CG_INJECT=""
+carm "a claim that is NOT the one that stands is CANNOT-ASSESS, never a success" \
+    2 'does not carry what was just published' 'conclude OK' "$(cg_out)" "$cg_rc"
+
+# MUTANT: with the read-back removed the same fixture must NOT refuse. Without
+# this half, the arm above would assert a property nothing proves is load-bearing.
+mkdir -p "$cg_fx/mut-readback/scripts"
+sed 's/if \[ "\$back_state" != "\$c_state" \]; then/if false; then/' \
+    "$POSTER" > "$cg_fx/mut-readback/scripts/gate-status.sh"
+cp "$MAPPER" "$cg_fx/mut-readback/scripts/gate-status-map.py"
+if cmp -s "$POSTER" "$cg_fx/mut-readback/scripts/gate-status.sh"; then
+  echo "check-gate-status: FAIL — the read-back MUTANT did not apply: the guard's text moved, so the falsification would prove nothing" >&2
+  fail=1
+else
+  CG_INJECT=error
+  cg_run success.json stale-red.json "$cg_fx/mut-readback/scripts/gate-status.sh" conclude --sha "$cg_sha"
+  cg_rc=$?
+  CG_INJECT=""
+  carm "MUTANT (read-back removed): the same peer-posted state is PUBLISHED as a success" \
+      0 'conclude OK' 'does not carry' "$(cg_out)" "$cg_rc"
+fi
+
+# SHAPE B. A run that has not reached a verdict publishes NOTHING.
+cg_run inflight.json stale-red.json "$cg_fx/tree/scripts/gate-status.sh" conclude --sha "$cg_sha"
+cg_rc=$?
+carm "an IN-FLIGHT venue run is REFUSED by name, and no verdict is published" \
+    2 'has NOT concluded' 'conclude OK' "$(cg_out)" "$cg_rc"
+cg_extra "and nothing was POSTed while the verdict does not exist" \
+    "no POST reached the API" \
+    "$([ -s "$cg_fx/posts" ] && echo false || echo true)"
+
+mkdir -p "$cg_fx/mut-inflight/scripts"
+sed 's/if \[ "\$c_status" != "completed" \]; then/if false; then/' \
+    "$POSTER" > "$cg_fx/mut-inflight/scripts/gate-status.sh"
+cp "$MAPPER" "$cg_fx/mut-inflight/scripts/gate-status-map.py"
+if cmp -s "$POSTER" "$cg_fx/mut-inflight/scripts/gate-status.sh"; then
+  echo "check-gate-status: FAIL — the in-flight MUTANT did not apply: the guard's text moved, so the falsification would prove nothing" >&2
+  fail=1
+else
+  cg_run inflight.json stale-red.json "$cg_fx/mut-inflight/scripts/gate-status.sh" conclude --sha "$cg_sha"
+  cg_rc=$?
+  carm "MUTANT (the not-concluded guard removed): its named refusal DISAPPEARS" \
+      2 "concluded ''" 'has NOT concluded' "$(cg_out)" "$cg_rc"
+fi
+
+cg_run none.json stale-red.json "$cg_fx/tree/scripts/gate-status.sh" conclude --sha "$cg_sha"
+cg_rc=$?
+carm "a commit the venue never ran has NO verdict to publish (CANNOT-ASSESS)" \
+    2 'produced no run' 'conclude OK' "$(cg_out)" "$cg_rc"
+
+cg_run skipped.json stale-red.json "$cg_fx/tree/scripts/gate-status.sh" conclude --sha "$cg_sha"
+cg_rc=$?
+carm "a conclusion that is neither a pass nor a fail is REFUSED by name" \
+    2 "concluded 'skipped'" 'conclude OK' "$(cg_out)" "$cg_rc"
+
+# The other direction of the same verdict: `failure` on a fail, where the venue
+# can deliver one -- and a REFUSAL where its own record says it cannot, so this
+# verb cannot hand the required context back to a producer that cannot post it
+# (#1467's deadlock, which the sibling gate's arm 14 measures from the other end).
+cg_run red.json stale-red.json "$cg_fx/tree/scripts/gate-status.sh" conclude --sha "$cg_sha"
+cg_rc=$?
+carm "a CONCLUDED FAILURE is published as the run's own verdict" \
+    0 'conclude OK' 'REFUSED' "$(cg_out)" "$cg_rc"
+cg_extra "and the failure is the state that was posted" \
+    "last state=failure" \
+    "$([ "$(cg_last_state)" = failure ] && echo true || echo false)"
+
+CG_VENUE_LOG="$cg_fx/venue-unable.log"
+cg_run red.json stale-red.json "$cg_fx/tree/scripts/gate-status.sh" conclude --sha "$cg_sha"
+cg_rc=$?
+CG_VENUE_LOG=""
+carm "a red the venue MEASURED it cannot deliver is REFUSED, not republished" \
+    2 'does not show it delivering a verdict' 'conclude OK' "$(cg_out)" "$cg_rc"
+cg_extra "and that refusal posted nothing, so #1467's precedence is untouched" \
+    "no POST reached the API" \
+    "$([ -s "$cg_fx/posts" ] && echo false || echo true)"
+
+# The box-side half of ask 1: the GATE's own attested verdict is published for the
+# head it measured, over an earlier claim by an earlier step. `post --attestation`
+# is the path the landing driver runs; here it proves the later verdict supersedes
+# the earlier one rather than being refused by it.
+cg_run success.json stale-red.json "$cg_fx/tree/scripts/gate-status.sh" \
+    post --attestation "$cg_att" --sha "$cg_sha"
+cg_rc=$?
+carm "the GATE's own attested verdict is published over an earlier claim" \
+    0 'posted' 'REFUSED' "$(cg_out)" "$cg_rc"
+cg_extra "and it is the NEWEST claim for the commit, so it supersedes the red" \
+    "last state=success on the commit that was measured" \
+    "$([ "$(cg_last_state)" = success ] && echo true || echo false)"
+
+# The field walk (#1470). `venue_agreement` prints MORE than the three fields
+# `reconcile` consumes, so the url has to be TAKEN FROM the record rather than
+# inherited from its remainder: the pre-#1504 walk shifted (`#*`) instead of
+# truncating (`%%`), which on the field it consumed last is the no-op the sibling
+# comment on `post` records -- leaving the build, region and project as extra
+# LINES inside target_url, an API-invalid value the real API rejects (while this
+# repository's own gates, which grep for the URL as a PREFIX, cannot see it). The
+# arm is the SHAPE of the POST: exactly four fields, one line each.
+cg_run red.json green.json "$cg_fx/tree/scripts/gate-status.sh" reconcile --sha "$cg_sha"
+cg_rc=$?
+carm "reconcile's withdrawal POST carries exactly its four fields" \
+    0 'WITHDREW' '' "$(cg_out)" "$cg_rc"
+cg_extra "and its target_url is the venue's URL on ONE line, not four" \
+    "4 fields posted" \
+    "$([ "$(cg_field_count)" = 4 ] && echo true || echo false)"
+
+mkdir -p "$cg_fx/mut-walk/scripts"
+sed 's|^    venue_url=.*$|    venue_url="$venue_rest"|' \
+    "$POSTER" > "$cg_fx/mut-walk/scripts/gate-status.sh"
+cp "$MAPPER" "$cg_fx/mut-walk/scripts/gate-status-map.py"
+if cmp -s "$POSTER" "$cg_fx/mut-walk/scripts/gate-status.sh"; then
+  echo "check-gate-status: FAIL — the field-walk MUTANT did not apply: the walk's text moved, so the falsification would prove nothing" >&2
+  fail=1
+else
+  cg_run red.json green.json "$cg_fx/mut-walk/scripts/gate-status.sh" reconcile --sha "$cg_sha"
+  cg_rc=$?
+  cg_extra "MUTANT (the url's field extraction removed): the withdrawal's target_url swallows the fields after it" \
+      "more than 4 fields posted (measured $(cg_field_count))" \
+      "$([ "$(cg_field_count)" -gt 4 ] && echo true || echo false)"
+fi
+
+if [ "$controls" -ne "$expected_controls" ]; then
+  echo "check-gate-status: FAIL — expected $expected_controls controls of 4g, ran $controls" >&2
+  fail=1
+fi
+
 # 5. PRODUCER — the REQUIRED context must have a PRODUCER (#1357).
 #
 #    Everything above proves the poster's machinery; this proves the poster is

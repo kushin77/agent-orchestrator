@@ -74,6 +74,28 @@ THE RULES (rc-2 semantics themselves are NOT changed)
                name. A `venue` entry that did not bite in this run is reported
                (`unused_venue_entries`), never silently ignored.
 
+  * LEASED     every entry carries `tracked_by` (the `#<n>` spelling of its
+               `issue`) and a `tracking` block -- `state`, `measured_at`,
+               `measured_by`, `measured_via`, `max_age_hours` -- and is honoured
+               only while that block says the tracking issue is OPEN and the
+               measurement is younger than its lease (#1499). The shape is
+               BORROWED, not invented: `governance/reconcile/
+               real-tree-quarantine.json` + `QuarantineLease`
+               (`real_tree_baseline.py`) carry exactly this pair and honour
+               nothing when it does not hold, which is what let #1338 retire all
+               six of its exemptions the moment the evidence resolved them. The
+               defect it closes here was MEASURED: all 13 of this record's
+               entries named an issue as their open tracker (#1361, then #1382)
+               and both had been CLOSED while the composite still read PASS, so
+               the gate was honouring an exemption whose tracker was shut. A
+               `state` that is not `open`, and a measurement older than its
+               declared lease, are each REFUSED by name; a MISSING or MALFORMED
+               block is CANNOT-ASSESS, because a declaration that cannot be read
+               is never read as "still excused". The lease is checked on EVERY
+               entry, not only on the ones that bit: the record's claim is "this
+               exemption is leased to an OPEN issue", and a claim that is false
+               is false whether or not this venue happened to exercise it.
+
   Fail-closed everywhere: a MISSING budget file means "no exemptions" (every
   skip is then unnamed and refused); a MALFORMED one is CANNOT-ASSESS, never a
   silent no-exemption; an entry naming a check that is not discovered is
@@ -82,22 +104,26 @@ THE RULES (rc-2 semantics themselves are NOT changed)
 Usage:
   python3 scripts/lib/skip-ratchet.py --results .verify/.results.tsv \
       --names .verify/.check-names.txt [--budget scripts/skip-budget.json] \
-      [--root DIR] [--json-out FILE] [--note-out FILE]
+      [--root DIR] [--json-out FILE] [--note-out FILE] [--now ISO8601]
   python3 scripts/lib/skip-ratchet.py --self-test
 
-Exit codes: 0 OK (every skip named, no stale entry) / 1 RATCHET VIOLATION
-(refused by name) / 2 CANNOT-ASSESS (the skip set could not be evaluated).
+Exit codes: 0 OK (every skip named, no stale entry, no lapsed lease) / 1 RATCHET
+VIOLATION (refused by name) / 2 CANNOT-ASSESS (the skip set could not be
+evaluated).
 """
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -117,6 +143,30 @@ VENUE = "venue"
 # because a failing check is a finding, not a skip.
 LIVE_DEPENDENT = "live-dependent"
 KINDS = (STANDING_GAP, VENUE, LIVE_DEPENDENT)
+
+# --- the lease on an exemption (issue #1499) ----------------------------------
+#
+# An exemption is a claim about an OPEN issue. Until #1499 nothing held the
+# "open" half of that claim: `scripts/skip-budget.json` could name an issue that
+# had been CLOSED for a day and the composite still read PASS. Measured: all 13
+# entries named a tracker (#1361 for the 11 `venue` entries, #1382 for the two
+# `live-dependent` ones) and BOTH were closed -- #1361 at 2026-09-19T01:03:11Z,
+# #1382 at 2026-09-19T15:50:08Z -- while the venue's run was green.
+#
+# The fix BORROWS the shape this repository already solved it with rather than
+# inventing a second vocabulary: `governance/reconcile/real-tree-quarantine.json`
+# pairs a `tracked_by` with a `tracking` block, and
+# `governance/reconcile/real_tree_baseline.py`'s `QuarantineLease.refusal()`
+# honours nothing unless `state == "open"` and the measurement is younger than
+# `max_age_hours`. The same two conditions, in the same order, with the same
+# remedies -- a recorded state with no term is a memory, and a memory cannot be
+# wrong.
+TRACKING_TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+#: A lease inside its last quarter is REPORTED on every run (a note, never a
+#: failure): the term is coming, and the honest moment to re-measure is before
+#: it lapses rather than after the gate has already refused.
+LEASE_RENEW_NOTE_FRACTION = 0.25
+TRACKED_BY_PATTERN = re.compile(r"#([0-9]+)")
 
 # --- venue preconditions (issues #1199/#1351, #1361) --------------------------
 #
@@ -148,6 +198,83 @@ CANNOT_ASSESS = 2
 
 class CannotAssess(Exception):
     """The ratchet could not evaluate the skip set -- never a pass."""
+
+
+# --- the lease: the two conditions, borrowed from the quarantine (#1499) -------
+
+def parse_utc(text: str) -> float:
+    """Seconds since the epoch for a `%Y-%m-%dT%H:%M:%SZ` stamp.
+
+    The format is the QUARANTINE's (`real_tree_baseline.parse_lease`), not a new
+    one: the record must not carry two spellings of the same instant.
+    """
+    stamp = datetime.datetime.strptime(text, TRACKING_TIME_FORMAT)
+    return stamp.replace(tzinfo=datetime.timezone.utc).timestamp()
+
+
+def format_utc(at: float) -> str:
+    """The `%Y-%m-%dT%H:%M:%SZ` spelling of `at` -- the write half of parse_utc."""
+    return datetime.datetime.fromtimestamp(at, datetime.timezone.utc).strftime(
+        TRACKING_TIME_FORMAT
+    )
+
+
+def tracked_issue(entry: dict) -> Optional[int]:
+    """The issue `tracked_by` names, or None when it names none."""
+    value = entry.get("tracked_by")
+    if not isinstance(value, str):
+        return None
+    match = TRACKED_BY_PATTERN.fullmatch(value.strip())
+    return int(match.group(1)) if match else None
+
+
+def tracking_age_hours(entry: dict, *, at: float) -> float:
+    """How old the lease's measurement is. Only callable on a shape-checked entry."""
+    return (at - parse_utc(entry["tracking"]["measured_at"])) / 3600.0
+
+
+def lease_refusal(entry: dict, *, at: float) -> str:
+    """``""`` when the lease holds; else the reason no entry may be honoured.
+
+    The same two conditions and the same remedies as
+    ``real_tree_baseline.QuarantineLease.refusal()``: the tracker must be OPEN,
+    and the measurement of that fact must be younger than the declared lease.
+    Only callable once `load_budget` has accepted the entry's shape -- a
+    malformed lease never reaches here, it is a CANNOT-ASSESS finding instead.
+    """
+    tracked_by = entry["tracked_by"]
+    state = str(entry["tracking"]["state"]).strip().lower()
+    if state != "open":
+        return (
+            "the tracking issue %s is %s, not open -- an exemption is leased to the "
+            "OPEN issue that tracks it, so one whose tracker is shut may not be "
+            "honoured: re-point it at the live issue that now tracks the gap, or "
+            "retire the entry and let the venue red on its own missing "
+            "preconditions" % (tracked_by, state or "unstated")
+        )
+    age_hours = tracking_age_hours(entry, at=at)
+    max_age_hours = float(entry["tracking"]["max_age_hours"])
+    if age_hours > max_age_hours:
+        return (
+            "the tracking measurement is %.1fh old (> %gh lease); re-measure %s and "
+            "record it, or retire the exemption"
+            % (age_hours, max_age_hours, tracked_by)
+        )
+    return ""
+
+
+def lease_note(entry: dict, *, at: float) -> str:
+    """A NOTE for a lease inside its last quarter -- never a failure."""
+    max_age_hours = float(entry["tracking"]["max_age_hours"])
+    age_hours = tracking_age_hours(entry, at=at)
+    if age_hours < max_age_hours * (1.0 - LEASE_RENEW_NOTE_FRACTION):
+        return ""
+    return "%s (%s, %.0fh of %gh)" % (
+        entry["check"],
+        entry["tracked_by"],
+        age_hours,
+        max_age_hours,
+    )
 
 
 # --- the budget (the named, shrink-only record) -------------------------------
@@ -207,21 +334,135 @@ def load_budget(path: Path) -> Tuple[List[dict], List[str]]:
                     "entry[%d] (%s) is a standing-gap with no open issue number"
                     % (i, name)
                 )
+                issue = None
         elif kind == VENUE:
             findings.extend(precondition_findings(i, name, entry.get("precondition")))
-            if "issue" in entry and not (
-                isinstance(entry["issue"], int)
-                and not isinstance(entry["issue"], bool)
-                and entry["issue"] > 0
+            issue = entry.get("issue")
+            if not (
+                isinstance(issue, int) and not isinstance(issue, bool) and issue > 0
             ):
+                # `issue` was OPTIONAL for a venue entry until #1499 and is not
+                # any more: the kind's own contract already named "the open issue
+                # that tracks it", and an exemption with no tracker is exactly the
+                # record that could be honoured after its tracker closed.
                 findings.append(
-                    "entry[%d] (%s) names issue %r, which is not a positive integer "
-                    "(a venue entry MAY name the open issue that tracks the gap)"
-                    % (i, name, entry["issue"])
+                    "entry[%d] (%s) is a venue with no open issue number -- every "
+                    "exemption is leased to the OPEN issue that tracks the gap, so "
+                    "the number is required here too (issue #1499)" % (i, name)
                 )
+                issue = None
         else:
             findings.extend(live_dependent_findings(i, name, entry))
+            declared = entry.get("issue")
+            issue = (
+                declared
+                if isinstance(declared, int) and not isinstance(declared, bool)
+                else None
+            )
+        findings.extend(tracked_by_findings(i, name, entry, issue))
+        findings.extend(tracking_findings(i, name, entry))
     return entries, findings
+
+
+def tracked_by_findings(
+    index: int, name: str, entry: dict, issue: Optional[int]
+) -> List[str]:
+    """The tracker this exemption is leased to, and its agreement with `issue`.
+
+    One tracker per entry, spelled once: `tracked_by` is the quarantine's key and
+    has to agree with the entry's own `issue`, so a re-point cannot half-land
+    (#1499). That coherence rule is the whole reason the borrowed key does not
+    become a second vocabulary here.
+    """
+    tracked_by = entry.get("tracked_by")
+    if not isinstance(tracked_by, str) or not tracked_by.strip():
+        return [
+            "entry[%d] (%s) carries no 'tracked_by' -- an exemption must name the "
+            "OPEN issue that tracks it, spelled the quarantine's way ('#<n>'), or "
+            "it cannot be leased to anything (issue #1499)" % (index, name)
+        ]
+    # The ONE parse of the tracker (tracked_issue), so the agreement rule below
+    # cannot read a different number than the rest of the module.
+    declared_issue = tracked_issue(entry)
+    if declared_issue is None:
+        return [
+            "entry[%d] (%s) declares tracked_by %r, which is not a '#<n>' issue "
+            "reference" % (index, name, tracked_by)
+        ]
+    if issue is not None and declared_issue != issue:
+        return [
+            "entry[%d] (%s) declares tracked_by %r while naming issue %s -- one "
+            "tracker per entry, spelled once: the two halves must agree, so a "
+            "re-point cannot half-land (issue #1499)"
+            % (index, name, tracked_by, issue)
+        ]
+    return []
+
+
+def tracking_findings(index: int, name: str, entry: dict) -> List[str]:
+    """Shape findings for one entry's lease (#1499).
+
+    Borrowed wholesale from the quarantine: the declaration is `tracked_by` plus
+    a `tracking` block, and a MISSING or MALFORMED one is a FINDING -- never a
+    silent "still excused". `real_tree_baseline.py` raises
+    `QuarantineUnavailable` for exactly this family of shapes; the direction is
+    the same one every CANNOT-ASSESS decision in this package takes.
+    """
+    tracking = entry.get("tracking")
+    if not isinstance(tracking, dict):
+        return [
+            "entry[%d] (%s) carries no 'tracking' block -- an exemption is HONOURED "
+            "only while its tracking issue is measured OPEN and that measurement is "
+            "younger than its lease, so a missing declaration is a finding rather "
+            "than a silent 'still excused' (the quarantine's shape, issue #1499)"
+            % (index, name)
+        ]
+    findings: List[str] = []
+    state = tracking.get("state")
+    if not isinstance(state, str) or not state.strip():
+        findings.append(
+            "entry[%d] (%s) tracking.state must be a non-empty string naming the "
+            "issue's state AS IT WAS READ (e.g. 'open') -- the lease is refused "
+            "when it is not 'open', so an unstated state cannot be honoured"
+            % (index, name)
+        )
+    measured_at = tracking.get("measured_at")
+    if not isinstance(measured_at, str) or not measured_at.strip():
+        findings.append(
+            "entry[%d] (%s) tracking.measured_at must be the UTC timestamp of the "
+            "read, formatted '%s'" % (index, name, TRACKING_TIME_FORMAT)
+        )
+    else:
+        try:
+            parse_utc(measured_at)
+        except ValueError:
+            findings.append(
+                "entry[%d] (%s) tracking.measured_at %r is not '%s' -- a lease "
+                "cannot be measured from a timestamp nothing can parse"
+                % (index, name, measured_at, TRACKING_TIME_FORMAT)
+            )
+    for key, why in (
+        ("measured_by", "WHO took the measurement"),
+        ("measured_via", "HOW it was taken (the read whose answer is recorded)"),
+    ):
+        value = tracking.get(key)
+        if not isinstance(value, str) or not value.strip():
+            findings.append(
+                "entry[%d] (%s) tracking.%s must be a non-empty string naming %s"
+                % (index, name, key, why)
+            )
+    max_age_hours = tracking.get("max_age_hours")
+    if (
+        not isinstance(max_age_hours, (int, float))
+        or isinstance(max_age_hours, bool)
+        or max_age_hours <= 0
+    ):
+        findings.append(
+            "entry[%d] (%s) tracking.max_age_hours must be a positive number -- the "
+            "term of the lease, after which the recorded state must be re-measured"
+            % (index, name)
+        )
+    return findings
 
 
 def precondition_findings(index: int, name: str, value) -> List[str]:
@@ -364,10 +605,19 @@ def entry_record(entry: dict, root: Path) -> dict:
     """
     kind = entry["kind"]
     declared = entry.get("precondition") if kind == VENUE else None
+    tracking = entry.get("tracking") if isinstance(entry.get("tracking"), dict) else {}
     return {
         "check": entry["check"],
         "kind": kind,
         "issue": entry.get("issue") if isinstance(entry.get("issue"), int) else None,
+        # The lease (#1499): the borrowed pair, carried into the attestation so
+        # the board reads WHY the exemption was honoured from the record itself
+        # rather than from the prose around it, and so a reader can see the
+        # tracker's state and the age of the read that established it.
+        "tracked_by": entry.get("tracked_by"),
+        "tracking_state": tracking.get("state"),
+        "tracking_measured_at": tracking.get("measured_at"),
+        "tracking_max_age_hours": tracking.get("max_age_hours"),
         # The LIVE mechanism this entry names (#1410): WHICH part of the world did
         # not answer. Carried into the attestation so the board reads why a check
         # sat in the skip bucket from the record rather than from prose.
@@ -447,8 +697,15 @@ def evaluate(
     names: Sequence[str],
     entries: Sequence[dict],
     budget_label: str,
+    *,
+    at: float,
 ) -> Tuple[dict, int, List[str]]:
-    """Apply the rules. Returns (record, rc, stdout lines)."""
+    """Apply the rules. Returns (record, rc, stdout lines).
+
+    `at` is the clock the leases are measured against, passed in rather than read
+    here so a fixture can pin the moment it is evaluating (the determinism rule
+    the clock/date-bomb class taught, #1025).
+    """
     discovered = set(names)
     skipped = [(n, rc) for n, rc in results if rc == 2]
     observed = {n for n, _ in results}
@@ -460,6 +717,7 @@ def evaluate(
     unused_venue: List[str] = []
     unused_live: List[str] = []
     refused: List[str] = []
+    lease_notes: List[str] = []
     lines: List[str] = []
 
     for name, _rc in skipped:
@@ -516,6 +774,20 @@ def evaluate(
 
     for entry in entries:
         name = entry["check"]
+        # The lease (#1499), checked FIRST and on EVERY entry -- not only on the
+        # ones that bit. The record's claim is "this exemption is leased to an
+        # OPEN issue"; a claim that is false is false whether or not this venue
+        # happened to exercise it, and a tracker that closed is precisely the
+        # fact nobody notices while only the skipping entries are inspected.
+        lease_problem = lease_refusal(entry, at=at)
+        if lease_problem:
+            refused.append(
+                "entry '%s' is not leased to an open tracker: %s" % (name, lease_problem)
+            )
+        else:
+            renewing = lease_note(entry, at=at)
+            if renewing:
+                lease_notes.append(renewing)
         if name not in discovered and name not in observed:
             refused.append(
                 "entry names '%s', which is not a check this run discovered -- a "
@@ -576,6 +848,7 @@ def evaluate(
         "stale_entries": stale,
         "unused_venue_entries": unused_venue,
         "unused_live_entries": unused_live,
+        "lease_notes": lease_notes,
         "findings": refused,
     }
     return record, rc, lines
@@ -608,7 +881,12 @@ def run(
     budget_path: Path,
     json_out: Optional[Path],
     note_out: Optional[Path],
+    at: Optional[float] = None,
 ) -> int:
+    # The lease clock (#1499). Read ONCE, here, so every entry is judged against
+    # the same instant and a long run cannot straddle a lease boundary.
+    if at is None:
+        at = time.time()
     results = read_results(results_path)
     names = read_names(names_path)
     try:
@@ -629,6 +907,7 @@ def run(
             "stale_entries": [],
             "unused_venue_entries": [],
             "unused_live_entries": [],
+            "lease_notes": [],
             "findings": shape_findings,
         }
         _write(json_out, record)
@@ -640,11 +919,22 @@ def run(
         )
         return CANNOT_ASSESS
 
-    record, rc, lines = evaluate(root, results, names, entries, budget_label)
+    record, rc, lines = evaluate(root, results, names, entries, budget_label, at=at)
     for line in lines:
         print(line)
     for finding in record["findings"]:
         print("verify: skip ratchet FAIL -- %s" % finding, file=sys.stderr)
+    if record["lease_notes"]:
+        print(
+            "verify: skip ratchet note -- %d entr(y/ies) are inside the last %d%% of "
+            "their tracking lease; re-measure the tracking issue and record it before "
+            "the lease lapses (they are REFUSED the moment it does): %s"
+            % (
+                len(record["lease_notes"]),
+                int(LEASE_RENEW_NOTE_FRACTION * 100),
+                ", ".join(record["lease_notes"]),
+            )
+        )
     if record["unused_venue_entries"]:
         print(
             "verify: skip ratchet note -- %d venue entr(y/ies) did not bite in this "
@@ -759,6 +1049,32 @@ def _case(scratch: Path, label: str, expected_rc: int, needle: Optional[str], **
     return ok
 
 
+def _lease(
+    issue: int,
+    *,
+    state: str = "open",
+    age_hours: float = 0.0,
+    max_age_hours: float = 720.0,
+) -> dict:
+    """The borrowed lease block, derived from the LIVE clock.
+
+    Derived rather than written as a date literal: a fixture that pins a date
+    while the subject reads the live clock is green the day it is written and red
+    every day after (the clock/date-bomb class, #1025). `age_hours` is relative to
+    now, so even the EXPIRY arm is deterministic on every day it runs.
+    """
+    return {
+        "tracked_by": "#%d" % issue,
+        "tracking": {
+            "state": state,
+            "measured_at": format_utc(time.time() - age_hours * 3600.0),
+            "measured_by": "scripts/lib/skip-ratchet.py self-test fixture",
+            "measured_via": "fixture: the entry's own issue number, read at the fixture's clock",
+            "max_age_hours": max_age_hours,
+        },
+    }
+
+
 def self_test() -> int:
     scratch = Path(
         tempfile.mkdtemp(
@@ -774,14 +1090,14 @@ def self_test() -> int:
             _case(
                 scratch, "named-standing-gap-pass", 0, "standing gap tracked by #1176",
                 results=[("paperclip-routines", 2)], names=["paperclip-routines"],
-                entries=[{"check": "paperclip-routines", "kind": STANDING_GAP, "issue": 1176, "reason": "the dropped-entry tree"}],
+                entries=[{**_lease(1176), "check": "paperclip-routines", "kind": STANDING_GAP, "issue": 1176, "reason": "the dropped-entry tree"}],
             )
         )
         results.append(
             _case(
                 scratch, "named-venue-absent-precondition", 0, "venue: vendor/CMR/sync absent",
                 results=[("module-registry", 2)], names=["module-registry"],
-                entries=[{"check": "module-registry", "kind": VENUE, "precondition": "vendor/CMR/sync", "reason": "the pin is unreadable here"}],
+                entries=[{**_lease(1295), "check": "module-registry", "kind": VENUE, "issue": 1295, "precondition": "vendor/CMR/sync", "reason": "the pin is unreadable here"}],
             )
         )
         # The COMMAND form of a venue precondition (#1361): the Cloud Build
@@ -793,7 +1109,7 @@ def self_test() -> int:
                 scratch, "venue-command-precondition-not-supplied", 0,
                 "cannot run 'ao-no-such-tool-1361'",
                 results=[("branch-protection", 2)], names=["branch-protection"],
-                entries=[{"check": "branch-protection", "kind": VENUE, "issue": 1361,
+                entries=[{**_lease(1361), "check": "branch-protection", "kind": VENUE, "issue": 1361,
                           "precondition": {"command": "ao-no-such-tool-1361"},
                           "reason": "no gh in this container"}],
             )
@@ -803,7 +1119,7 @@ def self_test() -> int:
                 scratch, "venue-command-precondition-names-its-issue", 0,
                 "the open issue that tracks it is #1361",
                 results=[("branch-protection", 2)], names=["branch-protection"],
-                entries=[{"check": "branch-protection", "kind": VENUE, "issue": 1361,
+                entries=[{**_lease(1361), "check": "branch-protection", "kind": VENUE, "issue": 1361,
                           "precondition": {"command": "ao-no-such-tool-1361"},
                           "reason": "no gh in this container"}],
             )
@@ -813,7 +1129,7 @@ def self_test() -> int:
                 scratch, "venue-command-precondition-supplied-refused", 1,
                 "venue precondition present but 'branch-protection' still cannot assess",
                 results=[("branch-protection", 2)], names=["branch-protection"],
-                entries=[{"check": "branch-protection", "kind": VENUE, "issue": 1361,
+                entries=[{**_lease(1361), "check": "branch-protection", "kind": VENUE, "issue": 1361,
                           "precondition": {"command": "true"},
                           "reason": "the command IS runnable here"}],
             )
@@ -823,7 +1139,7 @@ def self_test() -> int:
                 scratch, "venue-command-metacharacter-refused", 2,
                 "carries shell metacharacter(s)",
                 results=[("branch-protection", 2)], names=["branch-protection"],
-                entries=[{"check": "branch-protection", "kind": VENUE,
+                entries=[{**_lease(1295), "check": "branch-protection", "kind": VENUE,
                           "precondition": {"command": "gh auth status | tee /tmp/x"},
                           "reason": "a shell line, not an argument vector"}],
             )
@@ -833,7 +1149,7 @@ def self_test() -> int:
                 scratch, "venue-precondition-of-the-wrong-type-refused", 2,
                 "must be a repo-relative path or a",
                 results=[("module-registry", 2)], names=["module-registry"],
-                entries=[{"check": "module-registry", "kind": VENUE,
+                entries=[{**_lease(1295), "check": "module-registry", "kind": VENUE,
                           "precondition": 42, "reason": "neither form"}],
             )
         )
@@ -842,7 +1158,7 @@ def self_test() -> int:
             _case(
                 scratch, "stale-standing-gap-refused", 1, "stale skip exemption 'dispatch-queue'",
                 results=[("dispatch-queue", 0)], names=["dispatch-queue"],
-                entries=[{"check": "dispatch-queue", "kind": STANDING_GAP, "issue": 1189, "reason": "six queued-but-closed issues"}],
+                entries=[{**_lease(1189), "check": "dispatch-queue", "kind": STANDING_GAP, "issue": 1189, "reason": "six queued-but-closed issues"}],
             )
         )
         results.append(
@@ -850,7 +1166,7 @@ def self_test() -> int:
                 scratch, "venue-precondition-present-but-blind-refused", 1,
                 "venue precondition present but 'module-registry' still cannot assess",
                 results=[("module-registry", 2)], names=["module-registry"],
-                entries=[{"check": "module-registry", "kind": VENUE, "precondition": "vendor/CMR/sync", "reason": "the pin is unreadable here"}],
+                entries=[{**_lease(1295), "check": "module-registry", "kind": VENUE, "issue": 1295, "precondition": "vendor/CMR/sync", "reason": "the pin is unreadable here"}],
                 precondition_path="vendor/CMR/sync",
             )
         )
@@ -858,7 +1174,7 @@ def self_test() -> int:
             _case(
                 scratch, "entry-for-undiscovered-check-refused", 1, "not a check this run discovered",
                 results=[("a", 0)], names=["a"],
-                entries=[{"check": "ghost", "kind": STANDING_GAP, "issue": 42, "reason": "a check that no longer exists"}],
+                entries=[{**_lease(42), "check": "ghost", "kind": STANDING_GAP, "issue": 42, "reason": "a check that no longer exists"}],
             )
         )
         results.append(
@@ -883,7 +1199,7 @@ def self_test() -> int:
             _case(
                 scratch, "unused-venue-entry-reported-not-failed", 0, "did not bite in this run",
                 results=[("module-registry", 0)], names=["module-registry"],
-                entries=[{"check": "module-registry", "kind": VENUE, "precondition": "vendor/CMR/sync", "reason": "the pin is unreadable here"}],
+                entries=[{**_lease(1295), "check": "module-registry", "kind": VENUE, "issue": 1295, "precondition": "vendor/CMR/sync", "reason": "the pin is unreadable here"}],
             )
         )
         results.append(
@@ -901,6 +1217,7 @@ def self_test() -> int:
         # never a stale entry for this kind), and the refusal when the check itself
         # FAILS -- a failing check is a finding, not a skip.
         LIVE_ENTRY = {
+            **_lease(1382),
             "check": "gate-status",
             "kind": LIVE_DEPENDENT,
             "issue": 1382,
@@ -957,7 +1274,7 @@ def self_test() -> int:
                 scratch, "live-dependent-without-mechanism-refused", 2,
                 "is live-dependent with no 'mechanism'",
                 results=[("gate-status", 2)], names=["gate-status"],
-                entries=[{"check": "gate-status", "kind": LIVE_DEPENDENT,
+                entries=[{**_lease(1382), "check": "gate-status", "kind": LIVE_DEPENDENT,
                           "issue": 1382, "reason": "no mechanism named"}],
             )
         )
@@ -966,10 +1283,135 @@ def self_test() -> int:
                 scratch, "live-dependent-with-a-precondition-refused", 2,
                 "is live-dependent and declares a precondition",
                 results=[("gate-status", 2)], names=["gate-status"],
-                entries=[{"check": "gate-status", "kind": LIVE_DEPENDENT, "issue": 1382,
+                entries=[{**_lease(1382), "check": "gate-status", "kind": LIVE_DEPENDENT, "issue": 1382,
                           "mechanism": "the live statuses source",
                           "precondition": {"command": "gh auth status"},
                           "reason": "a venue entry mislabelled"}],
+            )
+        )
+        # --- the LEASE (#1499), borrowed from the quarantine --------------------
+        # An exemption is honoured only while its tracker is OPEN and the
+        # measurement of that fact is younger than the term it declares. Both
+        # directions are provoked, plus the fail-closed shape: a MISSING or
+        # disagreeing declaration is CANNOT-ASSESS rather than a silent "still
+        # excused". Every state below is CLOCK-DERIVED (`_lease`), so no arm can
+        # go stale by itself -- and the expiry arm is a RELATIVE age, so it is
+        # deterministic on the day it runs and every day after.
+        LEASE_VENUE = {
+            "check": "module-registry",
+            "kind": VENUE,
+            "issue": 1295,
+            "precondition": "vendor/CMR/sync",
+            "reason": "the pin is unreadable in this venue",
+        }
+        results.append(
+            _case(
+                scratch, "lease-closed-tracker-refused", 1,
+                "the tracking issue #1361 is closed, not open",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[{**_lease(1361, state="closed"), **LEASE_VENUE, "issue": 1361}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "lease-closed-tracker-names-the-remedy", 1,
+                "re-point it at the live issue that now tracks the gap",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[{**_lease(1361, state="closed"), **LEASE_VENUE, "issue": 1361}],
+            )
+        )
+        # The closed tracker is refused even when the entry did NOT bite. That is
+        # the half a per-bite check would miss entirely: the 13 entries whose
+        # tracker closed did not bite on a developer box (gh, docker and crontab
+        # are all present here), so a lease checked only where a skip happened
+        # would never have looked at them.
+        results.append(
+            _case(
+                scratch, "lease-closed-tracker-refused-even-when-it-did-not-bite", 1,
+                "is not leased to an open tracker",
+                results=[("module-registry", 0)], names=["module-registry"],
+                entries=[{**_lease(1361, state="closed"), **LEASE_VENUE, "issue": 1361}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "lease-lapsed-measurement-refused", 1,
+                "the tracking measurement is 100.0h old (> 1h lease)",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[
+                    {**_lease(1295, age_hours=100.0, max_age_hours=1.0), **LEASE_VENUE}
+                ],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "lease-inside-its-last-quarter-is-noted-not-failed", 0,
+                "inside the last 25% of their tracking lease",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[
+                    {**_lease(1295, age_hours=600.0, max_age_hours=720.0), **LEASE_VENUE}
+                ],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "lease-missing-is-cannot-assess", 2,
+                "carries no 'tracking' block",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[{"check": "module-registry", "kind": VENUE, "issue": 1295,
+                          "precondition": "vendor/CMR/sync",
+                          "reason": "no lease declared at all"}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "lease-without-tracked-by-is-cannot-assess", 2,
+                "carries no 'tracked_by'",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[{**_lease(1295), **LEASE_VENUE, "tracked_by": None}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "lease-disagreeing-with-issue-is-cannot-assess", 2,
+                "the two halves must agree",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[{**_lease(1295), **LEASE_VENUE, "issue": 1361}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "lease-with-an-unparseable-measurement-is-cannot-assess", 2,
+                "a lease cannot be measured from a timestamp nothing can parse",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[
+                    {
+                        **_lease(1295),
+                        **LEASE_VENUE,
+                        "tracking": dict(
+                            _lease(1295)["tracking"], measured_at="yesterday-ish"
+                        ),
+                    }
+                ],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "lease-with-a-non-positive-term-is-cannot-assess", 2,
+                "tracking.max_age_hours must be a positive number",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[{**_lease(1295, max_age_hours=0.0), **LEASE_VENUE}],
+            )
+        )
+        results.append(
+            _case(
+                scratch, "venue-entry-without-an-issue-refused", 2,
+                "is a venue with no open issue number",
+                results=[("module-registry", 2)], names=["module-registry"],
+                entries=[{"tracked_by": "#1295", "tracking": _lease(1295)["tracking"],
+                          "check": "module-registry", "kind": VENUE,
+                          "precondition": "vendor/CMR/sync",
+                          "reason": "no tracker named"}],
             )
         )
     finally:
@@ -994,10 +1436,29 @@ def main(argv: List[str]) -> int:
     parser.add_argument("--json-out")
     parser.add_argument("--note-out")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument(
+        "--now",
+        help="the instant the leases are measured against, as "
+        "'%%Y-%%m-%%dT%%H:%%M:%%SZ' (default: the live clock; env "
+        "AO_SKIP_RATCHET_CLOCK is the seam a fixture uses)",
+    )
     args = parser.parse_args(argv)
 
     if args.self_test:
         return self_test()
+
+    at: Optional[float] = None
+    clock = args.now or os.environ.get("AO_SKIP_RATCHET_CLOCK")
+    if clock:
+        try:
+            at = parse_utc(clock.strip())
+        except ValueError:
+            print(
+                "verify: skip ratchet CANNOT-ASSESS -- --now %r is not '%s', so no "
+                "lease can be measured against it" % (clock, TRACKING_TIME_FORMAT),
+                file=sys.stderr,
+            )
+            return CANNOT_ASSESS
 
     root = Path(args.root).resolve()
     if not args.results or not args.names:
@@ -1012,6 +1473,7 @@ def main(argv: List[str]) -> int:
             budget_path,
             Path(args.json_out) if args.json_out else None,
             Path(args.note_out) if args.note_out else None,
+            at=at,
         )
     except CannotAssess as exc:
         print("verify: skip ratchet CANNOT-ASSESS -- %s" % exc, file=sys.stderr)
@@ -1026,6 +1488,7 @@ def main(argv: List[str]) -> int:
                 "stale_entries": [],
                 "unused_venue_entries": [],
                 "unused_live_entries": [],
+                "lease_notes": [],
                 "findings": [str(exc)],
             },
         )

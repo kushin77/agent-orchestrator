@@ -1,0 +1,70 @@
+{
+  "schema": "cmr.module/v1",
+  "id": "nous",
+  "name": "nous",
+  "description": "Nous Research provider module: the OpenAI-compatible inference API (POST /v1/chat/completions, Bearer API key billed against account credits) with a 402-model live catalog, tier-mapped onto models taken from that catalog, with cloud-to-local (Ollama) graceful degradation.",
+  "source": {
+    "repo": "external",
+    "default_branch": "n/a",
+    "path": "https://portal.nousresearch.com/api-docs"
+  },
+  "type": "service",
+  "class": ["model-gateway", "provider", "nous", "cloud"],
+  "versions": {
+    "latest": "v1.0.0"
+  },
+  "distribution": {
+    "language": "python",
+    "package": "gateway.providers.nous",
+    "terraform": null
+  },
+  "features": [
+    {
+      "id": "chat-completions",
+      "default": "on",
+      "flags": ["nous.chat"],
+      "desc": "OpenAI-compatible chat/completions chat with Bearer auth and typed output validation."
+    },
+    {
+      "id": "tier-routing",
+      "default": "on",
+      "flags": ["nous.tiers"],
+      "desc": "LOW routes to inclusionai/ling-3.0-flash, MED to qwen/qwen3.7-flash, HIGH to anthropic/claude-haiku-4.5 and MAX to openai/gpt-6-astra-fast - every id VERIFIED SERVABLE against the endpoint's chat path (HTTP 402 = accepted, 400 = unknown model) rather than transcribed from the docs or the wider /v1/models listing (issue #1559)."
+    },
+    {
+      "id": "api-key-auth",
+      "default": "on",
+      "flags": ["nous.auth"],
+      "desc": "Provider-specific: the API key is a required Bearer credential (requires_key=true), stored in Vault secret/shared-services/nous and mirrored to GSM, never in code, logs or git."
+    },
+    {
+      "id": "credits-billing",
+      "default": "on",
+      "flags": ["nous.credits"],
+      "desc": "Provider-specific: usage bills against Nous account credits (plans/top-ups declared in gateway/finops/provider-credits.yaml) rather than post-paid metered USD."
+    },
+    {
+      "id": "graceful-degradation",
+      "default": "on",
+      "flags": ["nous.fallback"],
+      "desc": "Cloud-to-local fallback to the keyless local Ollama hop when the primary is unavailable."
+    }
+  ],
+  "integrations": [
+    { "id": "gateway", "type": "api" },
+    { "id": "ollama", "type": "fallback" }
+  ],
+  "dependencies": [],
+  "consumers": ["purebliss-team"],
+  "governance": {
+    "hub": "kushin77/CMR",
+    "adopted": "2026-09-20",
+    "branch_protection": "standard",
+    "security": ["dependabot", "gitleaks"],
+    "ai_guardrails": "standard"
+  },
+  "provenance": {
+    "harvested_from": "none (external SaaS; nothing vendored)",
+    "note": "Gateway-owned module-catalog entry (issue #1559) for the registered `nous` provider adapter. Written from Nous Research's published API contract (https://portal.nousresearch.com/api-docs) - no source file was copied, and no third-party code is vendored. The `hermes` module entry is a separate, unchanged declaration for the local Ollama-compatible hop."
+  }
+}

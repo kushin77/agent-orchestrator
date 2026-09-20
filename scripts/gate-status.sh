@@ -18,6 +18,12 @@
 #                                        API's 140-character description cap)
 #   post    --attestation <file>         publish the rc the GATE ITSELF recorded,
 #                                        bound to the commit it measured
+#   conclude --sha <sha>                 publish the CI VENUE OF RECORD's own
+#                                        CONCLUDED verdict for that commit --
+#                                        success on pass, failure on fail -- and
+#                                        prove by read-back that this claim is
+#                                        the one that STANDS (see THE VERDICT
+#                                        NOTHING PUBLISHED, #1504)
 #   reconcile --sha <sha>                make the PUBLISHED context agree with the
 #                                        CI venue's own verdict for that commit,
 #                                        withdrawing a standing green the venue's
@@ -127,6 +133,56 @@
 # any run for the commit is not refusable at post time, so after the fact the
 # published context must be brought back into agreement -- a standing `success`
 # whose venue run concluded red is SUPERSEDED by an `error` that names the run.
+#
+# THE VERDICT NOTHING PUBLISHED (issue #1504, measured 2026-09-19)
+# The two verbs above cover the PRODUCER'S own verdict and the WITHDRAWAL of a
+# green the venue contradicts. Neither of them ever publishes the venue of
+# record's own verdict, and that gap is a state in which the required context
+# cannot be satisfied at all. Measured on four live pull requests:
+#
+#   #1466  `ao/gate-of-record=failure`, created 22:52:01, on a head whose venue
+#          check-run `control-plane-verify (purebliss-ghl)` completed `success`
+#          at 22:56:50 -- a red posted FOUR MINUTES BEFORE the run it belongs to
+#          finished, and never replaced by that run's outcome;
+#   #1489  the same shape (red 22:07:01, run completed success 22:17:43);
+#   #1493  a run that completed success and published NOTHING -- `[]`, no status
+#   #1498  for the required context at all. A head in that state can never merge,
+#          whatever its content says.
+#
+# The refusal that keeps a box-side claim from pre-empting the venue of record
+# (post's `unsettled` arm) is RIGHT and stays: it is what stopped a second
+# producer from satisfying the context while the run was in flight. But it
+# publishes NOTHING in that state, and when the run then concludes, nothing
+# publishes its verdict either -- so the required context is left empty and
+# every merge behind it is blocked. So this poster also carries the missing
+# half, stated as three properties that are each a refusal:
+#
+#   1. `conclude` PUBLISHES THE VENUE OF RECORD'S OWN CONCLUDED VERDICT for the
+#      commit that run measured -- `success` on a pass, `failure` on a fail --
+#      and it publishes it whether or not an earlier step already posted
+#      something: a later verdict SUPERSEDES an earlier one, and how that is
+#      known is property 3.
+#   2. IT NEVER PUBLISHES BEFORE THE VERDICT EXISTS. A venue run that has not
+#      concluded (status not `completed`) is REFUSED BY NAME, and so is a
+#      conclusion that is neither a pass nor a fail (`skipped`, `neutral`,
+#      `stale`, an unknown string): a run that did not assess this commit has no
+#      verdict, and publishing one would be a claim about a verdict that was
+#      never reached -- the exact shape measured on #1466.
+#   3. THE CLAIM IS READ BACK, AND MUST BE THE ONE THAT STANDS. A status POST is
+#      a claim, not an observation; the newest claim for that commit is what
+#      branch protection reads. So `conclude` reads the context back after
+#      posting and is CANNOT-ASSESS (2) if the newest state is not the one it
+#      just published -- a peer posting after us must never be reported as the
+#      venue's verdict (#739's class: reporting a state that was never
+#      observed). That read-back is also what makes "a later verdict supersedes
+#      an earlier one" a measurement instead of a belief.
+#
+# What `conclude` deliberately does NOT do, stated because it is the direction
+# that would re-create a deadlock this repo already fixed: it does not publish a
+# RED that the venue's own record shows it cannot deliver (#1467). Where the
+# venue cannot post its own verdict, precedence belongs to `post --attestation`,
+# which owns that decision; republishing the red from here would hand the
+# required context back to a producer that provably cannot post it.
 set -u
 
 # This script's own ABSOLUTE path, captured before the `cd` below: the self-test
@@ -277,6 +333,16 @@ def answer(verdict, reason, run=None):
     print(build)
     print(region)
     print(project)
+    # The run's OWN terminal facts, APPENDED (#1504). `conclude` has to publish
+    # the venue's verdict itself, so it needs the conclusion, whether the run is
+    # concluded, and the run's identity to name in the description -- and it must
+    # read them from THIS selection, not from a second copy of the rule that
+    # could disagree with the guard `post` runs. Appended rather than inserted,
+    # so `post`'s field walk (which consumes only the first six) is untouched.
+    print(str(run.get("conclusion") or "") if isinstance(run, dict) else "")
+    print(str(run.get("status") or "") if isinstance(run, dict) else "")
+    print(str(run.get("id") or "") if isinstance(run, dict) else "")
+    print(str(run.get("name") or "") if isinstance(run, dict) else "")
     raise SystemExit(0)
 
 try:
@@ -315,7 +381,7 @@ if live:
     # because a build had merely started.
     answer("unsettled", "the CI venue's own run for this commit has NOT concluded (%s, status '%s', started %s, %s) "
                         "-- a second producer must not satisfy the required context before the venue of record speaks"
-           % (run.get("name"), run.get("status"), run.get("started_at") or "unknown", build_of(run)))
+           % (run.get("name"), run.get("status"), run.get("started_at") or "unknown", build_of(run)), run)
 if venue:
     run = venue[-1]
     answer("allow", "the CI venue's own run for this commit concluded '%s' (%s, %s)"
@@ -544,7 +610,7 @@ detail=""
 mode=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    post|show|dry-run|reconcile) mode="$1" ;;
+    post|show|dry-run|reconcile|conclude) mode="$1" ;;
     --self-test) mode="self-test" ;;
     --sha) sha="${2:-}"; shift ;;
     --rc)  rc="${2:-}";  shift ;;
@@ -568,7 +634,7 @@ fi
 
 [ "$mode" = "self-test" ] && { self_test; exit $?; }
 
-[ -n "$mode" ] || die "usage: $0 {post|reconcile|show|dry-run} --sha <sha> [--rc <0|1|2> | --attestation <file>] [--venue-run <build-id>] [--detail <text>] | --self-test" 2
+[ -n "$mode" ] || die "usage: $0 {post|conclude|reconcile|show|dry-run} --sha <sha> [--rc <0|1|2> | --attestation <file>] [--venue-run <build-id>] [--detail <text>] | --self-test" 2
 
 # A detail describes the outcome of a `post`. The other verbs publish a
 # description this command OWNS -- `reconcile` names the withdrawal it makes --
@@ -819,10 +885,20 @@ PY
     fi
     agreement="$(venue_agreement "$reconcile_json")"
     rm -f "$reconcile_json"
+    # ONE field per line, with a trailing newline appended so even the LAST
+    # field has a terminator (#1470): `venue_agreement` prints MORE than the
+    # three fields this branch reads, and the pre-#1504 walk took the url with a
+    # SHIFT (`${venue_rest#*$'\n'}`), which the sibling comment on `post` records
+    # as a no-op on the field it consumes last -- so the withdrawal's target_url
+    # inherited the build, region and project as extra LINES, an API-invalid
+    # value. The walk below TRUNCATES each field and the record is terminated, so
+    # a field cannot swallow the ones after it.
+    agreement="${agreement}"$'\n'
     venue_verdict="${agreement%%$'\n'*}"
     venue_rest="${agreement#*$'\n'}"
     venue_reason="${venue_rest%%$'\n'*}"
-    venue_url="${venue_rest#*$'\n'}"
+    venue_rest="${venue_rest#*$'\n'}"
+    venue_url="${venue_rest%%$'\n'*}"
     case "$venue_verdict" in
       allow)
         echo "gate-status: reconcile OK — the published green on ${sha:0:12} agrees with the venue of record: $venue_reason"
@@ -844,6 +920,105 @@ PY
         die "CANNOT-ASSESS — the venue agreement could not be decided: $venue_reason" 2
         ;;
     esac
+    ;;
+
+  conclude)
+    # PUBLISH THE VENUE OF RECORD'S OWN VERDICT (#1504). See THE VERDICT NOTHING
+    # PUBLISHED in the header: `post` publishes the GATE's verdict, `reconcile`
+    # WITHDRAWS a green the venue contradicts, and neither of them can produce
+    # the state a head needs when the venue's run concludes after the box-side
+    # producer was (correctly) refused -- measured on #1493/#1498, where a run
+    # completed success and the context carried nothing at all.
+    [ -n "$sha" ] || die "CANNOT-ASSESS — --sha is required" 2
+    conclude_json="$(mktemp /tmp/gs-conclude.XXXXXX)" \
+      || die "CANNOT-ASSESS — no scratch file for the venue read" 2
+    if ! fetch_venue_runs "$sha" "$conclude_json"; then
+      rm -f "$conclude_json"
+      die "CANNOT-ASSESS — the CI venue's verdict for ${sha:0:12} could not be read ($(head -c 160 /tmp/gs-venue-err.txt 2>/dev/null)), so its own verdict cannot be published" 2
+    fi
+    agree="$(venue_agreement "$conclude_json")"
+    rm -f "$conclude_json"
+    # The terminator (#1470) -- see the same walk in the reconcile branch.
+    agree="${agree}"$'\n'
+    c_verdict="${agree%%$'\n'*}"
+    c_rest="${agree#*$'\n'}"
+    c_reason="${c_rest%%$'\n'*}"
+    c_rest="${c_rest#*$'\n'}"
+    c_url="${c_rest%%$'\n'*}"
+    c_rest="${c_rest#*$'\n'}"
+    c_build="${c_rest%%$'\n'*}"
+    c_rest="${c_rest#*$'\n'}"
+    c_region="${c_rest%%$'\n'*}"
+    c_rest="${c_rest#*$'\n'}"
+    c_project="${c_rest%%$'\n'*}"
+    c_rest="${c_rest#*$'\n'}"
+    c_conclusion="${c_rest%%$'\n'*}"
+    c_rest="${c_rest#*$'\n'}"
+    c_status="${c_rest%%$'\n'*}"
+    c_rest="${c_rest#*$'\n'}"
+    c_id="${c_rest%%$'\n'*}"
+    c_rest="${c_rest#*$'\n'}"
+    c_name="${c_rest%%$'\n'*}"
+
+    case "$c_verdict" in
+      allow) ;;
+      unsettled|refuse)
+        # An in-flight run and a refused read are handled by the CONCLUSION
+        # below; what matters here is that the record was READ. Only an
+        # unreadable or undecidable record stops this verb before the run's own
+        # facts are examined.
+        ;;
+      *)
+        die "CANNOT-ASSESS — the venue of record's verdict for ${sha:0:12} could not be decided: $c_reason" 2
+        ;;
+    esac
+    # NO RUN AT ALL is not a verdict: a commit the venue never ran has nothing to
+    # publish from here, and saying otherwise would publish this verb's belief
+    # as the venue's verdict. (The agreement's own reason for this case is
+    # worded for `post`, where having no venue run makes this producer the only
+    # one -- for `conclude` it means the opposite, so it is NOT quoted here.)
+    [ -n "$c_id" ] || die "CANNOT-ASSESS — the venue of record produced no run for ${sha:0:12}, so it has reached no verdict to publish: there is nothing here to conclude, and the gate's OWN attested verdict is published with 'post --attestation' (#1504)" 2
+    # PROPERTY 2: never publish before the verdict exists.
+    if [ "$c_status" != "completed" ]; then
+      die "REFUSED — the venue of record's run $c_id for ${sha:0:12} has NOT concluded (status '$c_status'): a verdict is published only once the run reaches one, and the required context '${CONTEXT}' stays unsatisfied until it does (#1504)" 2
+    fi
+    case "$c_conclusion" in
+      success) c_state="success" ;;
+      failure|timed_out|cancelled|startup_failure) c_state="failure" ;;
+      *)
+        die "REFUSED — the venue of record's run $c_id for ${sha:0:12} concluded '$c_conclusion', which is neither a pass nor a fail: a run that did not assess this commit reached no verdict, and publishing one would be a claim about a verdict that was never reached (#1504)" 2
+        ;;
+    esac
+    # A RED is a verdict only where the venue can DELIVER one (#1467). Where its
+    # own record measures that it cannot, the precedence decision belongs to
+    # `post --attestation` -- so this verb refuses BY NAME rather than handing
+    # the required context back to a producer that provably cannot post it.
+    if [ "$c_state" = "failure" ]; then
+      capability="$(venue_publish_capability "$c_build" "$c_region" "$c_project")" || capability=""
+      cap_verdict="${capability%%$'\n'*}"
+      cap_rest="${capability#*$'\n'}"
+      cap_reason="${cap_rest%%$'\n'*}"
+      if [ "$cap_verdict" != "publishes" ]; then
+        die "REFUSED — the venue of record's run $c_id for ${sha:0:12} concluded '$c_conclusion', but its own record does not show it delivering a verdict (${cap_reason:-the venue of record own record could not be read here}): publishing that red from here would give the required context back to a producer that cannot post it, which is the deadlock #1467 removed -- that precedence is decided by 'post --attestation' (#1504)" 2
+      fi
+    fi
+    # The description NAMES the run: the required context and the check-run must
+    # be the same verdict, and a reader of the PR page has to be able to see
+    # WHICH run it reports (property 3 of the header).
+    c_desc="${c_name:-the CI venue} run $c_id concluded $c_conclusion"
+    c_desc="${c_desc:0:140}"
+    publish_status "$sha" "$c_state" "$c_desc" "$c_url"
+    # PROPERTY 3: the POST is a claim; the READ-BACK is the observation. The
+    # newest claim is what branch protection reads, so a claim that is not the
+    # newest one is not the venue's verdict and must never be reported as it.
+    conclude_back="$(published_state "$sha")" \
+      || die "CANNOT-ASSESS — the status just published for ${sha:0:12} could not be read back, so whether its claim is the one that STANDS cannot be decided (#1504)" 2
+    back_state="${conclude_back%%$'\n'*}"
+    back_desc="${conclude_back#*$'\n'}"
+    if [ "$back_state" != "$c_state" ]; then
+      die "CANNOT-ASSESS — ${sha:0:12} does not carry what was just published: the newest '${CONTEXT}' status reads '$back_state' ($back_desc), not '$c_state'. The required context must report the run's own verdict, and a claim that is not the one that stands is not that verdict (#1504)" 2
+    fi
+    echo "gate-status: conclude OK — ${CONTEXT}=$c_state for ${sha:0:12}: the venue of record's run $c_id concluded $c_conclusion, and the read-back agrees that this is the newest claim on the commit"
     ;;
 
   show)

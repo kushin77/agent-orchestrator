@@ -10,8 +10,8 @@
 This tree is the **multi-provider client adapter layer** of the Model
 Gateways pillar (pillar 2, phase 2): a clean, typed, retry-able, measurable
 provider interface for **Claude (Anthropic), DeepSeek, OpenAI (Copilot/GPT),
-Gemini, local Ollama, Paperclip and Hermes** — swappable without touching
-orchestration. The
+Gemini, local Ollama, Paperclip, Hermes and Nous Research** — swappable without
+touching orchestration. The
 gateway proxy (issue #16) and later phases consume these adapters.
 
 This module is the **contract-freeze boundary** for phase 2 (per
@@ -126,6 +126,19 @@ non-transient failures (bad key/request, invalid output) fail immediately.
 | Ollama (local) | `ollama.py` | `/api/chat` | none (keyless) | LOW/MED→`llama3.2`, HIGH/MAX→`qwen2.5` |
 | Paperclip | `paperclip.py` | OpenAI-compatible `chat/completions` | Bearer | `paperclip-planner` (all tiers) |
 | Hermes (local) | `hermes.py` | `/api/chat` (Ollama-compatible) | none (keyless) | `hermes3` (all tiers) |
+| Nous Research | `nous.py` | OpenAI-compatible `chat/completions` | Bearer (required) | LOW→`inclusionai/ling-3.0-flash`, MED→`qwen/qwen3.7-flash`, HIGH→`anthropic/claude-haiku-4.5`, MAX→`openai/gpt-6-astra-fast` (all probe-verified servable) |
+
+**`hermes` and `nous` are deliberately two ids, not one.** `hermes` is the
+keyless, Ollama-compatible **local** hop: `integrations/hermes/` declares it as
+the ADR-0012 namesake exclusion, `telemetry/metering/rate_cards/hermes.yaml`
+prices it `local: true` at $0, and EPIC #253's frozen `hermes -> hermes/ollama`
+map makes local Ollama its terminal fallback. `nous` is Nous Research's
+**billed cloud API** behind a required Bearer key. Re-pointing `hermes` at the
+cloud API would have made all of those declarations false *without reddening a
+gate* — none of them derives its hermes facts from `config.py` — so the cloud
+target is declared under its own id instead, which is also what makes its
+catalog module and rate card addressable (the same reason `copilot` has its own
+id).
 
 **Claude-specific capabilities (claude-anthropic module parity, flag-gated OFF
 by default — GR-28).** The `anthropic` adapter reads an optional
@@ -170,7 +183,7 @@ OpenAI-compatible and Ollama protocols), maps assistant roles correctly
 
 `registry.ProviderRegistry` owns:
 
-- **Provider configs** — `config.default_provider_configs()` returns the seven
+- **Provider configs** — `config.default_provider_configs()` returns the eight
   platform defaults (`ProviderConfig`: base URL, tier→model map,
   supported-model set, timeout, retry policy, breaker settings, fallback
   chain, `requires_key`). Unknown models are rejected before any request

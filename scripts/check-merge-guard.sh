@@ -17,15 +17,22 @@
 # in front of the real one, and the REAL `scripts/check-squash-message.sh` is
 # driven through it, so the refusal observed here is the real predicate's
 # refusal and not a stub's:
-#   1. NOT-OK: `gh pr view` answers with a body whose last paragraph is not the
+#   1. NOT-OK: the pull answers with a body whose last paragraph is not the
 #      trailer block. merge-pr.sh must exit 1, print the refusal name
 #      `squash-message-would-drop-trailer`, report the predicate's own finding
 #      `commit-missing-ticket-trailer`, and the recording `gh` must show that
 #      `gh pr merge` was NEVER invoked. Run in apply mode, so that last claim is
 #      load-bearing rather than trivially true.
 #   2. OK: a trailer-bearing body. Dry run by default (exit 0, nothing merged),
-#      then AO_MERGE_APPLY=1 must exit 0 and record `gh pr merge` EXACTLY once.
-#   3. NO VERDICT: `gh pr view` fails, so the guard reports CANNOT-ASSESS.
+#      then AO_MERGE_APPLY=1 must exit 0, record the REST merge call EXACTLY once
+#      (issue #1569 moved the read, the merge and the head-branch delete to
+#      `gh api`, because `gh pr view`/`gh pr merge` are GraphQL and this box's
+#      SHARED GraphQL budget is exhausted by the fleet's own agents) and delete
+#      the merged head branch over REST exactly once. The GUARD reads the same
+#      pull over REST as well (issue #1567), so every read in this gate is a
+#      `gh api` GET of ONE pull -- answered per-arm below, because arm 1 and arm
+#      2 assert OPPOSITE verdicts about that one endpoint.
+#   3. NO VERDICT: the pull read fails, so the guard reports CANNOT-ASSESS.
 #      merge-pr.sh must exit 2 and NEVER merge (also asserted in apply mode).
 #   4. The instruction surfaces: the source of the ONE render module AND the
 #      prompt it actually renders must both hand out `scripts/merge-pr.sh`, and
@@ -82,9 +89,20 @@ mkdir -p "$fakebin"
 cat > "$fakebin/gh" <<'GH'
 #!/usr/bin/env bash
 # A RECORDING fake gh for check-merge-guard.sh. Never touches the network:
-#   pr view  -> the JSON at $AO_TEST_GH_VIEW_JSON, or a failure when
-#               $AO_TEST_GH_VIEW_MODE is `fail`
-#   pr merge -> appends the PR number to $AO_TEST_GH_MERGE_CALLS, exits 0
+#   pr view   -> the JSON at $AO_TEST_GH_VIEW_JSON, or a failure when
+#                $AO_TEST_GH_VIEW_MODE is `fail`
+#   pr merge  -> appends the PR number to $AO_TEST_GH_MERGE_CALLS, exits 0
+#   api ...   -> the REST transport merge-pr.sh AND its guard use (issues #1569,
+#                #1567). The stand-in does NOT implement jq: it answers with the
+#                shape each caller's own `--jq` asks for (a GET of the pull
+#                returns the fixture at $AO_TEST_GH_REST_PULL, which carries the
+#                union of the renamed keys the THREE REST reads look up -- the
+#                guard's title/body/headRefName, the apply path's
+#                baseRefName/headRefOid, and the delete's headRef/headRepo), the
+#                merge endpoint appends the PR number to the SAME
+#                $AO_TEST_GH_MERGE_CALLS record `pr merge` writes -- so the
+#                "exactly once" property covers either transport -- and the
+#                head-ref DELETE appends the branch to $AO_TEST_GH_DELETE_CALLS.
 set -u
 if [ "${1:-}" = "pr" ] && [ "${2:-}" = "view" ]; then
   if [ "${AO_TEST_GH_VIEW_MODE:-ok}" = "fail" ]; then
@@ -97,6 +115,38 @@ fi
 if [ "${1:-}" = "pr" ] && [ "${2:-}" = "merge" ]; then
   printf '%s\n' "${3:-}" >> "$AO_TEST_GH_MERGE_CALLS"
   exit 0
+fi
+if [ "${1:-}" = "api" ]; then
+  shift
+  method="GET"
+  if [ "${1:-}" = "-X" ]; then
+    method="${2:-GET}"
+    shift 2
+  fi
+  url="${1:-}"
+  if [ $# -gt 0 ]; then shift; fi
+  case "$method $url" in
+    "GET "*"/pulls/"*)
+      if [ "${AO_TEST_GH_VIEW_MODE:-ok}" = "fail" ]; then
+        echo "fake gh: could not resolve to a Repository (offline)" >&2
+        exit 1
+      fi
+      cat "$AO_TEST_GH_REST_PULL"
+      exit 0
+      ;;
+    "PUT "*"/pulls/"*"/merge")
+      pr="${url##*/pulls/}"
+      printf '%s\n' "${pr%%/*}" >> "$AO_TEST_GH_MERGE_CALLS"
+      printf '{"merged":true,"sha":"1111111111111111111111111111111111111111","message":"Pull Request successfully merged"}\n'
+      exit 0
+      ;;
+    "DELETE "*"/git/refs/heads/"*)
+      printf '%s\n' "${url##*/git/refs/heads/}" >> "$AO_TEST_GH_DELETE_CALLS"
+      exit 0
+      ;;
+  esac
+  echo "fake gh: unexpected api invocation: $method $url" >&2
+  exit 1
 fi
 echo "fake gh: unexpected invocation: $*" >&2
 exit 1
@@ -131,37 +181,91 @@ if [ -z "$head_oid_for_fixture" ]; then
   echo "check-merge-guard: CANNOT-ASSESS — could not build the scratch fixture commit" >&2
   exit 2
 fi
-python3 - "$view_bad" "$view_good" "$head_oid_for_fixture" <<'PY'
+# The REST fixture (issue #1569) and the repository slug the apply path derives
+# from `git remote get-url origin`. The slug matters: the merged head branch may
+# only be deleted when the head really lives in that same repository, so the
+# fixture has to name it rather than leave it unreadable.
+# One REST fixture PER ARM. The guard (issue #1567) and the apply path (issue
+# #1569) read the SAME pull over the SAME endpoint, and the two arms below assert
+# OPPOSITE verdicts about it -- arm 1's body is not a trailer block, arm 2's is.
+# One shared fixture would have to be both, so each arm names the one it means and
+# the fixtures are written from that arm's own body rather than one shared blob.
+rest_pull_bad="$TMPD/rest-bad.json"
+rest_pull_good="$TMPD/rest-good.json"
+repo_slug="$(git remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
+python3 - "$view_bad" "$view_good" "$head_oid_for_fixture" \
+  "$rest_pull_bad" "$rest_pull_good" "$repo_slug" <<'PY'
 import json
 import sys
 
 bad, good = sys.argv[1], sys.argv[2]
 # baseRefName/headRefOid (issue #1332's merged-tree seam): merge-pr.sh's apply
-# path now reads these off the SAME `gh pr view` call this fake answers, so a
-# fixture missing them starves that seam of evidence and merge-pr.sh reaches
-# CANNOT-ASSESS before ever reaching gh pr merge — that is not this gate's
-# NOT-OK/no-verdict case, it is a fixture gap, so both bodies carry them.
+# path reads these off the call this fake answers, so a fixture missing them
+# starves that seam of evidence and merge-pr.sh reaches CANNOT-ASSESS before
+# ever reaching the merge -- that is not this gate's NOT-OK/no-verdict case, it
+# is a fixture gap, so all four bodies carry them.
 head_oid = sys.argv[3]
-with open(bad, "w", encoding="utf-8") as handle:
-    json.dump(
-        {
-            "title": "fix(thing): do the thing",
-            "body": "What changed.\n\nSome detail with no trailer paragraph at all.\n",
-            "baseRefName": "master",
-            "headRefOid": head_oid,
-        },
-        handle,
-    )
-with open(good, "w", encoding="utf-8") as handle:
-    json.dump(
-        {
-            "title": "fix(thing): do the thing",
-            "body": "What changed.\n\nSome detail.\n\nRefs kushin77/agent-orchestrator#1233\n",
-            "baseRefName": "master",
-            "headRefOid": head_oid,
-        },
-        handle,
-    )
+rest_bad, rest_good, repo_slug = sys.argv[4], sys.argv[5], sys.argv[6]
+
+# The title and the two bodies, written ONCE. Both transports describe the same
+# pull, so rendering them from separate literals would let the harness drift into
+# measuring a fiction -- a REST read and a GraphQL read disagreeing about one PR.
+title = "fix(thing): do the thing"
+bad_body = "What changed.\n\nSome detail with no trailer paragraph at all.\n"
+# The OK body carries BOTH trailer lines, because the guard applies its issue-lane
+# rule as soon as the REST read reports headRefName=issue-1233 (issue #1567): a lane
+# branch whose trailer block names only `Refs` would not auto-close the issue, so
+# the guard refuses it by name (closes-missing:1233). That is the guard's own
+# production rule, not a harness convention -- the OK fixture must therefore
+# describe a pull that would really be accepted, or arm 2 would be asserting that a
+# body the guard is required to refuse lands.
+good_body = (
+    "What changed.\n\nSome detail.\n\n"
+    "Refs kushin77/agent-orchestrator#1233\nCloses #1233\n"
+)
+
+# The GraphQL shape, kept for the `gh pr view` the apply path's publish step still
+# makes. It carries no `state`/`mergeCommit`, so that step reports it could not
+# name the landed commit -- its own tolerated path, and NOT arm 2's claim (which
+# is about the merge call and the head-branch delete).
+for path, body in ((bad, bad_body), (good, good_body)):
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(
+            {
+                "title": title,
+                "body": body,
+                "baseRefName": "master",
+                "headRefOid": head_oid,
+            },
+            handle,
+        )
+
+# The REST shape. The fake answers after-the-filter rather than running jq (the
+# real filters are measured against the live API elsewhere), so this fixture
+# carries the union of the renamed keys the THREE REST reads look up:
+#   * scripts/check-squash-message.sh --jq '{title, body, headRefName: .head.ref}'
+#     (issue #1567 -- the guard reads the pull over REST, so a fixture without
+#     title/body/headRefName starves it into CANNOT-ASSESS and merge-pr.sh exits 2
+#     where arm 1 expects 1 and arm 2 expects 0)
+#   * scripts/merge-pr.sh (apply)  --jq '{baseRefName: .base.ref, headRefOid: .head.sha}'
+#   * scripts/merge-pr.sh (delete) --jq '{headRef: .head.ref, headRepo: (.head.repo.full_name // "")}'
+# headRefName and headRef are the same underlying field (.head.ref), which is why
+# the fixture names it twice; headRepo must equal the slug merge-pr.sh derived
+# from origin or the delete is refused as a branch living in another repository.
+for path, body in ((rest_bad, bad_body), (rest_good, good_body)):
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(
+            {
+                "title": title,
+                "body": body,
+                "headRefName": "issue-1233",
+                "baseRefName": "master",
+                "headRefOid": head_oid,
+                "headRef": "issue-1233",
+                "headRepo": repo_slug,
+            },
+            handle,
+        )
 PY
 fixtures_rc=$?
 if [ "$fixtures_rc" -ne 0 ]; then
@@ -170,15 +274,24 @@ if [ "$fixtures_rc" -ne 0 ]; then
 fi
 
 # --- drive the REAL entrypoint (which drives the REAL guard) -----------------
-# <label> <view-mode> <json-file> <apply 0|1> -> prints the entrypoint's exit
-# code; its output lands in $TMPD/out-<label>.txt, the recorded merge calls in
-# $TMPD/calls-<label>.txt.
+# <label> <view-mode> <graphql-json> <rest-json> <apply 0|1> -> prints the
+# entrypoint's exit code; its output lands in $TMPD/out-<label>.txt, the recorded
+# merge calls in $TMPD/calls-<label>.txt, the recorded head-branch deletes in
+# $TMPD/deletes-<label>.txt.
+#
+# Two json files, because one arm must present ONE pull over BOTH transports the
+# production code now uses: the guard reads it over REST (issue #1567) and the
+# apply path reads it over REST for the merge/delete (issue #1569) plus GraphQL
+# for the post-merge read-back. Passing the arm's pair keeps the arm's verdict and
+# the arm's recorded calls describing a single pull.
 run_merge() {
-  local label="$1" mode="$2" json="$3" apply="$4"
-  local calls out rc
+  local label="$1" mode="$2" json="$3" rest_json="$4" apply="$5"
+  local calls deletes out rc
   calls="$TMPD/calls-$label.txt"
+  deletes="$TMPD/deletes-$label.txt"
   out="$TMPD/out-$label.txt"
   : > "$calls"
+  : > "$deletes"
   # AO_QUEUE_VERIFY_MERGED/AO_QUEUE_VERIFY_CMD are scripts/pr-queue.sh's own
   # offline test seam for merged-tree evidence source (b) — merge-pr.sh's
   # apply path now reuses merged_tree_evidence_by_ref (issue #1254 step 6 via
@@ -186,6 +299,7 @@ run_merge() {
   # (evidence source (a)), so without this seam every apply-mode run would
   # refuse merged-tree-unverified before ever reaching gh pr merge.
   AO_TEST_GH_MERGE_CALLS="$calls" AO_TEST_GH_VIEW_MODE="$mode" AO_TEST_GH_VIEW_JSON="$json" \
+    AO_TEST_GH_REST_PULL="$rest_json" AO_TEST_GH_DELETE_CALLS="$deletes" \
     AO_MERGE_APPLY="$apply" AO_QUEUE_VERIFY_MERGED=1 AO_QUEUE_VERIFY_CMD="exit 0" \
     PATH="$fakebin:$PATH" \
     bash "$root/$entry" --pr 1233 > "$out" 2>&1
@@ -196,7 +310,7 @@ run_merge() {
 echo "== check-merge-guard: the merge entrypoint is gated on the squash-message guard =="
 
 # --- 1. NOT-OK: refused by name, and never merged ---------------------------
-rc="$(run_merge notok ok "$view_bad" 1)"
+rc="$(run_merge notok ok "$view_bad" "$rest_pull_bad" 1)"
 if [ "$rc" = "1" ]; then
   ok "NOT-OK verdict: merge-pr.sh exits 1 (refused)"
 else
@@ -213,13 +327,18 @@ else
   fail "NOT-OK verdict: the shared predicate's own finding was not reported"
 fi
 if [ -s "$TMPD/calls-notok.txt" ]; then
-  fail "NOT-OK verdict: gh pr merge was recorded although the guard refused"
+  fail "NOT-OK verdict: the REST merge was called although the guard refused"
 else
-  ok "NOT-OK verdict: gh pr merge was never invoked"
+  ok "NOT-OK verdict: the REST merge was never called"
+fi
+if [ -s "$TMPD/deletes-notok.txt" ]; then
+  fail "NOT-OK verdict: a head branch was deleted although nothing merged"
+else
+  ok "NOT-OK verdict: no head branch was deleted"
 fi
 
 # --- 2. OK: dry run by default, then merged exactly once --------------------
-rc="$(run_merge ok-dryrun ok "$view_good" 0)"
+rc="$(run_merge ok-dryrun ok "$view_good" "$rest_pull_good" 0)"
 if [ "$rc" = "0" ]; then
   ok "OK verdict (dry run by default): merge-pr.sh exits 0"
 else
@@ -231,12 +350,12 @@ else
   fail "OK verdict (dry run by default): no DRY RUN plan was printed"
 fi
 if [ -s "$TMPD/calls-ok-dryrun.txt" ]; then
-  fail "OK verdict (dry run by default): gh pr merge was recorded in dry-run mode"
+  fail "OK verdict (dry run by default): a merge was recorded in dry-run mode"
 else
-  ok "OK verdict (dry run by default): gh pr merge was never invoked"
+  ok "OK verdict (dry run by default): the REST merge was never called"
 fi
 
-rc="$(run_merge ok-apply ok "$view_good" 1)"
+rc="$(run_merge ok-apply ok "$view_good" "$rest_pull_good" 1)"
 if [ "$rc" = "0" ]; then
   ok "OK verdict (apply): merge-pr.sh exits 0"
 else
@@ -245,18 +364,28 @@ fi
 merge_count="$(wc -l < "$TMPD/calls-ok-apply.txt")"
 merge_count="${merge_count// /}"
 if [ "$merge_count" = "1" ]; then
-  ok "OK verdict (apply): gh pr merge was invoked exactly once"
+  ok "OK verdict (apply): the merge endpoint was called exactly once"
 else
-  fail "OK verdict (apply): gh pr merge was invoked $merge_count time(s), expected exactly 1"
+  fail "OK verdict (apply): the merge endpoint was called $merge_count time(s), expected exactly 1"
 fi
 if [ "$(head -n1 "$TMPD/calls-ok-apply.txt")" = "1233" ]; then
   ok "OK verdict (apply): the recorded merge is for PR 1233"
 else
   fail "OK verdict (apply): the recorded merge names the wrong PR"
 fi
+# The head-branch delete is the REST replacement for `--delete-branch` (issue
+# #1569): without this arm the new call could stop happening and no control here
+# would notice.
+delete_count="$(wc -l < "$TMPD/deletes-ok-apply.txt")"
+delete_count="${delete_count// /}"
+if [ "$delete_count" = "1" ] && [ "$(head -n1 "$TMPD/deletes-ok-apply.txt")" = "issue-1233" ]; then
+  ok "OK verdict (apply): the merged head branch was deleted over REST exactly once (issue-1233)"
+else
+  fail "OK verdict (apply): the head-branch delete recorded $(tr '\n' ' ' < "$TMPD/deletes-ok-apply.txt"), expected exactly one delete of issue-1233"
+fi
 
 # --- 3. NO VERDICT: CANNOT-ASSESS, and never merged -------------------------
-rc="$(run_merge noverdict fail "$view_good" 1)"
+rc="$(run_merge noverdict fail "$view_good" "$rest_pull_good" 1)"
 if [ "$rc" = "2" ]; then
   ok "no verdict: merge-pr.sh exits 2 (CANNOT-ASSESS)"
 else
@@ -268,9 +397,9 @@ else
   fail "no verdict: the refusal is not named CANNOT-ASSESS"
 fi
 if [ -s "$TMPD/calls-noverdict.txt" ]; then
-  fail "no verdict: gh pr merge was recorded although the guard reached no verdict"
+  fail "no verdict: a merge was recorded although the guard reached no verdict"
 else
-  ok "no verdict: gh pr merge was never invoked"
+  ok "no verdict: the REST merge was never called"
 fi
 
 # --- 4. the instruction surfaces --------------------------------------------

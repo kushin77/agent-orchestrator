@@ -79,6 +79,11 @@ variable "enable_web" {
   default     = false
 }
 
+# enable_paperclip — go/no-go decision (issue #1515): NO-GO as of 2026-09-20.
+# Deliberately left default = false. See docs/PAPERCLIP-PROMOTION-DECISION.md
+# for the recorded decision and owner sign-off (kushin77). Promote only via a
+# separate go decision: terraform plan with enable_paperclip = true, reviewed
+# before any follow-up apply issue — never an ad-hoc apply (GR-5).
 variable "enable_paperclip" {
   description = "Deploy the self-hosted upstream paperclip runtime beside the control plane (issue #411, ADR-0013). OFF until promoted."
   type        = bool
