@@ -28,7 +28,17 @@ transcript is issue #3.
 - The architecture is **five pillars** — Agent Registry & Profiling, Model
   Gateways, State-machine execution, Security & guardrails, Observability —
   plus cross-cutting tenant identity/RBAC, control-plane/portal, and
-  autonomous ops/governance. Source of truth: `docs/ARCHITECTURE.md`.
+  autonomous ops/governance. Design reference: `docs/ARCHITECTURE.md`; the
+  as-built control chain (what actually runs today, per layer) is
+  `docs/ARCHITECTURE-2026-09.md`.
+- This repo also acts as the fleet's **CTO office** — root/super-admin
+  technical authority for everything in the CMR (module onboarding, gates,
+  tiers, the IaC mandate, dispatch). See `docs/CTO-OFFICE.md`.
+- Per **ADR-0033**, neither "Paperclip" nor "Hermes" is a top-level
+  orchestrator of agent work — the sole top-level orchestrator is
+  `fleet/brain.py` + `governance/dispatch/`. Paperclip is the ticket/
+  heartbeat/budget reporting surface; Hermes is a routing persona/inference
+  adapter. See `docs/decision-records/ADR-0033-paperclip-hermes-naming-resolution.md`.
 
 This repository IS the product (the control plane itself) — not a hub, and not
 a spoke's application.
