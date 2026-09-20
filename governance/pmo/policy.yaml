@@ -1,0 +1,122 @@
+# governance/pmo/policy.yaml — the PMO priority/dispatch policy (issue #403 follow-on).
+#
+# This is the ONE committed file that decides priority ordering and dispatch
+# routing (IaC per docs/SME-ROUTING.md's own doctrine: "the policy is declared
+# data, not code"). Changing a weight, a lane's owned globs, or the wave cap is
+# editing this file — no code change, no human judgement call at runtime.
+#
+# `governance/pmo/policy.py` validates this document against
+# `governance/pmo/policy.schema.json` before anything reads it: a malformed
+# policy is CANNOT-ASSESS, never a silent default.
+#
+# Every weight below is cited to a real, committed ledger the graph already
+# carries (GR-12 — a term with no source is not invented, it is declared
+# `unsourced` in the priority document and contributes 0):
+#
+#   * `priority_weights`   <- the board's `priority:P0/P1/P2` labels
+#   * `aging_weights`      <- `governance/pmo/views.py::aging` tiers (AGING_TIERS)
+#   * `fanout_weight`      <- `governance/pmo/views.py::deps` blocked_by edges
+#     (how many *other* tickets name this one in their own blocked_by)
+#   * `readiness_bonus`    <- `deps`: a ticket with no open blocker is ready
+#   * `capacity_penalty`   <- `lanes`: the owner's current in_progress count
+#
+# `sla_breach` has NO committed ledger in this repo (no `sla-enforcement`
+# package, no due-date field on the frozen ticket contract) — it is declared
+# `unsourced` here on purpose, with weight 0, rather than fabricated from the
+# aging tier a second time. When an SLA ledger lands, add its weight here.
+version: 1
+
+wave_cap_default: 12  # epic #1510's own wave cap, reused rather than restated
+
+priority_weights:
+  P0: 100
+  P1: 50
+  P2: 20
+  unset: 5           # a board issue carrying no priority:* label
+
+aging_weights:
+  postmortem: 50
+  red: 30
+  attention: 15
+  watch: 5
+  none: 0            # not an aging candidate at all
+
+fanout_weight_per_blocker: 10   # per ticket that is blocked_by this one
+readiness_bonus: 25             # unblocked (no open blocker) open work
+capacity_penalty_per_inflight: 8  # per ticket the owner already has in-progress
+
+unsourced_terms:
+  sla_breach:
+    weight: 0
+    reason: >-
+      no SLA ledger is committed in this repo (no sla-enforcement package, no
+      due-date field on docs/contracts/paperclip/ticket.schema.json contract
+      v2) — fabricating a number here would be a second, invented source of
+      truth, which GR-12 forbids.
+
+# Model tiers, per docs/SME-ROUTING.md section 4 (route/tier contract): the
+# declared ladder is flash -> pro -> auditor, escalate on observed difficulty,
+# never pre-emptively (fleet doctrine, ~/.claude/CLAUDE.md FinOps section).
+model_tiers:
+  L0: flash    # locating code, mechanical edits, routine views — default
+  L1: pro      # multi-file work, security/auth/IaC never drops below this
+  L2: auditor  # architecture tradeoffs, adversarial verification, ambiguous specs
+
+# Lane ownership, sourced verbatim from docs/EXECUTION-PLAN.md section 3 (the
+# fleet's own "no two lanes share a file" contract) and keyed by the board's
+# `pillar:*` label so a ticket's lane is a lookup, never a guess. A pillar this
+# table does not carry (or a ticket with no pillar label) falls to
+# `default_lane` — declared, not silent, exactly like SME-ROUTING's own
+# `sme_default` fall-through.
+lanes:
+  - pillar: pillar:registry-profiling
+    lane: registry
+    owns: ["registry/**"]
+    tier: L0
+    sme: sniper-generic
+  - pillar: pillar:model-gateway
+    lane: gateway
+    owns: ["gateway/**"]
+    tier: L0
+    sme: sniper-generic
+  - pillar: pillar:state-machine
+    lane: engine
+    owns: ["engine/**"]
+    tier: L0
+    sme: sniper-generic
+  - pillar: pillar:guardrails-security
+    lane: guardrails
+    owns: ["guardrails/**"]
+    tier: L1          # security work never drops below L1 (fleet doctrine)
+    sme: security
+  - pillar: pillar:observability-finops
+    lane: telemetry
+    owns: ["telemetry/**"]
+    tier: L0
+    sme: sniper-generic
+  - pillar: pillar:identity-rbac
+    lane: identity
+    owns: ["identity/**"]
+    tier: L1          # authN/z never drops below L1 (fleet doctrine)
+    sme: security
+  - pillar: pillar:control-plane
+    lane: control-plane
+    owns: ["control-plane/**", "portal/**"]
+    tier: L0
+    sme: sniper-generic
+  - pillar: pillar:autonomous-ops
+    lane: autonomous-ops
+    owns: ["docs/**", "guardrails/**", "infra/**"]
+    tier: L0
+    sme: sniper-generic
+  - pillar: pillar:governance
+    lane: governance
+    owns: ["governance/**"]
+    tier: L0
+    sme: sniper-generic
+
+default_lane:
+  lane: unassigned
+  owns: []
+  tier: L0
+  sme: sniper-generic
