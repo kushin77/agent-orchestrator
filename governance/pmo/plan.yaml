@@ -1,0 +1,216 @@
+goal: "CRM + Asterisk voice fully operational and functioning, end to end"
+
+paperclip:
+  project_id: "purebliss-crm-voice"
+  project_name: "Purebliss CRM + Voice — enterprise project plan"
+  owner_persona: pmo
+  sync_adapter_status: not-implemented  # tracked in issue #1649
+  milestone_owners:
+    M0: platform-sme
+    M1: cto
+    M2: cto
+    M3: hermes
+    M4: pmo
+
+milestones:
+  - id: M0
+    name: "Infra stabilized"
+    order: 0
+    exit_criteria:
+      - description: ".42 outage closed"
+        command: "gh issue view 4264 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "shared-services apply sequence at steady state"
+        command: "gh issue view 3867 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+
+  - id: M1
+    name: "CRM foundation reachable"
+    order: 1
+    exit_criteria:
+      - description: "purebliss api/app backend deployed (not 404)"
+        command: "gh issue view 120 --repo kushin77/purebliss --json state -q .state"
+        expect: "CLOSED"
+      - description: "no live CRM credentials committed to git"
+        command: "gh issue view 121 --repo kushin77/purebliss --json state -q .state"
+        expect: "CLOSED"
+
+  - id: M2
+    name: "Voice (Asterisk/dial) foundation reachable"
+    order: 2
+    exit_criteria:
+      - description: "dial.purebliss.app landing runbook complete"
+        command: "gh issue view 4094 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "dial-api + WebSocket origin gated behind shared tunnel"
+        command: "gh issue view 4095 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "os-auth integration contract for Go engine + realtime"
+        command: "gh issue view 4096 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+
+  - id: M3
+    name: "CRM + voice hardened (data plane, network, observability)"
+    order: 3
+    exit_criteria:
+      - description: "DIAL-4 data-plane + secrets registration closed"
+        command: "gh issue view 4097 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "DIAL-6 network + carrier egress posture closed"
+        command: "gh issue view 4099 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "Dialplane → shared-services e2e integration review closed"
+        command: "gh issue view 4093 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+
+  - id: M4
+    name: "CRM + Asterisk voice operational e2e"
+    order: 4
+    exit_criteria:
+      - description: "shared-services-dial-api container health"
+        command: "curl -s -o /dev/null -w '%{http_code}' https://dial.purebliss.app/healthz"
+        expect: "200"
+      - description: "purebliss app backend health"
+        command: "curl -s -o /dev/null -w '%{http_code}' https://app.purebliss.app/healthz"
+        expect: "200"
+
+tasks:
+  # M0 — infra stabilization (shared-services outage/apply chain)
+  - id: t-4264
+    repo: shared-services
+    issue: 4264
+    module: infra
+    milestone: M0
+    priority: 1
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+  - id: t-3867
+    repo: shared-services
+    issue: 3867
+    module: infra
+    milestone: M0
+    priority: 1
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+  - id: t-4262
+    repo: shared-services
+    issue: 4262
+    module: infra
+    milestone: M0
+    priority: 1
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+
+  # M1 — CRM foundation (purebliss / GHL)
+  - id: t-purebliss-120
+    repo: purebliss
+    issue: 120
+    module: crm
+    milestone: M1
+    priority: 1
+    depends_on: ["t-4264", "t-3867"]
+    sme: cto-sme
+    tier: L1
+    status_source: github
+  - id: t-purebliss-121
+    repo: purebliss
+    issue: 121
+    module: crm
+    milestone: M1
+    priority: 1
+    depends_on: []
+    sme: security-sme
+    tier: L1
+    status_source: github
+
+  # M2 — voice (Asterisk/dial) foundation
+  - id: t-dial-1
+    repo: shared-services
+    issue: 4094
+    module: voice
+    milestone: M2
+    priority: 1
+    depends_on: ["t-4264"]
+    sme: platform-sme
+    tier: L0
+    status_source: github
+  - id: t-dial-2
+    repo: shared-services
+    issue: 4095
+    module: voice
+    milestone: M2
+    priority: 1
+    depends_on: ["t-dial-1"]
+    sme: platform-sme
+    tier: L0
+    status_source: github
+  - id: t-dial-3
+    repo: shared-services
+    issue: 4096
+    module: voice
+    milestone: M2
+    priority: 2
+    depends_on: ["t-dial-2"]
+    sme: platform-sme
+    tier: L1
+    status_source: github
+  - id: t-dial-5
+    repo: shared-services
+    issue: 4098
+    module: voice
+    milestone: M2
+    priority: 3
+    depends_on: ["t-dial-3"]
+    sme: platform-sme
+    tier: L0
+    status_source: github
+
+  # M3 — hardening (data plane, network, e2e integration review)
+  - id: t-dial-4
+    repo: shared-services
+    issue: 4097
+    module: voice
+    milestone: M3
+    priority: 2
+    depends_on: ["t-dial-3"]
+    sme: security-sme
+    tier: L1
+    status_source: github
+  - id: t-dial-6
+    repo: shared-services
+    issue: 4099
+    module: voice
+    milestone: M3
+    priority: 2
+    depends_on: ["t-dial-4"]
+    sme: iac-sme
+    tier: L1
+    status_source: github
+  - id: t-dialplane-e2e
+    repo: shared-services
+    issue: 4093
+    module: voice
+    milestone: M3
+    priority: 2
+    depends_on: ["t-dial-6"]
+    sme: platform-sme
+    tier: L1
+    status_source: github
+
+  # M4 — final convergence (paperclip sync gap is itself a task on the plan)
+  - id: t-paperclip-sync
+    repo: agent-orchestrator
+    issue: 1649
+    module: paperclip
+    milestone: M4
+    priority: 3
+    depends_on: []
+    sme: pmo
+    tier: L1
+    status_source: github
