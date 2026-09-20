@@ -50,14 +50,15 @@ import json
 import os
 import re
 import subprocess
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterator
 
-from fleet.runner.evidence import state_of_verify_rc, write_local_marker
-from fleet.runner.model import CANNOT_ASSESS, PARKED_RCS
+from fleet.runner.evidence import EvidenceTable, state_of_verify_rc, write_local_marker
+from fleet.runner.model import CANNOT_ASSESS, PARKED_RCS, SOURCE_GATE_STATUS
 
 OK, NOT_OK, CANNOT_ASSESS_RC = 0, 1, 2
 
@@ -636,3 +637,153 @@ def real_post_status(sh: Command, repo: Path) -> Callable[..., Result]:
         return sh(argv, cwd=repo)
 
     return post
+
+
+# --- the verdict-convergence pass (issue #1506) --------------------------------
+#
+# THE DEFECT THIS EXISTS FOR. `scripts/gate-status.sh conclude` (ADR-0028) is the
+# only path that can publish the CI VENUE OF RECORD's own concluded verdict for a
+# commit whose run concluded AFTER the box-side producer was (correctly) refused
+# -- and NOTHING SCHEDULED IT. Measured on the tree that landed the verb (#1504):
+#
+#     $ grep -rn "gate-status.sh conclude" --include=*.sh --include=*.py . | wc -l
+#           0
+#     $ grep -rn "gate-status" config/fleet-jobs.json | wc -l
+#           0
+#
+# A head whose context was never published is a head `scripts/pr-queue.sh`
+# cannot merge, so it waits for a human while the venue's own verdict sits
+# unread. That is not a hypothesis: the same measurement (#1504, and #1506's own
+# follow-up comment) caught four heads "venue=queued, published=none" in one
+# landing cycle, because updating a branch onto the tip creates a NEW head whose
+# verdicts do not exist yet.
+#
+# THE INVOKER, BY NAME. The ops runner rung -- `ao-fleet-runner` in
+# `config/fleet-jobs.json`, whose command is `fleet/runner/cli.py run --once
+# --apply` -- is the fleet's SCHEDULED PR-verdict producer, and `conclude` is the
+# verb it was missing. It is owned HERE, beside `real_post_status`, because the
+# two verbs answer ONE question -- which verdict STANDS for this head -- and a
+# second owner would be a second producer of one required context (#1357/#1415).
+# The venue's own recipe is NOT the invoker, and that is measured rather than
+# judged: `infra/cloudbuild/verify.yaml` posts nothing by design (#1415), and its
+# image carries neither `gh` nor `gcloud` (#1350/#1361), so a venue that cannot
+# reach the API cannot be the scheduled publisher of its own verdict.
+#
+# WHY THIS IS A CONVERGENCE AND NOT A RE-POST. The pass asks the poster ONLY for
+# heads that carry no `ao/gate-of-record` status at all -- the measured state
+# (#1504's four heads, "published=none") -- and it reads that from the evidence
+# table the cycle has ALREADY fetched, so a head that is already converged costs
+# no call and cannot accumulate one status per tick. The poster itself publishes
+# the venue's verdict and proves BY READ-BACK that its claim is the newest one on
+# the commit, so even a head asked twice can never carry two different verdicts
+# (#1504, property 3).
+#
+# WHY `--apply` GATES IT. The runner's verify pass posts without `--apply`,
+# because that post is part of the work the cycle is already doing. This pass
+# does no other work: it exists only to change what a head carries, so a dry-run
+# reports the heads it would ask and asks none of them. The rung's own command
+# (`run --once --apply`) applies, so the published behaviour on the fleet host is
+# the applied one.
+
+#: How many heads one cycle may ask the poster about. The count of heads carrying
+#: no context is measured in single digits (#1504: four), so this bounds the
+#: pathological case -- a fresh clone, or a mass update-branch -- and the heads it
+#: cannot take are DEFERRED BY NAME for the next tick rather than dropped.
+MAX_CONCLUDE_PER_CYCLE = 8
+
+
+def real_conclude_status(sh: Command, repo: Path) -> Callable[[str], Result]:
+    """The venue of record's own concluded verdict, published by the poster.
+
+    The argv this builds uses the poster's `conclude` verb, whose own branch in
+    `scripts/gate-status.sh` owns the API call, the refusals and the read-back
+    that decides which claim STANDS -- so `post` (the gate's verdict) and this
+    (the venue's) are two verbs of ONE owner, never two implementations of one
+    context. The name and the verb are deliberately not spelled adjacently on
+    any line of this module that does not RUN them: the producer walk that
+    polices this context matches a non-comment line naming both, so a docstring
+    that read like an invocation would certify an invoker that is not there.
+    """
+
+    def conclude(sha: str) -> Result:
+        argv = ["bash", "scripts/gate-status.sh", "conclude", "--sha", sha]
+        return sh(argv, cwd=repo)
+
+    return conclude
+
+
+def heads_carrying_the_context(table: EvidenceTable) -> set[tuple[int, str]]:
+    """The (pr, sha) pairs that already carry ANY `ao/gate-of-record` record.
+
+    Answered from the cycle's own evidence table, so the filter costs no call and
+    cannot disagree with the plan drawn from the same table.
+    """
+    return {(record.pr, record.sha) for record in table.all() if record.source == SOURCE_GATE_STATUS}
+
+
+def classify_conclude(rc: int, output: str) -> tuple[str, str]:
+    """`(state, detail)` for one poster call, judged by the poster's OWN words.
+
+    An answer that matches nothing here is `unassessable`, never a publication: a
+    result this pass cannot read is not evidence that a status was published.
+    """
+    text = (output or "").strip()
+    lines = text.splitlines()
+    last = lines[-1].strip() if lines else ""
+    detail = last[:200] if last else "the poster printed no reason"
+    if rc == 0 and "conclude OK" in text:
+        return "published", detail
+    # The specific refusals come FIRST: an in-flight run is reported by the poster
+    # as `REFUSED` too, and it is a wait rather than a refusal of the verdict.
+    if "has NOT concluded" in text:
+        return "awaiting-verdict", detail
+    if "produced no run" in text:
+        return "no-venue-run", detail
+    if "neither a pass nor a fail" in text:
+        return "no-verdict", detail
+    if "does not show it delivering a verdict" in text:
+        return "red-not-deliverable", detail
+    if "does not carry what was just published" in text:
+        return "claim-not-standing", detail
+    if "REFUSED" in text:
+        return "refused", detail
+    return "unassessable", detail
+
+
+def publish_concluded(
+    heads: list[tuple[int, str]] | tuple[tuple[int, str], ...],
+    *,
+    already_carrying: set[tuple[int, str]],
+    conclude: Callable[[str], Result],
+    ledger: Ledger,
+    out=sys.stdout,
+    cap: int = MAX_CONCLUDE_PER_CYCLE,
+) -> list[tuple[int, str]]:
+    """Ask the poster for the venue's own verdict on every head carrying none.
+
+    Returns the heads it PUBLISHED for, so the caller can read their statuses back
+    into the evidence table it is about to plan from -- the plan must see the
+    context that now stands, not the one that did.
+
+    An in-flight run, an absent venue run and an unreadable venue are recorded BY
+    NAME and never fail the cycle: publishing is a separate fact from the gate's
+    verdict, and a cycle that could not publish has still said nothing about the
+    code under test.
+    """
+    published: list[tuple[int, str]] = []
+    asked = 0
+    for pr, sha in heads:
+        if (pr, sha) in already_carrying:
+            continue
+        if asked >= cap:
+            ledger.record("conclude", pr=pr, sha=sha, state="deferred", reason=f"capacity:{cap}")
+            print(f"  conclude     #{pr} {sha[:12]} deferred — {cap} head(s) already asked this cycle", file=out)
+            continue
+        asked += 1
+        result = conclude(sha)
+        state, detail = classify_conclude(result.rc, (result.out or "") + (result.err or ""))
+        ledger.record("conclude", pr=pr, sha=sha, state=state, rc=result.rc, detail=detail)
+        print(f"  conclude     #{pr} {sha[:12]} {state} — {detail}", file=out)
+        if state == "published":
+            published.append((pr, sha))
+    return published

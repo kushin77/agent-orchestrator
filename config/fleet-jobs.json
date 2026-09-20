@@ -90,7 +90,7 @@
         "env": "AO_RUNNER_HOST_ROLE",
         "equals": "primary"
       },
-      "doc": "issue #1343: the shared-services PR runner (docs/PR-RUNNER.md). Role-gated, not flag-gated: installed only where the env contract says AO_RUNNER_HOST_ROLE=primary (the shared-services pair); declared and reconciled everywhere."
+      "doc": "issue #1343: the shared-services PR runner (docs/PR-RUNNER.md). Role-gated, not flag-gated: installed only where the env contract says AO_RUNNER_HOST_ROLE=primary (the shared-services pair); declared and reconciled everywhere. Since #1506 it is also the SCHEDULED invoker of the verb scripts/gate-status.sh conclude: every cycle publishes the CI venue of record's own concluded verdict for each open PR head that carries no ao/gate-of-record at all (fleet/runner/verify.py, the verdict-convergence pass). The schedule reaches that verb in one hop from this command, which scripts/check-gate-status-scheduled.sh proves by measurement rather than by reading this sentence. The venue's own recipe is not the invoker and cannot be: infra/cloudbuild/verify.yaml posts nothing by design (#1415) and its image carries neither gh nor gcloud (#1350/#1361)."
     }
   ]
 }
