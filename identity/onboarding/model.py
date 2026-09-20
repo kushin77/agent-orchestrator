@@ -19,9 +19,20 @@ this to HTTP - this lane ships the operator-only controller core.
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+
+# The platform's closed vocabularies are READ from their declared authorities,
+# never restated (#1494): the model-tier ladder comes from the AgentProfile
+# catalog through its one reader `registry/profiles/tiers.py`.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from registry.profiles.tiers import authority as _tier_authority  # noqa: E402
 
 # --- tenant lifecycle --------------------------------------------------------
 
@@ -78,11 +89,13 @@ JOB_DEFAULT_MAX_ATTEMPTS = 3
 
 # --- customization overlay ---------------------------------------------------
 # The customization overlay is bounded to the platform's closed vocabularies
-# (consumed field names; do not redefine). defaultModelTier and memoryScope are
-# the AgentProfile contract enums (registry/profiles); instructionLayers refs
-# resolve against the versioned prompt-module library (registry/prompts).
+# (consumed field names; do not redefine). defaultModelTier is the AgentProfile
+# contract enum, read from `registry/profiles/catalog.yaml` through its one
+# reader (#1494); memoryScope is the same catalog's `memoryScopes`;
+# instructionLayers refs resolve against the versioned prompt-module library
+# (registry/prompts).
 
-MODEL_TIERS: tuple[str, ...] = ("LOW", "MED", "HIGH", "MAX")
+MODEL_TIERS: tuple[str, ...] = _tier_authority()
 MEMORY_SCOPES: tuple[str, ...] = ("user", "session", "repository")
 INSTRUCTION_LAYER_KINDS: tuple[str, ...] = ("system", "tenant")
 

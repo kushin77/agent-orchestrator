@@ -28,9 +28,19 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from typing import Any, Dict, List, Optional
 
 from e2e._paths import ensure_sys_paths  # noqa: F401  (idempotent)
+from e2e._paths import REPO_ROOT as _REPO_ROOT
+
+# The tier ladder is READ from its declared authority (#1494) — the AgentProfile
+# catalog `registry/profiles/catalog.yaml` ``tiers``, through its one reader —
+# rather than restated here as a comprehension over a literal tuple.
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from registry.profiles.tiers import authority as _tier_authority  # noqa: E402
 
 ensure_sys_paths()
 
@@ -451,7 +461,7 @@ def _team_provider_configs() -> List[Any]:
             name=name,
             base_url=f"http://localhost:{port}",
             api_path="/api/chat",
-            tier_models={tier: model for tier in ("LOW", "MED", "HIGH", "MAX")},
+            tier_models={tier: model for tier in _tier_authority()},
             default_model=model,
             supported_models=frozenset({model}),
             requires_key=False,

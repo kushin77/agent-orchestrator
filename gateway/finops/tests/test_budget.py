@@ -19,10 +19,10 @@ import yaml
 import loader
 from budget import (
     BudgetBlocked,
-    BudgetEnforcer,
+    BudgetDecisionMaker,
     BudgetLedger,
     BudgetPolicy,
-    TenantBudget,
+    TenantBudgetLine,
 )
 from chooser import ModelChooser
 
@@ -50,8 +50,8 @@ def table():
 def _chooser(table, policy: BudgetPolicy, spend: float, warn_at: float = WARN_AT):
     ledger = BudgetLedger()
     ledger.add_spend(TENANT, spend)
-    enforcer = BudgetEnforcer(ledger=ledger)
-    enforcer.add_budget(TenantBudget(TENANT, MONTHLY, policy, warn_at_pct=warn_at))
+    enforcer = BudgetDecisionMaker(ledger=ledger)
+    enforcer.add_budget(TenantBudgetLine(TENANT, MONTHLY, policy, warn_at_pct=warn_at))
     return ModelChooser(
         table=table,
         budget_enforcer=enforcer,

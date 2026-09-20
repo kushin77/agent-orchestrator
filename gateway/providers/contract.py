@@ -36,19 +36,32 @@ mirroring the harvested ollama resilient client and defragsuite gateway.
 
 from __future__ import annotations
 
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Mapping
+
+# The tier ladder is READ from its declared authority (#1494): the issue-#9
+# AgentProfile catalog `registry/profiles/catalog.yaml` ``tiers``, through its
+# one reader `registry/profiles/tiers.py`. The repo root goes on the path so the
+# reader resolves by NAME rather than this module keeping a sixth copy of the
+# ladder (the same way providers/config.py reads
+# telemetry.metering.model_aliases).
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from registry.profiles.tiers import authority as _tier_authority  # noqa: E402
 
 SYSTEM = "system"
 USER = "user"
 ASSISTANT = "assistant"
 _ROLES = frozenset({SYSTEM, USER, ASSISTANT})
 
-# Logical model tiers consumed from the issue-#9 AgentProfile catalog
-# (registry/profiles/catalog.yaml ``tiers``). The phase-2 gateway routes on
-# these; this lane resolves each to a provider+model.
-TIERS: tuple[str, ...] = ("LOW", "MED", "HIGH", "MAX")
+# Logical model tiers, in ladder order, read from the authority above. The
+# phase-2 gateway routes on these; this lane resolves each to a provider+model.
+TIERS: tuple[str, ...] = _tier_authority()
 DEFAULT_TIER = "MED"
 
 

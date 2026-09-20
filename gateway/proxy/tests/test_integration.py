@@ -113,12 +113,12 @@ class TestRealBoundaries:
         assert result.content is None
 
     def test_budget_exhausted_blocks_real_limits(self):
-        from limits.budget import BudgetController, BudgetMode, BudgetPolicy
+        from limits.budget import BudgetController, BudgetMode, TokenBudgetPolicy
         from limits.limiter import LimitsEngine
 
         enforce = LimitsEngine(
             budget=BudgetController(
-                default_policy=BudgetPolicy(cap_tokens=5, mode=BudgetMode.ENFORCE)
+                default_policy=TokenBudgetPolicy(cap_tokens=5, mode=BudgetMode.ENFORCE)
             )
         )
         wired = build_real_gateway(limits_engine=enforce)
