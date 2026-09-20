@@ -36,9 +36,11 @@ which is itself part of the finding.
 
 The two audit documents live at
 `/home/akushnir/.claude/jobs/84034cd1/tmp/` — an audit session's artifact
-directory, not a repository path. They are not tracked in `agent-orchestrator`
-(0 hits on `origin/master`, and no commit on any local ref ever added them) nor
-in `shared-services`. So the row could not be updated in place by a lane; the
+directory, not a repository path. They are not tracked in either repository:
+measured against both HEAD trees, `ISOLATION-REVIEW-2026-09-20.md` and
+`FRICTION-AUDIT-2026-09-20.md` each return 0 paths in `agent-orchestrator` and 0
+in `shared-services`; on this repo, `origin/master` has 0 hits for the name and no
+commit on any local ref ever added it. So the row could not be updated in place by a lane; the
 corrected row is published as a comment on #1547 instead of by editing another
 session's artifact.
 
