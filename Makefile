@@ -387,6 +387,27 @@ reconcile:
 lease-policy:
 	@bash scripts/check-lease-policy.sh
 
+
+# isolation-landed — the ticket-trailer rule over LANDED history (issue #287), and the
+# wire that issue #1542 CONFIRMED rather than added. The check is wired into `make verify`
+# by the DISCOVERY layer (`scripts/discover-checks.sh`, #698), which appends every
+# `scripts/check-*.sh` that is not disabled by name in `scripts/check-denylist.txt`; it is
+# therefore absent from this file and from `scripts/verify.sh`'s explicit `checks=()`
+# array BY DESIGN, and `grep -n check-isolation-landed Makefile` returning nothing is the
+# EXPECTED result — not evidence of dead code. A hand-added `verify.sh` entry would be a
+# DUPLICATE registration of the same check name, which the gate of record refuses by name.
+# The sibling targets above (session-isolation, reconcile, lease-policy) are hand-run
+# conveniences, not the wire; every one of them would be discovered with or without them.
+# Measured at b895e396 (2026-09-20, issue #1542): `discover_check_scripts` yields
+# `isolation-landed|bash scripts/check-isolation-landed.sh` (position 95 of 189); it is
+# absent from the denylist; `scripts/check-gate-coverage.sh`'s #698 marker rule reports it
+# `check scripts WIRED=194 UNWIRED=0` (rc 0); and the check itself exits 0 —
+# `isolation-enforce: OK — 39 recorded legacy, 0 unrecorded, 0 stale in HEAD`. Its
+# negative control is real and was reproduced outside the check's own harness: a synthetic
+# landed commit carrying no ticket trailer is refused rc 1 naming
+# `commit-missing-ticket-trailer`, while its compliant twin in the same repo shape is
+# accepted rc 0.
+
 ## paperclip-gap-analysis — sourced paperclip.ing gap analysis (issue #368): the
 ## GR-10 provenance, the four-way namesake disambiguation, the six capability
 ## families and the cannibalize-vs-build table must all be present, and the check
