@@ -15,9 +15,9 @@ Public surface
   (provider/model/tenant/agent/logical key). Tier vocabulary
   ``LOW/MED/HIGH/MAX`` consumed from the issue-#9 AgentProfile catalog.
 - adapters         - ``anthropic``, ``deepseek``, ``openai`` (Copilot/GPT),
-  ``gemini``, ``ollama`` (local), ``paperclip`` and ``hermes`` providers over
-  an injected transport; every adapter validates typed output against the
-  caller's output schema and fails closed on invalid output.
+  ``gemini``, ``ollama`` (local), ``paperclip``, ``hermes`` and ``nous``
+  providers over an injected transport; every adapter validates typed output
+  against the caller's output schema and fails closed on invalid output.
 - ``registry``     - ``ProviderRegistry`` (route resolution + per-tenant model
   overrides + resilient client pool + graceful degradation + hooks) and
   ``ProviderClient``.

@@ -108,7 +108,7 @@ def _base(name: str, base_url: str, api_path: str, tier_models: Mapping[str, str
 
 
 def default_provider_configs() -> dict[str, ProviderConfig]:
-    """Platform-default configurations for the eight shipped providers.
+    """Platform-default configurations for the nine shipped providers.
 
     Model ids are real provider model identifiers (provenance:
     gmail-agent sonnet/opus/haiku tiers, capital-underwriting gemini model
@@ -123,6 +123,20 @@ def default_provider_configs() -> dict[str, ProviderConfig]:
     existing OpenAI adapter (issue #340 deliverable 4; see
     ``providers/copilot.py``) and is a distinct provider id only so its rate
     card and catalog module are addressable.
+
+    ``nous`` (issue #1559) is the same shape of decision for the opposite kind
+    of target: Nous Research's **billed, OpenAI-compatible cloud API** at
+    ``https://inference-api.nousresearch.com/v1``, whose tier ids are REAL —
+    taken from the endpoint's own live ``GET /v1/models`` catalog (402 models,
+    measured 2026-09-20) rather than from the API docs, which advertise three
+    ``Hermes-4.x`` ids that the live service has since retired or never served.
+    Unlike ``hermes`` — the keyless local Ollama-compatible hop declared by
+    ``integrations/hermes/`` (ADR-0012) and priced ``local: true`` by
+    ``telemetry/metering/rate_cards/hermes.yaml`` — this provider requires a
+    Bearer key. They are separate ids so neither declaration has to become
+    false: re-pointing ``hermes`` would silently contradict those files rather
+    than red any gate, since none of them derives its hermes facts from this
+    module.
     """
     configs: dict[str, ProviderConfig] = {
         "anthropic": _replace(
@@ -190,6 +204,40 @@ def default_provider_configs() -> dict[str, ProviderConfig]:
             "/api/chat",
             {"LOW": "hermes3", "MED": "hermes3",
              "HIGH": "hermes3", "MAX": "hermes3"},
+        ),
+        # Nous Research (issue #1559): OpenAI-compatible chat/completions behind
+        # a REQUIRED Bearer API key, billed against account credits.
+        # ``requires_key`` stays at its default of True, so the adapter sends no
+        # Authorization header without a key and the call is refused by the
+        # provider with an auth error instead of silently succeeding.
+        #
+        # The tier ids below are VERIFIED-SERVABLE ids, measured 2026-09-20 by
+        # probing this endpoint's own chat path. The provider's signals are
+        # unambiguous: HTTP 402 (the x402 "payment required" flow) for a model id
+        # it ACCEPTS, 400 "Unknown model" for one it does not, and 401 for a bad
+        # key. Two traps this avoids, both measured rather than assumed:
+        #
+        #   1. The ``Hermes-4.x`` ids the API docs advertise are dead -
+        #      ``Hermes-4-70B`` and ``Hermes-4-405B`` answer 404 "This model has
+        #      been retired", ``Hermes-4.3-36B`` answers 404 "not found", and no
+        #      id containing "hermes" is servable at all.
+        #   2. ``GET /v1/models`` (HTTP 200, unauthenticated) lists 402 models with
+        #      prices, but that catalog is MUCH wider than the chat namespace:
+        #      most catalog slugs answer "Unknown model" on /chat/completions and
+        #      ``anthropic/claude-sonnet-5`` answers "No pricing available".
+        #      Declaring a ladder from the catalog alone would ship dead ids.
+        #
+        # Each rung is therefore an id that answered 402, ascending by the
+        # endpoint's own published per-MTok rates (see
+        # ``gateway/finops/provider-credits.yaml``, which prices exactly these).
+        "nous": _base(
+            "nous",
+            "https://inference-api.nousresearch.com/v1",
+            "/chat/completions",
+            {"LOW": "inclusionai/ling-3.0-flash",
+             "MED": "qwen/qwen3.7-flash",
+             "HIGH": "anthropic/claude-haiku-4.5",
+             "MAX": "openai/gpt-6-astra-fast"},
         ),
     }
     for name in configs:
