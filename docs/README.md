@@ -8,6 +8,7 @@ Index of the repo's canonical documentation. Agents start at
 | Doc | Purpose |
 |-----|---------|
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Five-pillar control-plane architecture (source of truth; EPIC-00 = issue #4). |
+| [`PMO-PROJECT-PLAN.md`](PMO-PROJECT-PLAN.md) | GENERATED enterprise project plan: every module/task by milestone + priority, converging on "CRM + Asterisk voice operational". Regenerate with `python3 governance/pmo/cli.py plan`; freshness gated by `scripts/check-pmo-rollup.sh` (issue #1648). |
 | [`RELEASE-PLAN.md`](RELEASE-PLAN.md) | The v1.0.0 commitment and SemVer contract: surfaces under contract, v1.0.0 exit criteria mapped to issue #803's acceptance boxes, residual risks named (issue #1074). |
 | [`EXECUTION-PLAN.md`](EXECUTION-PLAN.md) | One-issue-one-lane parallel dispatch contract, phase/wave sequencing 0–8. |
 | [`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md) | Sourced fork-map of upstream `paperclip.ing` against the fleet's own primitives (issue #368). |
