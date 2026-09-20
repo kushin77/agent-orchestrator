@@ -12,6 +12,17 @@
 #   * `gdc-manifest.yaml` (root) -> still carries the `code-indexing.mcp`
 #     mandatory pin (`modules[]`). The pin is owned by #464; this gate only
 #     READS it and refuses its absence.
+#   * the DECLARED indexer server, alive (issue #1526) -> once the shape above
+#     is conformant, the entry point `.mcp.json` actually names is SPAWNED and
+#     asked to answer one JSON-RPC `initialize` over stdio, under a 5s deadline.
+#     A shape-only gate passed every run while the declared entry point did not
+#     exist at all (INDEXER-REVIEW-2026-09-20.md §3): the declaration LOOKED
+#     like the seed, so nothing noticed the server behind it could never start.
+#     `result.serverInfo.name` is required in the reply, so a process that
+#     answers with JSON but names no server is refused by the same fault.
+#     A venue whose vendored contract is unreadable (a fresh CI checkout) is
+#     already CANNOT-ASSESS before this step, so it is the DEVELOPER venue --
+#     which is where the entry point is exercised -- that carries the verdict.
 #
 # Tri-state, honest (GR-12, no false green):
 #   0  conformant
@@ -20,12 +31,23 @@
 #      vendor/CMR submodule is not initialised in this worktree) or PyYAML is
 #      unavailable, so conformance to the mandatory contract cannot be judged.
 #      An unreadable contract is NEVER reported as a pass.
+#     Liveness is deliberately NOT a fourth CANNOT-ASSESS state: by the time it
+#     runs the contract is readable, the exchange is local and needs no network,
+#     and every refusal it can produce is a real defect in `.mcp.json` or in the
+#     server that entry names — so all of them are rc 1, named on stderr.
 #
-# Offline and deterministic; no network, no containers. `--self-test` runs
-# internal negative controls: each constructs one violation class in a scratch
-# tree (the real subjects are never mutated) and asserts the gate refuses it,
-# naming the fault. A class the gate stops refusing turns the self-test itself
-# red — the controls are real, not decorative.
+# Offline and deterministic; no network, no containers. The liveness step is the
+# one thing here that EXECUTES something: proving a declared server is reachable
+# requires starting it, which is exactly the proof the shape check could not give.
+# The declared entry point is the repo's own `.mcp.json`; nothing else is run.
+#
+# `--self-test` runs internal negative controls: each constructs one violation
+# class in a scratch tree (the real subjects are never mutated) and asserts the
+# gate refuses it, naming the fault. A class the gate stops refusing turns the
+# self-test itself red — the controls are real, not decorative. The liveness
+# controls spawn a synthetic stdio server written into the scratch tree, so a
+# gate that stopped spawning anything — or one that could no longer reach a
+# server that DOES answer — turns them red too.
 #
 # Usage:
 #   scripts/check-codeidx-surface.sh              # validate this repo
@@ -41,9 +63,12 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 exec python3 - "$root" "$@" <<'PY'
 import json
 import os
+import selectors
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 
 try:
     import yaml
@@ -172,6 +197,207 @@ def gdc_errors(gdc_path):
     return []
 
 
+# --- liveness: the DECLARED server must actually answer (issue #1526) -------
+#
+# Everything above judges `.mcp.json` as TEXT. It passed every run while the
+# indexer it names could not start at all (INDEXER-REVIEW-2026-09-20.md §3),
+# because a declaration that LOOKS like the vendored seed is indistinguishable
+# from a working one until something tries to run it. This step tries.
+#
+# The exchange is deliberately the smallest one an MCP host performs: one
+# JSON-RPC `initialize` written to the server's stdin, its stdout read back
+# under a deadline. The deadline bounds the EXCHANGE, not the process's
+# lifetime — a long-lived stdio server that answers and then keeps running is
+# reachable and must PASS, so the reader never waits for the process to exit.
+
+LIVENESS_TIMEOUT_SECONDS = 5.0
+LIVENESS_FAULT = "FAIL: codeidx-surface-liveness: server unreachable"
+LIVENESS_PASS = "PASS: codeidx-surface-liveness"
+INITIALIZE_REQUEST = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {},
+}
+
+
+def _liveness_fault(reason):
+    """One liveness fault: the fixed name first, then the measured reason."""
+    return "%s - %s" % (LIVENESS_FAULT, reason)
+
+
+def _terminate(proc):
+    """Kill a server whose reply we already have, or never will. Never raises."""
+    try:
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait(timeout=LIVENESS_TIMEOUT_SECONDS)
+    except Exception:
+        pass
+    for stream in (proc.stdin, proc.stdout, proc.stderr):
+        try:
+            if stream is not None:
+                stream.close()
+        except Exception:
+            pass
+
+
+def _first_json_line(buf):
+    """(obj, None) for the first complete JSON line, else (None, reason|None).
+
+    A line that is present but not JSON is a fault, not a reason to keep
+    reading: this surface speaks JSON-RPC, so banner text on stdout means the
+    declared entry point is not the server the entry claims it is.
+    """
+    while b"\n" in buf:
+        line, buf = buf.split(b"\n", 1)
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            return json.loads(line.decode("utf-8", "replace")), None
+        except Exception:
+            return None, "the initialize response is not JSON: %r" % (line[:160],)
+    return None, None
+
+
+def _server_name(reply):
+    """The reply's `result.serverInfo.name`, or None when it is not carried."""
+    if not isinstance(reply, dict):
+        return None
+    result = reply.get("result")
+    if not isinstance(result, dict):
+        return None
+    info = result.get("serverInfo")
+    if not isinstance(info, dict):
+        return None
+    name = info.get("name")
+    if isinstance(name, str) and name.strip():
+        return name
+    return None
+
+
+def _exchange(root, argv):
+    """Speak one stdio `initialize` to `argv`, launched with cwd `root`.
+
+    Returns (reply, reason) — exactly one of them is None — bounded by
+    LIVENESS_TIMEOUT_SECONDS for the whole exchange, never for the process's
+    lifetime.
+    """
+    try:
+        proc = subprocess.Popen(
+            argv,
+            cwd=root,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except Exception as exc:
+        return None, "cannot start %r: %r" % (argv[0], exc)
+
+    try:
+        try:
+            proc.stdin.write(
+                (json.dumps(INITIALIZE_REQUEST) + "\n").encode("utf-8")
+            )
+            proc.stdin.flush()
+            proc.stdin.close()
+        except Exception:
+            # A server that closes its own stdin early is judged on its stdout.
+            pass
+
+        fd = proc.stdout.fileno()
+        sel = selectors.DefaultSelector()
+        sel.register(fd, selectors.EVENT_READ)
+        buf = b""
+        deadline = time.monotonic() + LIVENESS_TIMEOUT_SECONDS
+        try:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or not sel.select(remaining):
+                    return None, "no initialize response within %gs" % (
+                        LIVENESS_TIMEOUT_SECONDS,
+                    )
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    break
+                buf += chunk
+                reply, reason = _first_json_line(buf)
+                if reply is not None or reason is not None:
+                    return reply, reason
+        finally:
+            sel.close()
+
+        # stdout closed: a final unterminated object still counts as an answer.
+        reply, reason = _first_json_line(buf + b"\n")
+        if reply is not None or reason is not None:
+            return reply, reason
+        return None, "the server closed stdout without an initialize response"
+    finally:
+        _terminate(proc)
+
+
+def _declared_indexers(root, seed_servers):
+    """[(name, command, args)] for the mandatory servers, as DECLARED."""
+    with open(os.path.join(root, MCP_SUBJECT), encoding="utf-8") as fh:
+        obj = json.load(fh)
+    servers = obj.get("mcpServers") if isinstance(obj, dict) else None
+    servers = servers if isinstance(servers, dict) else {}
+    declared = []
+    for name in sorted(seed_servers):
+        entry = servers.get(name)
+        entry = entry if isinstance(entry, dict) else {}
+        command = entry.get("command")
+        command = (
+            command
+            if isinstance(command, str) and command.strip()
+            else "python3"
+        )
+        args = entry.get("args")
+        args = (
+            [a for a in args if isinstance(a, str)]
+            if isinstance(args, list)
+            else []
+        )
+        declared.append((name, command, args))
+    return declared
+
+
+def liveness_faults(root, seed_servers):
+    """Named faults proving the DECLARED indexer server actually answers."""
+    faults = []
+    for name, command, args in _declared_indexers(root, seed_servers):
+        label = "%s: mcpServers.%s" % (MCP_SUBJECT, name)
+        if not args:
+            faults.append(_liveness_fault(
+                "%s.args is empty - the entry declares no server to start"
+                % (label,)
+            ))
+            continue
+        # The MCP host launches the server with cwd = the repo root, so a
+        # relative entry point resolves there; an absolute one is used as given.
+        entry = args[0]
+        resolved = entry if os.path.isabs(entry) else os.path.join(root, entry)
+        if not os.path.isfile(resolved):
+            faults.append(_liveness_fault(
+                "%s.args[0] %r resolves to %r, which does not exist: the server "
+                "is launched with cwd = the repo root, so the declaration must "
+                "name an entry point that resolves from there"
+                % (label, entry, resolved)
+            ))
+            continue
+        reply, reason = _exchange(root, [command] + args)
+        if reason is not None:
+            faults.append(_liveness_fault("%s: %s" % (label, reason)))
+            continue
+        if _server_name(reply) is None:
+            faults.append(_liveness_fault(
+                "%s answered %s with no result.serverInfo.name"
+                % (label, json.dumps(reply)[:200])
+            ))
+    return faults
+
+
 def evaluate(subject_dir, contract_dir):
     """Return (rc, messages). rc: 0 conformant, 1 violation, 2 cannot-assess."""
     seed_servers, seed_err = load_seed(contract_dir)
@@ -189,11 +415,26 @@ def evaluate(subject_dir, contract_dir):
 def cmd_check(root, contract_dir):
     rc, msgs = evaluate(root, contract_dir)
     if rc == 0:
+        # The shape is conformant, so the declaration and the vendored contract
+        # AGREE. Only now is liveness the next question: the entry point that
+        # shape names must actually start and answer.
+        seed_servers, seed_err = load_seed(contract_dir)
+        if seed_err is not None:
+            # Unreachable by construction: `evaluate` above read the same
+            # contract a moment ago, so its absence here is not a pass.
+            sys.stderr.write(
+                "check-codeidx-surface: CANNOT-ASSESS - %s\n" % seed_err
+            )
+            return 2
+        msgs = liveness_faults(root, seed_servers)
+        rc = 1 if msgs else 0
+    if rc == 0:
         print(
             "check-codeidx-surface: OK - .mcp.json declares the indexer MCP "
             "surface in %s's shape and gdc-manifest.yaml carries the %s pin"
             % (SEED_LABEL, PIN_MODULE)
         )
+        print(LIVENESS_PASS)
         return 0
     for m in msgs:
         sys.stderr.write(m + "\n")
@@ -260,6 +501,97 @@ def _read(path, stream):
         return None
     with open(path, encoding="utf-8") as fh:
         return fh.read()
+
+
+# --- liveness controls (issue #1526) ----------------------------------------
+#
+# Synthetic stdio servers, written into a SCRATCH tree and never into the repo.
+# `live-answers` is the positive control: a control that cannot pass proves
+# nothing, so the gate's PASS path is asserted before the refusals are.
+_LIVENESS_STUBS = {
+    "answers": (
+        "import json, sys\n"
+        "sys.stdin.readline()\n"
+        "print(json.dumps({'jsonrpc': '2.0', 'id': 1, 'result': {\n"
+        "    'protocolVersion': '2024-11-05', 'capabilities': {},\n"
+        "    'serverInfo': {'name': 'cmr-indexer', 'version': '0.0.0'}}}),\n"
+        "      flush=True)\n"
+    ),
+    "not-json": (
+        "import sys\n"
+        "sys.stdin.readline()\n"
+        "print('cmr-indexer: warming up, this is not JSON at all', flush=True)\n"
+    ),
+    "no-serverinfo": (
+        "import json, sys\n"
+        "sys.stdin.readline()\n"
+        "print(json.dumps({'jsonrpc': '2.0', 'id': 1,\n"
+        "                  'result': {'capabilities': {}}}), flush=True)\n"
+    ),
+    "never-answers": (
+        "import sys, time\n"
+        "sys.stdin.readline()\n"
+        "time.sleep(600)\n"
+    ),
+}
+
+_LIVENESS_CASES = (
+    # (control, stub written into the scratch tree or None, declared args,
+    #  expect a reachable server?, token the refusal must carry)
+    ("live-answers", "answers", ["stub_server.py"], True, LIVENESS_PASS),
+    ("live-not-json", "not-json", ["stub_server.py"], False, "not JSON"),
+    ("live-no-serverinfo", "no-serverinfo", ["stub_server.py"], False,
+     "no result.serverInfo.name"),
+    ("live-never-answers", "never-answers", ["stub_server.py"], False,
+     "no initialize response within"),
+    ("live-unresolvable-entry", None, ["catalog/indexer/mcp_server.py"], False,
+     "catalog/indexer/mcp_server.py"),
+)
+
+
+def _liveness_controls(contract_dir):
+    """Spawn every liveness control; return the number that failed (None: cannot assess).
+
+    Each control declares its server in its OWN scratch `.mcp.json` and writes
+    the stub beside it, so the gate reaches the liveness step exactly the way it
+    does in production and starts a real process. The mandatory server NAMES
+    come from the vendored seed, as they do on the real subject.
+    """
+    seed_servers, seed_err = load_seed(contract_dir)
+    if seed_err is not None:
+        sys.stderr.write(
+            "check-codeidx-surface: CANNOT-ASSESS - liveness controls need the "
+            "vendored seed: %s\n" % seed_err
+        )
+        return None
+    print("== codeidx-surface liveness (scratch servers, real spawn) ==")
+    bad = 0
+    for control, stub, args, expect_reachable, token in _LIVENESS_CASES:
+        work = tempfile.mkdtemp(prefix="codeidx-live-")
+        try:
+            if stub is not None:
+                with open(os.path.join(work, "stub_server.py"), "w",
+                          encoding="utf-8") as fh:
+                    fh.write(_LIVENESS_STUBS[stub])
+            with open(os.path.join(work, MCP_SUBJECT), "w", encoding="utf-8") as fh:
+                json.dump({"mcpServers": {"cmr-indexer": {
+                    "type": "stdio", "command": "python3", "args": args}}}, fh)
+            faults = liveness_faults(work, seed_servers)
+            if expect_reachable:
+                ok = not faults
+                want = "reachable"
+            else:
+                ok = bool(faults) and all(token in f for f in faults)
+                want = "refused (%r)" % token
+            print("  %s  %-24s expects %s" %
+                  ("OK  " if ok else "FAIL", control, want))
+            if not ok:
+                bad += 1
+                for f in faults:
+                    sys.stderr.write("      got: %s\n" % f)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+    return bad
 
 
 def cmd_self_test(root, contract_dir):
@@ -329,7 +661,12 @@ def cmd_self_test(root, contract_dir):
         finally:
             shutil.rmtree(work, ignore_errors=True)
 
-    total = len(_cases()) + 1
+    live_bad = _liveness_controls(contract_dir)
+    if live_bad is None:
+        return 2
+    failures += live_bad
+
+    total = len(_cases()) + len(_LIVENESS_CASES) + 1
     if failures:
         sys.stderr.write(
             "check-codeidx-surface self-test: FAIL - %d of %d control(s) not "
@@ -337,7 +674,7 @@ def cmd_self_test(root, contract_dir):
         )
         return 1
     print("check-codeidx-surface self-test: OK - %d/%d controls proven "
-          "(incl. rc 2 CANNOT-ASSESS)" % (total, total))
+          "(incl. rc 2 CANNOT-ASSESS and the liveness spawn)" % (total, total))
     return 0
 
 
