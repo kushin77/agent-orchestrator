@@ -26,10 +26,6 @@
       await refresh();
       render();
 
-      function role() {
-        return CP.tenant || "acme";
-      }
-
       async function refresh() {
         try {
           var payload = await CP.get("/api/skillstudio/skills");
