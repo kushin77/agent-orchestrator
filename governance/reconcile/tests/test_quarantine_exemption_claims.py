@@ -387,13 +387,23 @@ def test_the_shipped_document_re_measures_its_own_rows():
             quarantine_path=SHIPPED_DOCUMENT,
             ops=RepoOps(REPO_ROOT),
         )
-        assert verdict.assessable, verdict.reason
-        assert not verdict.quarantine_applicable, verdict.describe()
+        # DOCUMENT-SCOPED properties only. `verdict.assessable` and
+        # `verdict.quarantine_applicable` describe the WHOLE real tree of whichever
+        # venue reads the document — a checkout carries its own young refs, and
+        # production never even evaluates the venue for an EMPTY document (there is
+        # nothing for the venue to govern) — so asserting either one here would be
+        # the same venue-bound mistake as the identity assert this branch replaces,
+        # one level down. Measured in a pristine clone of this branch: asserting
+        # `assessable` failed on the clone's OWN `issue-1509` ref.
+        assert verdict.quarantined == (), (
+            "a document that is not in force honours nothing, in whichever venue it is read"
+        )
         assert [e.name for e in verdict.inapplicable_quarantine] == [e.name for e in entries], (
             f"every one of the document's {len(entries)} row(s) must be reported inapplicable, by "
             f"name, in a venue the document does not name: {verdict.describe()}"
         )
-        assert verdict.quarantined == (), "a document that is not in force honours nothing"
+        if not entries:
+            assert "declares no exemptions" in verdict.describe(), verdict.describe()
         return
 
     if not entries:
