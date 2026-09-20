@@ -74,6 +74,7 @@ reachable from this index.
 | [`FLEET-CAPABILITY-DRIFT.md`](FLEET-CAPABILITY-DRIFT.md) | Capability drift — restarting a rung that does not implement what the repository declares (issue #319). |
 | [`FLEET-DASHBOARD-GAP-ANALYSIS.md`](FLEET-DASHBOARD-GAP-ANALYSIS.md) | Fleet dashboard gap analysis — terminal TUI vs web single-pane-of-glass (issue #330). |
 | [`LEASE-POLICY.md`](LEASE-POLICY.md) | One declared policy for every fleet lease and TTL (issue #322). |
+| [`LEASE-HOOK.md`](LEASE-HOOK.md) | The opt-in `pre-commit` file-lease hook: what it refuses, the situations it fails open on, the opt-in install, and the two documented opt-out paths (issue #1541). |
 | [`SESSION-FLEET-SYNC.md`](SESSION-FLEET-SYNC.md) | Session fleet sync — the sync contract and gap register (issue #181). |
 | [`CROSS-REPO-LESSONS-SYNC.md`](CROSS-REPO-LESSONS-SYNC.md) | The declared relationship between the two lessons loops either side of the repo boundary. |
 | [`SHARED-SERVICES-FALLBACK.md`](SHARED-SERVICES-FALLBACK.md) | Shared-services fallback rung — frozen contract, owner lane `gateway/health` (issue #375). |
