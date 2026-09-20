@@ -15,15 +15,30 @@
 # row for its OWN new check:
 #   * every row carries the issue that will retire it AND the 40-hex commit at
 #     which the row was added (column 5); a row without both is malformed;
-#   * a script row (the `uninvoked` deferral) whose wiring issue is CLOSED
-#     while the artifact is still unwired fails, naming both — a deferral to an
-#     open lane is honest, a deferral to a closed one is a permanent excuse
-#     (state read offline from the committed board snapshot `.board/snapshot.json`);
+#   * EVERY LIVE row — a script row whose check no gate invokes, AND a suite row
+#     whose suite no gate names as a pytest target — must name a tracker issue
+#     that is still OPEN. A CLOSED tracker fails, naming the row and the issue;
+#     so does a tracker ABSENT from the committed board snapshot, which is the
+#     only board state a gate may read (offline, no network). A deferral to an
+#     open lane is honest; a deferral to a closed one is a permanent excuse.
+#     The rule covered `script` rows ONLY until #1497, and the `swept-only`
+#     suite rows were exempt on the argument that their reason recorded a
+#     permanent state rather than a deferred wiring — so 51 suite rows sat
+#     against #524 (CLOSED 2026-09-14) and #502/#445/#447 (all CLOSED) while
+#     this detector reported OK. The reason says WHY an artifact is unwired; it
+#     does not make the row ownerless.
 #   * a row for an artifact that did not exist at this file's OWN last-touched
-#     commit fails as newly delivered.
-# The three live `script` rows below are deferred to #559 (RC-8, the
-# gate-wiring lane, OPEN) and retire the moment #559 wires those checks. This
-# file is RC-8 single-writer territory (docs/EXECUTION-PLAN.md, per #603).
+#     commit, or at the 40-hex commit the row itself declares, fails as newly
+#     delivered.
+# NO `script` ROWS EXIST IN THIS FILE, and this paragraph used to claim three
+# did — "live", deferred to #559 (RC-8, "the
+# gate-wiring lane, OPEN") and retiring "the moment #559 wires those checks".
+# Measured 2026-09-19 for #1497: `grep -cP '^script\t'` over this file = 0, and
+# #559 closed 2026-09-14T20:32:15Z. A header describing rows that do not exist,
+# deferred to an issue closed five days earlier, is the same defect as a row
+# deferred to a closed issue, one level up: the DECLARATION, not the detector,
+# had rotted. The paragraph is deleted rather than re-worded, so nothing here
+# describes a row this file does not carry.
 #
 # Format — tab-separated, one artifact path per line (never a glob or a wildcard
 # prefix: a glob would absorb a newly declared artifact under that prefix and
@@ -35,9 +50,12 @@
 #   reason   swept-only  suite: run only by the scripts/run-pytest-suites.sh
 #                        manifest sweep; no gate file names it as a pytest target
 #            uninvoked   script: delivered, invoked by no gate file
-#   tracker  the issue that must remove this line (a script row's issue must be
-#            OPEN — the suite rows name the epic that established them)
-#   sha      the 40-hex commit at which this line was added
+#   tracker  the issue that must remove this line; EVERY live row's issue must
+#            be OPEN in the committed board snapshot, or the row is refused
+#   sha      the 40-hex commit at which this line was added; for a row #1497
+#            re-trackered, the commit that lane was cut from (a9f63bf4), because
+#            a row cannot cite the commit that introduces it. The detector
+#            requires only that the artifact exist at the cited commit.
 #
 # Measured when this baseline landed, at ffb2688 (the detector prints the same
 # numbers from the tree, it does not read them from here): 78 check scripts
@@ -71,54 +89,48 @@
 # both-directions rule: naming a suite made its row STALE, so the gate failed by
 # name until the row was removed -- the list cannot grow an excuse and cannot
 # keep a dead one.
-suite	guardrails/dlp	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	guardrails/policy	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	guardrails/controls	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	guardrails/honesty	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	guardrails/isolation	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	guardrails/sandbox	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	identity/onboarding	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	identity/cpapi	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	identity/edges	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	identity/entitlements	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	identity/sso	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	telemetry/ledger	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	telemetry/audit	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	telemetry/observability	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	telemetry/budgets	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	portal	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	control-plane/instructions	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	control-plane/sdk/python	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/merge	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/dispatch	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/knowledge	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/conformance	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/finops	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/sync	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	infra/rollout	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/lessons	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/lessons-sync	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/remediation	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/board	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/isolation	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/lifecycle	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/reconcile	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/ticket	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/pmo	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/cto-overlay	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/authority	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	governance/rollup	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	control-plane/fleet-template	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	gateway/sme-routing	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	integrations/paperclip	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	integrations/paperclip/adapters/approvals	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	integrations/paperclip/adapters/routines	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	integrations/paperclip/adapters/secrets	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	integrations/paperclip/adapters/skills	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	registry/parity	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	scripts	swept-only	#524	248339a18797157aea704e5c4d67e1adb4383f16
-suite	guardrails/chat	swept-only	#502	a3213dc8de814a7c2345ca93ccc9502093c8b6a4
-suite	registry/chat	swept-only	#502	a3213dc8de814a7c2345ca93ccc9502093c8b6a4
-suite	telemetry/chat	swept-only	#502	a3213dc8de814a7c2345ca93ccc9502093c8b6a4
-suite	integrations/paperclip/reporting	swept-only	#447	1810e5cae387b451e2922bd61ded10f5385ffc4c
-suite	governance/modules	swept-only	#445	26bff7aaf97adeb5aa7ef8d50a1d6b205ae02a6c
+# LANDED (#1497, 2026-09-19), measured against origin/master a9f63bf4: the 51
+# `swept-only` rows that stood there are TWELVE. THIRTY-NINE were retired the only
+# way this file allows — by NAMING each suite as a pytest target the gate of
+# record runs: `scripts/check-pytest-suites.sh`, auto-discovered into `make
+# verify` by `scripts/discover-checks.sh` (#698), runs each of them in
+# isolation. Naming a suite made its row STALE, which is the both-directions
+# rule above doing exactly what it promises. A second, independent half landed
+# with it: the closed/unknown-tracker rule now covers EVERY live row, so the
+# twelve rows that remain cannot be deferred to a closed issue either.
+# THE NINE LANE-VENUE ROWS ARE OWNED, NOT EXCUSED. Each is a declared suite that
+# fails, hangs, or cannot run in a lane venue (each measured ALONE, its own
+# pytest process): portal (rc 124 after 240s, 3 failures), scripts (18 failed),
+# governance/knowledge (4 failed), governance/conformance (1 failed),
+# governance/ticket (1 failed), governance/cto-overlay (4 failed),
+# governance/authority (2 failed), integrations/paperclip/reporting (7 failed +
+# 57 errors), governance/modules (3 errors: no vendor/CMR in a worktree).
+# Wiring any of them would red the gate of record for every lane — worse than
+# the honest deferral, because a gate that is red on master is ignored. They
+# carry tracker #1501 (OPEN), which owns fixing them; that issue also has to be
+# in the committed board snapshot for this rule to read its state OFFLINE, so
+# this lane spliced an entry into `.board/snapshot.json` for it.
+#
+# THREE CI-VENUE ROWS WERE ADDED BY THE SAME LANE when the first CI run of the
+# wired list (Cloud Build python:3.14, build 6845d8ad) reded the gate of record:
+# `check-pytest-suites.sh` had named 42 suites, and three of them failed in the
+# CI venue while passing alone in a lane worktree. They are baselined here
+# rather than named by the check, each tracked by #1509 (OPEN, spliced into
+# `.board/snapshot.json` alongside #1501):
+#   guardrails/honesty       CI pytest exit 1 (74 passed alone in a lane worktree)
+#   governance/lifecycle     CI pytest exit 1 (259 passed alone in a lane worktree)
+#   governance/reconcile     CI pytest exit 1 — test_the_shipped_document_re_measures_its_own_rows
+#                            re-measures the shipped quarantine document against its recorded
+#                            git common dir, which differs in a fresh CI checkout (reproduced)
+suite	portal	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/knowledge	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/conformance	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/ticket	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/cto-overlay	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/authority	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	scripts	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	integrations/paperclip/reporting	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/modules	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	guardrails/honesty	swept-only	#1509	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/lifecycle	swept-only	#1509	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/reconcile	swept-only	#1509	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
