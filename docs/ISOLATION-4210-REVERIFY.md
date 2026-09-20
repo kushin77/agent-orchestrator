@@ -80,8 +80,17 @@ base=main  head=lane/3867-host-firewall-ssh-key-trigger  changed_files=3
 Its three files are `infra/MODULE-LOCK.json`, `infra/modules/host-firewall/main.tf` and
 `scripts/tests/propagate-node-checkout-classify.test.sh` — **all shared-services paths**. Nothing
 at those paths exists in this repo, so the repro #1546 went looking for here was never here. (The
-resolution was not a guess: all 104 repositories in the `kushin77` org were enumerated, and the
-five that could plausibly hold a 4-digit issue number were probed by REST; one answered 200.)
+resolution was not a guess: the `kushin77` org's 114 repositories were enumerated, and the five that
+could plausibly hold a 4-digit issue number — `agent-orchestrator`, `shared-services`,
+`shared-frontend`, `CMR`, `shared-governance` — were probed by REST; one answered 200.)
+
+The repository's own cross-repo references agree on the number *range* without naming this one:
+`docs/CROSS-REFERENCE-SPINE.md` and the four `docs/CROSS-REPO-*.md` files carry no `4210`, the peer
+board (`governance/sync/peer-board/`) carries none either, and the same grep finds this repo's
+recorded shared-services edges in the 4000s (`kushin77/shared-services#4040`, `#4192`) against this
+repository's own ~1600. So the number belonged to the other repo's range, and no recorded reference
+had to be reconciled — the resolution is from REST, and the references corroborate it rather than
+source it.
 
 ## 2. What #4210 actually says, quoted
 
