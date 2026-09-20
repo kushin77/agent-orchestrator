@@ -57,6 +57,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -66,6 +67,18 @@ try:  # PyYAML is the single non-stdlib dependency this module is allowed.
     import yaml
 except ImportError:  # pragma: no cover - the CLI reports CANNOT-ASSESS instead.
     yaml = None  # type: ignore[assignment]
+
+# The tier vocabulary the matrix's tier column is drawn from is READ from its
+# declared authority (#1494) — the AgentProfile catalog
+# `registry/profiles/catalog.yaml` ``tiers``, through its one reader
+# `registry/profiles/tiers.py` — so the authority model cannot drift from the
+# ladder every other surface routes on.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from registry.profiles.tiers import authority as _tier_authority  # noqa: E402
+from registry.profiles.tiers import rank as _tier_rank  # noqa: E402
 
 PKG_DIR = Path(__file__).resolve().parent
 DEFAULT_SCHEMA_PATH = PKG_DIR / "schema.json"
@@ -86,8 +99,8 @@ ROLES: Tuple[str, ...] = (
     "auditor",
     "scribe",
 )
-TIERS: Tuple[str, ...] = ("LOW", "MED", "HIGH", "MAX")
-TIER_RANK: Mapping[str, int] = {"LOW": 0, "MED": 1, "HIGH": 2, "MAX": 3}
+TIERS: Tuple[str, ...] = _tier_authority()
+TIER_RANK: Mapping[str, int] = _tier_rank()
 
 _EVIDENCE_SLOTS: Tuple[str, ...] = ("gate_evidence", "verify_evidence")
 _SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")

@@ -72,16 +72,19 @@ expect_tiers = [part.strip() for part in sys.argv[1].split(",")]
 expect_actions = [part.strip() for part in sys.argv[2].split(",")]
 problems = []
 
-# 1. the authority: the gateway's provider contract and budget action enum.
-contract = Path("gateway/providers/contract.py").read_text(encoding="utf-8")
-found = re.search(r"^TIERS[^=]*=\s*\(([^)]*)\)", contract, re.MULTILINE)
-authority_tiers = (
-    [item.strip().strip("\"'") for item in found.group(1).split(",") if item.strip()]
-    if found else []
-)
+# 1. the authority: the DECLARED tier vocabulary and the budget action enum.
+#    The ladder's authority is `registry/profiles/catalog.yaml` `tiers:`, read
+#    through its one reader (#1494) — the portal used to pin a second copy of the
+#    ladder "from the gateway's provider contract", and that copy is gone, so this
+#    reads the one authority every surface now reads. The pin above stays an
+#    independent literal, which is what makes this comparison able to fail.
+sys.path.insert(0, ".")
+from registry.profiles import tiers as tier_authority  # noqa: E402
+
+authority_tiers = list(tier_authority.authority())
 if authority_tiers != expect_tiers:
     problems.append(
-        f"gateway/providers/contract.py TIERS = {authority_tiers} "
+        f"registry/profiles/catalog.yaml tiers = {authority_tiers} "
         f"(pinned {expect_tiers})"
     )
 

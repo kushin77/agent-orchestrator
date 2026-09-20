@@ -3,12 +3,12 @@
 
 Adapted from the leaderboard ``finops-governor.sh`` pre-flight check (exit 0
 OK / 1 DEGRADED / 2 HARD BLOCKED) and ``config/finops-budget.yaml`` per-tier
-budget + throttle semantics. The chooser consults a ``BudgetEnforcer`` before
+budget + throttle semantics. The chooser consults a ``BudgetDecisionMaker`` before
 any model call and turns the returned action into routing behavior.
 
 Two independent budget axes share one ledger:
 
-- **Per-tenant** (issue #17) — ``TenantBudget`` / ``BudgetEnforcer`` below.
+- **Per-tenant** (issue #17) — ``TenantBudgetLine`` / ``BudgetDecisionMaker`` below.
   The tenant's monthly ceiling and its stop/warn/fallback policy.
 - **Per-role** (issue #633, workbook-2) — ``RoleBudget`` / ``RoleBudgetEnforcer``.
   The monthly cap the workbook declares per C-suite role (CEO 300 / CTO 250 /
@@ -95,7 +95,7 @@ class BudgetBlocked(BudgetError):
 
 
 @dataclass(frozen=True)
-class TenantBudget:
+class TenantBudgetLine:
     """A tenant's budget line."""
 
     tenant_id: str
@@ -173,17 +173,17 @@ class BudgetDecision:
         }
 
 
-class BudgetEnforcer:
+class BudgetDecisionMaker:
     """Pre-flight per-tenant budget checks over an injected spend ledger."""
 
     def __init__(
         self,
-        budgets: Optional[Dict[str, TenantBudget]] = None,
+        budgets: Optional[Dict[str, TenantBudgetLine]] = None,
         ledger: Optional[BudgetLedger] = None,
         default_policy: BudgetPolicy = BudgetPolicy.WARN,
         default_monthly_budget_usd: float = 1000.0,
     ) -> None:
-        self.budgets: Dict[str, TenantBudget] = dict(budgets or {})
+        self.budgets: Dict[str, TenantBudgetLine] = dict(budgets or {})
         self.ledger = ledger or BudgetLedger()
         # Fallback applied to tenants with no explicit budget line: unbudgeted
         # tenants stay routable but are flagged, so spend is never invisible.
@@ -193,14 +193,14 @@ class BudgetEnforcer:
         # means no per-role ceiling was declared, so only the tenant axis applies.
         self.roles: Optional["RoleBudgetEnforcer"] = None
 
-    def add_budget(self, budget: TenantBudget) -> None:
+    def add_budget(self, budget: TenantBudgetLine) -> None:
         self.budgets[budget.tenant_id] = budget
 
-    def budget_for(self, tenant_id: str) -> TenantBudget:
+    def budget_for(self, tenant_id: str) -> TenantBudgetLine:
         budget = self.budgets.get(tenant_id)
         if budget is not None:
             return budget
-        return TenantBudget(
+        return TenantBudgetLine(
             tenant_id=tenant_id,
             monthly_budget_usd=self.default_monthly_budget_usd,
             policy=self.default_policy,
@@ -621,14 +621,14 @@ def parse_role_policy(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def parse_budgets(data: Dict[str, Any]) -> Dict[str, TenantBudget]:
+def parse_budgets(data: Dict[str, Any]) -> Dict[str, TenantBudgetLine]:
     """Parse and validate a budgets mapping (from budgets.yaml or a test)."""
     if not isinstance(data, dict):
         raise BudgetError("budget config must be a mapping")
     raw = data.get("budgets")
     if not isinstance(raw, dict):
         raise BudgetError("budget config: missing 'budgets' mapping")
-    budgets: Dict[str, TenantBudget] = {}
+    budgets: Dict[str, TenantBudgetLine] = {}
     for tenant_id, cfg in raw.items():
         if not isinstance(cfg, dict):
             raise BudgetError(f"budgets.{tenant_id}: config must be a mapping")
@@ -645,7 +645,7 @@ def parse_budgets(data: Dict[str, Any]) -> Dict[str, TenantBudget]:
                 f"budgets.{tenant_id}: policy must be one of "
                 f"stop|warn|fallback, got {policy_raw!r}"
             ) from None
-        budgets[tenant_id] = TenantBudget(
+        budgets[tenant_id] = TenantBudgetLine(
             tenant_id=tenant_id,
             monthly_budget_usd=float(monthly),
             policy=policy,
@@ -663,11 +663,11 @@ def load_budgets(
     with_roles: bool = True,
     org_chart_path: Path = ORG_CHART_PATH,
     cards_dir: Path = PERSONA_CARDS_DIR,
-) -> BudgetEnforcer:
-    """Load budgets.yaml into a ``BudgetEnforcer`` backed by ``ledger``.
+) -> BudgetDecisionMaker:
+    """Load budgets.yaml into a ``BudgetDecisionMaker`` backed by ``ledger``.
 
     With ``with_roles`` (the default) the returned enforcer also exposes the
-    per-role cap axis (issue #633) via ``BudgetEnforcer.roles``, sharing this
+    per-role cap axis (issue #633) via ``BudgetDecisionMaker.roles``, sharing this
     enforcer's ledger so role spend and tenant spend stay on one book.
     """
     if not path.is_file():
@@ -682,7 +682,7 @@ def load_budgets(
         policy = BudgetPolicy(default)
     except ValueError:
         raise BudgetError(f"{path}: defaultPolicy must be stop|warn|fallback") from None
-    enforcer = BudgetEnforcer(budgets=parsed, ledger=ledger, default_policy=policy)
+    enforcer = BudgetDecisionMaker(budgets=parsed, ledger=ledger, default_policy=policy)
     if with_roles:
         role_cfg = parse_role_policy(data)
         roles = load_role_budgets(
