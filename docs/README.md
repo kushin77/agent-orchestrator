@@ -89,6 +89,8 @@ reachable from this index.
 | [`erp-finops/current-state.md`](erp-finops/current-state.md) | Current-state money map — subscription flows and the manual reconciliation points (PF-1, issue #666, EPIC #665). |
 | [`erp-finops/saas-metrics-current-state.md`](erp-finops/saas-metrics-current-state.md) | SaaS metrics current state — MRR/ARR, cloud compute burn, invoicing bottlenecks and the silo map (issue #668). |
 | [`erp-finops/token-baseline.md`](erp-finops/token-baseline.md) | DeepSeek token-flow baseline (issue #667, EPIC #665). |
+| [`cfo/COST-MODEL-2026-09-20.md`](cfo/COST-MODEL-2026-09-20.md) | Enterprise cost ledger — model API rate cards, FinOps budget caps, the on-prem/GCP/Cloudflare inventory, and the token/prompt cost model; every figure tagged MEASURED, DECLARED or `UNKNOWN (source needed: …)` with a cited path (issue #1582, parent #1510). |
+| [`cfo/PROMPT-REDUCTION-PLAN.md`](cfo/PROMPT-REDUCTION-PLAN.md) | Ranked lever table toward the 90%+ prompt-reduction objective, carrying the repo-only-lever headline finding — the measurable repo-tracked instruction set is smaller than the harness-injected skill/MCP/tool-schema surface (issue #1582, parent #1510). |
 
 ## Planned (later issues)
 
