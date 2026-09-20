@@ -1,0 +1,285 @@
+# gateway/finops/budget-authority.yaml — THE BUDGET-DECISION AUTHORITY.
+#
+# Issue #1495 (child lane of the #1458 register, residual row R6) measured 22
+# enforcement-shaped `*Budget*` classes across 8 pillars, four names declared
+# more than once with different semantics, and five distinct enforcement entry
+# points — so "which one is authoritative for a given spend decision" was not
+# readable from the tree. This file IS that reading.
+#
+# WHAT IT DECLARES
+#   1. `model:` — the canonical decision model: the RECORD that says what a
+#      decision is (`BudgetDecision`), its closed outcome vocabulary
+#      (`BudgetAction`), and the MAKER that produces it. Everything else that
+#      decides spend is either a member of this model or a recorded boundary.
+#   2. `makers:` — every enforcement entry point and the axis it alone owns.
+#   3. `classes:` — every enforcement-shaped budget class in the tree, each
+#      with a disposition: `authority` (the model), `delegates` (to the model
+#      or to another recorded class), or `boundary` (a deliberate per-pillar
+#      boundary, recorded WITH the boundary it owns). Nothing is deleted: a
+#      per-pillar enforcer that exists for a real reason is a boundary, not a
+#      defect, and the only defect is an unrecorded one.
+#   4. `collisions:` — every name declared more than once. Each row records the
+#      resolution that was applied (rename or unification) and WHY, and the
+#      gate refuses a row whose current names are still a duplicate — so a
+#      collision cannot survive as an undocumented pair, and cannot be
+#      "resolved" on paper only.
+#
+# WHAT IT DOES NOT DO (the borrow contract)
+#   It declares no policy vocabulary of its own. The per-tenant response policy
+#   is declared by `gateway/finops/budgets.yaml`, the per-tenant cost/token
+#   policy by `telemetry/budgets/config/policies.yaml` (already cited as the
+#   budget authority by `gateway/mcp/sources.py::BudgetSource`), and the model
+#   tiers the token axes are keyed by by `governance/finops/policy.json`.
+#   `borrowed_from:` names each anchor and the value this authority claims it
+#   holds; the gate RESOLVES each anchor and fails by name on drift, so a
+#   borrowed value can never be a re-declaration in disguise.
+#
+# Enforcement: `scripts/check-budget-authority.sh` (auto-discovered into
+# `make verify`). It provokes itself on every run.
+
+authority_version: "1.0.0"
+authority: budget-decision
+declared: "2026-09-19"
+issue: 1495
+register: 1458
+
+# --------------------------------------------------------------------------- #
+# 1. the model
+# --------------------------------------------------------------------------- #
+model:
+  concept: "budget decision"
+  # what a decision IS
+  record: "gateway/finops/budget.py::BudgetDecision"
+  # the closed vocabulary of outcomes the record carries
+  outcome_enum: "gateway/finops/budget.py::BudgetAction"
+  outcomes: ["allow", "warn", "fallback", "stop"]
+  # the response-policy vocabulary the outcome is chosen from
+  response_policy: "gateway/finops/budget.py::BudgetPolicy"
+  # who MAKES the decision on the tenant axis (the record's producer)
+  maker: "gateway/finops/budget.py::BudgetDecisionMaker"
+
+# --------------------------------------------------------------------------- #
+# 2. borrowed, never re-declared — the gate resolves each anchor
+# --------------------------------------------------------------------------- #
+borrowed_from:
+  - path: "governance/finops/policy.json"
+    format: json
+    pointer: "/vocabulary/tiers"
+    expect: ["flash", "pro", "auditor"]
+    dimension: "model tiers"
+    why: >-
+      the token axes are keyed by model tier (gateway/limits scope_key), so the
+      tier vocabulary is the FinOps authority's, not this file's.
+
+  - path: "gateway/finops/budgets.yaml"
+    format: yaml
+    pointer: "/budgets/*/policy"
+    each_member_of: "gateway/finops/budget.py::BudgetPolicy"
+    dimension: "per-tenant response policy"
+    why: >-
+      the seed config declares the supported per-tenant policy vocabulary; a
+      policy named there that the enum cannot represent is drift, not a
+      feature.
+
+  - path: "telemetry/budgets/config/policies.yaml"
+    format: yaml
+    pointer: "/policies/*/mode"
+    each_member_of_inline: ["observe", "enforce"]
+    dimension: "per-tenant rollout mode"
+    why: >-
+      the observe->enforce ladder is the safe-rollout control declared by the
+      budgets seed config and cited as the budget authority by
+      gateway/mcp/sources.py::BudgetSource; this file only reads it.
+
+# --------------------------------------------------------------------------- #
+# 3. the makers — every enforcement entry point and the axis it owns
+# --------------------------------------------------------------------------- #
+makers:
+  - symbol: "gateway/finops/budget.py::BudgetDecisionMaker"
+    axis: "per-tenant monthly USD ceiling (budgets.yaml budgets.*)"
+  - symbol: "gateway/finops/budget.py::RoleBudgetEnforcer"
+    axis: "per-role monthly USD cap, consumed from registry/personas/org-chart.yaml"
+  - symbol: "gateway/limits/budget.py::BudgetController"
+    axis: "per (tenant, agent, model tier) rolling-window token cap on the request path"
+  - symbol: "telemetry/budgets/budget.py::BudgetEnforcer"
+    axis: "per-tenant cost + token limits (and per-vendor caps) over a durable spend ledger"
+  - symbol: "telemetry/metering/budget.py::DailyTokenBudget"
+    axis: "per-tenant daily token total, observe->enforce, read from the usage store"
+  - symbol: "telemetry/chat/budget_guard.py::TurnBudgetGuard"
+    axis: "per chat turn (day/month buckets) over the merged telemetry.budgets rails"
+
+# --------------------------------------------------------------------------- #
+# 4. every enforcement-shaped budget class, with its disposition
+# --------------------------------------------------------------------------- #
+classes:
+  # -- the authority: the decision model itself ------------------------------
+  - symbol: "gateway/finops/budget.py::BudgetDecision"
+    disposition: authority
+    role: "the decision RECORD — what a decision is"
+  - symbol: "gateway/finops/budget.py::BudgetDecisionMaker"
+    was: BudgetEnforcer
+    disposition: authority
+    role: "the decision MAKER on the tenant USD axis — who makes it"
+  - symbol: "gateway/finops/budget.py::RoleBudgetEnforcer"
+    disposition: authority
+    role: "the decision maker on the per-role USD axis"
+  - symbol: "gateway/finops/budget.py::BudgetPolicy"
+    disposition: authority
+    role: "the response-policy vocabulary the record's outcome is chosen from"
+  - symbol: "gateway/finops/budget.py::BudgetLedger"
+    disposition: authority
+    role: "the injectable spend ledger every maker reads"
+
+  # -- boundaries in this lane's pillars -------------------------------------
+  - symbol: "gateway/limits/budget.py::TokenBudgetDecision"
+    was: BudgetDecision
+    disposition: boundary
+    owns: >-
+      the TOKEN decision record — a cap/window/used/remaining view, not a
+      response policy; the request-path backpressure contract reads this.
+  - symbol: "gateway/limits/budget.py::TokenBudgetPolicy"
+    was: BudgetPolicy
+    disposition: boundary
+    owns: >-
+      one rolling-window token cap plus its observe/enforce mode; it caps
+      TOKENS, so it is not the response-policy vocabulary.
+  - symbol: "gateway/limits/budget.py::BudgetController"
+    disposition: boundary
+    owns: >-
+      per-(tenant, agent, model-tier) policy resolution with optional
+      tenant-wide caps, merged so any enforcing level that is exceeded binds.
+  - symbol: "telemetry/metering/budget.py::DailyTokenBudgetPolicy"
+    was: BudgetPolicy
+    disposition: boundary
+    owns: >-
+      one tenant's DAILY token limit plus rollout mode, loaded from the
+      metering config; a per-day limit, not a response policy.
+  - symbol: "telemetry/metering/budget.py::BudgetVerdict"
+    disposition: boundary
+    owns: >-
+      the observe->enforce verdict over a tenant's projected daily usage
+      (allow/would_block/block); the gateway refusal is the consumer's job.
+  - symbol: "telemetry/budgets/budget.py::BudgetEnforcer"
+    disposition: boundary
+    owns: >-
+      per-tenant cost + token limits (cost window month / token window day)
+      and per-vendor caps over a durable spend ledger, with warn_at_pct and a
+      soft/hard cap ladder.
+  - symbol: "telemetry/budgets/budget.py::BudgetLimit"
+    disposition: boundary
+    owns: "one limit record (cost USD or token count) over one window"
+  - symbol: "telemetry/budgets/budget.py::TenantBudgetPolicy"
+    disposition: boundary
+    owns: "one tenant's full policy: cost limit + token limit + vendor caps"
+  - symbol: "telemetry/budgets/exporter.py::BudgetStateExporter"
+    disposition: boundary
+    owns: "the machine-readable budget/quota/SLO/audit state snapshot"
+  - symbol: "telemetry/chat/budget_guard.py::TurnBudgetGuard"
+    disposition: delegates
+    delegates_to: "telemetry/budgets/budget.py::BudgetEnforcer"
+    owns: "the per-TURN rail: which day/month bucket a turn's spend lands in"
+
+  # -- boundaries owned by other pillars (recorded, never edited here) -------
+  - symbol: "telemetry/role_health.py::BudgetBurn"
+    disposition: boundary
+    owns: "one role's month-to-date burn against its declared monthly cap"
+  - symbol: "telemetry/role_health.py::RoleBudgetBurnReport"
+    disposition: boundary
+    owns: "the month-to-date burn for every declared role plus the alert feed"
+  - symbol: "telemetry/role_health.py::RoleBudgetBurnExporter"
+    disposition: boundary
+    owns: "exporting the per-role feed, optionally merged into the budgets snapshot"
+  - symbol: "portal/server/chat.py::BudgetState"
+    disposition: boundary
+    owns: "the portal read model of a tenant's budget state (display only)"
+  - symbol: "integrations/erp/finops/budget.py::ErpBudgetGuard"
+    disposition: delegates
+    delegates_to: "telemetry/budgets/budget.py::BudgetEnforcer"
+    owns: "the pre-operation budget check for ERP document operations"
+  - symbol: "e2e/chat_surface.py::TurnDatedBudgetGuard"
+    disposition: boundary
+    owns: "the e2e guard whose turn date is injected, so date scoping is testable"
+  - symbol: "e2e/chat_surface.py::NeuteredTurnDatedBudgetGuard"
+    disposition: boundary
+    owns: "the e2e negative control: the same guard with the refusal removed"
+
+# --------------------------------------------------------------------------- #
+# 5. every name declared more than once, and the resolution applied
+# --------------------------------------------------------------------------- #
+collisions:
+  - name: BudgetPolicy
+    resolution: renamed
+    choice: >-
+      the authority keeps `BudgetPolicy` for the response-policy vocabulary the
+      seed config already declares (gateway/finops/budgets.yaml); the two
+      other definitions cap TOKENS, so each was renamed after the axis it caps
+      (`TokenBudgetPolicy`, `DailyTokenBudgetPolicy`). Renaming beat unifying
+      because the three shapes are not interchangeable: one is a response
+      policy, one a rolling-window cap, one a per-day limit.
+    sites:
+      - symbol: "gateway/finops/budget.py::BudgetPolicy"
+        disposition: authority
+      - symbol: "gateway/limits/budget.py::TokenBudgetPolicy"
+        was: BudgetPolicy
+        disposition: boundary
+      - symbol: "telemetry/metering/budget.py::DailyTokenBudgetPolicy"
+        was: BudgetPolicy
+        disposition: boundary
+
+  - name: BudgetDecision
+    resolution: renamed
+    choice: >-
+      the authority keeps the canonical decision record; the request-path token
+      decision is a different record (cap/window/used/remaining, no response
+      policy) and was renamed `TokenBudgetDecision` after that axis.
+    sites:
+      - symbol: "gateway/finops/budget.py::BudgetDecision"
+        disposition: authority
+      - symbol: "gateway/limits/budget.py::TokenBudgetDecision"
+        was: BudgetDecision
+        disposition: boundary
+
+  - name: BudgetEnforcer
+    resolution: renamed
+    choice: >-
+      renamed on THIS authority's side rather than on the telemetry side,
+      because the one name must have exactly one owner and the telemetry class
+      is imported by four other pillars (portal, integrations, e2e, scripts) —
+      renaming it would have widened a name collision into a cross-pillar
+      import churn. The authority's maker is therefore named after the record
+      it produces (`BudgetDecisionMaker`), and the telemetry enforcer keeps
+      `BudgetEnforcer` as the recorded boundary it is.
+    sites:
+      - symbol: "gateway/finops/budget.py::BudgetDecisionMaker"
+        was: BudgetEnforcer
+        disposition: authority
+      - symbol: "telemetry/budgets/budget.py::BudgetEnforcer"
+        disposition: boundary
+
+  - name: TokenBudget
+    resolution: renamed
+    choice: >-
+      the grounding record is a REPORT (limit / static / delta / total for the
+      turn) while the limits one is an ENFORCER (a rolling window over a
+      scope), so the enforcer was renamed `RollingTokenWindow` after its own
+      window semantics.
+    sites:
+      - symbol: "gateway/limits/budget.py::RollingTokenWindow"
+        was: TokenBudget
+        disposition: boundary
+      - symbol: "gateway/mcp/grounding.py::TokenBudget"
+        disposition: boundary
+
+  - name: TenantBudget
+    resolution: renamed
+    choice: >-
+      the gateway class is a budget LINE (ceiling + policy, able to decide);
+      the portal class is the read model of the line telemetry declares. The
+      gateway one was renamed `TenantBudgetLine` — the rename stayed inside
+      this lane, and the portal read model keeps its name.
+    sites:
+      - symbol: "gateway/finops/budget.py::TenantBudgetLine"
+        was: TenantBudget
+        disposition: authority
+      - symbol: "portal/server/livestore.py::TenantBudget"
+        disposition: boundary

@@ -26,8 +26,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+# The model-tier vocabulary this projection EMITS is read from its declared
+# authority (#1494) — the AgentProfile catalog `registry/profiles/catalog.yaml`
+# ``tiers``, through its one reader — rather than restated here. The projection
+# is a pure function of the tree it is given, so a tree that carries this
+# adapter carries the authority too; the gate's scratch tree names both
+# (scripts/check-hermes-integration.sh).
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from registry.profiles.tiers import authority as _tier_authority  # noqa: E402
 
 from .._seam.schema import validate  # noqa: F401 - re-exported at this adapter's seam
 from .._seam.yaml_subset import load_yaml, load_yaml_file  # noqa: F401
@@ -63,8 +76,9 @@ SERVICE_PORT = 9501
 SERVICE_ENDPOINTS = ("/health", "/api/capabilities", "/api/router", "/api/tiering")
 SERVICE_RUNTIME = "deployable-not-running"
 
-#: The closed model-tier vocabulary (registry/profiles/catalog.yaml).
-MODEL_TIERS = ("LOW", "MED", "HIGH", "MAX")
+#: The closed model-tier vocabulary, READ from its authority
+#: (registry/profiles/catalog.yaml) through its one reader.
+MODEL_TIERS = _tier_authority()
 
 
 # ==========================================================================

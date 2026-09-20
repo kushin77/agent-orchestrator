@@ -22,7 +22,7 @@ from typing import Callable
 
 from limits import model
 from limits.backpressure import BackpressureController, BackpressureDecision
-from limits.budget import BudgetController, BudgetDecision
+from limits.budget import BudgetController, TokenBudgetDecision
 from limits.cache import SemanticCache
 from limits.ratelimit import RateLimitDecision, RateLimiter, rate_scope
 from limits.throttle import OutputThrottle
@@ -44,7 +44,7 @@ class GuardDecision:
     metering: model.MeteringRecord
     response: str | None = None  # populated on a cache hit
     cache_key: str | None = None
-    budget: BudgetDecision | None = None
+    budget: TokenBudgetDecision | None = None
     rate: RateLimitDecision | None = None
     backpressure: BackpressureDecision | None = None
 
