@@ -1,0 +1,92 @@
+# CTO Office abilities (issue #1573)
+#
+# Harvested-ability -> platform tool/verb/capability id mapping. Every id on
+# the right of each row is verified to exist in this repo at the time of
+# writing (control-plane/control/verbs.yaml, registry/personas/persona-card.
+# schema.json capabilitySet/toolAllowlist enums, guardrails/). Nothing here
+# invents a new tool, verb or capability — an ability that has no existing
+# platform primitive is listed under `gaps` instead of being wired to a
+# fictitious id.
+office: cto
+schema: cto-office-abilities/v1
+version: 1.0.0
+provenance:
+  - "docs/cto/HARVEST.md (adopt/adapt rows this ability map draws from,
+    GR-10 provenance)"
+  - "kushin77/agent-orchestrator registry/personas/cards/cto.yaml (existing
+    expertise list this ability map elaborates)"
+  - "kushin77/agent-orchestrator control-plane/control/verbs.yaml (verb ids
+    referenced below verified to exist at time of writing)"
+
+abilities:
+  - id: architecture-decision
+    harvestedFrom: "leaderboard gatekeeper architecture-gate doctrine;
+      capital-underwriting FLEET_FIRST.md fleet-first operating model"
+    capability: architecture-decision   # persona-card.schema.json capabilitySet enum
+    tools: [file_read, file_write, search_memory, store_memory]
+    verbs: []   # architecture decisions are recorded, not a control-plane verb
+
+  - id: merge-approval-gate
+    harvestedFrom: "capital-underwriting CODEOWNERS review-gate pattern;
+      leaderboard gatekeeper.yaml merge-blocking doctrine"
+    capability: code-review
+    tools: [gh_pr]
+    verbs: [channel.escalate]   # existing verb; root-admin escalation channel
+
+  - id: iac-apply-gate
+    harvestedFrom: "capital-underwriting infra/ + SECURITY.md IaC posture"
+    capability: infra-authoring
+    tools: [shell_exec, file_read]
+    verbs: [fleet.override]   # existing verb; human-override terminal, the
+                                # only lever that authorizes an irreversible
+                                # infra action — never ad-hoc (GR-5)
+
+  - id: security-posture-review
+    harvestedFrom: "capital-underwriting SECURITY.md; leaderboard
+      gatekeeper.yaml secret/PII scan doctrine"
+    capability: security-review
+    tools: [file_read, search_memory]
+    verbs: [board.status]
+
+  - id: pr-triage
+    harvestedFrom: "registry/personas/cards/cto.yaml existing PR-triage
+      expertise (issue #614 Tab 1)"
+    capability: code-review
+    tools: [gh_issue, gh_pr, board_sync]
+    verbs: [channel.watch, channel.listen]
+
+  - id: fleet-vocabulary-authority
+    harvestedFrom: "capital-underwriting FLEET_FIRST.md tier/budget ladder
+      doctrine; leaderboard modules.manifest.json module-brief pattern"
+    capability: module-brief
+    tools: [file_read, file_write]
+    verbs: [fleet.status, fleet.verbs]
+
+  - id: paperclip-chain-oversight
+    harvestedFrom: "owner control-flow directive 2026-09-20 (PMO -> paperclip
+      ticket -> hermes -> lane SME -> verify -> merge -> attest)"
+    capability: audit
+    tools: [gh_issue, board_sync, search_memory]
+    verbs: [channel.head-commit, channel.follow]
+
+  - id: escalation-to-ceo
+    harvestedFrom: "registry/personas/org-chart.yaml cto -> ceo edge"
+    capability: orchestrate
+    tools: [board_sync]
+    verbs: [channel.escalate]
+
+# Harvested abilities with NO existing platform primitive to bind to. Recorded
+# so they are not silently dropped (GR-10); a future issue wires each one to a
+# real capability/verb rather than this office inventing one unilaterally.
+gaps:
+  - ability: "automated draw.io / architecture-diagram generation"
+    harvestedFrom: "registry/personas/cards/cto.yaml expertise list (already
+      declared, not yet a wired capability)"
+    note: "no capabilitySet enum value exists for diagram generation; closest
+      existing platform asset is integrations/paperclip/diagrams.py, which is
+      a paperclip-side reporting tool, not a persona capability. Flag for the
+      capabilitySet catalog owner (issue #9)."
+  - ability: "cross-repository AST mapping"
+    harvestedFrom: "registry/personas/cards/cto.yaml expertise list"
+    note: "no dedicated tool id; currently exercised through file_read +
+      shell_exec generically. Not a gap in authority, a gap in named tooling."
