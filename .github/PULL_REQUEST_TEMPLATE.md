@@ -155,12 +155,21 @@ issue #1001, declared as platform policy by issue #1138
 `bash scripts/repo-settings.sh verify`): the squash commit message on `master`
 IS this PR's body ("<title> (#N)\n\n<body>"), never the branch's own commit
 trailers. That means THIS is the only place the trailer paragraph can
-still be lost before it lands. Leave the line below as the body's FINAL
+still be lost before it lands. Leave BOTH lines below as the body's FINAL
 paragraph (replace `<n>` with this PR's own issue number; do not add anything
-after it) so the composed squash message keeps the ticket reference inside a
-trailing trailer block. Verify before merging with:
+after them) so the composed squash message keeps the ticket reference inside a
+trailing trailer block AND the auto-close keyword that actually closes the
+issue.
+
+Both lines are required, and issue #1266 is why: `Refs` alone satisfies the
+ticket-trailer rule, but `scripts/check-squash-message.sh` answers
+`closes-missing:<n>` when the trailing block carries no bare `Closes #<n>` (or
+another GitHub auto-close keyword naming the same number) -- measured on the
+first pull request opened from this template after issue #1533 updated it.
+Verify before merging with:
 
     bash scripts/check-squash-message.sh --pr <this PR's number>
 -->
 
+Closes #<n>
 Refs kushin77/agent-orchestrator#<n>
