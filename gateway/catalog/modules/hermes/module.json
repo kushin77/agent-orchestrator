@@ -9,6 +9,7 @@
     "path": "models/model_tiering.py"
   },
   "type": "service",
+  "status": "retired",
   "class": ["model-gateway", "provider", "hermes", "local"],
   "versions": {
     "latest": "v1.0.0"
