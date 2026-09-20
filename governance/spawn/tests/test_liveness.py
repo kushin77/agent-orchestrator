@@ -18,10 +18,17 @@ from pathlib import Path
 from governance.spawn import liveness
 
 
-def stamp(seconds_ago: float) -> str:
-    """An ISO beat exactly the form `fleet/terminal.py::_now` writes."""
-    moment = datetime.now(timezone.utc) - timedelta(seconds=seconds_ago)
-    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+def stamp(seconds_ago: float, *, anchor: datetime | None = None) -> str:
+    """An ISO beat exactly the form `fleet/terminal.py::_now` writes.
+
+    `anchor` pins the instant the beat is taken from (#1572). `strftime` truncates
+    microseconds, so a beat built from the live clock renders the intended integer
+    only while the reader happens to land inside the same wall-clock second — a
+    sub-second window. A test that asserts a RENDERED integer must therefore pass the
+    same anchor to the reader's `now=`, which removes the clock read entirely.
+    """
+    base = datetime.now(timezone.utc) if anchor is None else anchor
+    return (base - timedelta(seconds=seconds_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def marker(directory: Path, name: str, **fields) -> Path:
@@ -179,8 +186,15 @@ def test_a_non_pid_is_never_alive() -> None:
 
 
 def test_the_verdict_line_carries_its_evidence(tmp_path: Path) -> None:
+    # #1572: the anchor is PINNED and handed back through the reader's `now=` seam, so
+    # the rendered integer is exact by construction. It used to be built from the live
+    # clock, where `5000s old` held only inside the write's own wall-clock second.
+    anchor = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
     verdict = liveness.marker_verdict(
-        "run-x", {"pid": os.getpid(), "child_pid": None, "ts": stamp(5000)}, window=120
+        "run-x",
+        {"pid": os.getpid(), "child_pid": None, "ts": stamp(5000, anchor=anchor)},
+        now=anchor.timestamp(),
+        window=120,
     )
 
     assert verdict.in_flight is False
