@@ -293,7 +293,7 @@ if [ "$scan_rc" -eq 0 ]; then
 else
   report_fail "a product module re-declares a vocabulary (refused above, by name)"
 fi
-if ! printf '%s\n' "$scan_out" | grep -qE 'SCANNED [1-9][0-9]* '; then
+if [[ $scan_out != *SCANNED\ [1-9]* ]]; then
   report_fail "the scan read no product module at all — a scan that cannot find the tree is not a pass"
 fi
 
@@ -307,7 +307,7 @@ printf '%s\n' \
 planted_out="$(scan_trees "$planted" "the planted tree")"; planted_rc=$?
 printf '%s\n' "$planted_out" | sed 's/^/  /'
 if [ "$planted_rc" -eq 1 ] \
-   && printf '%s\n' "$planted_out" | grep -q 'REFUSED identity/onboarding/planted_copy.py:3'; then
+   && [[ $planted_out == *"REFUSED identity/onboarding/planted_copy.py:3"* ]]; then
   echo "  OK    the planted copy is refused BY NAME and LINE"
 else
   report_fail "the planted copy was not refused by name (rc=$planted_rc) — a detector that cannot fail is a formality"
