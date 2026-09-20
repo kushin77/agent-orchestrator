@@ -291,6 +291,16 @@ exit 0
 
 FAKE_GH = """#!/usr/bin/env bash
 # A RECORDING fake gh for the landing arms. Never touches the network.
+#   pr view   -> the JSON at $AO_CGS_GH_VIEW_JSON
+#   pr merge  -> records the PR number in $AO_CGS_GH_MERGE_LOG, exits $AO_CGS_GH_MERGE_RC
+#   api ...   -> the REST transport scripts/merge-pr.sh uses (issue #1569). The
+#                stand-in does not implement jq: a GET of the pull answers with
+#                the fixture at $AO_CGS_GH_REST_PULL, which carries the renamed
+#                keys BOTH of the apply path's REST reads look up. The merge
+#                endpoint records the PR number in the same log and exits the
+#                same $AO_CGS_GH_MERGE_RC, so one knob scripts the outcome on
+#                either transport, and the head-ref DELETE records the branch it
+#                was asked to delete in $AO_CGS_GH_DELETE_LOG.
 set -u
 if [ "${1:-}" = "pr" ] && [ "${2:-}" = "view" ]; then
   printf '%s' "$AO_CGS_GH_VIEW_JSON"
@@ -299,6 +309,34 @@ fi
 if [ "${1:-}" = "pr" ] && [ "${2:-}" = "merge" ]; then
   printf '%s\\n' "${3:-}" >> "$AO_CGS_GH_MERGE_LOG"
   exit "${AO_CGS_GH_MERGE_RC:-0}"
+fi
+if [ "${1:-}" = "api" ]; then
+  shift
+  method="GET"
+  if [ "${1:-}" = "-X" ]; then
+    method="${2:-GET}"
+    shift 2
+  fi
+  url="${1:-}"
+  if [ $# -gt 0 ]; then shift; fi
+  case "$method $url" in
+    "GET "*"/pulls/"*)
+      cat "$AO_CGS_GH_REST_PULL"
+      exit 0
+      ;;
+    "PUT "*"/pulls/"*"/merge")
+      rest_pr="${url##*/pulls/}"
+      printf '%s\\n' "${rest_pr%%/*}" >> "$AO_CGS_GH_MERGE_LOG"
+      printf '{"merged":true,"sha":"1111111111111111111111111111111111111111"}\\n'
+      exit "${AO_CGS_GH_MERGE_RC:-0}"
+      ;;
+    "DELETE "*"/git/refs/heads/"*)
+      printf '%s\\n' "${url##*/git/refs/heads/}" >> "$AO_CGS_GH_DELETE_LOG"
+      exit 0
+      ;;
+  esac
+  echo "fake gh: unexpected api invocation: $method $url" >&2
+  exit 1
 fi
 echo "fake gh: unexpected invocation: $*" >&2
 exit 1
@@ -787,7 +825,22 @@ def landing_venue(name, state="MERGED", head_green=True, merge_rc=0):
         "state": state,
         "mergeCommit": {"oid": "1" * 40},
     })
+    # the REST fixture (issue #1569): the apply path reads the pull over `gh api`
+    # and then resolves the head ref for its post-merge branch delete from the
+    # same endpoint. This venue's origin remote IS this path, so that is also the
+    # slug the delete is authorised against -- the fixture NAMES it rather than
+    # leaving it absent, so the delete is judged on a readable value.
+    write(path / "rest-pull.json", json.dumps({
+        "baseRefName": "master",
+        "headRefOid": head,
+        "headRef": "fixture-head",
+        "headRepo": str(path),
+    }), 0o644)
     return path, view, "1" * 40, head, head_green, merge_rc
+
+
+def deletes(path):
+    return [x for x in (path / "delete.log").read_text(encoding="utf-8").splitlines() if x.strip()]
 
 
 def run_landing(path, view, head_green, merge_rc):
@@ -795,6 +848,8 @@ def run_landing(path, view, head_green, merge_rc):
     log.write_text("", encoding="utf-8")
     merge_log = path / "merge.log"
     merge_log.write_text("", encoding="utf-8")
+    delete_log = path / "delete.log"
+    delete_log.write_text("", encoding="utf-8")
     rc, out = run(["bash", "scripts/merge-pr.sh", "--pr", "1382"], path, {
         "PATH": "%s:%s" % (path / "bin", os.environ.get("PATH", "")),
         "AO_CGS_STUB_LOG": str(log),
@@ -802,6 +857,8 @@ def run_landing(path, view, head_green, merge_rc):
         "AO_CGS_GH_VIEW_JSON": view,
         "AO_CGS_GH_MERGE_LOG": str(merge_log),
         "AO_CGS_GH_MERGE_RC": str(merge_rc),
+        "AO_CGS_GH_REST_PULL": str(path / "rest-pull.json"),
+        "AO_CGS_GH_DELETE_LOG": str(delete_log),
         "AO_MERGE_APPLY": "1",
         "AO_QUEUE_VERIFY_MERGED": "1",
         "AO_QUEUE_VERIFY_CMD": "exit 0",
@@ -815,6 +872,8 @@ def landing_arms():
     arm("a landed merge posts exactly one status, rc 0, for the commit that LANDED",
         rc == 0 and len(posts(rec)) == 1 and landed in posts(rec)[0] and "--rc 0" in posts(rec)[0]
         and any(head in x for x in shows(rec)), "rc=%s posts=%r" % (rc, posts(rec)))
+    arm("a landed merge deletes the merged head branch over REST, once (issue #1569)",
+        deletes(path) == ["fixture-head"], "deletes=%r rc=%s" % (deletes(path), rc))
 
     path, view, landed, head, green, mrc = landing_venue("ungated")
     rc, out, rec = run_landing(path, view, False, mrc)
@@ -828,6 +887,8 @@ def landing_arms():
     arm("a merge that did NOT land publishes nothing",
         rc == 1 and not posts(rec) and any("nothing landed to publish for" in x for x in notes(out)),
         "rc=%s posts=%r" % (rc, posts(rec)))
+    arm("a merge that did NOT land deletes no branch",
+        deletes(path) == [], "deletes=%r rc=%s" % (deletes(path), rc))
 
     path, view, landed, head, green, mrc = landing_venue("mutant-ungated")
     ok = mutate(path, "scripts/merge-pr.sh", '  if [ "$post_rc" -ne 0 ]; then\n',
