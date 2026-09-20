@@ -42,7 +42,9 @@ def test_shipped_tiers_yaml_loads(table) -> None:
 
 def test_shipped_budgets_yaml_loads(seeded_enforcer) -> None:
     assert seeded_enforcer.budgets  # non-empty
-    assert set(seeded_enforcer.budgets) == {"tenant-acme", "tenant-beta", "tenant-gamma"}
+    assert set(seeded_enforcer.budgets) == {
+        "tenant-purebliss", "tenant-acme", "tenant-beta", "tenant-gamma",
+    }
 
 
 def test_shipped_task_class_tier_refs_are_valid(table) -> None:
