@@ -23,17 +23,28 @@
 #     the exact message `gh pr merge --squash` would compose and asks the ONE
 #     shared predicate (`governance/isolation/trailer.py`) about it.
 #   * A refusal (guard rc 1) exits 1 printing `squash-message-would-drop-trailer`.
-#     No verdict (guard rc 2, or an unrecognised rc) exits 2. `gh pr merge` is
-#     NEVER invoked in either case: a gate that could not reach a verdict is not
+#     No verdict (guard rc 2, or an unrecognised rc) exits 2. No merge is
+#     invoked in either case: a gate that could not reach a verdict is not
 #     permission.
+#   * THE MERGE PATH IS REST, NOT GraphQL (issue #1569). `gh pr view --json` and
+#     `gh pr merge` are GraphQL, and the box's SHARED GraphQL budget is
+#     exhausted by the fleet's own agents (measured twice on 2026-09-20:
+#     `GraphQL: API rate limit already exceeded for user ID ...` while REST
+#     stayed healthy) -- so a merge path built on them refuses to even READ a
+#     pull request for a reason no lane can fix. The PR read, the merge and the
+#     head-branch delete therefore go through `gh api` (REST, a separate quota).
+#     The guard's verdict still describes the message that lands: the REST merge
+#     endpoint composes the squash message from the same repository setting
+#     (`squash_merge_commit_message: PR_BODY`) the guard models.
 #   * DRY RUN BY DEFAULT, mirroring `scripts/pr-queue.sh` (AO_QUEUE_APPLY) and
 #     `scripts/land-lane.sh` (AO_LAND_APPLY): without AO_MERGE_APPLY=1 nothing is
 #     merged and the planned command is printed instead.
 #
 # WHAT IT DOES NOT DO (named rather than papered over)
 #   It cannot make a deliberate bypass impossible: a human or agent that calls
-#   `gh pr merge` directly still bypasses every local control. Only the required
-#   status check tracked by #1138 can close that boundary.
+#   `gh pr merge`, or the REST merge endpoint, directly still bypasses every
+#   local control. Only the required status check tracked by #1138 can close
+#   that boundary.
 #
 # Exit contract: 0 OK / 1 NOT-OK (refused; nothing merged) / 2 CANNOT-ASSESS
 # (nothing merged).
@@ -95,6 +106,13 @@ case "$pr_number" in
     ;;
 esac
 
+# --- the repository slug, resolved ONCE (issue #1569) -----------------------
+# Every GitHub call below is `gh api repos/<slug>/...` (REST), and even the dry
+# run's plan names that URL, so the slug is resolved before the guard runs
+# rather than at the first REST call. `AO_REPO` is the same override seam
+# `scripts/gate-status.sh` and `scripts/scan-pr-failures.sh` already honour.
+repo="${AO_REPO:-$(git remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')}"
+
 # --- the guard, resolved next to this script so the two cannot drift apart ---
 guard="$(dirname "${BASH_SOURCE[0]}")/check-squash-message.sh"
 if [ ! -f "$guard" ]; then
@@ -112,22 +130,22 @@ fi
 case "$guard_rc" in
   0) ;;
   1)
-    echo "merge-pr: REFUSED — squash-message-would-drop-trailer — #$pr_number's rendered squash message would fail check-isolation-landed after merge; gh pr merge was NOT invoked" >&2
+    echo "merge-pr: REFUSED — squash-message-would-drop-trailer — #$pr_number's rendered squash message would fail check-isolation-landed after merge; nothing was merged" >&2
     exit 1
     ;;
   2)
-    echo "merge-pr: CANNOT-ASSESS — the squash-message guard reached no verdict for #$pr_number; gh pr merge was NOT invoked" >&2
+    echo "merge-pr: CANNOT-ASSESS — the squash-message guard reached no verdict for #$pr_number; nothing was merged" >&2
     exit 2
     ;;
   *)
-    printf 'merge-pr: CANNOT-ASSESS — the squash-message guard returned an unrecognised exit code %s for #%s; gh pr merge was NOT invoked\n' \
+    printf 'merge-pr: CANNOT-ASSESS — the squash-message guard returned an unrecognised exit code %s for #%s; nothing was merged\n' \
       "$guard_rc" "$pr_number" >&2
     exit 2
     ;;
 esac
 
 if [ "${AO_MERGE_APPLY:-0}" != "1" ]; then
-  echo "merge-pr: DRY RUN — #$pr_number carries the ticket trailer; would run: gh pr merge $pr_number --squash --delete-branch (AO_MERGE_APPLY=1 to execute)"
+  echo "merge-pr: DRY RUN — #$pr_number carries the ticket trailer; would run: gh api -X PUT repos/$repo/pulls/$pr_number/merge -f merge_method=squash, then delete the merged head branch (AO_MERGE_APPLY=1 to execute)"
   exit 0
 fi
 
@@ -143,15 +161,20 @@ fi
 # through this script would still land on per-head evidence alone. Reuses
 # scripts/pr-queue.sh's own merged-tree functions (one predicate, not a
 # second copy) via its offline test seam.
-pr_view_json="$(gh pr view "$pr_number" --json baseRefName,headRefOid 2>/tmp/mp-view-err.txt)" || {
-  printf 'merge-pr: CANNOT-ASSESS — could not read #%s from gh pr view: %s\n' \
+#
+# The READ is REST (issue #1569), not `gh pr view --json`: the GraphQL form is
+# the same shared budget the guard just used, and a limit there refused a merge
+# for a reason no lane could fix. `--jq` renames the REST fields back to the two
+# keys the parsers below already read, so nothing downstream of this line moves.
+pr_view_json="$(gh api "repos/$repo/pulls/$pr_number" --jq '{baseRefName: .base.ref, headRefOid: .head.sha}' 2>/tmp/mp-view-err.txt)" || {
+  printf 'merge-pr: CANNOT-ASSESS — could not read #%s from the REST pulls endpoint: %s\n' \
     "$pr_number" "$(head -c 200 /tmp/mp-view-err.txt)" >&2
   exit 2
 }
 pr_base_ref="$(printf '%s' "$pr_view_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("baseRefName",""))' 2>/dev/null)"
 pr_head_oid="$(printf '%s' "$pr_view_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("headRefOid",""))' 2>/dev/null)"
 if [ -z "$pr_base_ref" ] || [ -z "$pr_head_oid" ]; then
-  echo "merge-pr: CANNOT-ASSESS — gh pr view #$pr_number did not report baseRefName/headRefOid" >&2
+  echo "merge-pr: CANNOT-ASSESS — the REST read of #$pr_number did not report baseRefName/headRefOid" >&2
   exit 2
 fi
 pr_queue_script="$(dirname "${BASH_SOURCE[0]}")/pr-queue.sh"
@@ -160,7 +183,7 @@ if [ ! -f "$pr_queue_script" ]; then
   exit 2
 fi
 if ! bash "$pr_queue_script" --check-merged-tree "$pr_number" --head "$pr_head_oid" --against-base "origin/$pr_base_ref"; then
-  echo "merge-pr: REFUSED — merged-tree evidence check failed for #$pr_number; gh pr merge was NOT invoked" >&2
+  echo "merge-pr: REFUSED — merged-tree evidence check failed for #$pr_number; nothing was merged" >&2
   exit 1
 fi
 
@@ -176,16 +199,16 @@ if [ "${AO_APPROVAL_REQUIRED:-0}" = "1" ]; then
     approval_rc=$?
     cat /tmp/mp-approval.txt >&2
     if [ "$approval_rc" = "2" ]; then
-      echo "merge-pr: CANNOT-ASSESS — approval check reached no verdict for #$pr_number; gh pr merge was NOT invoked" >&2
+      echo "merge-pr: CANNOT-ASSESS — approval check reached no verdict for #$pr_number; nothing was merged" >&2
       exit 2
     fi
-    echo "merge-pr: REFUSED — approval-missing:merge:pr#$pr_number — gh pr merge was NOT invoked" >&2
+    echo "merge-pr: REFUSED — approval-missing:merge:pr#$pr_number — nothing was merged" >&2
     exit 1
   fi
   echo "merge-pr: approval record verified for #$pr_number"
 fi
 
-echo "merge-pr: merging #$pr_number (gh pr merge --squash --delete-branch); the message was verified above"
+echo "merge-pr: merging #$pr_number over REST (gh api -X PUT repos/$repo/pulls/$pr_number/merge, merge_method=squash); the message was verified above"
 
 # --- publish the gate of record for the commit that LANDED (issue #1382) ------
 # A required status check gates a PULL REQUEST, and a status is posted for a
@@ -269,19 +292,68 @@ publish_landed_status() {
   return 0
 }
 
+# --- the merged head branch, deleted over REST (issue #1569) -----------------
+# `gh pr merge --delete-branch` had no REST equivalent, so the head branch is
+# deleted explicitly -- and only when the head really lives in THIS repository:
+# a fork's branch belongs to the fork, and a `heads/<name>` ref in the base
+# repository may be an unrelated branch that merely shares the name. Every
+# failure here is REPORTED rather than swallowed, and none of them can change
+# the outcome: the merge has already landed by the time this runs.
+delete_head_branch() {
+  local pr="$1" view head_ref head_repo
+  if ! view="$(gh api "repos/$repo/pulls/$pr" --jq '{headRef: .head.ref, headRepo: (.head.repo.full_name // "")}' 2>/tmp/mp-delete-err.txt)"; then
+    printf 'merge-pr: NOTE — the merged head branch was NOT deleted: #%s could not be read back for its head ref (%s)\n' \
+      "$pr" "$(head -c 200 /tmp/mp-delete-err.txt)"
+    return 0
+  fi
+  head_ref="$(printf '%s' "$view" | python3 -c 'import json,sys; print((json.load(sys.stdin) or {}).get("headRef") or "")' 2>/dev/null)"
+  head_repo="$(printf '%s' "$view" | python3 -c 'import json,sys; print((json.load(sys.stdin) or {}).get("headRepo") or "")' 2>/dev/null)"
+  if [ -z "$head_ref" ]; then
+    printf 'merge-pr: NOTE — the merged head branch was NOT deleted: #%s reported no head ref\n' "$pr"
+    return 0
+  fi
+  if [ -z "$head_repo" ]; then
+    printf 'merge-pr: NOTE — the head branch %s was NOT deleted: #%s did not report which repository it lives in, and this script does not delete a branch on a guess\n' \
+      "$head_ref" "$pr"
+    return 0
+  fi
+  if [ "$head_repo" != "$repo" ]; then
+    printf 'merge-pr: NOTE — the head branch %s was NOT deleted: it lives in %s, not in %s\n' \
+      "$head_ref" "$head_repo" "$repo"
+    return 0
+  fi
+  if gh api -X DELETE "repos/$repo/git/refs/heads/$head_ref" >/tmp/mp-delete-out.txt 2>&1; then
+    printf 'merge-pr: deleted the merged head branch %s\n' "$head_ref"
+  else
+    printf 'merge-pr: NOTE — the merged head branch %s was NOT deleted (the DELETE exited non-zero): %s\n' \
+      "$head_ref" "$(head -c 200 /tmp/mp-delete-out.txt)"
+  fi
+  return 0
+}
+
 # A non-zero exit here is a refusal to RE-CHECK, not proof that nothing landed:
-# `gh pr merge --delete-branch` can exit rc 1 after the merge actually succeeded
-# (measured 2026-09-15, #623 — the local branch-prune step collides with the
-# shared checkout that holds `master`). Read `gh pr view <n> --json
-# state,mergeCommit` before acting on it -- which is what publish_landed_status
-# does, in both branches below: a merge that LANDED publishes its status even
-# when `gh` exits non-zero afterwards, and a merge that did NOT land publishes
-# nothing because the state it reads back is not MERGED.
-if gh pr merge "$pr_number" --squash --delete-branch; then
-  echo "merge-pr: OK — #$pr_number merged"
+# the REST merge endpoint answers 405 (`Pull Request is not mergeable`) for a
+# merge it refuses, and a transport failure can return non-zero for a merge the
+# server did accept. Read the state back before acting on it -- which is what
+# publish_landed_status does, in both branches below: a merge that LANDED
+# publishes its status even when the call exits non-zero afterwards, and a merge
+# that did NOT land publishes nothing because the state it reads back is not
+# MERGED. (`gh pr merge --delete-branch` additionally pruned the LOCAL branch,
+# which collided with the shared checkout that holds `master` -- measured
+# 2026-09-15, #623; that local step does not exist on the REST path, and the
+# remote ref is deleted explicitly by delete_head_branch above.)
+if merge_out="$(gh api -X PUT "repos/$repo/pulls/$pr_number/merge" -f merge_method=squash 2>/tmp/mp-merge-err.txt)"; then
+  landed_sha="$(printf '%s' "$merge_out" | python3 -c 'import json,sys; print((json.load(sys.stdin) or {}).get("sha") or "")' 2>/dev/null)"
+  if [ -n "$landed_sha" ]; then
+    echo "merge-pr: OK — #$pr_number merged (squash commit ${landed_sha:0:12})"
+  else
+    echo "merge-pr: OK — #$pr_number merged"
+  fi
+  delete_head_branch "$pr_number"
   publish_landed_status "$pr_number"
   exit 0
 fi
-echo "merge-pr: REFUSED — gh pr merge #$pr_number failed; re-check state before retrying" >&2
+printf 'merge-pr: REFUSED — the REST merge of #%s failed (%s); re-check state before retrying\n' \
+  "$pr_number" "$(head -c 200 /tmp/mp-merge-err.txt)" >&2
 publish_landed_status "$pr_number"
 exit 1
