@@ -32,7 +32,7 @@ import budget as budget_mod
 import chooser as chooser_mod
 import loader as loader_mod
 import metering as metering_mod
-from budget import BudgetEnforcer
+from budget import BudgetDecisionMaker
 from chooser import Choice, ModelChooser
 from loader import TierTable
 from metering import JsonlMeteringSink
@@ -123,7 +123,7 @@ def _parse_health(raw: Optional[str]) -> Dict[str, bool]:
 
 def _cmd_choose(args: argparse.Namespace) -> int:
     table = _load_table()
-    enforcer: Optional[BudgetEnforcer] = None
+    enforcer: Optional[BudgetDecisionMaker] = None
     if args.budget_config:
         enforcer = budget_mod.load_budgets(Path(args.budget_config))
     sink = JsonlMeteringSink(Path(args.meter)) if args.meter else metering_mod.NoopMeteringSink()

@@ -164,8 +164,34 @@ PROCESS_CONTROLS = ("refresh", "restart", "stop", "kill", "halt")
 TASK_CONTROLS = ("override",)
 # Control actions that must name the directive they act on (not their own id).
 DIRECTIVE_CONTROLS = ("drop",)
-MODEL_TIERS = ("flash", "pro", "auditor")
 THINKING_LEVELS = ("none", "low", "medium", "high")
+#: `MODEL_TIERS` is the FinOps tier vocabulary a message's `model.tier` is drawn
+#: from, and it is READ from its declared authority (#1494):
+#: `governance/finops/policy.json` `vocabulary.tiers`, through the reader that
+#: already owns that policy (`governance/finops/chooser.py`). It used to be a
+#: literal three-tuple here, declared beside `THINKING_LEVELS` — a second list
+#: that agreed with the policy until the day it did not, which is exactly the
+#: drift that issue removed. Resolved LAZILY and cached for the same reason the
+#: runtime vocabulary above is: this module is copied into scratch trees by gate
+#: fixtures (`scripts/check-control-verbs.sh` copies `fleet/channel.py` alone),
+#: and an import-time read of a policy those trees do not carry would make
+#: `channel` unloadable there. A policy that cannot be read is REFUSED by name,
+#: never answered with an empty vocabulary.
+_MODEL_TIERS: tuple[str, ...] | None = None
+
+
+def model_tiers() -> tuple[str, ...]:
+    """The FinOps tier names (`model.tier`'s values), from the declared policy."""
+    global _MODEL_TIERS
+    if _MODEL_TIERS is None:
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from governance.finops import chooser as finops
+
+        _MODEL_TIERS = tuple(finops.vocabulary(finops.load_policy())[0])
+    return _MODEL_TIERS
+
+
 # Order kinds (schema v1, additive): `work` needs an issue; the others are
 # answered by the director without dispatching anything to the dispatcher.
 TASK_KINDS = ("work", "status", "report", "ping", "steer")
@@ -216,6 +242,8 @@ def runtime_ids() -> tuple[str, ...]:
 def __getattr__(name: str) -> object:
     if name == "RUNTIME_IDS":
         return runtime_ids()
+    if name == "MODEL_TIERS":
+        return model_tiers()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -1050,8 +1078,8 @@ def validate(message: dict) -> list[str]:
         if not isinstance(model, dict):
             problems.append("model must be an object")
         else:
-            if model.get("tier") not in MODEL_TIERS:
-                problems.append(f"model.tier must be one of {', '.join(MODEL_TIERS)}")
+            if model.get("tier") not in model_tiers():
+                problems.append(f"model.tier must be one of {', '.join(model_tiers())}")
             if model.get("thinking") not in THINKING_LEVELS:
                 problems.append(f"model.thinking must be one of {', '.join(THINKING_LEVELS)}")
     task = message.get("task")

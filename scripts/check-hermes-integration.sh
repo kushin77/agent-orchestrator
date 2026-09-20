@@ -98,6 +98,8 @@ cp -R "$root/integrations/_seam" "$scratch/integrations/"
 for rel in \
   registry/personas/cards/hermes.yaml \
   registry/profiles/seeds/hermes.1.0.0.yaml \
+  registry/profiles/catalog.yaml \
+  registry/profiles/tiers.py \
   gateway/finops/tiers.yaml \
   gateway/catalog/modules/hermes/module.json; do
   mkdir -p "$scratch/$(dirname "$rel")"

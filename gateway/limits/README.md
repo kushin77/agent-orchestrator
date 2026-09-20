@@ -105,7 +105,7 @@ a different tenant or tier → a different key → isolated entries.
 | [`model.py`](model.py) | `ModelCallRequest`, `MeteringRecord`, outcome vocabulary. |
 | [`fingerprint.py`](fingerprint.py) | Prompt normalization + sha256 fingerprint / cache-key / scope-key helpers. |
 | [`cache.py`](cache.py) | `SemanticCache` (TTL, LRU, stats) over a `CacheStore` seam: `MemoryCacheStore` + `FileCacheStore`. |
-| [`budget.py`](budget.py) | `BudgetPolicy`/`BudgetMode`, `TokenBudget`, `BudgetController`, `BudgetDecision`, `UsageLedger` seam (`MemoryLedger` + `JsonlLedger`). |
+| [`budget.py`](budget.py) | `TokenBudgetPolicy`/`BudgetMode`, `RollingTokenWindow`, `BudgetController`, `TokenBudgetDecision`, `UsageLedger` seam (`MemoryLedger` + `JsonlLedger`). |
 | [`ratelimit.py`](ratelimit.py) | `TokenBucket`, `RateLimitPolicy`, `RateLimiter`, `RateLimitDecision`. |
 | [`throttle.py`](throttle.py) | `OutputThrottle` + per-taskType cap taxonomy, `ThrottleVerdict`. |
 | [`backpressure.py`](backpressure.py) | `BackpressureController` (queue/degrade), `BackpressureQueue`, `BackpressureDecision`. |

@@ -54,6 +54,7 @@ from __future__ import annotations
 import http.client
 import json
 import os
+import sys
 import tempfile
 import time
 import uuid
@@ -64,14 +65,50 @@ from urllib.parse import urlsplit
 
 from portal.server.fleet import surface_enabled
 
+#: The tier ladder is READ from its declared authority (#1494): the issue-#9
+#: AgentProfile catalog `registry/profiles/catalog.yaml` ``tiers``, through its
+#: one reader `registry/profiles/tiers.py`. The portal used to pin a second copy
+#: of the ladder "from the gateway's provider contract"; that copy is gone, so a
+#: rename in the authority is followed here rather than cross-checked later.
+#: The read is LAZY: this module is copied into scratch trees by a gate fixture
+#: (`scripts/check-control-audit.sh` copies `portal/` alone), and an import-time
+#: read of an authority those trees do not carry would make the surface
+#: unloadable there — the exact #967 failure shape that check already guards
+#: against for `portal/server/fleet.py`.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+_TIERS: tuple[str, ...] | None = None
+
+
+def tiers() -> tuple[str, ...]:
+    """The tier ladder, in the authority's declared order (read once, cached)."""
+    global _TIERS
+    if _TIERS is None:
+        from registry.profiles.tiers import authority
+
+        _TIERS = authority()
+    return _TIERS
+
+
+def __getattr__(name: str) -> object:
+    """Resolve the declared name ``TIERS`` through :func:`tiers` (PEP 562).
+
+    ``chat.TIERS`` and ``from portal.server.chat import TIERS`` therefore get
+    the one ladder while the read stays lazy. Any OTHER unknown name is still an
+    ``AttributeError`` — a resolver that answered everything would turn a typo
+    into a silent empty vocabulary.
+    """
+    if name == "TIERS":
+        return tiers()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 #: The registry surface key that gates this endpoint family (issue #500).
 CHAT_SURFACE = "chat"
 
-#: The tier ladder, pinned from the gateway's provider contract
-#: (``gateway/providers/contract.py`` ``TIERS``), which itself consumes it from
-#: the issue-#9 AgentProfile catalog. Cross-checked by
-#: ``scripts/check-chat-ux.sh`` — a rename on either side fails the gate.
-TIERS: tuple[str, ...] = ("LOW", "MED", "HIGH", "MAX")
+#: The default tier, a single rung of the authority (an id, never a second
+#: declaration of the ladder).
 DEFAULT_TIER = "MED"
 
 #: The pre-flight budget actions, pinned from ``gateway/finops/budget.py``
@@ -147,11 +184,11 @@ def parse_turn_request(body: dict[str, Any]) -> tuple[str, str]:
                 f"({forbidden!r} is refused; send 'tier' instead)",
             )
     tier = str(body.get("tier") or DEFAULT_TIER).strip().upper()
-    if tier not in TIERS:
+    if tier not in tiers():
         raise ChatError(
             400,
             "chat_unknown_tier",
-            f"unknown tier {tier!r}; the ladder is {', '.join(TIERS)}",
+            f"unknown tier {tier!r}; the ladder is {', '.join(tiers())}",
         )
     text = str(body.get("text") or body.get("message") or "").strip()
     if not text:
@@ -298,15 +335,15 @@ class ChatSurface:
                 for turn in conversation["turns"]:
                     model = str(turn.get("resolvedModel") or "")
                     tier = str(turn.get("tier") or "")
-                    if model and tier in TIERS:
+                    if model and tier in tiers():
                         resolved[tier] = model
         return {
-            "vocabulary": list(TIERS),
+            "vocabulary": list(tiers()),
             "defaultTier": DEFAULT_TIER,
             "selects": "tier",
             "tiers": [
                 {"id": tier, "label": tier, "default": tier == DEFAULT_TIER}
-                for tier in TIERS
+                for tier in tiers()
             ],
             "resolvedModels": resolved,
             "note": (

@@ -8,7 +8,7 @@ Public surface
   callable).  ``build_engine()`` wires one from config/limits.yaml.
 - ``SemanticCache`` (limits.cache) - prompt-fingerprint dedup with TTL; a hit
   is zero-cost and accounted (metering outcome=cache_hit, zero_cost=True).
-- ``BudgetController`` / ``TokenBudget`` (limits.budget) - per
+- ``BudgetController`` / ``RollingTokenWindow`` (limits.budget) - per
   (tenant, agent, model tier) rolling-window token budget with an
   observe->enforce toggle.
 - ``RateLimiter`` (limits.ratelimit) - token-bucket rate limiter per scope.
@@ -35,10 +35,10 @@ from limits.backpressure import (
 )
 from limits.budget import (
     BudgetController,
-    BudgetDecision,
+    TokenBudgetDecision,
     BudgetMode,
-    BudgetPolicy,
-    TokenBudget,
+    TokenBudgetPolicy,
+    RollingTokenWindow,
 )
 from limits.cache import CacheEntry, FileCacheStore, MemoryCacheStore, SemanticCache
 from limits.fingerprint import cache_key, prompt_fingerprint, scope_key
@@ -70,9 +70,9 @@ __all__ = [
     "BackpressureDecision",
     "BackpressureQueue",
     "BudgetController",
-    "BudgetDecision",
+    "TokenBudgetDecision",
     "BudgetMode",
-    "BudgetPolicy",
+    "TokenBudgetPolicy",
     "CACHE_HIT",
     "CacheEntry",
     "CompleteResult",
@@ -99,7 +99,7 @@ __all__ = [
     "SemanticCache",
     "ThrottleVerdict",
     "TokenBucket",
-    "TokenBudget",
+    "RollingTokenWindow",
     "build_engine",
     "cache_key",
     "prompt_fingerprint",

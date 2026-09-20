@@ -193,12 +193,12 @@ def cmd_demo(args: argparse.Namespace) -> int:
 
     # --- 4. negative: budget exhausted -> blocked (never silent) ------------ #
     print("\n--- 4. negative: budget exhausted -> blocked (backpressure) ---")
-    from limits.budget import BudgetController, BudgetMode, BudgetPolicy
+    from limits.budget import BudgetController, BudgetMode, TokenBudgetPolicy
     from limits.limiter import LimitsEngine
 
     enforce = LimitsEngine(
         budget=BudgetController(
-            default_policy=BudgetPolicy(cap_tokens=5, mode=BudgetMode.ENFORCE)
+            default_policy=TokenBudgetPolicy(cap_tokens=5, mode=BudgetMode.ENFORCE)
         )
     )
     wired_budget = build_real_gateway(limits_engine=enforce,
