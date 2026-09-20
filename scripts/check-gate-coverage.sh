@@ -6,8 +6,11 @@
 #   Gate coverage in this repo is OPT-IN. `scripts/verify.sh` holds an explicit
 #   `checks=()` array, so a new `scripts/check-*.sh` that nobody registers is
 #   inert: it exists, it looks like a gate, and no gate ever runs it. The same
-#   is true of the pytest corpus: `scripts/pytest-suites.txt` declares 71
-#   suites, but the gate of record only ever runs the ones a gate NAMES.
+#   is true of the pytest corpus: `scripts/pytest-suites.txt` declares 99
+#   suites, but the gate of record only ever runs the ones a gate NAMES. (99 is
+#   a snapshot, never a promise — #526 wrote 71 here, #1458 re-measured it — so
+#   re-measure it rather than trusting this line:
+#   `grep -vcE '^[[:space:]]*(#|$)' scripts/pytest-suites.txt`.)
 #   Nothing complained when the count of unwired check scripts went from 0 (at
 #   the first measurement, 2026-09-14 morning) to 8 (re-measured the same day at
 #   ffb2688, when EPIC #499's chat surface landed six of them). A class that can
@@ -58,10 +61,11 @@
 #      cover the suite, and that suite stays reported.
 #
 # THE BASELINE, AND WHY IT CANNOT ROT INTO A FICTION
-#   Rules 1 and 2 are red on master today (8 unwired check scripts, and the
-#   suites only the manifest sweep reaches). A gate that is red on master is
-#   either disabled or ignored — strictly worse than no gate. So the accepted
-#   exceptions live in ONE committed, explicit, per-path file
+#   When this detector landed (2026-09-14) rules 1 and 2 were red on master — 8
+#   unwired check scripts, and the suites only the manifest sweep reached — and
+#   the exceptions below are what have kept it usable since. A gate that is red
+#   on master is either disabled or ignored — strictly worse than no gate. So
+#   the accepted exceptions live in ONE committed, explicit, per-path file
 #   (`scripts/gate-coverage-baseline.txt`), and the honest part is what keeps it
 #   from becoming a permanent excuse:
 #     * a NEWLY declared suite or a NEWLY delivered `scripts/check-*.sh` is
@@ -86,15 +90,21 @@
 #     * EVERY row carries the issue that will retire it (`#<n>`) AND the 40-hex
 #       commit at which the row was added. A row whose sha is missing, is not
 #       40-hex, or does not resolve to a real git object is MALFORMED and fails.
-#     * a SCRIPT row (the `uninvoked` deferral) whose wiring issue is CLOSED
-#       while the artifact is still unwired fails, naming both — a deferral to
-#       an open lane is honest, a deferral to a closed one is a permanent
-#       excuse. Issue state is read OFFLINE from the committed board snapshot
-#       `.board/snapshot.json` (never the network); a tracker ABSENT from the
-#       snapshot fails too, because a deferral to an unknown issue cannot be
-#       trusted. The `swept-only` SUITE rows are exempt: they record a permanent
-#       state (run only by the manifest sweep), not a deferred wiring, so a
-#       closed epic that established them does not make them dishonest.
+#     * EVERY LIVE row — a `script` row whose check no gate invokes, OR a
+#       `suite` row whose suite no gate names as a pytest target — must name a
+#       tracker issue that is still OPEN. A row whose tracker is CLOSED fails,
+#       naming both — a deferral to an open lane is honest, a deferral to a
+#       closed one is a permanent excuse. Issue state is read OFFLINE from the
+#       committed board snapshot `.board/snapshot.json` (never the network); a
+#       tracker ABSENT from the snapshot fails too, because a deferral to an
+#       unknown issue cannot be trusted. Until #1497 the rule was scoped to
+#       `script` rows and the `swept-only` SUITE rows were exempt, on the
+#       argument that they record a permanent state rather than a deferred
+#       wiring — so 51 suite rows sat naming #524 (CLOSED 2026-09-14) while the
+#       detector stayed green, and the declaration, not the detector, was what
+#       had rotted. A `swept-only` reason says WHY the suite is unwired; it does
+#       not make the row ownerless, which is exactly the rot this closes.
+#       Widening it is what forces every row to be either wired or owned.
 #     * a row for an artifact that did not exist at the commit the row ITSELF
 #       declares (column 5), OR at the baseline's last-touched commit, fails —
 #       "newly delivered" is computable, and the row's own provenance is what
@@ -123,7 +133,7 @@
 #                       every baseline entry is live and unique
 #   1  NOT-OK           an unwired artifact is not baselined, a baseline entry
 #                       is stale / duplicated / malformed / newly delivered, a
-#                       script deferral names a closed or unknown wiring issue,
+#                       live row's tracker names a closed or unknown issue,
 #                       or a scan is refused
 #   2  CANNOT-ASSESS    the question cannot be answered (a gate file is missing,
 #                       the manifest is missing or declares no suites, python3
@@ -477,6 +487,17 @@ def main():
     entry_keys = [(kind, path) for kind, path, _, _, _ in entries]
     duplicates = sorted({key for key in entry_keys if entry_keys.count(key) > 1})
 
+    def row_is_live(kind, path):
+        """True when a row still excuses something no gate reaches.
+
+        A `script` row excuses a delivered check no gate invokes; a `suite` row
+        excuses a declared suite no gate names as a pytest target. A row whose
+        artifact has since been wired (or removed) is STALE instead — reported
+        above — and owes no tracker (#1497).
+        """
+        return ((kind == "script" and path in unwired_checks)
+                or (kind == "suite" and path in unwired_suites))
+
     # --- findings ------------------------------------------------------------
     findings = ["self-check: %s" % problem for problem in self_check()]
     for path in unwired_checks:
@@ -500,26 +521,29 @@ def main():
         elif suite in wired_suites:
             findings.append("baseline suite %s (stale: a gate names it now — remove the entry)" % suite)
 
-    # --- provenance (#603): a deferral must be accountable -------------------
+    # --- provenance (#603; widened to EVERY live row by #1497) ---------------
+    # A row that still excuses an unwired artifact must name a tracker that is
+    # still OPEN. The rule used to cover only `script` rows, so 51 `suite` rows
+    # could name a CLOSED epic forever while the detector stayed green.
     if entries:
-        live_scripts = [row for row in entries
-                        if row[0] == "script" and row[1] in unwired_checks]
-        states = tracker_states() if live_scripts else {}
+        live_rows = [row for row in entries if row_is_live(row[0], row[1])]
+        states = tracker_states() if live_rows else {}
         base_sha = baseline_last_commit()
         for kind, path, reason, tracker, sha in entries:
-            if kind == "script" and path in unwired_checks:
+            if row_is_live(kind, path):
                 issue = int(tracker[1:])
                 state = states.get(issue)
                 if state is None:
                     findings.append(
-                        "baseline script %s (%s: wiring issue #%d is absent from "
+                        "baseline %s %s (%s: tracker issue #%d is absent from "
                         "the board snapshot — a deferral to an unknown issue "
-                        "cannot be trusted)" % (path, tracker, issue))
+                        "cannot be trusted)" % (kind, path, tracker, issue))
                 elif state != "open":
                     findings.append(
-                        "baseline script %s (wiring issue #%d is %s while the "
+                        "baseline %s %s (tracker issue #%d is %s while the "
                         "artifact is still unwired — a deferral to a closed "
-                        "issue is a permanent excuse)" % (path, issue, state.upper()))
+                        "issue is a permanent excuse)"
+                        % (kind, path, issue, state.upper()))
             if kind == "script" and not (root / path).is_file():
                 continue  # stale: no such delivered check script (reported above)
             if kind == "suite" and path not in suites:
@@ -547,9 +571,9 @@ def main():
              len(unwired_suites) - len(unlisted_suites)))
     print("check-gate-coverage: baseline entries=%d" % len(entries))
     for kind, path, _, tracker, _ in entries:
-        if kind == "script" and path in unwired_checks:
-            print("check-gate-coverage: deferral script %s -> %s (unwired; the "
-                  "named issue retires this row by wiring it)" % (path, tracker))
+        if row_is_live(kind, path):
+            print("check-gate-coverage: deferral %s %s -> %s (unwired; the "
+                  "named issue retires this row by wiring it)" % (kind, path, tracker))
 
     if malformed:
         findings.extend("baseline line %s" % item for item in malformed)

@@ -309,6 +309,17 @@ checks=(
   # property per rule on every run. Registered here deliberately: the array is
   # explicit, so the gate is itself inert until it is named.
   'agentconsole-hosting|bash scripts/check-agentconsole-hosting.sh'
+  # overlay-sync (issue #1513, parent #1510): the contrib/shared-services
+  # overlay hand-lift waited 3 days (09-17 -> 09-20) because the lift was a
+  # documented MANUAL step. This check is the offline half of the automated
+  # lift: it proves the sync tool's comparison detects drift on fixtures (an
+  # identical pair is accepted, a mutated pair is reported BY NAME) and that the
+  # overlay-sync manifest is well-formed. The live half (the real diff against
+  # the shared-services run-half targets) runs under the push-triggered Cloud
+  # Build job (infra/cloudbuild/overlay-sync.*), because it needs the network —
+  # `make verify` stays offline. Registered here deliberately: the array is
+  # explicit, so the sync tool is itself inert until it is named.
+  'overlay-sync|bash scripts/check-agentconsole-overlay-sync.sh'
   # runner-preflight (issue #733): the fleet could not spawn a single subagent
   # because the loop inherited cron's minimal PATH, and it failed per directive
   # per cycle (a runaway amplifier). The check names the resolution, the hold and

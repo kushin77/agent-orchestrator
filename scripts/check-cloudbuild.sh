@@ -221,9 +221,10 @@ PY
 # assert a contract the file does not claim.
 while IFS= read -r trigger; do
   case "${trigger##*/}" in
-    verify-trigger.yaml) check_trigger "$trigger" _ENABLE_VERIFY "$cb_dir/verify.yaml" || fail=$((fail + 1)) ;;
-    apply-trigger.yaml)  check_trigger "$trigger" _ENABLE_APPLY  "$cb_dir/apply.yaml"  || fail=$((fail + 1)) ;;
-    *)                   check_trigger "$trigger" "" "" || fail=$((fail + 1)) ;;
+    verify-trigger.yaml)       check_trigger "$trigger" _ENABLE_VERIFY       "$cb_dir/verify.yaml"       || fail=$((fail + 1)) ;;
+    apply-trigger.yaml)        check_trigger "$trigger" _ENABLE_APPLY        "$cb_dir/apply.yaml"        || fail=$((fail + 1)) ;;
+    overlay-sync-trigger.yaml) check_trigger "$trigger" _ENABLE_OVERLAY_SYNC "$cb_dir/overlay-sync.yaml" || fail=$((fail + 1)) ;;
+    *)                         check_trigger "$trigger" "" "" || fail=$((fail + 1)) ;;
   esac
 done < <(find "$cb_dir" -maxdepth 1 -name '*-trigger.yaml' -type f | LC_ALL=C sort)
 

@@ -65,6 +65,16 @@
 #      yet (held), a dead child, a missing or unparseable beat (crashed, and
 #      reported), an unreadable marker (crashed, and named) — plus mutant M4, which
 #      restores the pid-only rule and must make the remedy stop acting.
+#  10. The clock the marker arms are judged on is PINNED, not sampled (#1572). A
+#      beat stamp is written at second resolution (`strftime` truncates
+#      microseconds), so an age measured against the LIVE clock renders the intended
+#      integer only while the read lands inside the write's own wall-clock second —
+#      a sub-second window that made this check's verdict partly a coin flip on a
+#      byte-identical tree (measured 5 OK / 1 FAIL across 6 venue builds). The flight
+#      probe takes ONE whole-second anchor, builds every marker beat from it, and
+#      hands that same anchor to the reader through its `now=` seam; the F2 arm
+#      therefore asserts a BOUND on a PARSED integer, never a literal, and prints the
+#      rendered evidence so a failure is diagnosable from the log alone.
 #
 # Tri-state contract (docs/QA-GATE.md):
 #   0 OK             — every case correct and every mutant caught
@@ -112,6 +122,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -406,7 +417,23 @@ if mode == "flight":
     # invisible here while it held the live sister's drift lock open for hours.
     # The marker's `pid` written here is the DRIVER's own pid, i.e. a live process,
     # which is exactly the measured shape: the loop alive, nothing running.
+    #
+    # #1572: THE CLOCK IS PINNED. A beat stamp is written at second resolution
+    # (`strftime` truncates microseconds), so with write instant T, read instant T'
+    # and microsecond fraction f(T), the reader ages the stamp to
+    # `16200 + f(T) + (T' - T)`: it renders exactly `16200s old` only while the read
+    # lands inside the write's OWN wall-clock second. ONE whole-second anchor is taken
+    # here and handed to the reader through its `now=` seam, so every age this mode
+    # measures is exact by construction instead of by luck.
+    anchor = datetime.now(timezone.utc).replace(microsecond=0)
+    anchor_epoch = anchor.timestamp()
+
     def stamp(seconds_ago):
+        """A marker beat relative to the pinned `anchor` the reader is given."""
+        return (anchor - timedelta(seconds=seconds_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def live_stamp(seconds_ago):
+        """A beat for an artifact the REAL code times itself (the rung heartbeat)."""
         return (datetime.now(timezone.utc) - timedelta(seconds=seconds_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def dead_pid():
@@ -423,7 +450,9 @@ if mode == "flight":
         for path in runs.glob("*"):
             path.unlink()
         (runs / f"{name}.json").write_text(json.dumps(fields), encoding="utf-8")
-        return watchdog.spawn_liveness.runs_in_flight(runs)
+        # The reader is handed the SAME anchor the beat was built from (#1572), so the
+        # age it reports is exact instead of a function of when the read landed.
+        return watchdog.spawn_liveness.runs_in_flight(runs, now=anchor_epoch)
 
     live = os.getpid()
     print(f"F_run_stale_seconds={watchdog.spawn_liveness.stale_seconds()}")
@@ -434,13 +463,29 @@ if mode == "flight":
     print("F1_names_marker=" + ("yes" if "live-child" in detail else "no"))
 
     # 2. the measured box shape: the loop's pid alive, no child, a beat nothing advances
+    #
+    # #1572: this arm used to demand the literal `16200s old` inside `detail`. That
+    # integer is derived from the wall clock and the stamp above truncates
+    # microseconds, so the equality held only inside a sub-second window and a
+    # byte-identical tree went red at random. The INTENT is "the crashed marker reports
+    # its child state AND its age": the age is therefore PARSED out of the rendered
+    # detail and asserted as a BOUND, and the rendered evidence travels with the arm.
     held, detail = only("phantom", pid=live, child_pid=None, ts=stamp(16200))
     print(f"F2_dead_leftover={'held' if held else 'crashed'}")
     print("F2_names_marker=" + ("yes" if "phantom" in detail else "no"))
+    child_named = "child_pid None" in detail
+    beat = re.search(r"beat is (\d+)s old", detail)
+    age = int(beat.group(1)) if beat else None
+    print("F2_child_state=" + ("named" if child_named else "missing"))
+    print("F2_reported_age=" + ("absent" if age is None else str(age)))
     print(
         "F2_reports_child_and_age="
-        + ("yes" if ("child_pid None" in detail and "16200s old" in detail) else "no")
+        + ("yes" if (child_named and age is not None and 16200 <= age <= 16260) else "no")
     )
+    # The rendered string travels with the arm: the driver's output lives in $work,
+    # which the check's EXIT trap deletes, so a bare `measured no` would leave a future
+    # failure undiagnosable after the fact.
+    print("F2_detail=" + detail)
 
     # 3. `mark_run` writes child_pid: null BEFORE the subagent exists
     held, _ = only("starting", pid=live, child_pid=None, ts=stamp(2))
@@ -472,7 +517,7 @@ if mode == "flight":
     def sister_decision():
         """One REAL decision over whatever markers are on disk, respawn MEASURED."""
         rung_beat.write_text(
-            json.dumps({"pid": 111, "state": "idle", "commit": "old0000", "ts": stamp(5)}),
+            json.dumps({"pid": 111, "state": "idle", "commit": "old0000", "ts": live_stamp(5)}),
             encoding="utf-8",
         )
         watchdog.drift_record_path("sister").unlink(missing_ok=True)
@@ -535,13 +580,19 @@ kv() { # kv <file> <key> -> value (empty when absent)
   sed -n "s/^$2=//p" "$1" | head -1
 }
 
-expect() { # expect <file> <key> <expected> <description>
+expect() { # expect <file> <key> <expected> <description> [detail-key]
   local got
   got="$(kv "$1" "$2")"
   if [ "$got" = "$3" ]; then
     ok "$4"
   else
     bad "$4 (expected $2=$3, measured $got)"
+    # #1572: a failure must be diagnosable from the log ALONE. The driver's output
+    # lives in $work, which the EXIT trap deletes, so an arm can name a companion key
+    # whose value is the rendered evidence behind its verdict.
+    if [ -n "${5:-}" ]; then
+      printf '         the arm rendered: %s\n' "$(kv "$1" "$5")"
+    fi
   fi
 }
 
@@ -634,7 +685,8 @@ expect "$flight_out" F1_live_child "held" "a marker with a live child is a run i
 expect "$flight_out" F1_names_marker "yes" "and the hold names the marker that holds it"
 expect "$flight_out" F2_dead_leftover "crashed" "a leftover (loop pid alive, no child, dead beat) is NOT"
 expect "$flight_out" F2_names_marker "yes" "the crashed marker is NAMED — it cannot hold the lock invisibly"
-expect "$flight_out" F2_reports_child_and_age "yes" "with its child state and its age"
+expect "$flight_out" F2_child_state "named" "and the child state it reports is real"
+expect "$flight_out" F2_reports_child_and_age "yes" "with its age as a BOUND on a parsed integer, never a literal (#1572)" F2_detail
 expect "$flight_out" F3_fresh_beat_no_child "held" "a run that just started has no child yet — never restarted"
 expect "$flight_out" F4_dead_child "crashed" "a dead child with a stale beat is not work"
 expect "$flight_out" F5_missing_beat "crashed" "a missing beat is decided in the ACTING direction"

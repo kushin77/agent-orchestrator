@@ -125,6 +125,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 root = Path(sys.argv[1])
@@ -558,9 +559,26 @@ else:
     )
 
 # --- arm 5: mutant, venue block deleted, rc-2 checks budgeted ---------------
+# The budget below is an EXEMPTION record, and since #1499 an exemption carries a
+# LEASE (`tracked_by` + `tracking`) -- an entry whose tracker is closed, or whose
+# declaration cannot be read, is refused or CANNOT-ASSESS by the run's own loader.
+# A fixture that omitted the lease therefore stops being "budgeted": it stops
+# loading at all. The lease is derived from the fixture's own clock, so the arm
+# cannot go stale by itself (a pinned date beside a live clock is green the day it
+# is written and refused every day after -- the clock/date-bomb class, #1025).
+LEASE = {
+    "tracked_by": "#1499",
+    "tracking": {
+        "state": "open",
+        "measured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "measured_by": "scripts/check-venue-invalid.sh fixture",
+        "measured_via": "fixture: the arm's own tracker, read at the fixture's clock",
+        "max_age_hours": 720,
+    },
+}
 budget_entries = [
-    {"check": FIXTURE_A, "kind": "venue", "precondition": "vendor/CMR/sync", "reason": "fixture"},
-    {"check": FIXTURE_B, "kind": "venue", "precondition": "vendor/CMR/sync", "reason": "fixture"},
+    {"check": FIXTURE_A, "kind": "venue", "issue": 1499, "precondition": "vendor/CMR/sync", "reason": "fixture", **LEASE},
+    {"check": FIXTURE_B, "kind": "venue", "issue": 1499, "precondition": "vendor/CMR/sync", "reason": "fixture", **LEASE},
 ]
 venue = staged(
     "the fold-in mutant's venue",

@@ -25,6 +25,7 @@
     showCrumb();
     loadView(currentView());
     offerErpModule();
+    offerGatedViews();
   }
 
   var NAV_TENANT = [
@@ -83,6 +84,30 @@
     }
     nav.appendChild(navButton(item));
     window.ErpModule = { offered: true };
+  }
+
+  /* FinOps (issue #341) and Ops/SLO (issue #342) are *gated* tenant views
+   * (issue #1520): each nav entry is offered only while its backend surface is
+   * actually reachable. GET /api/finops/* and /api/ops/* are refused 404
+   * feature_disabled while their flags are off (infra/feature-flags/registry.yaml
+   * surfaces.finops_reports / surfaces.ops_health), so a probe that fails adds
+   * no nav entry — an unpromoted surface is absent, not a dead link. */
+  async function offerGatedViews() {
+    var specs = [
+      { id: "finops", label: "FinOps", icon: "\u25eb", probe: "/api/finops/overview" },
+      { id: "ops", label: "Ops / SLO", icon: "\u25b7", probe: "/api/ops/overview" }
+    ];
+    var nav = document.getElementById("nav");
+    for (var i = 0; i < specs.length; i++) {
+      var spec = specs[i];
+      try {
+        var payload = await CP.get(spec.probe);
+        if (!payload || !payload.data) continue;
+      } catch (err) {
+        continue;
+      }
+      nav.appendChild(navButton({ id: spec.id, label: spec.label, icon: spec.icon }));
+    }
   }
 
   function currentView() {

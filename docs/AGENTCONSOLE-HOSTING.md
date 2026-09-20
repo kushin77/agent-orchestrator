@@ -275,7 +275,16 @@ modules, and adding it here would declare a policy nothing applies.
 Handed over by direction issue on the shared-services board (never by an edit to
 that repo):
 
-- [ ] Lift the overlay (recommended `infra/docker-compose.agentconsole.yml`).
+- [ ] Lift the overlay (recommended `infra/docker-compose.agentconsole.yml`) —
+      **automated, not a hand copy** (issue #1513): the lift is no longer a
+      manual step. `scripts/sync-agentconsole-overlay.sh --check` diffs
+      `contrib/shared-services/agentconsole.compose.yml` against the run-half
+      target (`infra/docker-compose.agentconsole.yml`) and reports drift, and a
+      push to `contrib/shared-services/**` fires that check
+      (`infra/cloudbuild/overlay-sync-trigger.yaml`, flag-gated OFF until a
+      reviewed go-live). The run half still applies the lift — the delta is
+      handed over as a direction issue on the shared-services board, never as
+      an edit to that repo from here.
 - [x] Publish the image and set `AGENTCONSOLE_IMAGE` — **done by the promote
       rung** (issue #1329): `infra/fleet/promote_portal.py`, scheduled as the
       `ao-fleet-promote-portal` cron rung (`fleet/cron.py`), reads the newest
