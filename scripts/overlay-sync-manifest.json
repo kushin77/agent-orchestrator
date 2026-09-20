@@ -1,0 +1,40 @@
+{
+  "doc": "Overlay lift sync manifest (#1513, parent #1510). Each entry pairs a source overlay (this repo or shared-frontend) with its shared-services run-half target. scripts/sync-agentconsole-overlay.sh diffs each pair; a drifted or missing target is a finding. An entry with a `skip` string is excluded from sync, with the reason recorded (the reason is surfaced, never silently dropped).",
+  "schema": "overlay-sync-v1",
+  "issue": 1513,
+  "parent": 1510,
+  "target_repo": "kushin77/shared-services",
+  "entries": [
+    {
+      "name": "agentconsole",
+      "source_repo": "agent-orchestrator",
+      "source_path": "contrib/shared-services/agentconsole.compose.yml",
+      "target_path": "infra/docker-compose.agentconsole.yml"
+    },
+    {
+      "name": "erp-crm",
+      "source_repo": "kushin77/shared-frontend",
+      "source_path": "contrib/shared-services/erp-crm.compose.yml",
+      "target_path": "infra/docker-compose.erp-crm.yml"
+    },
+    {
+      "name": "vendor-deploy",
+      "source_repo": "kushin77/shared-frontend",
+      "source_path": "contrib/shared-services/vendor-deploy.compose.yml",
+      "target_path": "infra/docker-compose.vendor-deploy.yml"
+    },
+    {
+      "name": "docker-compose.frontends",
+      "source_repo": "kushin77/shared-frontend",
+      "source_path": "contrib/shared-services/docker-compose.frontends.yml",
+      "target_path": "infra/docker-compose.frontends.yml"
+    },
+    {
+      "name": "capital-underwriting",
+      "source_repo": "kushin77/shared-frontend",
+      "source_path": "contrib/shared-services/capital-underwriting.compose.yml",
+      "target_path": "infra/docker-compose.capital-underwriting.yml",
+      "skip": "capital-underwriting is a FUTURE shape (its backend is an Express/Prisma PLACEHOLDER that needs upstream DB + secrets before go-live); APPLY-ERP-CAPITAL.md declares it apply-ready-but-not-applied. Excluded from sync until the run half provisions its backend (docs/AGENTCONSOLE-HOSTING.md §8)."
+    }
+  ]
+}
