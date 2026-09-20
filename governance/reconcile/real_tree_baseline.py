@@ -467,21 +467,36 @@ def _worktree_age_seconds(path: str, *, at: float) -> float | None:
         return None
 
 
+#: Retry backoff (seconds) for `_branch_age_seconds` (#1620). On a box running
+#: many concurrent sessions against the SAME checkout, a single `git log` call
+#: can race a concurrent ref-write (another lane's `git branch -D`, a pack-refs
+#: rewrite) and come back empty/nonzero even though the branch is perfectly
+#: fine — measured 2026-09-20: one run reported 95 branches unmeasured (and
+#: therefore fail-closed to NEW) that a re-run seconds later, with zero
+#: overlap, did not. Three attempts with a short backoff absorb that class of
+#: transient loss without weakening the fail-closed default when the branch
+#: genuinely cannot be measured (retries exhausted).
+_BRANCH_AGE_RETRY_BACKOFF = (0.2, 0.5, 1.0)
+
+
 def _branch_age_seconds(root: Path | str, branch: str, *, at: float) -> float | None:
     # `branch` names a ref, not a path — no `--` pathspec separator here, or
     # git treats it as a path filter against HEAD and silently returns nothing.
-    result = subprocess.run(
-        ["git", "-C", str(root), "log", "-1", "--format=%ct", branch],
-        capture_output=True,
-        text=True,
-    )
-    text = result.stdout.strip()
-    if result.returncode != 0 or not text:
-        return None
-    try:
-        return at - float(text)
-    except ValueError:
-        return None
+    for attempt, backoff in enumerate((0.0, *_BRANCH_AGE_RETRY_BACKOFF)):
+        if backoff:
+            time.sleep(backoff)
+        result = subprocess.run(
+            ["git", "-C", str(root), "log", "-1", "--format=%ct", branch],
+            capture_output=True,
+            text=True,
+        )
+        text = result.stdout.strip()
+        if result.returncode == 0 and text:
+            try:
+                return at - float(text)
+            except ValueError:
+                return None
+    return None
 
 
 def _branch_resolves(root: Path | str, branch: str) -> bool:
