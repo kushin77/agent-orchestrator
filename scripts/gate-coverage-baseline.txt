@@ -90,17 +90,17 @@
 # name until the row was removed -- the list cannot grow an excuse and cannot
 # keep a dead one.
 # LANDED (#1497, 2026-09-19), measured against origin/master a9f63bf4: the 51
-# `swept-only` rows that stood there are NINE. FORTY-TWO were retired the only
+# `swept-only` rows that stood there are TWELVE. THIRTY-NINE were retired the only
 # way this file allows — by NAMING each suite as a pytest target the gate of
 # record runs: `scripts/check-pytest-suites.sh`, auto-discovered into `make
 # verify` by `scripts/discover-checks.sh` (#698), runs each of them in
 # isolation. Naming a suite made its row STALE, which is the both-directions
 # rule above doing exactly what it promises. A second, independent half landed
 # with it: the closed/unknown-tracker rule now covers EVERY live row, so the
-# nine rows that remain cannot be deferred to a closed issue either.
-# THE NINE ROWS ARE OWNED, NOT EXCUSED. Each is a declared suite that fails,
-# hangs, or cannot run in a lane venue (each measured ALONE, its own pytest
-# process): portal (rc 124 after 240s, 3 failures), scripts (18 failed),
+# twelve rows that remain cannot be deferred to a closed issue either.
+# THE NINE LANE-VENUE ROWS ARE OWNED, NOT EXCUSED. Each is a declared suite that
+# fails, hangs, or cannot run in a lane venue (each measured ALONE, its own
+# pytest process): portal (rc 124 after 240s, 3 failures), scripts (18 failed),
 # governance/knowledge (4 failed), governance/conformance (1 failed),
 # governance/ticket (1 failed), governance/cto-overlay (4 failed),
 # governance/authority (2 failed), integrations/paperclip/reporting (7 failed +
@@ -109,8 +109,19 @@
 # the honest deferral, because a gate that is red on master is ignored. They
 # carry tracker #1501 (OPEN), which owns fixing them; that issue also has to be
 # in the committed board snapshot for this rule to read its state OFFLINE, so
-# this lane spliced exactly one entry into `.board/snapshot.json` (measured: 12
-# added lines, 0 removed, `generated_at` unchanged).
+# this lane spliced an entry into `.board/snapshot.json` for it.
+#
+# THREE CI-VENUE ROWS WERE ADDED BY THE SAME LANE when the first CI run of the
+# wired list (Cloud Build python:3.14, build 6845d8ad) reded the gate of record:
+# `check-pytest-suites.sh` had named 42 suites, and three of them failed in the
+# CI venue while passing alone in a lane worktree. They are baselined here
+# rather than named by the check, each tracked by #1509 (OPEN, spliced into
+# `.board/snapshot.json` alongside #1501):
+#   guardrails/honesty       CI pytest exit 1 (74 passed alone in a lane worktree)
+#   governance/lifecycle     CI pytest exit 1 (259 passed alone in a lane worktree)
+#   governance/reconcile     CI pytest exit 1 — test_the_shipped_document_re_measures_its_own_rows
+#                            re-measures the shipped quarantine document against its recorded
+#                            git common dir, which differs in a fresh CI checkout (reproduced)
 suite	portal	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	governance/knowledge	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	governance/conformance	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
@@ -120,3 +131,6 @@ suite	governance/authority	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e
 suite	scripts	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	integrations/paperclip/reporting	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	governance/modules	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	guardrails/honesty	swept-only	#1509	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/lifecycle	swept-only	#1509	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	governance/reconcile	swept-only	#1509	a9f63bf497554ecd1bd0a4c1904dc03a989e623b

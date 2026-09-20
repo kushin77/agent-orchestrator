@@ -11475,6 +11475,18 @@
       "cross_refs": [],
       "closed_at": "",
       "files": []
+    },
+    {
+      "number": 1509,
+      "title": "gate: three wired suites are red in the CI venue, so check-pytest-suites.sh reds the gate of record in Cloud Build (#1497)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
     }
   ]
 }
