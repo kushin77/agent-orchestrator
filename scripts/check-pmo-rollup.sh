@@ -256,7 +256,115 @@ else
   unproven=$((unproven + 1))
 fi
 
-expected_controls=7
+# --- 8. priority + dispatch: run offline, tri-state, over the real graph ----
+echo "== priority + dispatch (issue #403 follow-on) =="
+for view in priority dispatch; do
+  rc=0
+  pmo "$view" --check --json > "$scratch/real-$view.json" 2> "$scratch/real-$view.err" || rc=$?
+  views=$((views + 1))
+  if [ "$rc" -eq 2 ]; then
+    echo "  FAIL  view $view could not assess the committed graph:" >&2
+    sed 's/^/        /' "$scratch/real-$view.err" >&2
+    unproven=$((unproven + 1))
+    continue
+  fi
+  if json_ok "$scratch/real-$view.json"; then
+    printf '  OK    view %-8s rc=%s (0 OK / 1 NOT-OK, 2 never treated as a pass)\n' "$view" "$rc"
+  else
+    echo "  FAIL  view $view did not emit a JSON document" >&2
+    unproven=$((unproven + 1))
+  fi
+done
+
+# --- 9. priority determinism: re-derive twice, identical (--check already
+# does this in-process; this control re-derives via two separate processes,
+# which is what would catch a formula that leaked the wall clock or depended
+# on PYTHONHASHSEED-sensitive dict/set order across runs) -------------------
+controls=$((controls + 1))
+pmo priority --root . --json > "$scratch/prio-1.json" 2>/dev/null
+pmo priority --root . --json > "$scratch/prio-2.json" 2>/dev/null
+if diff -q "$scratch/prio-1.json" "$scratch/prio-2.json" >/dev/null 2>&1; then
+  echo "  OK    control priority is byte-identical across two separate processes"
+else
+  echo "  FAIL  control priority differs across two separate processes" >&2
+  unproven=$((unproven + 1))
+fi
+
+# --- 10. dispatch refuses a real lane collision (crafted plan document) ----
+controls=$((controls + 1))
+collision_out="$(cd governance/pmo && python3 - <<'PY'
+from dispatch import validate_plan
+document = {
+    "wave": 1,
+    "assignments": [
+        {"ticket": "kushin77/agent-orchestrator#10", "lane": "registry"},
+        {"ticket": "kushin77/agent-orchestrator#11", "lane": "registry"},
+    ],
+    "deferred": [],
+    "unowned_risks": [],
+}
+findings = validate_plan(document)
+codes = {f.code for f in findings}
+assert "dispatch-lane-collision" in codes, findings
+detail = next(f.detail for f in findings if f.code == "dispatch-lane-collision")
+assert "#10" in detail and "#11" in detail, detail
+print("dispatch-lane-collision: " + detail)
+PY
+)"
+if [ $? -eq 0 ] && printf '%s' "$collision_out" | grep -qF "dispatch-lane-collision"; then
+  echo "  OK    control dispatch refuses a real lane collision, naming both tickets"
+else
+  echo "  FAIL  control dispatch did not refuse a crafted lane collision:" >&2
+  printf '%s\n' "$collision_out" | sed 's/^/        /' >&2
+  unproven=$((unproven + 1))
+fi
+
+# --- 11. dispatch refuses a silently dropped unowned R item ----------------
+controls=$((controls + 1))
+dropped_out="$(cd governance/pmo && python3 - <<'PY'
+from dispatch import validate_plan
+document = {
+    "wave": 1,
+    "assignments": [],
+    "deferred": [],
+    "unowned_risks": [],
+    "_assert_unowned_risks": ["kushin77/agent-orchestrator#99"],
+}
+findings = validate_plan(document)
+codes = {f.code for f in findings}
+assert "dispatch-unowned-risk" in codes, findings
+detail_subject = next(f.subject for f in findings if f.code == "dispatch-unowned-risk")
+assert detail_subject == "kushin77/agent-orchestrator#99", detail_subject
+print("dispatch-unowned-risk: " + detail_subject)
+PY
+)"
+if [ $? -eq 0 ] && printf '%s' "$dropped_out" | grep -qF "dispatch-unowned-risk"; then
+  echo "  OK    control dispatch refuses a silently dropped unowned risk, naming it"
+else
+  echo "  FAIL  control dispatch did not refuse a crafted unowned-risk drop:" >&2
+  printf '%s\n' "$dropped_out" | sed 's/^/        /' >&2
+  unproven=$((unproven + 1))
+fi
+
+# --- 12. a malformed policy.yaml is CANNOT-ASSESS, never a pass ------------
+malformed="$scratch/malformed-policy"
+make_fixture "$malformed" || { echo "check-pmo-rollup: CANNOT-ASSESS — fixture" >&2; exit 2; }
+write_board "$malformed" "2026-09-14T00:00:00Z" '[]'
+mkdir -p "$malformed/governance/pmo"
+cp governance/pmo/policy.schema.json "$malformed/governance/pmo/policy.schema.json"
+printf 'version: 1\n' > "$malformed/governance/pmo/policy.yaml"
+rc=0
+pmo priority --root "$malformed" --check > "$scratch/malformed.out" 2>&1 || rc=$?
+controls=$((controls + 1))
+if [ "$rc" -eq 2 ] && grep -qF "CANNOT-ASSESS" "$scratch/malformed.out"; then
+  echo "  OK    control a malformed policy.yaml is CANNOT-ASSESS (rc=2), never a pass"
+else
+  printf '  FAIL  control a malformed policy.yaml exited %s, expected 2\n' "$rc" >&2
+  cat "$scratch/malformed.out" | sed 's/^/        /' >&2
+  unproven=$((unproven + 1))
+fi
+
+expected_controls=11
 if [ "$controls" -ne "$expected_controls" ]; then
   echo "check-pmo-rollup: FAIL — expected $expected_controls controls, ran $controls" >&2
   unproven=$((unproven + 1))
