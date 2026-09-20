@@ -21,7 +21,10 @@
 #      holding the violation (a mutant that reads nothing, or never fails, is caught here);
 #   4. NOT refused: a bounded `for n in $(seq 1 20)` batch; a loop with gh but no sleep;
 #      a loop that closes on a line merely CONTAINING the word `done`;
-#   5. `scan` on a root with no shell files is CANNOT-ASSESS (rc 2), never a silent "0 loops".
+#   5. `scan` on a root with no shell files is CANNOT-ASSESS (rc 2), never a silent "0 loops";
+#   6. the helper's contract is pinned against a PATH-INJECTED fake gh EXECUTABLE (never a
+#      `gh()` function shadowing the binary — docs/SHELL-PATTERNS.md SP-4), and the
+#      injection itself is asserted before any arm reads it.
 #
 # Exit: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 set -uo pipefail
@@ -188,11 +191,41 @@ fi
 # so the ONE sanctioned gh wrapper cannot silently drift from the harvested curve.
 helper="$root/scripts/lib/gh-bounded.sh"
 
+# The stub is a PATH-INJECTED fake EXECUTABLE, never a shell function named after the
+# binary: a function named `gh` shadows /usr/bin/gh for the whole shell, so a later read
+# takes the stub for an answer and reports green (docs/SHELL-PATTERNS.md SP-4). This is
+# the repo's established shape — scripts/check-merge-guard.sh:78 and
+# scripts/check-pr-queue-squash-guard.sh:78 each stand a fake ./bin/gh and prepend it to
+# PATH for the invocation. One fake, three answers, selected by $AO_TEST_GH_STUB_MODE;
+# it never touches the network.
+fakebin="$scratch/bin"
+mkdir -p "$fakebin"
+cat > "$fakebin/gh" <<'GH'
+#!/usr/bin/env bash
+case "${AO_TEST_GH_STUB_MODE:-ok}" in
+  fail)      exit 1 ;;
+  ratelimit) printf 'RATE_LIMIT exceeded\n' >&2; exit 1 ;;
+  *)         exit 0 ;;
+esac
+GH
+chmod +x "$fakebin/gh"
+
+# the INJECTION ITSELF is asserted: a fixture that silently did not take would leave every
+# arm below reading the real binary. `GH=gh` pins the helper's own `GH="${GH:-gh}"`
+# indirection back to the PATH lookup, so an ambient $GH cannot bypass the fake either.
+probe_rc=0
+probe_out="$(env PATH="$fakebin:$PATH" GH=gh AO_TEST_GH_STUB_MODE=ratelimit gh x 2>&1)" || probe_rc=$?
+if [ "$probe_rc" -eq 1 ] && [ "$probe_out" = "RATE_LIMIT exceeded" ]; then
+  echo "  OK    the PATH-injected fake gh answers per \$AO_TEST_GH_STUB_MODE (no shadowing function)"
+else
+  echo "  FAIL  the fake gh did not answer (rc=$probe_rc, out='$probe_out'): the arms below would read the real binary" >&2
+  fail=1
+fi
+
 # 1. the backoff curve is min(base*2**(n-1), 300) — no shift, so it can never wrap negative
-curve="$(bash -c '
+curve="$(env PATH="$fakebin:$PATH" GH=gh AO_TEST_GH_STUB_MODE=fail bash -c '
   source "'"$helper"'"
   sleep(){ printf "%s " "$1"; }
-  gh(){ return 1; }
   AO_GH_MAX_ATTEMPTS=6 AO_GH_BASE_DELAY=30 gh_bounded x 2>/dev/null
 ')"
 if [ "$curve" = "30 60 120 240 300 " ]; then
@@ -205,10 +238,9 @@ fi
 # 2. a RATE_LIMIT error is NEVER retried: it dead-letters (rc 75) naming attempt 1
 rlf="$scratch/ratelimit.err"
 rl_rc=0
-bash -c '
+env PATH="$fakebin:$PATH" GH=gh AO_TEST_GH_STUB_MODE=ratelimit bash -c '
   source "'"$helper"'"
   sleep(){ :; }
-  gh(){ printf "RATE_LIMIT exceeded\n" >&2; return 1; }
   AO_GH_MAX_ATTEMPTS=5 gh_bounded x
 ' >/dev/null 2>"$rlf" || rl_rc=$?
 if [ "$rl_rc" -eq 75 ] && grep -q 'attempt 1/5 hit a RATE LIMIT' "$rlf"; then
@@ -219,11 +251,12 @@ else
   fail=1
 fi
 
-# 3. a misconfigured budget/base is REFUSED by name (rc 64), never a silent no-op
-mc="$(bash -c '
+# 3. a misconfigured budget/base is REFUSED by name (rc 64), never a silent no-op.
+#    The fake SUCCEEDS, so a removed validation shows a 0 here rather than a coincidental
+#    non-zero from a tool that happened to fail.
+mc="$(env PATH="$fakebin:$PATH" GH=gh AO_TEST_GH_STUB_MODE=ok bash -c '
   source "'"$helper"'"
   sleep(){ :; }
-  gh(){ return 0; }
   AO_GH_MAX_ATTEMPTS=0 gh_bounded x >/dev/null 2>&1; printf "%s" "$?"
   AO_GH_MAX_ATTEMPTS=x gh_bounded x >/dev/null 2>&1; printf " %s" "$?"
   AO_GH_BASE_DELAY=-1 gh_bounded x >/dev/null 2>&1; printf " %s" "$?"
