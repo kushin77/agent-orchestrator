@@ -30,7 +30,7 @@ if _GATEWAY_DIR not in sys.path:
 
 from limits import model  # noqa: E402
 from limits.backpressure import BackpressureController  # noqa: E402
-from limits.budget import BudgetController, BudgetMode, BudgetPolicy  # noqa: E402
+from limits.budget import BudgetController, BudgetMode, TokenBudgetPolicy  # noqa: E402
 from limits.config import LimitsConfig, load_config  # noqa: E402
 from limits.fingerprint import cache_key, prompt_fingerprint  # noqa: E402
 from limits.limiter import build_engine  # noqa: E402
@@ -84,7 +84,7 @@ def cmd_fingerprint(args: argparse.Namespace) -> int:
 def cmd_budget(args: argparse.Namespace) -> int:
     if args.action == "decide":
         mode = getattr(args, "mode", None)
-        policy = BudgetPolicy(
+        policy = TokenBudgetPolicy(
             cap_tokens=args.cap,
             window_seconds=args.window,
             mode=mode or BudgetMode.OBSERVE,
@@ -99,7 +99,7 @@ def cmd_budget(args: argparse.Namespace) -> int:
         )
     else:  # record
         mode = getattr(args, "mode", None) or BudgetMode.ENFORCE
-        policy = BudgetPolicy(cap_tokens=args.cap, window_seconds=args.window, mode=mode)
+        policy = TokenBudgetPolicy(cap_tokens=args.cap, window_seconds=args.window, mode=mode)
         ctl = BudgetController(default_policy=policy)
         ctl.record(args.tenant, args.agent, args.tier, args.tokens)
         decision = ctl.decide(args.tenant, args.agent, args.tier, 0)
@@ -213,11 +213,11 @@ def cmd_demo(args: argparse.Namespace) -> int:
 
     # 3. Observe vs enforce budget: observe logs and never blocks.
     observe_budget = BudgetController(
-        default_policy=BudgetPolicy(cap_tokens=10, mode=BudgetMode.OBSERVE)
+        default_policy=TokenBudgetPolicy(cap_tokens=10, mode=BudgetMode.OBSERVE)
     )
     obs = observe_budget.decide("acme", "coder", "LOW", 500)
     enforce_budget = BudgetController(
-        default_policy=BudgetPolicy(cap_tokens=10, mode=BudgetMode.ENFORCE)
+        default_policy=TokenBudgetPolicy(cap_tokens=10, mode=BudgetMode.ENFORCE)
     )
     enf = enforce_budget.decide("acme", "coder", "LOW", 500)
     print(f"[3] budget observe:  allowed={obs.allowed} would_block={obs.would_block} "

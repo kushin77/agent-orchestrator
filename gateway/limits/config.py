@@ -15,7 +15,7 @@ from typing import Any
 import yaml
 
 from limits.backpressure import BackpressureController
-from limits.budget import BudgetController, BudgetPolicy
+from limits.budget import BudgetController, TokenBudgetPolicy
 from limits.cache import FileCacheStore, MemoryCacheStore, SemanticCache
 from limits.ratelimit import RateLimiter, RateLimitPolicy
 from limits.throttle import DEFAULT_CAPS, OutputThrottle
@@ -155,8 +155,8 @@ def build_cache(cfg: LimitsConfig | None = None) -> SemanticCache:
     )
 
 
-def _budget_policy_from(spec: dict, cfg: BudgetConfig) -> BudgetPolicy:
-    return BudgetPolicy(
+def _budget_policy_from(spec: dict, cfg: BudgetConfig) -> TokenBudgetPolicy:
+    return TokenBudgetPolicy(
         cap_tokens=int(spec.get("cap_tokens", cfg.default_cap_tokens)),
         window_seconds=int(spec.get("window_seconds", cfg.default_window_seconds)),
         mode=str(spec.get("mode", cfg.default_mode)),
@@ -171,7 +171,7 @@ def build_budget(cfg: LimitsConfig | None = None) -> BudgetController:
         tenant: _budget_policy_from(spec, b) for tenant, spec in b.tenant_overrides.items()
     }
     return BudgetController(
-        default_policy=BudgetPolicy(
+        default_policy=TokenBudgetPolicy(
             cap_tokens=b.default_cap_tokens,
             window_seconds=b.default_window_seconds,
             mode=b.default_mode,

@@ -16,7 +16,7 @@ from telemetry.metering.budget import (
     DECISION_WOULD_BLOCK,
     BUDGET_MODE_ENFORCE,
     BUDGET_MODE_OBSERVE,
-    BudgetPolicy,
+    DailyTokenBudgetPolicy,
     DailyTokenBudget,
     load_budget_config,
 )
@@ -57,7 +57,7 @@ def _budget(store, policies=None, **kwargs):
 def test_observe_mode_never_blocks(over_budget_store):
     budget = _budget(
         over_budget_store,
-        {"acme": BudgetPolicy("acme", 2_000_000, BUDGET_MODE_OBSERVE)},
+        {"acme": DailyTokenBudgetPolicy("acme", 2_000_000, BUDGET_MODE_OBSERVE)},
     )
     verdict = budget.check("acme", requested_tokens=0, day="2026-09-08")
     assert verdict.mode == BUDGET_MODE_OBSERVE
@@ -69,7 +69,7 @@ def test_observe_mode_never_blocks(over_budget_store):
 def test_enforce_mode_blocks_when_over(over_budget_store):
     budget = _budget(
         over_budget_store,
-        {"acme": BudgetPolicy("acme", 2_000_000, BUDGET_MODE_ENFORCE)},
+        {"acme": DailyTokenBudgetPolicy("acme", 2_000_000, BUDGET_MODE_ENFORCE)},
     )
     verdict = budget.check("acme", requested_tokens=0, day="2026-09-08")
     assert verdict.mode == BUDGET_MODE_ENFORCE
@@ -79,7 +79,7 @@ def test_enforce_mode_blocks_when_over(over_budget_store):
 def test_enforce_mode_allows_when_within(over_budget_store):
     budget = _budget(
         over_budget_store,
-        {"acme": BudgetPolicy("acme", 3_000_000, BUDGET_MODE_ENFORCE)},
+        {"acme": DailyTokenBudgetPolicy("acme", 3_000_000, BUDGET_MODE_ENFORCE)},
     )
     verdict = budget.check("acme", requested_tokens=500, day="2026-09-08")
     assert verdict.decision == DECISION_ALLOW
@@ -88,7 +88,7 @@ def test_enforce_mode_allows_when_within(over_budget_store):
 def test_requested_tokens_push_over_in_enforce():
     store = MemoryUsageStore()  # acme has used 0 tokens
     budget = _budget(
-        store, {"acme": BudgetPolicy("acme", 1000, BUDGET_MODE_ENFORCE)}
+        store, {"acme": DailyTokenBudgetPolicy("acme", 1000, BUDGET_MODE_ENFORCE)}
     )
     within = budget.check("acme", requested_tokens=900, day="2026-09-08")
     over = budget.check("acme", requested_tokens=1001, day="2026-09-08")
@@ -103,10 +103,10 @@ def test_observe_flip_to_enforce_is_the_safe_rollout_path():
                           output_tokens=0, ts=T_SEP_08)]
     )
     observe = _budget(
-        store, {"acme": BudgetPolicy("acme", 2_000_000, BUDGET_MODE_OBSERVE)}
+        store, {"acme": DailyTokenBudgetPolicy("acme", 2_000_000, BUDGET_MODE_OBSERVE)}
     )
     enforce = _budget(
-        store, {"acme": BudgetPolicy("acme", 2_000_000, BUDGET_MODE_ENFORCE)}
+        store, {"acme": DailyTokenBudgetPolicy("acme", 2_000_000, BUDGET_MODE_ENFORCE)}
     )
     assert observe.check("acme", day="2026-09-08").decision == DECISION_WOULD_BLOCK
     assert enforce.check("acme", day="2026-09-08").decision == DECISION_BLOCK
@@ -132,9 +132,9 @@ def test_default_limit_applies_to_unlisted_tenant():
 
 def test_budget_policy_validates():
     with pytest.raises(ValueError):
-        BudgetPolicy("acme", 0, BUDGET_MODE_OBSERVE)
+        DailyTokenBudgetPolicy("acme", 0, BUDGET_MODE_OBSERVE)
     with pytest.raises(ValueError):
-        BudgetPolicy("acme", 1000, "nope")
+        DailyTokenBudgetPolicy("acme", 1000, "nope")
 
 
 def test_default_config_loads_observe_default():

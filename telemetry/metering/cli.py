@@ -244,11 +244,11 @@ def cmd_demo(args: argparse.Namespace) -> int:
     print(json.dumps(reporter.provider_mix(), indent=2))
 
     print("\n== budget (enforce tenant globex) ==")
-    from telemetry.metering.budget import BudgetPolicy
+    from telemetry.metering.budget import DailyTokenBudgetPolicy
 
     budget = DailyTokenBudget(
         reporter,
-        policies={"globex": BudgetPolicy("globex", 1_000_000, "enforce")},
+        policies={"globex": DailyTokenBudgetPolicy("globex", 1_000_000, "enforce")},
     )
     print(json.dumps(budget.check("globex", requested_tokens=5_000).to_dict(), indent=2))
     return EXIT_OK
