@@ -12,6 +12,15 @@ Exit criteria:
 
 | task | repo#issue | module | priority | sme | tier | depends_on |
 |---|---|---|---|---|---|---|
+| cluster-c-outage-12 | shared-services#4247 | fleet-hygiene/outage | 5 | platform-sme | L0 | - |
+| cluster-c-outage-13 | CMR#973 | fleet-hygiene/outage | 5 | platform-sme | L0 | - |
+| cluster-c-outage-14 | leaderboard#2544 | fleet-hygiene/outage | 5 | platform-sme | L0 | - |
+| cluster-c-outage-15 | capital-underwriting#2730 | fleet-hygiene/outage | 5 | platform-sme | L0 | - |
+| cluster-c-rca-07 | agent-orchestrator#1566 | fleet-hygiene/rca | 5 | platform-sme | L0 | - |
+| cluster-c-rca-08 | shared-services#4249 | fleet-hygiene/rca | 5 | platform-sme | L0 | - |
+| cluster-c-rca-09 | shared-frontend#513 | fleet-hygiene/rca | 5 | platform-sme | L0 | - |
+| cluster-c-rca-10 | leaderboard#2572 | fleet-hygiene/rca | 5 | platform-sme | L0 | - |
+| cluster-c-rca-11 | capital-underwriting#2800 | fleet-hygiene/rca | 5 | platform-sme | L0 | - |
 | t-3867 | shared-services#3867 | infra | 1 | platform-sme | L0 | - |
 | t-4262 | shared-services#4262 | infra | 1 | platform-sme | L0 | - |
 | t-4264 | shared-services#4264 | infra | 1 | platform-sme | L0 | - |
@@ -50,6 +59,9 @@ Exit criteria:
 
 | task | repo#issue | module | priority | sme | tier | depends_on |
 |---|---|---|---|---|---|---|
+| cluster-c-governance-gate-19 | shared-governance#804 | fleet-hygiene/governance-gate | 3 | iac-sme | L0 | - |
+| cluster-c-iac-drift-21 | leaderboard#1973 | fleet-hygiene/iac-drift | 3 | iac-sme | L0 | - |
+| cluster-c-iac-drift-22 | capital-underwriting#2795 | fleet-hygiene/iac-drift | 3 | iac-sme | L0 | - |
 | t-dial-4 | shared-services#4097 | voice | 2 | security-sme | L1 | t-dial-3 |
 | t-dial-6 | shared-services#4099 | voice | 2 | iac-sme | L1 | t-dial-4 |
 | t-dialplane-e2e | shared-services#4093 | voice | 2 | platform-sme | L1 | t-dial-6 |
@@ -63,6 +75,24 @@ Exit criteria:
 | task | repo#issue | module | priority | sme | tier | depends_on |
 |---|---|---|---|---|---|---|
 | t-paperclip-sync | agent-orchestrator#1649 | paperclip | 3 | pmo | L1 | - |
+
+## M5 — Fleet hygiene backlog (clusters.json, issue #1575)
+
+Exit criteria:
+- no open docs/friction/lessons/offshore cluster issues remain in shared-services: `gh issue list --repo kushin77/shared-services --search 'label:pmo-cluster-docs,pmo-cluster-friction,pmo-cluster-lessons,pmo-cluster-offshore state:open' --json number -q 'length'` -> `0`
+
+| task | repo#issue | module | priority | sme | tier | depends_on |
+|---|---|---|---|---|---|---|
+| cluster-c-docs-01 | agent-orchestrator#1574 | fleet-hygiene/docs | 1 | pmo-sme | L0 | - |
+| cluster-c-docs-02 | shared-services#4246 | fleet-hygiene/docs | 1 | pmo-sme | L0 | - |
+| cluster-c-docs-03 | shared-frontend#493 | fleet-hygiene/docs | 1 | pmo-sme | L0 | - |
+| cluster-c-docs-04 | CMR#1009 | fleet-hygiene/docs | 1 | pmo-sme | L0 | - |
+| cluster-c-docs-05 | leaderboard#2554 | fleet-hygiene/docs | 1 | pmo-sme | L0 | - |
+| cluster-c-docs-06 | capital-underwriting#2766 | fleet-hygiene/docs | 1 | pmo-sme | L0 | - |
+| cluster-c-friction-16 | agent-orchestrator#1513 | fleet-hygiene/friction | 1 | architecture-sme | L0 | - |
+| cluster-c-friction-17 | shared-services#4241 | fleet-hygiene/friction | 1 | architecture-sme | L0 | - |
+| cluster-c-lessons-20 | CMR#851 | fleet-hygiene/lessons | 1 | platform-sme | L0 | - |
+| cluster-c-offshore-18 | shared-services#4244 | fleet-hygiene/offshore | 1 | platform-sme | L0 | - |
 
 
 
@@ -90,4 +120,13 @@ this; `plan --paperclip` is read-only and never calls out to a live instance.
 The gap is tracked in issue #1649 (parent #1268). Until it lands, this
 control loop is one-directional: plan -> payload -> (manual/future adapter) ->
 Paperclip, with GitHub issue state as the only writable source of truth.
+
+## Fleet hygiene clusters (issue #1575)
+
+22 clusters from `governance/pmo/clusters.json` (sourced from branch
+`issue-board-triage-20260920`, not yet on `master`) are ingested as batched
+`cluster-*` tasks under M0 (outage/rca), M3 (governance-gate/iac-drift) and M5
+(docs/friction/lessons/offshore) — each task's `cluster.members` names every
+issue the batch covers, so "everything in one place" includes the fleet's
+existing cluster backlog, not only the CRM/voice critical path.
 

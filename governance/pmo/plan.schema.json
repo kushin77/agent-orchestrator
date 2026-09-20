@@ -75,7 +75,30 @@
           },
           "sme": { "type": "string", "minLength": 1 },
           "tier": { "enum": ["L0", "L1", "L2"] },
-          "status_source": { "const": "github" }
+          "status_source": { "const": "github" },
+          "cluster": {
+            "type": "object",
+            "description": "Set when this task represents a batched cluster from governance/pmo/clusters.json (issue #1575) rather than a single issue — the 'everything in one place' ingestion for issue #1648. 'issue' above is the cluster's own tracking placeholder; 'members' are the real issues the cluster batches.",
+            "additionalProperties": false,
+            "required": ["id", "family", "members"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "family": { "type": "string", "minLength": 1 },
+              "members": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["repo", "issue"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "repo": { "type": "string", "minLength": 1 },
+                    "issue": { "type": "integer", "minimum": 1 }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

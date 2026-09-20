@@ -50,6 +50,25 @@ def test_render_paperclip_is_deterministic_and_shaped():
         assert ticket["kind"] == "task"
 
 
+def test_clusters_ingested_as_batched_tasks():
+    document = plan_module.load_plan(str(ROOT))
+    cluster_tasks = [t for t in document["tasks"] if "cluster" in t]
+    assert len(cluster_tasks) == 22
+    families = {t["cluster"]["family"] for t in cluster_tasks}
+    assert families == {
+        "outage",
+        "rca",
+        "governance-gate",
+        "iac-drift",
+        "docs",
+        "friction",
+        "lessons",
+        "offshore",
+    }
+    total_members = sum(len(t["cluster"]["members"]) for t in cluster_tasks)
+    assert total_members == 204  # every cluster's member issues are named, not dropped
+
+
 def test_no_stored_status_field_on_any_task():
     document = plan_module.load_plan(str(ROOT))
     for task in document["tasks"]:
