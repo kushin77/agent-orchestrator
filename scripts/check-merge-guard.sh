@@ -24,7 +24,11 @@
 #      `gh pr merge` was NEVER invoked. Run in apply mode, so that last claim is
 #      load-bearing rather than trivially true.
 #   2. OK: a trailer-bearing body. Dry run by default (exit 0, nothing merged),
-#      then AO_MERGE_APPLY=1 must exit 0 and record `gh pr merge` EXACTLY once.
+#      then AO_MERGE_APPLY=1 must exit 0, record the REST merge call EXACTLY once
+#      (issue #1569 moved the read, the merge and the head-branch delete to
+#      `gh api`, because `gh pr view`/`gh pr merge` are GraphQL and this box's
+#      SHARED GraphQL budget is exhausted by the fleet's own agents) and delete
+#      the merged head branch over REST exactly once.
 #   3. NO VERDICT: `gh pr view` fails, so the guard reports CANNOT-ASSESS.
 #      merge-pr.sh must exit 2 and NEVER merge (also asserted in apply mode).
 #   4. The instruction surfaces: the source of the ONE render module AND the
@@ -82,9 +86,17 @@ mkdir -p "$fakebin"
 cat > "$fakebin/gh" <<'GH'
 #!/usr/bin/env bash
 # A RECORDING fake gh for check-merge-guard.sh. Never touches the network:
-#   pr view  -> the JSON at $AO_TEST_GH_VIEW_JSON, or a failure when
-#               $AO_TEST_GH_VIEW_MODE is `fail`
-#   pr merge -> appends the PR number to $AO_TEST_GH_MERGE_CALLS, exits 0
+#   pr view   -> the JSON at $AO_TEST_GH_VIEW_JSON, or a failure when
+#                $AO_TEST_GH_VIEW_MODE is `fail`
+#   pr merge  -> appends the PR number to $AO_TEST_GH_MERGE_CALLS, exits 0
+#   api ...   -> the REST transport merge-pr.sh uses (issue #1569). The stand-in
+#                does NOT implement jq: it answers with the shape each caller's
+#                own `--jq` asks for (a GET of the pull returns the fixture at
+#                $AO_TEST_GH_REST_PULL, which carries the renamed keys BOTH REST
+#                reads look up), the merge endpoint appends the PR number to the
+#                SAME $AO_TEST_GH_MERGE_CALLS record `pr merge` writes -- so the
+#                "exactly once" property covers either transport -- and the
+#                head-ref DELETE appends the branch to $AO_TEST_GH_DELETE_CALLS.
 set -u
 if [ "${1:-}" = "pr" ] && [ "${2:-}" = "view" ]; then
   if [ "${AO_TEST_GH_VIEW_MODE:-ok}" = "fail" ]; then
@@ -97,6 +109,38 @@ fi
 if [ "${1:-}" = "pr" ] && [ "${2:-}" = "merge" ]; then
   printf '%s\n' "${3:-}" >> "$AO_TEST_GH_MERGE_CALLS"
   exit 0
+fi
+if [ "${1:-}" = "api" ]; then
+  shift
+  method="GET"
+  if [ "${1:-}" = "-X" ]; then
+    method="${2:-GET}"
+    shift 2
+  fi
+  url="${1:-}"
+  if [ $# -gt 0 ]; then shift; fi
+  case "$method $url" in
+    "GET "*"/pulls/"*)
+      if [ "${AO_TEST_GH_VIEW_MODE:-ok}" = "fail" ]; then
+        echo "fake gh: could not resolve to a Repository (offline)" >&2
+        exit 1
+      fi
+      cat "$AO_TEST_GH_REST_PULL"
+      exit 0
+      ;;
+    "PUT "*"/pulls/"*"/merge")
+      pr="${url##*/pulls/}"
+      printf '%s\n' "${pr%%/*}" >> "$AO_TEST_GH_MERGE_CALLS"
+      printf '{"merged":true,"sha":"1111111111111111111111111111111111111111","message":"Pull Request successfully merged"}\n'
+      exit 0
+      ;;
+    "DELETE "*"/git/refs/heads/"*)
+      printf '%s\n' "${url##*/git/refs/heads/}" >> "$AO_TEST_GH_DELETE_CALLS"
+      exit 0
+      ;;
+  esac
+  echo "fake gh: unexpected api invocation: $method $url" >&2
+  exit 1
 fi
 echo "fake gh: unexpected invocation: $*" >&2
 exit 1
@@ -131,16 +175,22 @@ if [ -z "$head_oid_for_fixture" ]; then
   echo "check-merge-guard: CANNOT-ASSESS — could not build the scratch fixture commit" >&2
   exit 2
 fi
-python3 - "$view_bad" "$view_good" "$head_oid_for_fixture" <<'PY'
+# The REST fixture (issue #1569) and the repository slug the apply path derives
+# from `git remote get-url origin`. The slug matters: the merged head branch may
+# only be deleted when the head really lives in that same repository, so the
+# fixture has to name it rather than leave it unreadable.
+rest_pull="$TMPD/rest-pull.json"
+repo_slug="$(git remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
+python3 - "$view_bad" "$view_good" "$head_oid_for_fixture" "$rest_pull" "$repo_slug" <<'PY'
 import json
 import sys
 
 bad, good = sys.argv[1], sys.argv[2]
 # baseRefName/headRefOid (issue #1332's merged-tree seam): merge-pr.sh's apply
-# path now reads these off the SAME `gh pr view` call this fake answers, so a
-# fixture missing them starves that seam of evidence and merge-pr.sh reaches
-# CANNOT-ASSESS before ever reaching gh pr merge — that is not this gate's
-# NOT-OK/no-verdict case, it is a fixture gap, so both bodies carry them.
+# path reads these off the call this fake answers, so a fixture missing them
+# starves that seam of evidence and merge-pr.sh reaches CANNOT-ASSESS before
+# ever reaching the merge -- that is not this gate's NOT-OK/no-verdict case, it
+# is a fixture gap, so both bodies carry them.
 head_oid = sys.argv[3]
 with open(bad, "w", encoding="utf-8") as handle:
     json.dump(
@@ -162,6 +212,22 @@ with open(good, "w", encoding="utf-8") as handle:
         },
         handle,
     )
+# The REST transport (issue #1569): merge-pr.sh reads the pull with `gh api
+# repos/<slug>/pulls/<n> --jq '{baseRefName: .base.ref, headRefOid: .head.sha}'`
+# and resolves the head ref for its post-merge branch delete from `gh api
+# repos/<slug>/pulls/<n>`. This one fixture carries the renamed keys BOTH of
+# those reads look up, because the fake answers after-the-filter rather than
+# running jq; the filter itself is measured live against the real API, not here.
+with open(sys.argv[4], "w", encoding="utf-8") as handle:
+    json.dump(
+        {
+            "baseRefName": "master",
+            "headRefOid": head_oid,
+            "headRef": "issue-1233",
+            "headRepo": sys.argv[5],
+        },
+        handle,
+    )
 PY
 fixtures_rc=$?
 if [ "$fixtures_rc" -ne 0 ]; then
@@ -172,13 +238,16 @@ fi
 # --- drive the REAL entrypoint (which drives the REAL guard) -----------------
 # <label> <view-mode> <json-file> <apply 0|1> -> prints the entrypoint's exit
 # code; its output lands in $TMPD/out-<label>.txt, the recorded merge calls in
-# $TMPD/calls-<label>.txt.
+# $TMPD/calls-<label>.txt, the recorded head-branch deletes in
+# $TMPD/deletes-<label>.txt.
 run_merge() {
   local label="$1" mode="$2" json="$3" apply="$4"
-  local calls out rc
+  local calls deletes out rc
   calls="$TMPD/calls-$label.txt"
+  deletes="$TMPD/deletes-$label.txt"
   out="$TMPD/out-$label.txt"
   : > "$calls"
+  : > "$deletes"
   # AO_QUEUE_VERIFY_MERGED/AO_QUEUE_VERIFY_CMD are scripts/pr-queue.sh's own
   # offline test seam for merged-tree evidence source (b) — merge-pr.sh's
   # apply path now reuses merged_tree_evidence_by_ref (issue #1254 step 6 via
@@ -186,6 +255,7 @@ run_merge() {
   # (evidence source (a)), so without this seam every apply-mode run would
   # refuse merged-tree-unverified before ever reaching gh pr merge.
   AO_TEST_GH_MERGE_CALLS="$calls" AO_TEST_GH_VIEW_MODE="$mode" AO_TEST_GH_VIEW_JSON="$json" \
+    AO_TEST_GH_REST_PULL="$rest_pull" AO_TEST_GH_DELETE_CALLS="$deletes" \
     AO_MERGE_APPLY="$apply" AO_QUEUE_VERIFY_MERGED=1 AO_QUEUE_VERIFY_CMD="exit 0" \
     PATH="$fakebin:$PATH" \
     bash "$root/$entry" --pr 1233 > "$out" 2>&1
@@ -213,9 +283,14 @@ else
   fail "NOT-OK verdict: the shared predicate's own finding was not reported"
 fi
 if [ -s "$TMPD/calls-notok.txt" ]; then
-  fail "NOT-OK verdict: gh pr merge was recorded although the guard refused"
+  fail "NOT-OK verdict: the REST merge was called although the guard refused"
 else
-  ok "NOT-OK verdict: gh pr merge was never invoked"
+  ok "NOT-OK verdict: the REST merge was never called"
+fi
+if [ -s "$TMPD/deletes-notok.txt" ]; then
+  fail "NOT-OK verdict: a head branch was deleted although nothing merged"
+else
+  ok "NOT-OK verdict: no head branch was deleted"
 fi
 
 # --- 2. OK: dry run by default, then merged exactly once --------------------
@@ -231,9 +306,9 @@ else
   fail "OK verdict (dry run by default): no DRY RUN plan was printed"
 fi
 if [ -s "$TMPD/calls-ok-dryrun.txt" ]; then
-  fail "OK verdict (dry run by default): gh pr merge was recorded in dry-run mode"
+  fail "OK verdict (dry run by default): a merge was recorded in dry-run mode"
 else
-  ok "OK verdict (dry run by default): gh pr merge was never invoked"
+  ok "OK verdict (dry run by default): the REST merge was never called"
 fi
 
 rc="$(run_merge ok-apply ok "$view_good" 1)"
@@ -245,14 +320,24 @@ fi
 merge_count="$(wc -l < "$TMPD/calls-ok-apply.txt")"
 merge_count="${merge_count// /}"
 if [ "$merge_count" = "1" ]; then
-  ok "OK verdict (apply): gh pr merge was invoked exactly once"
+  ok "OK verdict (apply): the merge endpoint was called exactly once"
 else
-  fail "OK verdict (apply): gh pr merge was invoked $merge_count time(s), expected exactly 1"
+  fail "OK verdict (apply): the merge endpoint was called $merge_count time(s), expected exactly 1"
 fi
 if [ "$(head -n1 "$TMPD/calls-ok-apply.txt")" = "1233" ]; then
   ok "OK verdict (apply): the recorded merge is for PR 1233"
 else
   fail "OK verdict (apply): the recorded merge names the wrong PR"
+fi
+# The head-branch delete is the REST replacement for `--delete-branch` (issue
+# #1569): without this arm the new call could stop happening and no control here
+# would notice.
+delete_count="$(wc -l < "$TMPD/deletes-ok-apply.txt")"
+delete_count="${delete_count// /}"
+if [ "$delete_count" = "1" ] && [ "$(head -n1 "$TMPD/deletes-ok-apply.txt")" = "issue-1233" ]; then
+  ok "OK verdict (apply): the merged head branch was deleted over REST exactly once (issue-1233)"
+else
+  fail "OK verdict (apply): the head-branch delete recorded $(tr '\n' ' ' < "$TMPD/deletes-ok-apply.txt"), expected exactly one delete of issue-1233"
 fi
 
 # --- 3. NO VERDICT: CANNOT-ASSESS, and never merged -------------------------
@@ -268,9 +353,9 @@ else
   fail "no verdict: the refusal is not named CANNOT-ASSESS"
 fi
 if [ -s "$TMPD/calls-noverdict.txt" ]; then
-  fail "no verdict: gh pr merge was recorded although the guard reached no verdict"
+  fail "no verdict: a merge was recorded although the guard reached no verdict"
 else
-  ok "no verdict: gh pr merge was never invoked"
+  ok "no verdict: the REST merge was never called"
 fi
 
 # --- 4. the instruction surfaces --------------------------------------------
