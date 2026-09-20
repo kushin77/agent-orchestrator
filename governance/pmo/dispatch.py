@@ -23,17 +23,86 @@ from __future__ import annotations
 
 from typing import Any
 
-from graph import Graph, issue_number
+import clusters as clusters_mod
+from graph import CannotAssess, Graph, issue_number
 from policy import Policy
 from priority import priority
 from views import Finding, View
 
+#: ADR-0012(b): "code / test / PR authoring routes to the `hermes` persona at
+#: MED; research / docs / reporting routes to the `paperclip` persona at LOW."
+#: This is PERSONA ROUTING (declared registry vocabulary), never a runtime
+#: call — see docs/decision-records/ADR-0012-hermes-paperclip-boundary.md §(e)
+#: "map the policy, do not couple the runtime". The classification signal is
+#: the ticket's `kind` facet — a real, committed ADR-0014 contract field
+#: (governance/pmo already reads it via graph.kind()), never an invented
+#: keyword heuristic on free text: the non-code ticket kinds (the lessons/RCA
+#: family plus the generic improvement register) are the research/reporting
+#: half; the default `task` kind is the code-author/test/PR half.
+_PAPERCLIP_KINDS = ("incident", "rca", "corrective-action", "lesson", "suggestion")
+
+
+def _default_executor(graph: Graph, ticket: str, lane) -> str:
+    """ADR-0012(b) persona routing. A lane's declared ``executor`` (SME-ROUTING
+    style override) wins outright; otherwise the ticket ``kind`` decides."""
+    if lane.executor:
+        return lane.executor
+    return "paperclip" if graph.kind(ticket) in _PAPERCLIP_KINDS else "hermes"
+
+
+#: keys the frozen contract (docs/contracts/paperclip/ticket.schema.json)
+#: knows about a ticket node — additionalProperties: false there, so a
+#: dispatch-only field (lane/tier/executor/brief) never leaks into this
+#: sub-record; it lives as a SIBLING key on the assignment instead.
+_CONTRACT_KEYS = ("id", "owner", "status", "blocked_by", "goal", "evidence", "kind", "facets")
+
+
+def paperclip_ticket_record(graph: Graph, ticket: str) -> dict[str, Any]:
+    """A ``dispatch`` assignment's reporting half: fields shaped to the frozen
+    ticket contract (ADR-0014's join node), a partial PROJECTION written to
+    stdout only — never a store, never a second source of ``status``.
+
+    Only fields the graph actually carries are populated (an unclaimed,
+    dispatch-ready ticket legitimately has no ``owner``/``status``/``goal`` yet
+    — inventing one to satisfy the contract's ``required`` list would be
+    exactly the fabrication GR-12 forbids), so this is a **partial** record:
+    every populated key's type/enum matches the contract exactly, but the
+    contract's own ``required`` completeness is not claimed for a ticket that
+    is not yet claimed.
+    """
+    record: dict[str, Any] = {"id": ticket}
+    owner = graph.owner(ticket)
+    if owner:
+        record["owner"] = owner
+    status = graph.status(ticket)
+    if status:
+        record["status"] = status
+    blocked_by = graph.blocked_by(ticket)
+    if blocked_by:
+        record["blocked_by"] = sorted(blocked_by)
+    goal = graph.goal(ticket)
+    if goal:
+        record["goal"] = goal
+    kind = graph.kind(ticket)
+    if kind and kind != "task":
+        record["kind"] = kind
+    raid = graph.raid(ticket)
+    if raid:
+        record["facets"] = {"raid": raid}
+    return record
+
 #: agent brief skeleton (goal-first, per ~/.claude/CLAUDE.md's `/focus` rules:
 #: goal in the first line, then constraints, then context, then steps).
-BRIEF_TEMPLATE = """GOAL: Resolve {ticket} ({lane} lane, {sme} SME, tier {tier}/{model}) — read the issue, make the change, run the lane's gate, open a PR.
+BRIEF_TEMPLATE = """GOAL: Resolve {ticket} ({lane} lane, {sme} SME, tier {tier}/{model}, executor {executor}) — read the issue, make the change, run the lane's gate, open a PR.
 CONSTRAINTS: owns only {owns}; one issue = one lane = one branch (docs/EXECUTION-PLAN.md); never edit vendor/, .board/, .fleet/; escalate tier only on observed difficulty, never pre-emptively.
-CONTEXT: priority rank {rank}, score {score} ({term_summary}); {owner_note}.
+CONTEXT: priority rank {rank}, score {score} ({term_summary}); {owner_note}. Executor is ADR-0012(b) persona routing (declared vocabulary, no runtime call).
 STEPS: 1) read the issue and AGENTS.md/CLAUDE.md for {lane}; 2) implement + test; 3) run the lane's gate (make verify or the lane-specific target); 4) open a PR closing {ticket}."""
+
+#: cluster brief skeleton (--by-cluster): one agent, N member issues, one recipe.
+CLUSTER_BRIEF_TEMPLATE = """GOAL: Apply cluster {cluster_id}'s recipe ({family}) across all {issue_count} member issues in one pass — {recipe}.
+CONSTRAINTS: one agent, one branch per cluster (docs/EXECUTION-PLAN.md's "no two lanes share a file" extends to "no two clusters share an issue" — board-triage's own contract); tier {tier}/{model}, SME {sme}; escalate tier only on observed difficulty.
+CONTEXT: priority rank {priority_rank}; evidence: {evidence}; member issues: {issues}.
+STEPS: 1) read every member issue and confirm the shared recipe still applies; 2) apply the recipe per issue; 3) run the lane's gate once per issue (or the batch gate the recipe names); 4) open one PR per issue (or one batched PR if the recipe says so), each closing its issue."""
 
 
 def _term_summary(item: dict[str, Any]) -> str:
@@ -41,7 +110,7 @@ def _term_summary(item: dict[str, Any]) -> str:
     return ", ".join(f"{name}={t['value']:+g}" for name, t in terms.items())
 
 
-def _brief(item: dict[str, Any], lane, model: str) -> str:
+def _brief(item: dict[str, Any], lane, model: str, executor: str) -> str:
     owner = item.get("owner") or ""
     owner_note = f"currently unowned" if not owner else f"owner of record {owner!r} (unclaimed for this dispatch)"
     return BRIEF_TEMPLATE.format(
@@ -50,11 +119,27 @@ def _brief(item: dict[str, Any], lane, model: str) -> str:
         sme=lane.sme,
         tier=lane.tier,
         model=model,
+        executor=executor,
         owns=", ".join(lane.owns) or "(no owned globs declared — default lane)",
         rank=item["rank"],
         score=item["score"],
         term_summary=_term_summary(item),
         owner_note=owner_note,
+    )
+
+
+def _cluster_brief(cluster, model: str) -> str:
+    return CLUSTER_BRIEF_TEMPLATE.format(
+        cluster_id=cluster.id,
+        family=cluster.family,
+        issue_count=len(cluster.issues),
+        recipe=cluster.recipe,
+        tier=cluster.tier,
+        model=model,
+        sme=cluster.sme,
+        priority_rank=cluster.priority_rank,
+        evidence=cluster.evidence,
+        issues=", ".join(f"{i['repo']}#{i['number']}" for i in cluster.issues),
     )
 
 
@@ -70,7 +155,14 @@ def _is_unowned_live_risk(graph: Graph, ticket: str) -> bool:
     return is_risk and not graph.owner(ticket)
 
 
-def dispatch(graph: Graph, policy: Policy, wave: int = 1, wave_cap: int | None = None) -> View:
+def dispatch(
+    graph: Graph,
+    policy: Policy,
+    wave: int = 1,
+    wave_cap: int | None = None,
+    by_cluster: bool = False,
+    clusters: "clusters_mod.Clusters | None" = None,
+) -> View:
     findings: list[Finding] = []
     cap = wave_cap if wave_cap is not None else policy.wave_cap_default
     if cap < 1:
@@ -78,6 +170,59 @@ def dispatch(graph: Graph, policy: Policy, wave: int = 1, wave_cap: int | None =
 
     prio = priority(graph, policy)
     items_by_ticket = {item["ticket"]: item for item in prio.document["items"]}
+
+    # --- --by-cluster: one agent per batchable cluster, this wave only ------
+    # clusters.json is optional, read-only INPUT from a separate lane
+    # (governance/pmo/clusters.py). Absent -> fall back to the per-issue plan
+    # below, unchanged. This branch never re-derives clustering itself (PMO
+    # adds no ledger); it only filters/sorts the proposal it was handed.
+    if by_cluster and clusters is not None and clusters.clusters:
+        batch_assignments: list[dict[str, Any]] = []
+        batch_deferred: list[dict[str, Any]] = []
+        for cluster in sorted(clusters.clusters, key=lambda c: c.priority_rank):
+            if cluster.wave != wave:
+                batch_deferred.append(
+                    {"cluster": cluster.id, "reason": f"cluster-wave-{cluster.wave}-not-requested-wave-{wave}"}
+                )
+                continue
+            if not cluster.batchable:
+                batch_deferred.append({"cluster": cluster.id, "reason": "cluster-not-batchable"})
+                continue
+            if len(batch_assignments) >= cap:
+                batch_deferred.append({"cluster": cluster.id, "reason": "wave-cap-reached"})
+                continue
+            model = policy.model_tiers.get(cluster.tier, cluster.tier)
+            issue_ids = [f"{i['repo']}#{i['number']}" for i in cluster.issues]
+            batch_assignments.append(
+                {
+                    "cluster": cluster.id,
+                    "family": cluster.family,
+                    "priority_rank": cluster.priority_rank,
+                    "lane": cluster.id,
+                    "tier": cluster.tier,
+                    "model": model,
+                    "sme_profile": cluster.sme,
+                    "evidence": cluster.evidence,
+                    "issue_count": len(cluster.issues),
+                    "issues": issue_ids,
+                    "agent_brief": _cluster_brief(cluster, model),
+                }
+            )
+        document = {
+            "view": "dispatch",
+            "clock": graph.clock,
+            "tickets": sorted(graph.tickets),
+            "wave": wave,
+            "wave_cap": cap,
+            "by_cluster": True,
+            "clusters_source_generated_at": clusters.generated_at,
+            "assignments": batch_assignments,
+            "deferred": batch_deferred,
+            "unowned_risks": [],
+            "unclustered": list(clusters.unclustered),
+        }
+        findings.extend(validate_plan(document))
+        return View("dispatch", graph.clock, document, findings)
 
     assignments: list[dict[str, Any]] = []
     deferred: list[dict[str, Any]] = []
@@ -104,6 +249,7 @@ def dispatch(graph: Graph, policy: Policy, wave: int = 1, wave_cap: int | None =
             continue
 
         model = policy.model_tiers.get(lane.tier, lane.tier)
+        executor = _default_executor(graph, item["ticket"], lane)
         assignments.append(
             {
                 "ticket": item["ticket"],
@@ -114,7 +260,9 @@ def dispatch(graph: Graph, policy: Policy, wave: int = 1, wave_cap: int | None =
                 "tier": lane.tier,
                 "model": model,
                 "sme_profile": lane.sme,
-                "agent_brief": _brief(item, lane, model),
+                "executor": executor,
+                "agent_brief": _brief(item, lane, model, executor),
+                "paperclip_ticket": paperclip_ticket_record(graph, item["ticket"]),
             }
         )
         used_lanes.add(lane.lane)
@@ -136,6 +284,7 @@ def dispatch(graph: Graph, policy: Policy, wave: int = 1, wave_cap: int | None =
         "tickets": sorted(graph.tickets),
         "wave": wave,
         "wave_cap": cap,
+        "by_cluster": False,
         "assignments": assignments,
         "deferred": deferred,
         "unowned_risks": unowned_risks,

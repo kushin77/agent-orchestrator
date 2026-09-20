@@ -50,6 +50,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import clusters as clusters_mod
 from dispatch import dispatch as derive_dispatch
 from graph import CannotAssess, Graph, load
 from policy import Policy
@@ -125,11 +126,14 @@ def _overlay_live_labels(graph: Graph) -> list[str]:
     return notes
 
 
-def _derive_view(args: argparse.Namespace, graph: Graph, policy: Policy) -> View:
+def _derive_view(args: argparse.Namespace, graph: Graph, policy: Policy, clusters=None) -> View:
     if args.view == "priority":
         return derive_priority(graph, policy)
     if args.view == "dispatch":
-        return derive_dispatch(graph, policy, wave=args.wave or 1, wave_cap=args.wave_cap)
+        return derive_dispatch(
+            graph, policy, wave=args.wave or 1, wave_cap=args.wave_cap,
+            by_cluster=args.by_cluster, clusters=clusters,
+        )
     return VIEWS[args.view](graph)
 
 
@@ -225,6 +229,12 @@ def main(argv: list[str] | None = None) -> int:
         "--apply", action="store_true",
         help="dispatch: post one idempotent PMO comment + pmo:dispatched label per assignment (off by default; never used by the gate)",
     )
+    parser.add_argument(
+        "--by-cluster", dest="by_cluster", action="store_true",
+        help="dispatch: dispatch one agent per batchable cluster from governance/pmo/clusters.json "
+             "(optional, read-only input from a separate lane); falls back to the per-issue plan "
+             "when the file is absent, and CANNOT-ASSESS (rc 2) when it is present but schema-invalid",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -232,18 +242,19 @@ def main(argv: list[str] | None = None) -> int:
         if args.now:
             graph.clock = args.now
         policy = load_policy(args.root) if args.view in POLICY_VIEWS else None
+        clusters = clusters_mod.load(args.root) if args.view == "dispatch" and args.by_cluster else None
         live_notes: list[str] = []
         if args.live and args.view in POLICY_VIEWS:
             live_notes = _overlay_live_labels(graph)
 
-        view = _derive_view(args, graph, policy)
+        view = _derive_view(args, graph, policy, clusters)
         view.notes.extend(live_notes)
         findings = list(view.findings)
         if args.check:
             # A view is a projection, so deriving it twice over one graph must be
             # byte-identical: a render that depended on iteration order or the
             # wall clock would be a second source of truth wearing a view's name.
-            again = _derive_view(args, graph, policy)
+            again = _derive_view(args, graph, policy, clusters)
             if again.text() != view.text():
                 findings.append(
                     Finding("view-nondeterministic", view.name, "two derivations over one graph differ")
