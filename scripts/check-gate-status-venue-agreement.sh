@@ -48,8 +48,11 @@
 #   Arm 8 is fail-CLOSED on a conclusion nobody enumerated. Arm 9 is the
 #   MUTANT: the guard removed => the refusal arm must disappear, so the control
 #   is measuring the guard and not something else. Arms 10-13 provoke
-#   `reconcile`, which may only ever withdraw a green -- never publish one.
-#   Arms 14-15 are issue #1467's scope, in both directions: a red the venue
+#   `reconcile` withdrawing a green the venue contradicts. Arms 16-19 provoke
+#   its NEW other direction (issue #1504): the venue's own concluded success
+#   supersedes a stale failure/error/no status -- and ONLY its own, so a red
+#   venue or a venue that produced no run still publishes nothing. Arms 14-15
+#   are issue #1467's scope, in both directions: a red the venue
 #   MEASURED it cannot deliver loses its precedence (the deadlock), and a venue
 #   record that could not be READ keeps it (fail closed).
 #
@@ -185,6 +188,7 @@ write_runs "$scratch/cancel.json"   completed   cancelled
 write_runs "$scratch/mystery.json"  completed   mystery-conclusion
 write_status "$scratch/green-status.json" success "make verify: PASS"
 write_status "$scratch/no-status.json"    none    ""
+write_status "$scratch/failure-status.json" failure "make verify: FAIL"
 
 EVENTS="$scratch/events.log"
 
@@ -405,20 +409,21 @@ poster_run red.json no-status.json reconcile --sha "$SHA"
 rc=$?
 arm_count=$((arm_count + 1))
 if [ "$rc" -ne 0 ] || any_post; then
-  bad "reconcile posted although nothing was published under the context (rc $rc): $(cat "$EVENTS")"
-elif ! grep -qF "nothing is published under" "$scratch/out.txt"; then
+  bad "reconcile posted although nothing was published under the context and the venue concluded red (rc $rc): $(cat "$EVENTS")"
+elif ! grep -qF "concluded against this commit too" "$scratch/out.txt"; then
   bad "reconcile did not read the published status it was supposed to judge: $(cat "$scratch/out.txt")"
 else
-  ok "reconcile posts NOTHING when the context has no published status at all (and says so)"
+  ok "reconcile posts NOTHING when the context has no status and the venue concluded red (and says so)"
 fi
 
-# The final vacuity guard: reconcile may only ever publish a NON-success.
+# The withdrawal arm must never publish a success: a standing green + a red
+# venue is withdrawn as error, never "satisfied" a second way.
 poster_run red.json green-status.json reconcile --sha "$SHA"
 arm_count=$((arm_count + 1))
 if posted success; then
-  bad "reconcile published a SUCCESS — the withdrawal path must never be a second way to satisfy the context"
+  bad "reconcile published a SUCCESS on the withdrawal path — that would be a second way to satisfy the context"
 elif posted error; then
-  ok "reconcile can only ever publish a non-success (it withdrew with state=error)"
+  ok "the withdrawal path publishes only the error (never a success)"
 else
   bad "reconcile neither withdrew nor published anything unexpected: $(cat "$EVENTS")"
 fi
@@ -461,10 +466,58 @@ else
   ok "an unreadable venue record keeps the guard standing (CANNOT-ASSESS, nothing posted)"
 fi
 
+echo "== 16. issue #1504: a stale failure is superseded by the venue's own concluded success =="
+poster_run green.json failure-status.json reconcile --sha "$SHA"
+rc=$?
+arm_count=$((arm_count + 1))
+if [ "$rc" -ne 0 ]; then
+  bad "reconcile did not publish the venue's own success over a stale failure (expected rc 0, got rc $rc): $(cat "$scratch/out.txt")"
+elif ! posted success; then
+  bad "reconcile posted no success over the stale failure: $(cat "$EVENTS")"
+elif ! grep -qF "target_url=$BUILD_URL" "$EVENTS"; then
+  bad "the published success does not carry the venue's own run as evidence: $(cat "$EVENTS")"
+elif ! grep -qF "description=RESTORED: the CI venue's own run concluded success for this commit" "$EVENTS"; then
+  bad "the published success does not name the venue's own verdict: $(cat "$EVENTS")"
+else
+  ok "a stale failure is superseded by the venue's own concluded success, carrying the venue's run as evidence"
+fi
+
+echo "== 17. issue #1504: the missing-status case is restored by the venue's own success =="
+poster_run green.json no-status.json reconcile --sha "$SHA"
+rc=$?
+arm_count=$((arm_count + 1))
+if [ "$rc" -ne 0 ]; then
+  bad "reconcile did not publish the venue's own success where no status existed (expected rc 0, got rc $rc): $(cat "$scratch/out.txt")"
+elif ! posted success; then
+  bad "reconcile posted no success where no status existed: $(cat "$EVENTS")"
+else
+  ok "a head with no status at all is restored by the venue's own concluded success (the #1493/#1498 shape)"
+fi
+
+echo "== 18. issue #1504: a red venue must NOT supersede a stale failure =="
+poster_run red.json failure-status.json reconcile --sha "$SHA"
+rc=$?
+arm_count=$((arm_count + 1))
+if [ "$rc" -ne 0 ] || any_post; then
+  bad "a red venue superseded a stale failure, or reconcile otherwise wrote (rc $rc): $(cat "$EVENTS")"
+else
+  ok "a stale failure is NOT upgraded when the venue's own run concluded red"
+fi
+
+echo "== 19. issue #1504: a venue that produced no run must NOT upgrade a stale failure =="
+poster_run none.json failure-status.json reconcile --sha "$SHA"
+rc=$?
+arm_count=$((arm_count + 1))
+if [ "$rc" -ne 0 ] || any_post; then
+  bad "a venue that produced no run upgraded a stale failure, or reconcile otherwise wrote (rc $rc): $(cat "$EVENTS")"
+else
+  ok "a stale failure is NOT upgraded by a venue that produced no run (no verdict to cite)"
+fi
+
 echo
 if [ "$fail" -ne 0 ]; then
   echo "check-gate-status-venue-agreement: FAIL — $arm_count arm(s) run, at least one is not OK (see above)" >&2
   exit 1
 fi
-echo "check-gate-status-venue-agreement: OK — $arm_count arm(s) provoked: a green is refused while the venue of record's own run for the same commit is red or still running, the refusal names the run, the venue's own report and the healthy and un-run paths still publish, a red is never blocked, an unreadable verdict fails closed, a red the venue MEASURED it cannot deliver no longer deadlocks the required context while an unreadable record keeps it blocked, removing the guard restores the false green, and reconcile can only withdraw"
+echo "check-gate-status-venue-agreement: OK — $arm_count arm(s) provoked: a green is refused while the venue of record's own run for the same commit is red or still running, the refusal names the run, the venue's own report and the healthy and un-run paths still publish, a red is never blocked, an unreadable verdict fails closed, a red the venue MEASURED it cannot deliver no longer deadlocks the required context while an unreadable record keeps it blocked, removing the guard restores the false green, and reconcile brings the published context into agreement in BOTH directions — withdrawing a green the venue contradicts and publishing the venue's own success over a stale non-green"
 exit 0

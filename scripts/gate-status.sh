@@ -20,8 +20,10 @@
 #                                        bound to the commit it measured
 #   reconcile --sha <sha>                make the PUBLISHED context agree with the
 #                                        CI venue's own verdict for that commit,
-#                                        withdrawing a standing green the venue's
-#                                        run contradicts (see VENUE AGREEMENT)
+#                                        in BOTH directions: withdraw a standing
+#                                        green the venue's run contradicts, and
+#                                        publish the venue's own success over a
+#                                        stale non-green (see VENUE AGREEMENT)
 #   show    --sha <sha>                  read the combined status BACK
 #   dry-run --sha <sha> --rc <0|1|2>     print the request without sending it
 #   --self-test                          prove the token + attestation seams
@@ -125,8 +127,11 @@
 # `reconcile` is the other half of the same invariant, and it exists because the
 # halves are not symmetric in TIME: a green published before the venue produced
 # any run for the commit is not refusable at post time, so after the fact the
-# published context must be brought back into agreement -- a standing `success`
-# whose venue run concluded red is SUPERSEDED by an `error` that names the run.
+# published context must be brought back into agreement. That agreement runs in
+# BOTH directions: a standing `success` whose venue run concluded red is
+# SUPERSEDED by an `error` that names the run, and a stale `failure`/`error`/no
+# status is SUPERSEDED by the venue's OWN success. A green published here is the
+# venue's own verdict, never a hand-claim (issue #1504).
 set -u
 
 # This script's own ABSOLUTE path, captured before the `cd` below: the self-test
@@ -791,23 +796,33 @@ PY
     # not symmetric in TIME: a green published BEFORE the venue produced any run
     # for the commit cannot be refused at post time (there was nothing yet to
     # contradict it), so the published context has to be brought back into
-    # agreement afterwards. This verb never publishes a green -- it can only
-    # withdraw one -- so it cannot become a second way to satisfy the context.
+    # agreement afterwards. That agreement runs in BOTH directions, and this verb
+    # is the ONLY new path to green (the `post` guard is untouched):
     #
-    # `writes` is what the gate asserts on: this verb either posts a non-success
-    # or posts nothing at all.
+    #   * a standing `success` whose venue run concluded red is WITHDRAWN as an
+    #     `error` naming the run -- the existing half;
+    #   * a standing `failure`/`error`, or no status at all, whose venue run
+    #     concluded success is SUPERSEDED by the venue's own `success` -- the
+    #     half this issue adds (issue #1504).
+    #
+    # The green published here is the venue-of-record's OWN verdict, never a
+    # hand-claim: it is posted only when the venue actually concluded (its own
+    # run carries a page this verb can cite), so a venue that produced no run at
+    # all can never upgrade a non-green -- there is no venue verdict to cite, and
+    # inventing one is the fabricated-green class. That is also why this verb
+    # cannot become a second way for a box-side producer to satisfy the required
+    # context.
     [ -n "$sha" ] || die "CANNOT-ASSESS — --sha is required" 2
     published="$(published_state "$sha")" || die "CANNOT-ASSESS — the published '${CONTEXT}' status for ${sha:0:12} could not be read ($(head -c 160 /tmp/gs-status-err.txt 2>/dev/null))" 2
     pub_state="${published%%$'\n'*}"
     pub_desc="${published#*$'\n'}"
     case "$pub_state" in
-      success) ;;
-      none)
-        echo "gate-status: reconcile OK — nothing is published under '${CONTEXT}' on ${sha:0:12}, so there is no green to withdraw"
-        exit 0
+      success|failure|error|none) ;;
+      unassessable)
+        die "CANNOT-ASSESS — the published '${CONTEXT}' status for ${sha:0:12} is not readable ($pub_desc), so no agreement can be decided" 2
         ;;
       *)
-        echo "gate-status: reconcile OK — the published '${CONTEXT}' on ${sha:0:12} is '$pub_state' ($pub_desc), not a green, so no withdrawal is owed"
+        echo "gate-status: reconcile OK — the published '${CONTEXT}' on ${sha:0:12} is '$pub_state' ($pub_desc), which is neither a green to withdraw nor a stale non-green to upgrade"
         exit 0
         ;;
     esac
@@ -815,33 +830,74 @@ PY
       || die "CANNOT-ASSESS — no scratch file for the venue read" 2
     if ! fetch_venue_runs "$sha" "$reconcile_json"; then
       rm -f "$reconcile_json"
-      die "CANNOT-ASSESS — the CI venue's verdict for ${sha:0:12} could not be read ($(head -c 160 /tmp/gs-venue-err.txt 2>/dev/null)), so whether the published green agrees with it cannot be decided" 2
+      die "CANNOT-ASSESS — the CI venue's verdict for ${sha:0:12} could not be read ($(head -c 160 /tmp/gs-venue-err.txt 2>/dev/null)), so whether the published '${CONTEXT}' agrees with it cannot be decided" 2
     fi
     agreement="$(venue_agreement "$reconcile_json")"
     rm -f "$reconcile_json"
+    # ONE field per line, and a trailing newline appended so even the LAST field
+    # has a terminator: command substitution strips trailing newlines, and
+    # without the terminator `${rest#*$'\n'}` is a no-op on the final field,
+    # shifting each later field onto the previous one's value (the no-run case
+    # shifts the REASON onto the URL -- measured while writing the #1504 arm).
+    agreement="${agreement}"$'\n'
     venue_verdict="${agreement%%$'\n'*}"
     venue_rest="${agreement#*$'\n'}"
     venue_reason="${venue_rest%%$'\n'*}"
-    venue_url="${venue_rest#*$'\n'}"
-    case "$venue_verdict" in
-      allow)
-        echo "gate-status: reconcile OK — the published green on ${sha:0:12} agrees with the venue of record: $venue_reason"
-        exit 0
+    venue_rest="${venue_rest#*$'\n'}"
+    venue_url="${venue_rest%%$'\n'*}"
+    case "$pub_state" in
+      success)
+        case "$venue_verdict" in
+          allow)
+            echo "gate-status: reconcile OK — the published green on ${sha:0:12} agrees with the venue of record: $venue_reason"
+            exit 0
+            ;;
+          unsettled)
+            echo "gate-status: reconcile OK — nothing is withdrawn while the venue is still running: $venue_reason"
+            exit 0
+            ;;
+          refuse)
+            # Short on purpose: a commit-status description is capped at 140
+            # characters, and the BUILD that failed is the evidence an operator
+            # needs -- it travels in target_url, where the API allows a URL.
+            publish_status "$sha" error "WITHDRAWN: the CI venue's own run concluded against this commit" "$venue_url"
+            echo "gate-status: reconcile WITHDREW the standing green on ${sha:0:12} — $venue_reason" >&2
+            exit 0
+            ;;
+          *)
+            die "CANNOT-ASSESS — the venue agreement could not be decided: $venue_reason" 2
+            ;;
+        esac
         ;;
-      unsettled)
-        echo "gate-status: reconcile OK — nothing is withdrawn while the venue is still running: $venue_reason"
-        exit 0
-        ;;
-      refuse)
-        # Short on purpose: a commit-status description is capped at 140
-        # characters, and the BUILD that failed is the evidence an operator
-        # needs -- it travels in target_url, where the API allows a URL.
-        publish_status "$sha" error "WITHDRAWN: the CI venue's own run concluded against this commit" "$venue_url"
-        echo "gate-status: reconcile WITHDREW the standing green on ${sha:0:12} — $venue_reason" >&2
-        exit 0
-        ;;
-      *)
-        die "CANNOT-ASSESS — the venue agreement could not be decided: $venue_reason" 2
+      failure|error|none)
+        case "$venue_verdict" in
+          allow)
+            # The venue's own run concluded success/neutral/skipped, so a
+            # non-green standing here is STALE -- the venue, the source of
+            # truth, said so. The upgrade is gated on the venue having actually
+            # run (its own page, cited in target_url): a venue that produced no
+            # run at all has no verdict to cite, and upgrading on that would be
+            # the fabricated-green class.
+            if [ -n "$venue_url" ]; then
+              publish_status "$sha" success "RESTORED: the CI venue's own run concluded success for this commit" "$venue_url"
+              echo "gate-status: reconcile PUBLISHED the venue of record's own success on ${sha:0:12} — $venue_reason" >&2
+            else
+              echo "gate-status: reconcile OK — the venue produced no run for ${sha:0:12}, so its own verdict cannot supersede the published '$pub_state'; nothing is published" >&2
+            fi
+            exit 0
+            ;;
+          refuse)
+            echo "gate-status: reconcile OK — the published '${CONTEXT}' on ${sha:0:12} is '$pub_state', and the venue of record concluded against this commit too, so no upgrade is owed: $venue_reason"
+            exit 0
+            ;;
+          unsettled)
+            echo "gate-status: reconcile OK — the published '${CONTEXT}' on ${sha:0:12} is '$pub_state', and the venue of record has not concluded, so nothing is published: $venue_reason"
+            exit 0
+            ;;
+          *)
+            die "CANNOT-ASSESS — the venue agreement could not be decided: $venue_reason" 2
+            ;;
+        esac
         ;;
     esac
     ;;
