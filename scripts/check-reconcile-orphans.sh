@@ -470,18 +470,41 @@ else
   # filed-finding recheck (a board read), neither of which this gate owns — and
   # since #917 stamps a beat for every lane, a dead lane's beat would red every
   # verify run through a verdict about sessions, not orphans.
-  real_out="$(python3 - "$main_root" "$root/$budget" <<'PY' 2>&1
+  real_out="$(AO_GATE_VENUE="${AO_GATE_VENUE:-lane}" python3 - "$main_root" "$root/$budget" <<'PY' 2>&1
+import os
 import sys
 from pathlib import Path
 from governance.reconcile import orphans
+
+# #1620: orphan-branch and orphan-issue-lane are counted against the WHOLE
+# box's git state (every concurrent session's branches/lanes), so they swing
+# with unrelated fleet activity, not this checkout's own diff — measured
+# swinging orphan-branch from 107 to 97 and orphan-issue-lane from 44 to 45
+# with no action taken by the run reporting it. In the default "lane" venue
+# (a PR's own `make verify`) they are reported as advisory NOTEs, never
+# block. orphan-worktree / orphan-pr / orphan-directive stay blocking
+# everywhere — they are not subject to the same cross-session race. The
+# AO_GATE_VENUE=attestation venue (serial, post-merge) enforces all of them.
+ADVISORY_IN_LANE = ("orphan-branch", "orphan-issue-lane")
+venue = os.environ.get("AO_GATE_VENUE", "lane")
+
 budget, expired = orphans.load_budget(sys.argv[2])
 report = orphans.walk(orphans.RepoOrphanOps(Path(sys.argv[1])), apply=False, budget=budget, budget_expired=expired)
 print("orphan-walk (dry-run): " + ", ".join(f"{k}={v}" for k, v in report.counts.items()))
 for kind, reason in report.unmeasured.items():
     print(f"  unmeasured {kind}: {reason}")
+
+blocking = False
 for name in report.exceeded:
-    print(f"  NOT-OK {name}")
-sys.exit(2 if not report.assessable else (1 if report.exceeded else 0))
+    # name is "orphan-budget-exceeded:<kind>:<n>/<budget>"
+    kind = name.split(":")[1] if name.count(":") >= 1 else ""
+    if venue != "attestation" and kind in ADVISORY_IN_LANE:
+        print(f"  NOTE {name} (advisory in lane venue, #1620; blocking in AO_GATE_VENUE=attestation)")
+    else:
+        print(f"  NOT-OK {name}")
+        blocking = True
+
+sys.exit(2 if not report.assessable else (1 if blocking else 0))
 PY
 )"
   real_rc=$?
