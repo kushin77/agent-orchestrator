@@ -28,7 +28,7 @@ ATTESTATION ?= .verify/attestation.json
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e fleet-parity \
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage codeowners squash-message chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
-        brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
+        brain-profile conformance lessons ticket pmo pmo-dispatch secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety web-image-dryrun \
         remediation remediation-scan remediation-dispatch \
         capacity-gate tagging epic-focus capability-drift conformance-change-set board-gate ao-ssh-access \
@@ -495,6 +495,19 @@ ticket:
 ## that disagrees with the graph, a rollup from a stale cache) for real
 pmo:
 	@bash scripts/check-pmo-rollup.sh
+
+## pmo-dispatch — the priority/dispatch engine over the same ticket graph
+## (issue #403 follow-on): `priority` derives one explainable score per open
+## task (P-level + aging tier + blocking fan-out + unblocked-readiness + owner
+## capacity, every term cited to its ledger source in governance/pmo/policy.yaml,
+## an SLA term with no committed ledger carried as `unsourced` rather than
+## fabricated); `dispatch` turns the top of that order into a lane-collision-free
+## wave, each task attached to an SME profile, model tier and Agent brief
+## skeleton. Read-only by default — `--apply` (never run here) is the only path
+## that writes anything, and it writes one idempotent PMO comment + label.
+pmo-dispatch:
+	@python3 governance/pmo/cli.py priority
+	@python3 governance/pmo/cli.py dispatch --wave 1
 
 ## conformance — CMR class/pattern/template enforcement (issue #140): every
 ## milestoned issue must be classified, and the class it declares must hold
