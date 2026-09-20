@@ -18,6 +18,16 @@
  * fleet". A read projection that answers feature_disabled must not look like an
  * idle fleet.
  *
+ * The steer panel is narrowed to the CALLER (issue #1523). The closed vocabulary
+ * is the same declaration for everyone — it says which verbs exist, not which
+ * ones the operator reading it may run — so rendering it unfiltered put a steer
+ * button for every exposed verb, irreversible ones included, in front of callers
+ * whose capabilities reached none of them. The panel now renders the
+ * intersection of the registry's exposed set and the caller's own permitted set
+ * (`GET /api/console/me` -> `controlVerbs`, the server's own dispatch decision),
+ * and says in its state line what it withheld. A permitted set it cannot read
+ * fails CLOSED: no steer button, and the panel names that as the reason.
+ *
  * Dependency-free and DOM-framework-agnostic (the console ships offline, no npm,
  * no CDN): the model functions are pure and the render functions only touch the
  * DOM they are handed. The pure functions are exposed on `window.OT` so the
@@ -29,6 +39,7 @@
 
   var SNAPSHOT_PATH = "/api/fleet/snapshot";
   var VERBS_PATH = "/api/control/fleet/verbs";
+  var ME_PATH = "/api/console/me";
   var CONTROL_ROOT = "/api/control/";
 
   /* ---------------------------------------------------------------- helpers */
@@ -41,7 +52,21 @@
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
   }
 
-  function el(tag, attrs, children) {
+  /* el(tag, attrs, ...children) — children may be passed as extra arguments or
+   * as arrays, because both spellings are used below and only the array form
+   * ever rendered.
+   *
+   * This was a real defect, not a tidy-up (issue #1523): `children` was the
+   * THIRD parameter only, and it was read through `asArray`, which answers `[]`
+   * for anything that is not an array. So every `el("td", {}, el("span", …))`
+   * — and every `el("div", {class:"card"}, …, …)` — built its node and appended
+   * NOTHING. The visible consequences were an empty steer receipt (the click
+   * worked, the response was lost), a blank "effect class" column, and an empty
+   * "feature disabled" card, whose whole job is to name the flag that is off:
+   * a panel that renders nothing reads as "no fleet" / "no verbs", which is the
+   * false-green state this module's header says it exists to prevent.
+   */
+  function el(tag, attrs) {
     var node = document.createElement(tag);
     attrs = attrs || {};
     Object.keys(attrs).forEach(function (key) {
@@ -54,9 +79,13 @@
       else if (value === true) node.setAttribute(key, key);
       else node.setAttribute(key, String(value));
     });
-    asArray(children).forEach(function (child) {
+    function append(child) {
       if (child === null || child === undefined || child === false) return;
       node.appendChild(child.nodeType ? child : document.createTextNode(String(child)));
+    }
+    Array.prototype.slice.call(arguments, 2).forEach(function (child) {
+      if (Array.isArray(child)) asArray(child).forEach(append);
+      else append(child);
     });
     return node;
   }
@@ -194,6 +223,56 @@
     return "ok";
   }
 
+  /* The catalogue the panel may show THIS caller (issue #1523).
+   *
+   * The registry's declaration is the same for every caller: it says which verbs
+   * exist, not which ones the operator reading it may run. Offered unfiltered,
+   * the panel puts a steer button in front of every exposed verb — including the
+   * irreversible ones (closure.retire, board.reap) — for a caller whose
+   * capabilities reach none of them, so every click is a 403 the panel could
+   * have predicted. `permitted` is the caller's own verb set, computed by the
+   * server from the same decision its dispatch path refuses with.
+   *
+   * A verb the REGISTRY withholds (exposed: false) is not a capability question
+   * and is kept: the panel renders it as "withheld: <why>", which is how the
+   * closed vocabulary documents its own closedness. A verb this caller cannot
+   * run is dropped — the button would only announce the refusal.
+   *
+   * `permitted` that is not an array is the fail-closed case: the server gave no
+   * verdict, so no steer button is rendered rather than one that cannot be
+   * confirmed (never `[]`-as-absent, which would read as "you may run nothing").
+   */
+  function runnableRows(rows, permitted) {
+    var known = Array.isArray(permitted);
+    var allowed = {};
+    if (known) {
+      permitted.forEach(function (id) { allowed[String(id)] = true; });
+    }
+    return rows.filter(function (row) {
+      if (!row.exposed) return true;
+      return known && allowed[row.id] === true;
+    });
+  }
+
+  /* What the panel shows and what it withheld, so the filter is never a silent
+   * omission: a panel that quietly dropped 54 verbs would read as a small
+   * vocabulary rather than as a filtered one. */
+  function catalogueState(rows, permitted) {
+    var known = Array.isArray(permitted);
+    var shown = runnableRows(rows, permitted);
+    var exposed = 0;
+    var runnable = 0;
+    rows.forEach(function (row) { if (row.exposed) exposed += 1; });
+    shown.forEach(function (row) { if (row.exposed) runnable += 1; });
+    return {
+      rows: shown,
+      known: known,
+      exposed: exposed,
+      runnable: runnable,
+      withheld: exposed - runnable
+    };
+  }
+
   /* Split an args string into the lever's argv tokens (whitespace, shell-free). */
   function parseArgs(text) {
     return String(text || "").trim().split(/\s+/).filter(function (token) {
@@ -207,6 +286,8 @@
     boardRows: boardRows,
     dispatchRows: dispatchRows,
     steerRows: steerRows,
+    runnableRows: runnableRows,
+    catalogueState: catalogueState,
     effectTone: effectTone,
     parseArgs: parseArgs
   };
@@ -247,13 +328,14 @@
     });
   }
 
-  function renderVerbs(rows) {
+  function renderVerbs(rows, permitted) {
     var body = document.getElementById("verbsBody");
     var stateNode = document.getElementById("steerState");
     if (!body) return;
     clear(body);
+    var catalogue = catalogueState(rows, permitted);
     var families = {};
-    rows.forEach(function (row) {
+    catalogue.rows.forEach(function (row) {
       (families[row.family] = families[row.family] || []).push(row);
     });
     Object.keys(families).sort().forEach(function (family) {
@@ -273,7 +355,22 @@
       table.appendChild(tbody);
       body.appendChild(table);
     });
-    if (stateNode) stateNode.textContent = rows.length + " declared verb(s)";
+    if (stateNode) stateNode.textContent = catalogueLine(catalogue);
+  }
+
+  /* The panel's own account of what it is showing — never a silent filter. */
+  function catalogueLine(catalogue) {
+    if (!catalogue.known) {
+      return "no steer offered: your control capabilities could not be read " +
+        "(" + catalogue.exposed + " declared verb(s))";
+    }
+    var line = catalogue.runnable + " of " + catalogue.exposed +
+      " declared verb(s) are yours to run";
+    if (catalogue.withheld > 0) {
+      line += " — " + catalogue.withheld +
+        " withheld: your capabilities do not reach them";
+    }
+    return line;
   }
 
   function verbRow(row) {
@@ -357,6 +454,28 @@
     node.textContent = stateName;
   }
 
+  /* The caller's own control verbs, from the console's existing session read.
+   *
+   * `/api/console/me` is already the one session-scoped "what may I do" call
+   * (the shell and four views gate on it), and it now carries `controlVerbs` —
+   * the exposed verbs this caller's capabilities reach, computed server-side by
+   * the same decision the dispatch path refuses with. Nothing is inferred here:
+   * a verb absent from the list is a verb this panel must not offer.
+   *
+   * Any failure reads as `null`, which fails CLOSED (no steer button is
+   * rendered, and the panel says the capabilities could not be read). Showing
+   * the unfiltered catalogue on a failed read would be the defect this exists
+   * to fix, wearing a different cause. */
+  async function permittedVerbs() {
+    try {
+      var me = await CP.get(ME_PATH);
+      var list = asObject(me && me.data).controlVerbs;
+      return Array.isArray(list) ? list : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
   async function load() {
     /* read half: the fleet projection */
     try {
@@ -386,7 +505,7 @@
       var verbs = await CP.post(VERBS_PATH, {});
       var rows = steerRows(asObject(asObject(verbs.data).content));
       state.verbs = rows;
-      renderVerbs(rows);
+      renderVerbs(rows, await permittedVerbs());
     } catch (err) {
       var steer = document.getElementById("steerState");
       if (err.code === "feature_disabled") {
