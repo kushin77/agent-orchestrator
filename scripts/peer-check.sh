@@ -36,6 +36,21 @@
 #   bash scripts/peer-check.sh --agent ao-sub-1549 --issue 1549 --files a.sh,b.py
 #   bash scripts/peer-check.sh --standard
 #   bash scripts/peer-check.sh --json
+# ---knowledge---
+# module_id: scripts.peer-check
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"

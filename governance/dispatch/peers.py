@@ -1,4 +1,20 @@
 """The A2A peer-check standard — enumerate siblings, refuse on overlap, enhance
+
+---knowledge---
+module_id: governance.dispatch.peers
+system: governance
+app: dispatch
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [branch_candidates, classify_channel, Sibling, PeerReport, overlap_paths, Collision, sibling_collisions, peer_check, (+4 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 never clobber (issue #1549, EPIC #1510).
 
 THE STANDARD, IN FOUR STEPS. A lane runs this **before it claims work** — at

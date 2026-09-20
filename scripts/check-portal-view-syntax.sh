@@ -9,6 +9,21 @@
 # Python parser (the Cloud Build runner is `python:3.14` with no node — pinned in
 # infra/cloudbuild/requirements-verify.txt). Neither available = FAIL with the
 # reason, never a silent pass.
+# ---knowledge---
+# module_id: scripts.check-portal-view-syntax
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -euo pipefail
 cd "$(dirname "$0")/.." || exit 2
 

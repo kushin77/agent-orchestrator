@@ -58,6 +58,21 @@
 #    provocations ALWAYS run, because a gate whose self-test is optional is a
 #    gate that can be green without proving it can fail.)
 
+# ---knowledge---
+# module_id: scripts.check-prompt-intake-declaration
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: [cleanup]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 2

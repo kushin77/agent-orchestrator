@@ -68,6 +68,21 @@
 # REAP_BRANCHES_MANIFEST pattern the sibling gates use).
 #
 # Usage: bash scripts/check-gate-status-scheduled.sh
+# ---knowledge---
+# module_id: scripts.check-gate-status-scheduled
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: [cleanup]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

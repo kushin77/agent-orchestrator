@@ -83,6 +83,21 @@
 #   be a DUPLICATE registration of the same name, which the gate of record
 #   refuses by name — the same reasoning the Makefile records for
 #   `check-isolation-landed`.
+# ---knowledge---
+# module_id: scripts.check-nav-parity
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: [usage, cleanup]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"

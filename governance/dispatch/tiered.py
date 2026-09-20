@@ -1,5 +1,21 @@
 """Tiered try-loop dispatcher (L0 -> L1 -> L2 escalation), issue #1524.
 
+---knowledge---
+module_id: governance.dispatch.tiered
+system: governance
+app: dispatch
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [TieredRefusal, load_policy, read_tier, resolve_model, parse_acceptance_commands, run_commands, max_attempts_from, escalate_label_for, (+1 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Reads an issue's ``tier:L0``/``tier:L1``/``tier:L2`` label, dispatches the work
 to the matching model, runs the issue's own ``## Acceptance`` commands, and on
 repeated failure applies ``escalate:L1``/``escalate:L2`` and re-dispatches one

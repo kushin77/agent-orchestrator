@@ -27,6 +27,21 @@
 #      injection itself is asserted before any arm reads it.
 #
 # Exit: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+# ---knowledge---
+# module_id: scripts.check-gh-bounded
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: [detect, scan]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

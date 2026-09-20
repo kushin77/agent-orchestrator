@@ -43,6 +43,21 @@
 #   bash scripts/sync-agentconsole-overlay.sh --check [--manifest FILE]
 #   bash scripts/sync-agentconsole-overlay.sh --sync [--dry-run]
 #   bash scripts/sync-agentconsole-overlay.sh --self-test
+# ---knowledge---
+# module_id: scripts.sync-agentconsole-overlay
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

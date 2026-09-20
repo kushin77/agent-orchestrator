@@ -51,6 +51,21 @@
 #                      skip cannot sit here hiding a broken hook.
 #
 # Usage: bash scripts/check-lease-hook.sh
+# ---knowledge---
+# module_id: scripts.check-lease-hook
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: [cleanup, ok, bad, cannot_assess, build_fixture, plant, rewrite_line, reset_fixture, (+4 more)]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

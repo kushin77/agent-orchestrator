@@ -34,6 +34,21 @@
 # Usage:
 #   bash scripts/check-peer-check.sh              the gate
 #   bash scripts/check-peer-check.sh --self-test  the provocation and mutant alone
+# ---knowledge---
+# module_id: scripts.check-peer-check
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: [cleanup, ok, bad, run_peer]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"

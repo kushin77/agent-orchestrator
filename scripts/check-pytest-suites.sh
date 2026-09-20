@@ -122,6 +122,21 @@
 # Offline, deterministic, no network, no containers.
 #
 # Usage: bash scripts/check-pytest-suites.sh
+# ---knowledge---
+# module_id: scripts.check-pytest-suites
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: [suite_log, judge]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

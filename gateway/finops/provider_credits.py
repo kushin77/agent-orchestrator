@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Prepaid provider-credit budget: declaration loader + credit arithmetic (#1559).
 
+---knowledge---
+module_id: gateway.finops.provider_credits
+system: gateway
+app: finops
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [CreditDeclarationError, UnknownProviderError, UnknownPlanError, UnknownTopUpError, CreditPlan, ModelRate, ProviderCreditBudget, CreditsTable, (+1 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 `gateway/finops/` carries two budget axes over USD spend in ``budgets.yaml``:
 per-tenant (issue #17) and per-role (issue #633). This module adds the third
 axis - a provider that bills against **prepaid account credits** - for the

@@ -1,5 +1,21 @@
 """Nous Research provider adapter (issue #1559) - OpenAI-compatible chat.
 
+---knowledge---
+module_id: gateway.providers.nous
+system: gateway
+app: providers
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [NousProvider]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Nous Research's inference API is OpenAI-compatible: ``POST {base}/chat/completions``
 with the account API key as a bearer token. The published contract
 (``https://portal.nousresearch.com/api-docs``, OpenAPI mirror at

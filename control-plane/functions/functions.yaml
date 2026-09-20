@@ -660,6 +660,24 @@ functions:
     flags: [surfaces.remote_control]
     roles: [CTO, VP-Eng, Manager]
 
+  - id: TRY-LOOP
+    title: "Run the tiered try-loop dispatcher for one issue"
+    kind: command
+    endpoints: [board/try-loop]
+    parameters:
+      - {name: issue, type: integer, required: true, default: null}
+      - {name: agent, type: string, required: false, default: "brain"}
+      - {name: provider, type: string, required: false, default: null}
+      - {name: max-attempts, type: integer, required: false, default: null}
+      - {name: dry-run, type: boolean, required: false, default: false}
+      - {name: no-gh, type: boolean, required: false, default: false}
+      - {name: no-dispatch, type: boolean, required: false, default: false}
+    scope: {capability: board:claim, level: org, tenant: platform}
+    effect_class: hold
+    audit: board.try-loop
+    flags: [surfaces.remote_control]
+    roles: [CTO, VP-Eng, Manager]
+
   - id: RELEASE
     title: "Release a claim"
     kind: command

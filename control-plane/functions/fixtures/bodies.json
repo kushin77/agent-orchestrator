@@ -1,58 +1,366 @@
 {
   "why": "One fixture per declared function, so the gate renders EVERY function headlessly and a function added without a fixture fails loudly (the renderer prints FAILED naming the missing fixture) instead of rendering an empty panel.",
   "fixtures": {
-    "HEADER": {"outcome": "ok", "rows": ["repo kushin77/agent-orchestrator · HEAD 3bd6bf1 · up 1h"]},
-    "RUNGS": {"outcome": "ok", "rows": ["sister running · 3 rungs · 1 claim", "  a0312e1  running  beat 4s ago"]},
-    "ORDERS": {"outcome": "ok", "rows": ["operator -> brain: 1 queued", "brain -> operator: 0 replies"]},
-    "DISPATCHES": {"outcome": "ok", "rows": ["issue #565 dispatched to ao-rc10 · ack received"]},
-    "CLAIMS": {"outcome": "ok", "rows": ["#565 held by ao-rc10 (lane control-plane)"]},
-    "FOCUS": {"outcome": "ok", "rows": ["active epic #707 EPIC: single-epic-focused BAU", "children 7 open · 0 closed", "pooled 67 waiting", "agents the pool (max_agents 0)"]},
-    "QUEUE": {"outcome": "ok", "rows": ["next claimable: #566", "queue: valid (no duplicates, no cycles)"]},
-    "FRESHNESS": {"outcome": "ok", "rows": ["freshness: OK — snapshot aged 4.2h, tolerance 24h"]},
-    "POOL": {"outcome": "ok", "rows": ["#619 parked (out-of-epic)", "#620 parked (out-of-epic)", "2 waiting · drained when focus is none"]},
-    "LIVENESS": {"outcome": "ok", "rows": ["verdict self-refresh · ok", "ao-fleet-snapshot-refresh not installed (declared enabled:false)"]},
-    "DANGLING": {"outcome": "ok", "rows": ["7 open issue(s) dangle on a closed parent", "#132 declares Parent #125, which is closed"]},
-    "WAVES": {"outcome": "ok", "rows": ["wave #551 12/19 done", "#565 eligible"]},
-    "EVENTS": {"outcome": "ok", "rows": ["13:57 dispatch claim #565", "13:58 verify started"]},
-    "WATCHDOG": {"outcome": "ok", "rows": ["2 sessions, 0 orphaned, 0 suspect"]},
-    "VERBS": {"outcome": "ok", "rows": ["49 verbs declared, 39 exposed"]},
-    "SCHEDULE": {"outcome": "ok", "rows": ["*/15 * * * * reconcile sweep"]},
-    "HEALTH": {"outcome": "ok", "rows": ["3 rungs beat within 30.0 minutes"]},
-    "BOARD": {"outcome": "ok", "rows": ["milestone RC active · frontier #565"]},
-    "LEDGER": {"outcome": "ok", "rows": ["audit rail readable · 0 non-hygienic items"]},
-    "CLOSURE": {"outcome": "ok", "rows": ["#565 owes: merge, close, release"]},
-    "DISPATCH": {"outcome": "ok", "rows": ["#726 arbitrated: epic #551, lane control-plane, unowned"]},
-    "RECOVER": {"outcome": "ok", "rows": ["2 sessions: 2 live, 0 orphaned"]},
-    "CHANNEL": {"outcome": "ok", "rows": ["inbox 0 · outbox 1"]},
-    "WATCH": {"outcome": "ok", "rows": ["following fleet_projection · event snapshot"]},
-    "LOG": {"outcome": "ok", "rows": ["tail 20 of .fleet/sister.log"]},
-    "START": {"outcome": "ok", "rows": ["rung start requested"], "receipt": "cmd_8f21c4"},
-    "PAUSE": {"outcome": "ok", "rows": ["rung paused, run state kept"], "receipt": "cmd_8f21c5"},
-    "RESUME": {"outcome": "ok", "rows": ["rung resumed"], "receipt": "cmd_8f21c6"},
-    "REFRESH": {"outcome": "ok", "rows": ["refresh, update, poke applied"], "receipt": "cmd_8f21c7"},
-    "STOP": {"outcome": "ok", "rows": ["rung stopped gracefully"], "receipt": "cmd_8f21c8"},
-    "KILL": {"outcome": "ok", "rows": ["rung killed, no drain"], "receipt": "cmd_8f21c9"},
-    "RESTART": {"outcome": "ok", "rows": ["rung restarted"], "receipt": "cmd_8f21ca"},
-    "HALT": {"outcome": "ok", "rows": ["fleet halted"], "receipt": "cmd_8f21cb"},
-    "OVERRIDE": {"outcome": "ok", "rows": ["override recorded against #565"], "receipt": "cmd_8f21cc"},
-    "DROP": {"outcome": "ok", "rows": ["directive d-wedged dead-lettered (reason: its work already landed)"], "receipt": "cmd_8f21d5"},
-    "DEADLETTER": {"outcome": "ok", "rows": ["1 dead-lettered: d-wedged issue=754 attempts=5 by=runaway-guard"]},
-    "SEND": {"outcome": "ok", "rows": ["steering message queued"], "receipt": "cmd_8f21cd"},
-    "ORDER": {"outcome": "ok", "rows": ["order queued to the brain"], "receipt": "cmd_8f21ce"},
-    "ESCALATE": {"outcome": "ok", "rows": ["escalation sent at warn"], "receipt": "cmd_8f21cf"},
-    "STREAM": {"outcome": "ok", "rows": ["per-directive log stream: brain-directive-29c8cbf5"]},
-    "FOLLOW": {"outcome": "ok", "rows": ["following channel/log for brain-directive-29c8cbf5"]},
-    "KB": {"outcome": "ok", "rows": ["kb hit: issue-120 EPIC Fact-accurate code-indexing"]},
-    "STEER": {"outcome": "ok", "rows": ["steering hint queued"], "receipt": "cmd_8f21d1"},
-    "CLAIM": {"outcome": "ok", "rows": ["#565 claimed by ao-rc10"], "receipt": "cmd_8f21d0"},
-    "RELEASE": {"outcome": "ok", "rows": ["claim on #565 released"], "receipt": "cmd_8f21d1"},
-    "SNAPSHOT": {"outcome": "ok", "rows": ["board snapshot refreshed"], "receipt": "cmd_8f21d2"},
-    "REAP": {"outcome": "ok", "rows": ["0 wedged claims reaped"], "receipt": "cmd_8f21d3"},
-    "TRIGGER": {"outcome": "ok", "rows": ["brain-directive-29c8cbf5: refreshed once — dispatchable"], "receipt": "cmd_8f21d8"},
-    "SWEEP": {"outcome": "ok", "rows": ["one pass: 0 reclaimed, 0 parked, 0 shelved"], "receipt": "cmd_8f21d4"},
-    "STAMP": {"outcome": "ok", "rows": ["heartbeat stamped for ao-rc10"], "receipt": "cmd_8f21d5"},
-    "CLEAR": {"outcome": "ok", "rows": ["heartbeat cleared"], "receipt": "cmd_8f21d6"},
-    "CLOSE": {"outcome": "ok", "rows": ["#565 closed with evidence"], "receipt": "cmd_8f21d7"},
-    "RETIRE": {"outcome": "ok", "rows": ["brain-directive-a2a-692-6b3951b31bb3db7d retired for #692 (superseded by #723, #727, #754)"], "receipt": "cmd_8f21d9"}
+    "HEADER": {
+      "outcome": "ok",
+      "rows": [
+        "repo kushin77/agent-orchestrator \u00b7 HEAD 3bd6bf1 \u00b7 up 1h"
+      ]
+    },
+    "RUNGS": {
+      "outcome": "ok",
+      "rows": [
+        "sister running \u00b7 3 rungs \u00b7 1 claim",
+        "  a0312e1  running  beat 4s ago"
+      ]
+    },
+    "ORDERS": {
+      "outcome": "ok",
+      "rows": [
+        "operator -> brain: 1 queued",
+        "brain -> operator: 0 replies"
+      ]
+    },
+    "DISPATCHES": {
+      "outcome": "ok",
+      "rows": [
+        "issue #565 dispatched to ao-rc10 \u00b7 ack received"
+      ]
+    },
+    "CLAIMS": {
+      "outcome": "ok",
+      "rows": [
+        "#565 held by ao-rc10 (lane control-plane)"
+      ]
+    },
+    "FOCUS": {
+      "outcome": "ok",
+      "rows": [
+        "active epic #707 EPIC: single-epic-focused BAU",
+        "children 7 open \u00b7 0 closed",
+        "pooled 67 waiting",
+        "agents the pool (max_agents 0)"
+      ]
+    },
+    "QUEUE": {
+      "outcome": "ok",
+      "rows": [
+        "next claimable: #566",
+        "queue: valid (no duplicates, no cycles)"
+      ]
+    },
+    "FRESHNESS": {
+      "outcome": "ok",
+      "rows": [
+        "freshness: OK \u2014 snapshot aged 4.2h, tolerance 24h"
+      ]
+    },
+    "POOL": {
+      "outcome": "ok",
+      "rows": [
+        "#619 parked (out-of-epic)",
+        "#620 parked (out-of-epic)",
+        "2 waiting \u00b7 drained when focus is none"
+      ]
+    },
+    "LIVENESS": {
+      "outcome": "ok",
+      "rows": [
+        "verdict self-refresh \u00b7 ok",
+        "ao-fleet-snapshot-refresh not installed (declared enabled:false)"
+      ]
+    },
+    "DANGLING": {
+      "outcome": "ok",
+      "rows": [
+        "7 open issue(s) dangle on a closed parent",
+        "#132 declares Parent #125, which is closed"
+      ]
+    },
+    "WAVES": {
+      "outcome": "ok",
+      "rows": [
+        "wave #551 12/19 done",
+        "#565 eligible"
+      ]
+    },
+    "EVENTS": {
+      "outcome": "ok",
+      "rows": [
+        "13:57 dispatch claim #565",
+        "13:58 verify started"
+      ]
+    },
+    "WATCHDOG": {
+      "outcome": "ok",
+      "rows": [
+        "2 sessions, 0 orphaned, 0 suspect"
+      ]
+    },
+    "VERBS": {
+      "outcome": "ok",
+      "rows": [
+        "49 verbs declared, 39 exposed"
+      ]
+    },
+    "SCHEDULE": {
+      "outcome": "ok",
+      "rows": [
+        "*/15 * * * * reconcile sweep"
+      ]
+    },
+    "HEALTH": {
+      "outcome": "ok",
+      "rows": [
+        "3 rungs beat within 30.0 minutes"
+      ]
+    },
+    "BOARD": {
+      "outcome": "ok",
+      "rows": [
+        "milestone RC active \u00b7 frontier #565"
+      ]
+    },
+    "LEDGER": {
+      "outcome": "ok",
+      "rows": [
+        "audit rail readable \u00b7 0 non-hygienic items"
+      ]
+    },
+    "CLOSURE": {
+      "outcome": "ok",
+      "rows": [
+        "#565 owes: merge, close, release"
+      ]
+    },
+    "DISPATCH": {
+      "outcome": "ok",
+      "rows": [
+        "#726 arbitrated: epic #551, lane control-plane, unowned"
+      ]
+    },
+    "RECOVER": {
+      "outcome": "ok",
+      "rows": [
+        "2 sessions: 2 live, 0 orphaned"
+      ]
+    },
+    "CHANNEL": {
+      "outcome": "ok",
+      "rows": [
+        "inbox 0 \u00b7 outbox 1"
+      ]
+    },
+    "WATCH": {
+      "outcome": "ok",
+      "rows": [
+        "following fleet_projection \u00b7 event snapshot"
+      ]
+    },
+    "LOG": {
+      "outcome": "ok",
+      "rows": [
+        "tail 20 of .fleet/sister.log"
+      ]
+    },
+    "START": {
+      "outcome": "ok",
+      "rows": [
+        "rung start requested"
+      ],
+      "receipt": "cmd_8f21c4"
+    },
+    "PAUSE": {
+      "outcome": "ok",
+      "rows": [
+        "rung paused, run state kept"
+      ],
+      "receipt": "cmd_8f21c5"
+    },
+    "RESUME": {
+      "outcome": "ok",
+      "rows": [
+        "rung resumed"
+      ],
+      "receipt": "cmd_8f21c6"
+    },
+    "REFRESH": {
+      "outcome": "ok",
+      "rows": [
+        "refresh, update, poke applied"
+      ],
+      "receipt": "cmd_8f21c7"
+    },
+    "STOP": {
+      "outcome": "ok",
+      "rows": [
+        "rung stopped gracefully"
+      ],
+      "receipt": "cmd_8f21c8"
+    },
+    "KILL": {
+      "outcome": "ok",
+      "rows": [
+        "rung killed, no drain"
+      ],
+      "receipt": "cmd_8f21c9"
+    },
+    "RESTART": {
+      "outcome": "ok",
+      "rows": [
+        "rung restarted"
+      ],
+      "receipt": "cmd_8f21ca"
+    },
+    "HALT": {
+      "outcome": "ok",
+      "rows": [
+        "fleet halted"
+      ],
+      "receipt": "cmd_8f21cb"
+    },
+    "OVERRIDE": {
+      "outcome": "ok",
+      "rows": [
+        "override recorded against #565"
+      ],
+      "receipt": "cmd_8f21cc"
+    },
+    "DROP": {
+      "outcome": "ok",
+      "rows": [
+        "directive d-wedged dead-lettered (reason: its work already landed)"
+      ],
+      "receipt": "cmd_8f21d5"
+    },
+    "DEADLETTER": {
+      "outcome": "ok",
+      "rows": [
+        "1 dead-lettered: d-wedged issue=754 attempts=5 by=runaway-guard"
+      ]
+    },
+    "SEND": {
+      "outcome": "ok",
+      "rows": [
+        "steering message queued"
+      ],
+      "receipt": "cmd_8f21cd"
+    },
+    "ORDER": {
+      "outcome": "ok",
+      "rows": [
+        "order queued to the brain"
+      ],
+      "receipt": "cmd_8f21ce"
+    },
+    "ESCALATE": {
+      "outcome": "ok",
+      "rows": [
+        "escalation sent at warn"
+      ],
+      "receipt": "cmd_8f21cf"
+    },
+    "STREAM": {
+      "outcome": "ok",
+      "rows": [
+        "per-directive log stream: brain-directive-29c8cbf5"
+      ]
+    },
+    "FOLLOW": {
+      "outcome": "ok",
+      "rows": [
+        "following channel/log for brain-directive-29c8cbf5"
+      ]
+    },
+    "KB": {
+      "outcome": "ok",
+      "rows": [
+        "kb hit: issue-120 EPIC Fact-accurate code-indexing"
+      ]
+    },
+    "STEER": {
+      "outcome": "ok",
+      "rows": [
+        "steering hint queued"
+      ],
+      "receipt": "cmd_8f21d1"
+    },
+    "CLAIM": {
+      "outcome": "ok",
+      "rows": [
+        "#565 claimed by ao-rc10"
+      ],
+      "receipt": "cmd_8f21d0"
+    },
+    "TRY-LOOP": {
+      "outcome": "ok",
+      "rows": [
+        "#1524 try-loop: issue advanced to tier L1 (attempt 2/3), dispatched to claude-subagent"
+      ],
+      "receipt": "cmd_9a3f2c"
+    },
+    "RELEASE": {
+      "outcome": "ok",
+      "rows": [
+        "claim on #565 released"
+      ],
+      "receipt": "cmd_8f21d1"
+    },
+    "SNAPSHOT": {
+      "outcome": "ok",
+      "rows": [
+        "board snapshot refreshed"
+      ],
+      "receipt": "cmd_8f21d2"
+    },
+    "REAP": {
+      "outcome": "ok",
+      "rows": [
+        "0 wedged claims reaped"
+      ],
+      "receipt": "cmd_8f21d3"
+    },
+    "TRIGGER": {
+      "outcome": "ok",
+      "rows": [
+        "brain-directive-29c8cbf5: refreshed once \u2014 dispatchable"
+      ],
+      "receipt": "cmd_8f21d8"
+    },
+    "SWEEP": {
+      "outcome": "ok",
+      "rows": [
+        "one pass: 0 reclaimed, 0 parked, 0 shelved"
+      ],
+      "receipt": "cmd_8f21d4"
+    },
+    "STAMP": {
+      "outcome": "ok",
+      "rows": [
+        "heartbeat stamped for ao-rc10"
+      ],
+      "receipt": "cmd_8f21d5"
+    },
+    "CLEAR": {
+      "outcome": "ok",
+      "rows": [
+        "heartbeat cleared"
+      ],
+      "receipt": "cmd_8f21d6"
+    },
+    "CLOSE": {
+      "outcome": "ok",
+      "rows": [
+        "#565 closed with evidence"
+      ],
+      "receipt": "cmd_8f21d7"
+    },
+    "RETIRE": {
+      "outcome": "ok",
+      "rows": [
+        "brain-directive-a2a-692-6b3951b31bb3db7d retired for #692 (superseded by #723, #727, #754)"
+      ],
+      "receipt": "cmd_8f21d9"
+    }
   }
 }

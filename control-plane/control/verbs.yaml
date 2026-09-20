@@ -674,6 +674,18 @@ verbs:
     exposed: true
     refusals: [401, 403, 409, 503]
 
+  - id: board.try-loop
+    source: governance/dispatch/cli.py
+    local: try-loop
+    effect_class: hold
+    allowed_runtimes: [claude-session, claude-subagent, deepseek-sister, copilot-agent]
+    capability: board:claim
+    audit: board.try-loop
+    idempotent: false
+    exposed: true
+    refusals: [401, 403, 409, 503]
+    note: "Tiered try-loop dispatcher (#1524): drives one issue through L0 -> L1 -> L2 escalation, applying attempt-budget and escalate labels as it goes. Not idempotent -- each invocation may advance the tier and dispatch a model. --dry-run resolves the tier->model mapping without dispatching; --no-gh/--no-dispatch are fixture/negative-control modes that skip the label/comment and model-invocation side effects respectively, but the verb itself is declared by its normal (side-effecting) behavior."
+
   - id: board.dispatch
     source: governance/dispatch/cli.py
     local: dispatch

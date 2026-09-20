@@ -190,6 +190,12 @@ waived_roots:
     vendor/). Third-party, pinned by gitlink and verified by
     scripts/check-cmr-pin.sh, so it is neither this repo's product nor this
     repo's to assign a class to.
+  catalog: >-
+    Generated indexer output (catalog/indexer/index-graph.json,
+    catalog/indexer/out/catalog.db), written by `scripts/*` running
+    `--apply` (issue #1528). It ships no contract, suite or control of its
+    own — it is a build artifact of the registry/indexer surface, not a
+    product surface the ladder should measure.
 
 # The declared surfaces. `declared_class` is measured, never aspirational.
 #
