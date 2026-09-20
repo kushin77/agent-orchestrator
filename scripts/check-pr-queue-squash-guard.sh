@@ -306,6 +306,15 @@ cp "$root/scripts/pr-queue.sh" "$ap_scripts/pr-queue.sh"
 ln -s "$root/integrations" "$AP_SCRATCH/integrations"
 ap_view_calls="$TMPD/ap-view.json"
 printf '{"baseRefName":"master","headRefOid":"%s"}' "$RUN_CASE_TIP" > "$ap_view_calls"
+# The REST transport (issue #1569): merge-pr.sh reads the pull with `gh api` and
+# deletes the merged head branch over REST. This stand-in answers with the shape
+# each caller's own `--jq` asks for rather than running jq, and NAMES the head
+# repository, so the delete is authorised by a readable value rather than by an
+# absent one. The slug is resolved the same way merge-pr.sh resolves it.
+ap_rest_pull="$TMPD/ap-rest-pull.json"
+ap_repo_slug="$(git -C "$root" remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
+printf '{"baseRefName":"master","headRefOid":"%s","headRef":"issue-4321","headRepo":"%s"}' \
+  "$RUN_CASE_TIP" "$ap_repo_slug" > "$ap_rest_pull"
 ap_fakebin="$TMPD/ap-bin"
 mkdir -p "$ap_fakebin"
 cat > "$ap_fakebin/gh" <<EOF
@@ -318,11 +327,41 @@ if [ "\$1" = "pr" ] && [ "\$2" = "merge" ]; then
   echo "\$3" >> "$TMPD/ap-merge-calls.txt"
   exit 0
 fi
+if [ "\$1" = "api" ]; then
+  shift
+  method="GET"
+  if [ "\${1:-}" = "-X" ]; then
+    method="\${2:-GET}"
+    shift 2
+  fi
+  url="\${1:-}"
+  if [ \$# -gt 0 ]; then shift; fi
+  case "\$method \$url" in
+    "GET "*"/pulls/"*)
+      cat "$ap_rest_pull"
+      exit 0
+      ;;
+    "PUT "*"/pulls/"*"/merge")
+      ap_pr="\${url##*/pulls/}"
+      ap_pr="\${ap_pr%%/*}"
+      echo "\$ap_pr" >> "$TMPD/ap-merge-calls.txt"
+      echo '{"merged":true,"sha":"1111111111111111111111111111111111111111"}'
+      exit 0
+      ;;
+    "DELETE "*"/git/refs/heads/"*)
+      echo "\${url##*/git/refs/heads/}" >> "$TMPD/ap-delete-calls.txt"
+      exit 0
+      ;;
+  esac
+  echo "fake gh: unexpected api invocation: \$method \$url" >&2
+  exit 1
+fi
 echo "fake gh: unexpected invocation: \$*" >&2
 exit 1
 EOF
 chmod +x "$ap_fakebin/gh"
 : > "$TMPD/ap-merge-calls.txt"
+: > "$TMPD/ap-delete-calls.txt"
 ap_key="ao1272-self-test-key-not-a-secret"
 ap_store_dir="$root/.fleet/approvals"
 ap_record_file="$ap_store_dir/merge__pr_4321.json"
@@ -341,9 +380,9 @@ if [ "$ap_preexisting" -eq 0 ]; then
     fail "approval missing: exit=$ap_missing_rc, expected 1 with approval-missing:merge:pr#4321 — $(cat "$ap_missing_out")"
   fi
   if [ -s "$TMPD/ap-merge-calls.txt" ]; then
-    fail "approval missing: gh pr merge was called despite no approval record"
+    fail "approval missing: a merge was called despite no approval record"
   else
-    ok "approval missing: gh pr merge was NOT invoked"
+    ok "approval missing: no merge was invoked"
   fi
 else
   echo "  skip  approval missing: $ap_record_file already exists (pre-existing local .fleet state) — not overwritten"
@@ -361,7 +400,12 @@ ap_granted_rc=$?
 if [ "$ap_granted_rc" -eq 0 ] && grep -q "^4321$" "$TMPD/ap-merge-calls.txt"; then
   ok "approval granted: merge-pr.sh merges #4321 after grant"
 else
-  fail "approval granted: exit=$ap_granted_rc, expected 0 with gh pr merge called — $(cat "$ap_granted_out")"
+  fail "approval granted: exit=$ap_granted_rc, expected 0 with the merge endpoint called — $(cat "$ap_granted_out")"
+fi
+if grep -q "^issue-4321$" "$TMPD/ap-delete-calls.txt"; then
+  ok "approval granted: the merged head branch was deleted over REST"
+else
+  fail "approval granted: no head-branch delete was recorded (issue #1569's REST replacement for --delete-branch)"
 fi
 if [ "$ap_preexisting" -eq 0 ]; then
   rm -f "$ap_record_file"
