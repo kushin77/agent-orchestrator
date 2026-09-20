@@ -41,7 +41,7 @@ from budget import (
     BudgetAction,
     BudgetBlocked,
     BudgetDecision,
-    BudgetEnforcer,
+    BudgetDecisionMaker,
     RoleBudgetBlocked,
     RoleBudgetEnforcer,
 )
@@ -119,7 +119,7 @@ class ModelChooser:
         self,
         table: TierTable,
         scorer: Optional[DifficultyScorer] = None,
-        budget_enforcer: Optional[BudgetEnforcer] = None,
+        budget_enforcer: Optional[BudgetDecisionMaker] = None,
         sink: Optional[MeteringSink] = None,
         health: HealthSignal = None,
         tokens_per_call: int = DEFAULT_TOKENS_PER_CALL,

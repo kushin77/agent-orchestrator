@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from limits.backpressure import DEGRADE
-from limits.budget import BudgetController, BudgetMode, BudgetPolicy
+from limits.budget import BudgetController, BudgetMode, TokenBudgetPolicy
 from limits.cache import SemanticCache
 from limits.config import CacheConfig, LimitsConfig
 from limits.limiter import (
@@ -88,7 +88,7 @@ class TestBudgetInEngine:
     def test_observe_budget_does_not_block_but_reports_would_block(self):
         engine = build_engine()
         engine.budget = BudgetController(
-            default_policy=BudgetPolicy(cap_tokens=5, mode=BudgetMode.OBSERVE)
+            default_policy=TokenBudgetPolicy(cap_tokens=5, mode=BudgetMode.OBSERVE)
         )
         long_prompt = "long prompt " * 40  # ~400 chars -> ~100 estimated tokens
         # way over the tiny cap, but observe mode never blocks
@@ -106,7 +106,7 @@ class TestBudgetInEngine:
     def test_enforce_budget_blocks_and_backpressures(self):
         engine = build_engine()
         engine.budget = BudgetController(
-            default_policy=BudgetPolicy(cap_tokens=5, mode=BudgetMode.ENFORCE)
+            default_policy=TokenBudgetPolicy(cap_tokens=5, mode=BudgetMode.ENFORCE)
         )
         long_prompt = "long prompt " * 40
         decision = engine.guard(_req(prompt=long_prompt), requested_tokens=500)

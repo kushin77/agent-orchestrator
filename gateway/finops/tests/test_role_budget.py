@@ -227,7 +227,7 @@ def _role_chooser(table, cap: float, spend: float, policy=BudgetPolicy.STOP):
     role_enforcer = RoleBudgetEnforcer(ledger=ledger)
     role_enforcer.add_role(RoleBudget("cto", cap, policy, tenant=TENANT))
     role_enforcer.commit("cto", spend, tenant=TENANT)
-    tenant_enforcer = budget.BudgetEnforcer(
+    tenant_enforcer = budget.BudgetDecisionMaker(
         ledger=ledger,
         default_monthly_budget_usd=1_000_000.0,
         default_policy=BudgetPolicy.WARN,
@@ -311,7 +311,7 @@ def test_chooser_falls_back_to_platform_role_caps(table) -> None:
     enforcer = load_role_enforcer()
     ch = chooser.ModelChooser(
         table=table,
-        budget_enforcer=budget.BudgetEnforcer(ledger=enforcer.ledger),
+        budget_enforcer=budget.BudgetDecisionMaker(ledger=enforcer.ledger),
         tokens_per_call=1_000_000,
     )
     ch.role_enforcer = enforcer
@@ -331,7 +331,7 @@ def test_chooser_uncapped_agent_is_unaffected(table) -> None:
     enforcer = load_role_enforcer()
     ch = chooser.ModelChooser(
         table=table,
-        budget_enforcer=budget.BudgetEnforcer(ledger=enforcer.ledger),
+        budget_enforcer=budget.BudgetDecisionMaker(ledger=enforcer.ledger),
         tokens_per_call=1_000_000,
     )
     ch.role_enforcer = enforcer

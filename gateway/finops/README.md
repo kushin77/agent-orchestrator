@@ -100,7 +100,7 @@ estimated USD cost + reasons + budget action).
    `RoleBudgetEnforcer` resolves the cap for the persona the call is dispatched
    for (`agent_id`) and classifies the call: `stop` raises `RoleBudgetBlocked`
    **and meters a `RefusalRecord`**; `warn` flags it; `fallback` downgrades the
-   tier. The tenant `BudgetEnforcer` then classifies the same call: `stop`
+   tier. The tenant `BudgetDecisionMaker` then classifies the same call: `stop`
    raises `BudgetBlocked`; `fallback` downgrades the tier toward the class's
    cheapest-capable floor (never below it, never below the security floor)
    instead of blocking; `warn` flags the call. Spend commits to the ledger only
@@ -117,7 +117,7 @@ estimated USD cost + reasons + budget action).
 ### Per-tenant budgets
 
 `budgets.yaml` seeds per-tenant lines: monthly budget in USD, policy, warn and
-hard-cap percentages. `BudgetEnforcer.check()` is a pure decision over an
+hard-cap percentages. `BudgetDecisionMaker.check()` is a pure decision over an
 injected `BudgetLedger`, so the gateway wires real billing state without
 changing the chooser:
 
