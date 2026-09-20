@@ -16,7 +16,10 @@ write_board = _conftest.write_board
 write_claims = _conftest.write_claims
 write_lessons = _conftest.write_lessons
 
-from dispatch import dispatch, validate_plan
+import json
+
+import clusters as clusters_mod
+from dispatch import dispatch, paperclip_ticket_record, validate_plan
 from graph import load
 from policy import load as load_policy
 from views import Finding
@@ -146,6 +149,132 @@ def test_validate_plan_accepts_an_unowned_risk_named_in_the_plan():
         "_assert_unowned_risks": ["kushin77/agent-orchestrator#99"],
     }
     assert validate_plan(document) == []
+
+
+# --- ADR-0012(b): persona routing, not runtime coupling ---------------------
+
+def test_default_executor_is_hermes_for_a_task_kind_ticket(root):
+    write_board(root, [issue(10, labels=["priority:P0"])])
+    view = dispatch(load(root), load_policy(root), wave=1)
+    assert view.document["assignments"][0]["executor"] == "hermes"
+
+
+def test_default_executor_is_paperclip_for_the_lessons_rca_family(root):
+    write_board(root, [issue(10, labels=["priority:P0"])])
+    graph = load(root)
+    # kind is a projected, read-only field in the real pipeline; assert the
+    # classifier's own rule directly against a forced kind rather than
+    # depending on how a board issue earns the "rca" kind end to end.
+    from dispatch import _default_executor
+    pol = load_policy(root)
+    lane = pol.lane_for(())
+    graph.tickets["kushin77/agent-orchestrator#10"]["kind"] = "rca"
+    assert _default_executor(graph, "kushin77/agent-orchestrator#10", lane) == "paperclip"
+
+
+def test_a_lane_executor_override_wins_over_the_kind_default(root):
+    write_board(root, [issue(10, labels=["priority:P0", "pillar:guardrails-security"])])
+    pol = load_policy(root)
+    # guardrails' declared sme is security; no executor override is declared,
+    # so the kind default (task -> hermes) still applies — assert that, then
+    # assert an explicit override (constructed lane) wins.
+    from dispatch import _default_executor
+    lane = pol.lane_for(("pillar:guardrails-security",))
+    graph = load(root)
+    assert _default_executor(graph, "kushin77/agent-orchestrator#10", lane) == "hermes"
+    overridden = lane.__class__(**{**lane.__dict__, "executor": "paperclip"})
+    assert _default_executor(graph, "kushin77/agent-orchestrator#10", overridden) == "paperclip"
+
+
+def test_paperclip_ticket_record_is_a_partial_frozen_contract_projection(root):
+    write_board(root, [issue(9), issue(10, blocked_by=[9])])
+    write_claims(root, [claim(9, agent="agent-a")])
+    graph = load(root)
+    record = paperclip_ticket_record(graph, "kushin77/agent-orchestrator#10")
+    assert record["id"] == "kushin77/agent-orchestrator#10"
+    assert record["blocked_by"] == ["#9"]
+    assert "owner" not in record  # unclaimed: never fabricated
+    assert "status" not in record  # unclaimed: "" is not a valid contract enum value
+
+
+def test_paperclip_ticket_record_never_carries_an_unknown_contract_key(root):
+    write_board(root, [issue(10)])
+    record = paperclip_ticket_record(load(root), "kushin77/agent-orchestrator#10")
+    frozen_keys = {"id", "owner", "status", "blocked_by", "goal", "evidence", "kind", "facets"}
+    assert set(record) <= frozen_keys
+
+
+# --- --by-cluster ------------------------------------------------------------
+
+def _write_clusters(root, wave=1, batchable=True, priority_rank=1):
+    document = {
+        "generated_at": "2026-09-20T00:00:00Z",
+        "source_repos": ["kushin77/agent-orchestrator"],
+        "clusters": [
+            {
+                "id": "c-rca-backfill-1",
+                "family": "RCA backfill",
+                "title": "Backfill RCA docs",
+                "recipe": "apply the standard RCA template",
+                "sme": "sniper-generic",
+                "tier": "L0",
+                "batchable": batchable,
+                "wave": wave,
+                "priority_rank": priority_rank,
+                "evidence": "2 open issues matched family 'rca' by label scan",
+                "issues": [
+                    {"repo": "kushin77/agent-orchestrator", "number": 100, "title": "rca 100",
+                     "labels": ["type:task"], "age_days": 10, "parent": None},
+                    {"repo": "kushin77/agent-orchestrator", "number": 101, "title": "rca 101",
+                     "labels": ["type:task"], "age_days": 12, "parent": None},
+                ],
+            }
+        ],
+        "unclustered": [],
+        "hygiene": {"duplicates": [], "orphan_children": [], "empty_epics": [], "template_gaps": []},
+    }
+    target = root / "governance" / "pmo"
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "clusters.json").write_text(json.dumps(document), encoding="utf-8")
+
+
+def test_by_cluster_dispatches_one_agent_per_batchable_cluster(root):
+    write_board(root, [issue(10)])
+    _write_clusters(root)
+    clusters = clusters_mod.load(root)
+    view = dispatch(load(root), load_policy(root), wave=1, by_cluster=True, clusters=clusters)
+    assert view.ok
+    assert view.document["by_cluster"] is True
+    assert len(view.document["assignments"]) == 1
+    entry = view.document["assignments"][0]
+    assert entry["issue_count"] == 2
+    assert entry["issues"] == ["kushin77/agent-orchestrator#100", "kushin77/agent-orchestrator#101"]
+    assert entry["agent_brief"].startswith("GOAL:")
+
+
+def test_by_cluster_defers_a_non_batchable_cluster(root):
+    write_board(root, [issue(10)])
+    _write_clusters(root, batchable=False)
+    clusters = clusters_mod.load(root)
+    view = dispatch(load(root), load_policy(root), wave=1, by_cluster=True, clusters=clusters)
+    assert view.document["assignments"] == []
+    assert any(d["reason"] == "cluster-not-batchable" for d in view.document["deferred"])
+
+
+def test_by_cluster_defers_a_cluster_from_a_different_wave(root):
+    write_board(root, [issue(10)])
+    _write_clusters(root, wave=2)
+    clusters = clusters_mod.load(root)
+    view = dispatch(load(root), load_policy(root), wave=1, by_cluster=True, clusters=clusters)
+    assert view.document["assignments"] == []
+    assert any("cluster-wave-2-not-requested-wave-1" == d["reason"] for d in view.document["deferred"])
+
+
+def test_by_cluster_with_no_clusters_json_falls_back_to_per_issue(root):
+    write_board(root, [issue(10, labels=["priority:P0"])])
+    view = dispatch(load(root), load_policy(root), wave=1, by_cluster=True, clusters=None)
+    assert view.document["by_cluster"] is False
+    assert view.document["assignments"][0]["ticket"] == "kushin77/agent-orchestrator#10"
 
 
 def test_real_dispatch_never_silently_drops_an_unowned_live_risk(root):
