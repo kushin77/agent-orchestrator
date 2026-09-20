@@ -80,3 +80,55 @@ body:
       render: text
     validations:
       required: false
+
+  # No `parent_epic` here: an epic is a chain head, so the field is the one
+  # lifecycle field this form does not carry. The gate asserts that exemption by
+  # name rather than accepting any near-shape (scripts/check-issue-template.sh).
+  - type: dropdown
+    id: model_tier
+    attributes:
+      label: Model tier
+      description: The tier this work starts at on the escalation ladder the briefs state as L0/L1/L2 — NOT the FinOps executor tier (`model-tier`, whose options are flash/pro/auditor) that the dispatcher reads. An epic is planned before it is built, so this is the tier its child lanes start from unless a child states its own.
+      options:
+        - L0
+        - L1
+        - L2
+    validations:
+      required: true
+
+  - type: textarea
+    id: root_cause
+    attributes:
+      label: Root cause
+      description: The symptom, the mechanism (name the file and the line), the governance gap that let it through, and what would have caught it earlier. Write `RCA required, Step 1` when the cause is not yet known — an honest Step 1 is worth more than an invented theory.
+      value: |
+        **Symptom:**
+        **Mechanism:** `<file>:<line>`
+        **Governance gap:**
+        **Earlier catch:**
+      render: text
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: lifecycle_contract
+    attributes:
+      label: Lifecycle contract
+      description: Acknowledge the closure contract before filing. `governance/lifecycle/cli.py close` drives these invariants, and the issue-template gate fails if this field is dropped from the form.
+      options:
+        - label: "I will close this only via a merged PR with `Closes #n` + acceptance/negative-control evidence, own it to closure, and use the Escalation protocol for handoff — never silent abandonment."
+          required: true
+    validations:
+      required: true
+
+  - type: textarea
+    id: escalation
+    attributes:
+      label: Escalation
+      description: The sanctioned handoff path. N = 3 attempts at the stated tier, then a comment naming the exact failure plus an `escalate:L1` / `escalate:L2` label, and stop. Silent abandonment is not a handoff.
+      value: |
+        N = 3 attempts at <tier>.
+        Then — a comment naming the exact failure, the `escalate:<L1|L2>` label, and stop.
+      render: text
+    validations:
+      required: true

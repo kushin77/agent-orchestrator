@@ -91,9 +91,23 @@ Gate-changing: <no | yes — paths>
 
 ## Evidence
 
+Two outputs, each by its real command: the acceptance criteria the issue named,
+and a negative control proving the same check can FAIL. A check whose pass and
+fail paths collapse into one exit code is a formality (AGENTS.md golden rule 8),
+so the negative control is the half that makes the acceptance half mean anything.
+
+### Acceptance output
+
 ```
-$ <the exact commands you ran, in order>
-<their real output, pasted — including any failure>
+$ <the exact acceptance command the issue named>
+<its real output, pasted — a summary or a claimed count is not evidence>
+```
+
+### Negative-control output
+
+```
+$ <the same check against a deliberately broken input>
+<its real output, pasted, showing the refusal and naming what it refused>
 ```
 
 ## AI-assistance
