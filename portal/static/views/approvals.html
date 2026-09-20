@@ -82,7 +82,7 @@
               CP.el("button", { class: "btn small primary", text: "approve",
                 disabled: !mayApprove, onclick: function () { decide(approval, "approve"); } }),
               CP.el("button", { class: "btn small danger", text: "deny",
-                disabled: !mayApprove, onclick: function () { decide(approval, "deny"); } })))));
+                disabled: !mayApprove, onclick: function () { decide(approval, "deny"); } }))));
         });
         if (decided.length) {
           app.appendChild(CP.el("div", { class: "card" },

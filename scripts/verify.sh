@@ -144,6 +144,10 @@ results_tsv="$verify_dir/.results.tsv"
 checks=(
   'shell-syntax|bash scripts/check-shell-syntax.sh'
   'python-syntax|bash scripts/check-python-syntax.sh'
+  # portal-view-syntax: the console's views are hand-written inline <script>
+  # blocks with no bundler, so a paren slip ships a blank page in production and
+  # no gate noticed (approvals.html + policies.html, 2026-09-13 -> 2026-09-20).
+  'portal-view-syntax|bash scripts/check-portal-view-syntax.sh'
   # python-lint (issue #1203, parent #1201): the gate of record COMPILED the
   # Python but never LINTED it, so an unused import, a discarded local or an
   # undefined annotation name was invisible to `make verify` -- the deep review

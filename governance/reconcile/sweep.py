@@ -27,12 +27,27 @@ genuinely must move.
 A ``parked`` or ``shelved`` session is re-evaluated on every sweep, not written
 off: once its work lands on ``master`` (or is pushed), the next pass reclaims it.
 That is what makes the worker self-healing rather than a one-shot cleanup.
+
+Two invariants keep that self-healing from depending on a step succeeding.
+
+* **The beat is cleared last, and only when everything else worked**
+  (``_clear_heartbeat_if_terminal``). The beat is this worker's input, so
+  clearing it after a failure hides the lane from the only thing that could
+  finish it — measured on #1446: ``forget-lane`` raised, the beat was cleared
+  anyway, and the lane record outlived every worker that could forget it.
+* **A step that cannot complete refuses by name.** ``forget-lane`` reports the
+  lane it could not forget, re-reads the record it just removed, and says so if
+  the record survived; it never reports the *way* it was stopped. The step that
+  wedged the fleet reported `ImportError: attempted relative import with no known
+  parent package` — a fact about how this module imported a sibling, naming
+  neither the lane nor a remedy.
 """
 
 from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -242,6 +257,36 @@ def _attempt(action: Action, name: str, op, needed: bool = True) -> bool:
     return True
 
 
+def _clear_heartbeat_if_terminal(action: Action, ops: ReconcileOps, session: Session) -> None:
+    """Retire the beat only when every earlier step of this teardown succeeded.
+
+    The heartbeat *is* this worker's input: ``sweep`` iterates
+    ``list_sessions(root)``. Clearing it after a step has already failed is
+    therefore how a half-finished teardown became permanent — measured on #1446,
+    in the fixture and live: ``forget-lane`` raised, the beat was cleared anyway,
+    the lane record stayed with no beat to re-measure it, and the ``failed:``
+    finding it filed could never be retired (that key is resolved only for a
+    session the sweep *reclaims*, and it could no longer see this one). The lane
+    became invisible to the only worker that could finish it, while its record
+    and its issue stayed open for good.
+
+    It is the rule ``governance/isolation/cli.py close`` already states for the
+    same beat — "the beat is cleared only once the worktree is actually gone, so
+    a kept lane keeps its session too". A lane whose teardown did not finish keeps
+    its session: the next pass re-measures it, the failure stays named on the
+    board (one finding per session, deduped), and the finding gets the terminal
+    state it was denied.
+    """
+    if any(step.outcome == FAILED for step in action.steps):
+        action.steps.append(Step(
+            "clear-heartbeat",
+            SKIPPED,
+            "kept: an earlier step failed, so this lane must stay visible to the next pass",
+        ))
+        return
+    _attempt(action, "clear-heartbeat", lambda: ops.clear_session(session.session_id))
+
+
 def _teardown(session: Session, verdict: Verdict, ops: ReconcileOps, apply: bool) -> Action:
     """Drive one orphaned lane to the terminal state its work allows."""
     action = Action(
@@ -276,7 +321,7 @@ def _teardown(session: Session, verdict: Verdict, ops: ReconcileOps, apply: bool
         # this worker exists to clear.
         _attempt(action, "forget-lane", lambda: ops.forget_lane(session.session_id), bool(session.session_id))
         _attempt(action, "release-claim", lambda: ops.release_claim(session.issue, session.agent), bool(session.issue))
-        _attempt(action, "clear-heartbeat", lambda: ops.clear_session(session.session_id))
+        _clear_heartbeat_if_terminal(action, ops, session)
         action.outcome = FAILED_OUTCOME if action.steps and any(s.outcome == FAILED for s in action.steps) else RECLAIMED
         return action
 
@@ -296,7 +341,7 @@ def _teardown(session: Session, verdict: Verdict, ops: ReconcileOps, apply: bool
         action.steps.append(Step("keep-remote-branch", SKIPPED, f"origin/{branch} is the only copy of the work; parked"))
     _attempt(action, "forget-lane", lambda: ops.forget_lane(session.session_id))
     _attempt(action, "release-claim", lambda: ops.release_claim(session.issue, session.agent), bool(session.issue))
-    _attempt(action, "clear-heartbeat", lambda: ops.clear_session(session.session_id))
+    _clear_heartbeat_if_terminal(action, ops, session)
 
     if any(step.outcome == FAILED for step in action.steps):
         action.outcome = FAILED_OUTCOME
@@ -572,6 +617,53 @@ def _terminal_body(session: Session, action: Action, what: str) -> str:
     )
 
 
+#: The checkout this worker's *code* comes from — never the reconciled root. The
+#: root is a data plane (`.fleet/`), and resolving a module under it would run
+#: whatever stale copy of the mint happens to be checked out there (#1449).
+CODE_ROOT = Path(__file__).resolve().parents[2]
+
+
+class IsolationUnavailable(RuntimeError):
+    """The isolation package that owns a lane record could not be reached.
+
+    Named, because the failure it replaces was not. The teardown used to load
+    ``governance/isolation/worktree.py`` as a **top-level** module, so it died
+    with ``ImportError: attempted relative import with no known parent package``
+    — a message about how *this worker* imported a module, naming neither the
+    lane it could not forget nor a way to fix it, filed verbatim on the board
+    (#1446, #1452, #1457, #1461, and #1444).
+    """
+
+
+def _isolation_worktree():
+    """The isolation package's ``worktree`` module — imported *as a package*.
+
+    ``governance/isolation/worktree.py`` imports its own siblings relatively
+    (``from .identity import ...``), so loading it as a bare ``worktree`` off a
+    ``sys.path`` entry gives it no parent package and raises the relative-import
+    error above. It has to be reached through its package, and from **this**
+    checkout: the code is this repository's, only the data is the root's.
+
+    Measured 2026-09-19: `forget-lane` failed *after* the git half of the teardown
+    had already run, so every affected lane was left half-reclaimed, and the
+    record it could not forget kept its finding open permanently.
+    """
+    # The checkout goes ahead of the reconciled root on ``sys.path`` for this
+    # import, so a root that happens to carry its own ``governance/`` cannot
+    # shadow the collaborator: the module identity must be the *code* checkout's
+    # (the code-vs-data-root split ``active_claims`` makes for the claim ledger).
+    if str(CODE_ROOT) not in sys.path:
+        sys.path.insert(0, str(CODE_ROOT))
+    try:
+        from governance.isolation import worktree as isolation_worktree  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001 - a refusal to report, not a crash
+        raise IsolationUnavailable(
+            f"governance.isolation.worktree cannot be imported from {CODE_ROOT}: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    return isolation_worktree
+
+
 class RepoOps:
     """The real effects, through git and the repo's own CLIs."""
 
@@ -625,10 +717,10 @@ class RepoOps:
         return self._git("branch", "-D", branch)
 
     def forget_lane(self, session_id: str) -> str:
-        # Import here: the lane record is the isolation module's, and this worker
-        # must not reimplement what "forget a lane" means.
-        import sys
-
+        # The lane record is the isolation module's, and this worker must not
+        # reimplement what "forget a lane" means — but it must *load* that module
+        # the way its own package expects (see `_isolation_worktree`).
+        #
         # The *code* comes from this checkout; only the *data* — the lane record
         # under ``<root>/.fleet/lanes`` — comes from the reconciled root, the same
         # split ``active_claims`` makes for the claim ledger. Both halves of the
@@ -648,13 +740,19 @@ class RepoOps:
         # ``worktree.py``'s own relative imports resolvable, and keeps one module
         # identity for the isolation package instead of a second copy loaded by
         # filename.
-        checkout = Path(__file__).resolve().parents[2]
-        if str(checkout) not in sys.path:
-            sys.path.insert(0, str(checkout))
-        from governance.isolation.worktree import forget_record  # noqa: PLC0415
-
-        forget_record(session_id, self.root)
-        return f"forgot lane record {session_id}"
+        isolation_worktree = _isolation_worktree()
+        record = isolation_worktree.record_dir(self.root) / f"{session_id}.json"
+        existed = record.exists()
+        isolation_worktree.forget_record(session_id, self.root)
+        # The terminal state is verified, not assumed. `forget_record` is
+        # `unlink(missing_ok=True)`, so the only honest completion is the record
+        # being gone: a step that reports PERFORMED over a record still on disk is
+        # the silent half-success this step must never be.
+        if record.exists():
+            raise IsolationUnavailable(f"the lane record {record} survived forget_record")
+        if existed:
+            return f"forgot lane record {session_id}"
+        return f"no lane record for {session_id} (already forgotten)"
 
     def release_claim(self, issue: int, agent: str) -> str:
         if not issue:

@@ -17,7 +17,18 @@ from __future__ import annotations
 
 import hashlib
 import re
+import sys
 import unicodedata
+from pathlib import Path
+
+# The tier vocabulary is READ from its declared authority (#1494) — the same
+# AgentProfile catalog the gateway contract and the portal read, through its one
+# reader — rather than restated as a literal set here.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from registry.profiles.tiers import authority as _tier_authority  # noqa: E402
 
 # Bump when the canonicalization or key material layout changes; a bump
 # invalidates every previously cached entry (versioned invalidation, mirroring
@@ -26,7 +37,7 @@ SCHEMA_VERSION = 1
 
 # Consumed from registry/profiles/catalog.yaml (the tier vocabulary); keys are
 # constructed from the uppercase form so "low" and "LOW" collide.
-CANONICAL_TIERS = frozenset({"LOW", "MED", "HIGH", "MAX"})
+CANONICAL_TIERS = frozenset(_tier_authority())
 
 _WS_RUN = re.compile(r"\s+")
 _PUNCT = re.compile(r"[^\w\s]", flags=re.UNICODE)

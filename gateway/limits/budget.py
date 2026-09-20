@@ -7,7 +7,7 @@ lesson: an UNDETERMINABLE spend (e.g. a missing ledger) is never treated as
 "under budget".  Here a missing/invalid ledger raises rather than silently
 reporting zero, so a caller cannot fail open.
 
-Safe rollout: each BudgetPolicy carries a mode.  ``observe`` (default) logs the
+Safe rollout: each TokenBudgetPolicy carries a mode.  ``observe`` (default) logs the
 decision and never blocks (would_block=True when over cap); ``enforce`` blocks
 over-cap calls (allowed=False, reason="budget_exceeded").  The facade
 (limits.limiter) converts an enforce-block into an explicit backpressure
@@ -38,7 +38,7 @@ class BudgetMode(str, Enum):
 
 
 @dataclass(frozen=True)
-class BudgetPolicy:
+class TokenBudgetPolicy:
     """One rolling-window token cap with an observe/enforce mode."""
 
     cap_tokens: int
@@ -147,7 +147,7 @@ class JsonlLedger:
 
 
 @dataclass(frozen=True)
-class BudgetDecision:
+class TokenBudgetDecision:
     """Outcome of a token-budget check for one requested token count."""
 
     scope: str
@@ -168,13 +168,13 @@ class BudgetDecision:
             raise ValueError(f"unknown budget mode: {self.mode!r}")
 
 
-class TokenBudget:
+class RollingTokenWindow:
     """A single rolling-window token budget over one scope (or one tenant)."""
 
     def __init__(
         self,
         scope: str,
-        policy: BudgetPolicy,
+        policy: TokenBudgetPolicy,
         ledger: Ledger | None = None,
         *,
         clock=time.time,
@@ -200,7 +200,7 @@ class TokenBudget:
         records = [r for r in self.ledger.recent(self._window_since()) if self._matches(r)]
         return sum(r.tokens for r in records)
 
-    def decide(self, tokens: int, request_id: str = "") -> BudgetDecision:
+    def decide(self, tokens: int, request_id: str = "") -> TokenBudgetDecision:
         """Check whether ``tokens`` may be spent; observe mode never blocks."""
         if tokens < 0:
             raise ValueError("requested tokens must be >= 0")
@@ -213,7 +213,7 @@ class TokenBudget:
         else:
             allowed = not exceeded
             reason = None if allowed else REASON_BUDGET_EXCEEDED
-        return BudgetDecision(
+        return TokenBudgetDecision(
             scope=self.scope,
             mode=self.policy.mode,
             cap_tokens=self.policy.cap_tokens,
@@ -252,21 +252,21 @@ class BudgetController:
 
     def __init__(
         self,
-        default_policy: BudgetPolicy | None = None,
+        default_policy: TokenBudgetPolicy | None = None,
         *,
-        policies: dict[str, BudgetPolicy] | None = None,
-        tenant_policies: dict[str, BudgetPolicy] | None = None,
+        policies: dict[str, TokenBudgetPolicy] | None = None,
+        tenant_policies: dict[str, TokenBudgetPolicy] | None = None,
         ledger: Ledger | None = None,
         clock=time.time,
     ) -> None:
-        self.default_policy = default_policy or BudgetPolicy(cap_tokens=200_000)
+        self.default_policy = default_policy or TokenBudgetPolicy(cap_tokens=200_000)
         self.policies = dict(policies or {})
         self.tenant_policies = dict(tenant_policies or {})
         self.ledger = ledger if ledger is not None else MemoryLedger()
         self.clock = clock
 
     # --- public --------------------------------------------------------------
-    def policy_for(self, tenant: str, agent: str, model_tier: str) -> BudgetPolicy:
+    def policy_for(self, tenant: str, agent: str, model_tier: str) -> TokenBudgetPolicy:
         scope = scope_key(tenant, agent, model_tier)
         return self.policies.get(scope, self.default_policy)
 
@@ -277,15 +277,15 @@ class BudgetController:
         model_tier: str,
         tokens: int,
         request_id: str = "",
-    ) -> BudgetDecision:
+    ) -> TokenBudgetDecision:
         """Evaluate every applicable budget level for ``tokens``."""
         tier = normalize_tier(model_tier)
         scope = scope_key(tenant, agent, tier)
-        sub: list[BudgetDecision] = []
+        sub: list[TokenBudgetDecision] = []
 
         tenant_policy = self.tenant_policies.get(tenant)
         if tenant_policy is not None:
-            tenant_budget = TokenBudget(
+            tenant_budget = RollingTokenWindow(
                 scope=f"{tenant}::*::*",
                 policy=tenant_policy,
                 ledger=self.ledger,
@@ -295,7 +295,7 @@ class BudgetController:
             sub.append(tenant_budget.decide(tokens, request_id))
 
         triple_policy = self.policies.get(scope, self.default_policy)
-        triple_budget = TokenBudget(scope, triple_policy, self.ledger, clock=self.clock)
+        triple_budget = RollingTokenWindow(scope, triple_policy, self.ledger, clock=self.clock)
         sub.append(triple_budget.decide(tokens, request_id))
 
         return self._merge(sub, requested=tokens)
@@ -312,10 +312,10 @@ class BudgetController:
 
     # --- internal ------------------------------------------------------------
     @staticmethod
-    def _merge(sub: list[BudgetDecision], *, requested: int) -> BudgetDecision:
+    def _merge(sub: list[TokenBudgetDecision], *, requested: int) -> TokenBudgetDecision:
         blocked = [d for d in sub if not d.allowed]
         binding = blocked[0] if blocked else min(sub, key=lambda d: d.remaining)
-        return BudgetDecision(
+        return TokenBudgetDecision(
             scope=binding.scope,
             mode=binding.mode,
             cap_tokens=binding.cap_tokens,

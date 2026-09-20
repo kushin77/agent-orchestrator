@@ -10,7 +10,7 @@ from limits.backpressure import (
     BackpressureController,
     BackpressureQueue,
 )
-from limits.budget import BudgetController, BudgetMode, BudgetPolicy
+from limits.budget import BudgetController, BudgetMode, TokenBudgetPolicy
 from limits.limiter import (
     KIND_BUDGET_EXCEEDED,
     build_engine,
@@ -67,7 +67,7 @@ class TestNoFailOpenNegative:
     def test_engine_enforce_exhausted_never_silently_succeeds(self):
         engine = build_engine()
         engine.budget = BudgetController(
-            default_policy=BudgetPolicy(cap_tokens=10, mode=BudgetMode.ENFORCE)
+            default_policy=TokenBudgetPolicy(cap_tokens=10, mode=BudgetMode.ENFORCE)
         )
         request = ModelCallRequest(
             tenant="broker",
