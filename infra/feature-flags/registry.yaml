@@ -121,12 +121,17 @@ services:
       this row declares the independent rollout/kill-switch only; nothing in
       infra/terraform creates or gates a resource for it, and (like paperclip)
       it carries no infra/rollout/rollout-state.yaml entry. The declared
-      `enable_hermes` variable is the switch itself; the gateway provider does
-      not yet read it, so today the switch is a declared kill-switch surface
-      only, not a live gate on the in-process adapter — enforcing it in the
-      gateway is follow-up work, not claimed here. Inert until a reviewed
-      go-live promotes this flag. It declares no dedicated health-probe path
-      (unlike paperclip's GET /api/health): the health layer
+      `enable_hermes` variable is the switch itself, and it is a LIVE gate:
+      the provider registry reads it (gateway/providers/flags.py, issue #1518)
+      and, while it is off, drops hermes from the active provider set — hermes
+      is retired by default (gateway/catalog/modules/hermes/module.json status
+      is `retired`) and only a reviewed go-live that flips this flag
+      re-activates it. The dead local endpoint at http://localhost:8080/api/chat
+      is not re-created here: the namesake `~/hermes-agent` Flask product (port
+      9501,
+      ADR-0012) is a separate deployable, out of scope for this row. It
+      declares no dedicated health-probe path (unlike paperclip's GET
+      /api/health): the health layer
       (gateway/health/fallback.py) tracks hermes as a provider rung whose
       outcomes are recorded by the caller, and its only declared endpoint is
       the Ollama-compatible POST /api/chat chat surface above.

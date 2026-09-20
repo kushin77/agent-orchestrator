@@ -44,6 +44,7 @@ from providers.contract import (
 from providers.copilot import CopilotProvider
 from providers.deepseek import DeepSeekProvider
 from providers.hermes import HermesProvider
+from providers.flags import hermes_enabled as hermes_flag_enabled
 from providers.errors import (
     CircuitOpenError,
     OutputValidationError,
@@ -249,9 +250,20 @@ class ProviderRegistry:
         vault: ApiKeyVault | None = None,
         router: EventRouter | None = None,
         tier_ladder: str | Mapping[str, str] = "deepseek",
+        hermes_enabled: bool | None = None,
     ) -> None:
         configs = configs or default_provider_configs()
         self._configs: dict[str, ProviderConfig] = dict(configs)
+        # ``enable_hermes`` is the real gate on the hermes provider (issue
+        # #1518): when the flag is off (the default), hermes is retired — it is
+        # dropped from the active config set and cannot be routed to. The flag
+        # is read from the declared registry (infra/feature-flags/registry.yaml)
+        # unless a caller overrides it explicitly (tests).
+        self._hermes_enabled = (
+            hermes_enabled if hermes_enabled is not None else hermes_flag_enabled()
+        )
+        if not self._hermes_enabled:
+            self._configs.pop("hermes", None)
         self._overrides = TenantOverrides()
         self._router = router or EventRouter()
         if isinstance(tier_ladder, str):
@@ -275,6 +287,11 @@ class ProviderRegistry:
     # -- configuration ------------------------------------------------------ #
     def provider_configs(self) -> dict[str, ProviderConfig]:
         return dict(self._configs)
+
+    @property
+    def hermes_enabled(self) -> bool:
+        """Whether the hermes provider is active in this registry (flag-gated)."""
+        return self._hermes_enabled
 
     def config_for(self, provider: str) -> ProviderConfig:
         config = self._configs.get(provider)
