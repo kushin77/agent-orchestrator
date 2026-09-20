@@ -4,10 +4,9 @@ These exercise the validator's own logic — the closed sets, the audit rule and
 the cross-reference — rather than re-asserting the YAML by hand, so a registry
 edit that breaks a rule fails here with a named reason.
 
-The suite is owned by this lane but is NOT yet declared in
-`scripts/pytest-suites.txt`: RC-8 (#559) is this EPIC's single wiring lane for
-the build files. RC-8 must add `control-plane/control` to that manifest and
-`check-control-verbs` to `scripts/verify.sh`'s `checks=()` array.
+The composite gate covers this suite: `scripts/verify.sh` runs `pytest-control`
+over `control-plane/control/tests` and `control-verbs` over the registry, and
+`scripts/pytest-suites.txt` declares the suite (RC-8/#559 wired it).
 """
 
 from __future__ import annotations
