@@ -90,6 +90,7 @@ reachable from this index.
 | [`erp-finops/current-state.md`](erp-finops/current-state.md) | Current-state money map — subscription flows and the manual reconciliation points (PF-1, issue #666, EPIC #665). |
 | [`erp-finops/saas-metrics-current-state.md`](erp-finops/saas-metrics-current-state.md) | SaaS metrics current state — MRR/ARR, cloud compute burn, invoicing bottlenecks and the silo map (issue #668). |
 | [`erp-finops/token-baseline.md`](erp-finops/token-baseline.md) | DeepSeek token-flow baseline (issue #667, EPIC #665). |
+| [`BOARD-TRIAGE-2026-09-20.md`](BOARD-TRIAGE-2026-09-20.md) | Cross-repo open-issue board triage — clusters for tandem batch dispatch (issue #1574, parent #1510). |
 
 ## Planned (later issues)
 
