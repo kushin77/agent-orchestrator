@@ -61,7 +61,12 @@
           "lane": {"type": "string", "minLength": 1},
           "owns": {"type": "array", "items": {"type": "string"}},
           "tier": {"type": "string", "enum": ["L0", "L1", "L2"]},
-          "sme": {"type": "string", "minLength": 1}
+          "sme": {"type": "string", "minLength": 1},
+          "executor": {
+            "type": "string",
+            "enum": ["hermes", "paperclip"],
+            "description": "Optional SME-ROUTING-style override of the ADR-0012(b) kind-based default executor persona for every ticket this lane owns."
+          }
         }
       }
     },
@@ -73,7 +78,8 @@
         "lane": {"type": "string", "minLength": 1},
         "owns": {"type": "array", "items": {"type": "string"}},
         "tier": {"type": "string", "enum": ["L0", "L1", "L2"]},
-        "sme": {"type": "string", "minLength": 1}
+        "sme": {"type": "string", "minLength": 1},
+        "executor": {"type": "string", "enum": ["hermes", "paperclip"]}
       }
     }
   }

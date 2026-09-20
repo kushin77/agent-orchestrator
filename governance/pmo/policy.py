@@ -32,6 +32,10 @@ class Lane:
     owns: tuple[str, ...]
     tier: str
     sme: str
+    #: SME-ROUTING-style override of the ADR-0012(b) kind-based default
+    #: executor persona ("hermes" / "paperclip"). Empty means "no override" —
+    #: dispatch.py falls back to the kind-based default.
+    executor: str = ""
 
 
 @dataclass(frozen=True)
@@ -74,6 +78,7 @@ def _lane_from(payload: dict[str, Any], pillar: str = "") -> Lane:
         owns=tuple(payload.get("owns") or ()),
         tier=payload["tier"],
         sme=payload["sme"],
+        executor=payload.get("executor", ""),
     )
 
 
