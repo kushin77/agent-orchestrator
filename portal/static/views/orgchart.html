@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Org Chart — agent-orchestrator console</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Org Chart</h1>
+    <span class="grow"></span>
+    <span class="badge info" id="chartState">-</span>
+  </header>
+
+  <main class="view-main" id="app"><div class="empty">loading…</div></main>
+  <script src="/js/api.js"></script>
+  <script>
+    (async function () {
+      var app = document.getElementById("app");
+      var stateBadge = document.getElementById("chartState");
+      var chart, health;
+      try {
+        chart = (await CP.get("/api/orgchart/chart")).data;
+        health = (await CP.get("/api/orgchart/health")).data;
+      } catch (err) {
+        if (err.status === 401) { window.location.href = "/auth/login"; return; }
+        CP.clear(app).appendChild(CP.el("div", {
+          class: "empty error-text",
+          text: "Org chart unavailable: " + err.message
+        }));
+        stateBadge.textContent = err.code || "error";
+        stateBadge.className = "badge warn";
+        return;
+      }
+      stateBadge.textContent = chart.state === "resolved" ? "resolved" : "unresolved";
+      stateBadge.className = "badge " + (chart.state === "resolved" ? "ok" : "warn");
+      render();
+      function render() {
+        CP.clear(app);
+        if (chart.state !== "resolved") {
+          app.appendChild(CP.el("div", { class: "card", text: chart.note || "no chart" }));
+          return;
+        }
+        app.appendChild(CP.el("div", { class: "card" },
+          CP.el("div", { class: "spread" },
+            CP.el("h3", { text: "Organization" }),
+            CP.el("span", { class: "hint mono",
+              text: "root " + chart.root + " · " + chart.nodes.length + " seats" })),
+          CP.el("div", { class: "hint dim", style: "margin:4px 0",
+            text: chart.principal + " — declaration " + chart.id + "@" + chart.version })));
+        app.appendChild(hierarchyTable());
+        app.appendChild(healthTable());
+      }
+      function hierarchyTable() {
+        var card = CP.el("div", { class: "card" },
+          CP.el("div", { class: "spread" },
+            CP.el("strong", { text: "Reporting structure" }),
+            CP.el("span", { class: "hint", text: "workbook-1 declaration" })),
+          CP.el("table", { class: "tbl" }));
+        var table = card.querySelector("table");
+        table.appendChild(CP.el("thead", {},
+          CP.el("tr", {},
+            CP.el("th", { text: "seat" }),
+            CP.el("th", { text: "title" }),
+            CP.el("th", { text: "reports to" }),
+            CP.el("th", { text: "tier" }),
+            CP.el("th", { class: "num", text: "cap / mo" }))));
+        var tbody = CP.el("tbody");
+        (chart.nodes || []).forEach(function (node) {
+          tbody.appendChild(CP.el("tr", {},
+            CP.el("td", { class: "mono", text: node.id + (node.isRoot ? " ★" : "") }),
+            CP.el("td", { text: node.title || "" }),
+            CP.el("td", { class: "mono", text: node.reportsTo || "—" }),
+            CP.el("td", { text: node.defaultModelTier || "" }),
+            CP.el("td", { class: "num mono",
+              text: node.monthlyBudgetCapUsd == null ? "—" : CP.money(node.monthlyBudgetCapUsd) })));
+        });
+        table.appendChild(tbody);
+        return card;
+      }
+      function healthTable() {
+        var card = CP.el("div", { class: "card" },
+          CP.el("div", { class: "spread" },
+            CP.el("strong", { text: "Role health" }),
+            CP.el("span", { class: "hint", text: health.month ? "month " + health.month : "" })),
+          CP.el("table", { class: "tbl" }));
+        var table = card.querySelector("table");
+        table.appendChild(CP.el("thead", {},
+          CP.el("tr", {},
+            CP.el("th", { text: "seat" }),
+            CP.el("th", { class: "num", text: "spent / cap" }),
+            CP.el("th", { class: "num", text: "burn" }),
+            CP.el("th", { text: "heartbeat" }))));
+        var tbody = CP.el("tbody");
+        (health.rows || []).forEach(function (row) {
+          var spent = row.hasMeteredCalls ? CP.money(row.spentUsd) : "—";
+          var cap = row.monthlyCapUsd == null ? "—" : CP.money(row.monthlyCapUsd);
+          tbody.appendChild(CP.el("tr", {},
+            CP.el("td", { class: "mono", text: row.roleId }),
+            CP.el("td", { class: "num mono", text: spent + " / " + cap }),
+            CP.el("td", { class: "num mono",
+              text: row.burnPct == null ? "—" : row.burnPct + "%" }),
+            CP.el("td", { class: "mono", text: row.heartbeatStatus || "—" })));
+        });
+        table.appendChild(tbody);
+        if (health.alerts && health.alerts.length) {
+          card.appendChild(CP.el("div", { class: "hint", style: "margin-top:8px",
+            text: "alerts: " + health.alerts.length }));
+        }
+        return card;
+      }
+    })();
+  </script>
+</body>
+</html>
