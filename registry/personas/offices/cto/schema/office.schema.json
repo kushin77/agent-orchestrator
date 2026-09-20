@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:cto-office.schema:v1",
+  "title": "CTOOffice",
+  "description": "Structural contract for the CTO office module (issue #1573, Parent #1510): charter.yaml, abilities.yaml, reports.yaml and delivery-lifecycle.yaml under registry/personas/offices/cto/. Validated by registry/personas/tests/test_cto_office.py, wired into the existing pytest-registry-personas suite (scripts/verify.sh). This schema validates STRUCTURE only; cross-references (member ids resolving to real cards, verb ids existing in control-plane/control/verbs.yaml) are checked by the test module, not by this schema alone.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["office", "schema", "version"],
+  "properties": {
+    "office": { "type": "string", "const": "cto" },
+    "schema": {
+      "type": "string",
+      "enum": [
+        "cto-office-charter/v1",
+        "cto-office-abilities/v1",
+        "cto-office-reports/v1",
+        "cto-office-delivery-lifecycle/v1"
+      ]
+    },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "reportsTo": { "type": "string" },
+    "scopeOfAuthority": { "type": "object" },
+    "mayApprove": { "type": "array", "items": { "type": "string" } },
+    "mayNotApprove": { "type": "array", "items": { "type": "string" } },
+    "escalation": { "type": "object" },
+    "guardrails": { "type": "array", "items": { "type": "string" } },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "GR-10 provenance: required on every office file that declares harvested content (charter, abilities)."
+    },
+    "abilities": { "type": "array" },
+    "gaps": { "type": "array" },
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "card"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "card": { "type": "string", "pattern": "^registry/personas/cards/[a-z][a-z0-9-]*\\.yaml$" },
+          "lane": { "type": "string" },
+          "defaultTierAtWriting": { "type": "string", "enum": ["LOW", "MED", "HIGH", "MAX"] },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "chain": { "type": "array" },
+    "rootAdminScope": { "type": "string" },
+    "dispatchPlanContract": { "type": "object" }
+  }
+}
