@@ -469,7 +469,6 @@ def classify(app_text, js_text, exemptions, baseline_rows):
     # A1 + A4: the family verdict.
     for family in families:
         consumers = hits.get(family, [])
-        res["consumers"][family] = consumers
         if family in ex_family:
             status, detail = "EXEMPT", "%s — %s" % (ex_family[family]["class"], ex_family[family]["evidence"])
         elif family in nav_ids:
@@ -531,11 +530,10 @@ def classify(app_text, js_text, exemptions, baseline_rows):
     res["families"] = families
     res["routes"] = routes
     res["nav_ids"] = nav_ids
-    res["route_exemptions"] = sorted(ex_route)
     return res
 
 
-def report(res, baseline_present, baseline_rows, exempt_count, extra_findings):
+def report(res, baseline_present, baseline_rows, exemptions, extra_findings):
     if res.get("fatal"):
         unassessable(res["fatal"])
         return
@@ -553,7 +551,9 @@ def report(res, baseline_present, baseline_rows, exempt_count, extra_findings):
     out("  %s" % ", ".join(res["nav_ids"]))
     out("")
     out("== the exemption list ==")
-    out("  %d entry(ies) read from this script's own table" % exempt_count)
+    out("  %d entry(ies) read from this script's own table" % len(exemptions))
+    for entry in exemptions:
+        out("    %-28s %-8s %s" % (entry["key"], entry["class"], entry["evidence"]))
     out("")
     out("== the gap record ==")
     if baseline_present is None:
@@ -843,7 +843,7 @@ def main():
         rc = selftest(res, exempt_text, baseline_text or "")
         return rc
 
-    report(res, baseline_present, baseline_rows, len(exemptions), ex_findings + bl_findings)
+    report(res, baseline_present, baseline_rows, exemptions, ex_findings + bl_findings)
 
     if mode == "record":
         live = classify(app_text, js_text, exemptions, [])
