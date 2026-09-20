@@ -45,6 +45,52 @@ not a control act, so a read claiming an audit action is a defect, not a
 formality — and a `hold`/`stop`/`irreversible` verb without one is the silent
 action ADR-0022 refusal 4 forbids. Both directions are enforced and tested.
 
+## Where an invocation is recorded (the canonical ledger)
+
+Issue **#1548** asked this directory to either add a ledger of its own or
+confirm that `.board/dispatch-audit.jsonl` already is one. Measured, the answer
+is **neither as stated**: no new ledger is needed, and `dispatch-audit.jsonl` is
+not a ledger of these verbs — it is the **dispatch-arbitration** rail. The rails
+record different acts; this section is the one canonical statement of which is
+which.
+
+| the question | the rail | written by | row |
+|---|---|---|---|
+| why a **dispatch/assign** was allowed or refused | `.board/dispatch-audit.jsonl` | `governance/dispatch/audit.py`, called from `claims.arbitrate()` | `ao.dispatch/audit-v1`: `kind` (`grant`/`refusal`), `issue`, `agent`, `at`, `lane`, `epic`, `directive_id`, `reason`, `detail` |
+| which **control act** was ordered (`hold`/`stop`/`irreversible`) | `.fleet/slog.jsonl` | `fleet/channel.py::_slog()` | `ts`, `id`, `from`, `to`, `type`, `correlation_id`, `issue`, `severity`, `body` |
+| the tamper-evident, per-tenant history of an action | `telemetry/ledger/` | the ledger's own hash-chained store (`verify` is its gate) | `telemetry/ledger/audit_event.schema.json` |
+
+Neither JSONL rail is tracked: `.board/dispatch-audit.jsonl` and
+`.fleet/slog.jsonl` are runtime artifacts a fresh clone does not have. Their
+absence is not a defect, and a reader who looks for "the ledger" in
+`git ls-files` will find neither.
+
+**The `audit:` value is a label, not a field.** `verbs.yaml` declares an `audit:`
+action for every non-read verb; read against the writer, that value names the act
+in prose — it is not a key in the row. `_slog()` writes no `action`/`verb` key,
+and a control act travels as `body == "control:<action>"` (e.g. `control:pause`),
+truncated like every other body. The arbitration rail's `kind` is the *verdict*
+(`grant`/`refusal`), not the verb id.
+
+So the closed decision is: **`dispatch-audit.jsonl` is the canonical ledger for
+the claim/dispatch (assign) family, and is not a ledger of all 64 verbs in
+`verbs.yaml`.** A directory-local ledger would be a second, weaker authority for
+the same question — which is why #1548 added no file.
+
+`tests/test_ledger_doc.py` holds this section to the code: it reads `_slog()`'s
+real keys and refuses the moment this table names a field the writer does not
+produce, or stops naming either rail.
+
+### Where the rails are silent — measured, reported, not patched
+
+Both of these are real, and both live in files this lane does not own, so #1548
+reports them rather than patching them here:
+
+* a refusal raised *after* arbitration succeeds is not recorded, and the row
+  written for that invocation still says `grant` — `governance/dispatch/claims.py`;
+* a control-class refusal (`channel send`/`escalate` failing validation) prints to
+  stderr and writes no row — `fleet/channel.py`.
+
 ## Running it
 
 ```bash
@@ -53,11 +99,11 @@ python3 control-plane/control/cli.py validate
 python3 -m pytest control-plane/control -q
 ```
 
-## Not wired yet — deliberately
+## Wiring
 
-This lane does not touch `Makefile`, `scripts/verify.sh` or
-`scripts/pytest-suites.txt`: **RC-8 (#559) is this EPIC's single writer** for the
-shared build files. RC-8 must add `check-control-verbs` to `verify.sh`'s
-`checks=()` array and `control-plane/control` to `pytest-suites.txt`. Until then
-the gate runs only when invoked directly — and an unwired gate is a formality,
-which is exactly what RC-8 exists to fix.
+The composite gate covers both halves of this directory: `scripts/verify.sh`
+runs `control-verbs` (`bash scripts/check-control-verbs.sh`) and `pytest-control`
+(`control-plane/control/tests`), and `scripts/pytest-suites.txt` declares the
+suite — so nothing here depends on a caller remembering to run it. RC-8 (#559)
+landed that wiring; the paragraph that used to say otherwise here had gone stale,
+which is the same class of defect #1548 closed.
