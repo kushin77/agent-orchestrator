@@ -1,0 +1,36 @@
+# Build config for the control-plane overlay-lift sync trigger (code-native CI,
+# issue #1513). Two halves:
+#
+#   1. OFFLINE (always, no network): the detector proves itself on fixtures and
+#      the manifest validates — scripts/check-agentconsole-overlay-sync.sh.
+#   2. LIVE (network): the drift diff against the shared-services run-half
+#      targets — scripts/sync-agentconsole-overlay.sh --check. This half
+#      reaches kushin77/shared-services and kushin77/shared-frontend over the
+#      GitHub API, so it needs a GitHub token in the runner (documented on the
+#      trigger); without one it answers CANNOT-ASSESS (exit 2), never a pass.
+#
+# This file is declarative scaffolding — the trigger that executes it ships
+# disabled until a reviewed go-live (see README.md and the feature-flag
+# registry). Mirrors infra/cloudbuild/verify.yaml's toolchain approach.
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  - id: overlay-sync
+    name: 'python:3.14'
+    entrypoint: 'bash'
+    args:
+      - '-lc'
+      - |
+        set -euo pipefail
+        python3 -m pip install --quiet --disable-pip-version-check PyYAML
+        # offline half — no network, no gh (always runs)
+        bash scripts/check-agentconsole-overlay-sync.sh
+        # live half — needs gh auth to reach shared-services + shared-frontend
+        if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+          bash scripts/sync-agentconsole-overlay.sh --check
+        else
+          echo "overlay-sync: CANNOT-ASSESS — gh is absent or unauthenticated (a GitHub token must be wired at promotion time)"
+          exit 2
+        fi
