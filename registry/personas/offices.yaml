@@ -32,6 +32,7 @@ offices:
     budgetSource: "registry/personas/org-charts/purebliss.yaml + gateway/finops/budgets.yaml roles.capSource"
     fleetPack: purebliss-team@1.0.0
     routingGroup: purebliss-team
+    moduleDir: registry/personas/offices/ceo
 
   - id: cto
     title: Office of the CTO
@@ -56,6 +57,7 @@ offices:
     budgetSource: "registry/personas/org-charts/purebliss.yaml + gateway/finops/budgets.yaml roles.capSource"
     fleetPack: purebliss-team@1.0.0
     routingGroup: purebliss-team
+    moduleDir: registry/personas/offices/cto
 
   - id: cfo
     title: Office of the CFO
@@ -69,6 +71,7 @@ offices:
     budgetSource: "registry/personas/org-charts/purebliss.yaml + gateway/finops/budgets.yaml roles.capSource"
     fleetPack: purebliss-team@1.0.0
     routingGroup: purebliss-team
+    moduleDir: registry/personas/offices/cfo
 
   - id: pmo
     title: Office of the PMO
@@ -84,3 +87,4 @@ offices:
     budgetSource: "registry/personas/org-charts/purebliss.yaml + gateway/finops/budgets.yaml roles.capSource"
     fleetPack: purebliss-team@1.0.0
     routingGroup: purebliss-team
+    moduleDir: registry/personas/offices/pmo

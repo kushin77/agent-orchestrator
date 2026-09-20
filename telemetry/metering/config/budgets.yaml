@@ -9,6 +9,8 @@
 schemaVersion: 1
 defaultMode: observe
 policies:
+  # PROPOSAL pending Finance (CFO office) sign-off; see gateway/finops/
+  # budgets.yaml's tenant-purebliss comment.
   - tenantId: purebliss
     dailyTokenLimit: 3000000
     mode: enforce

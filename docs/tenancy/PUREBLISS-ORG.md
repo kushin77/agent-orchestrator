@@ -76,6 +76,40 @@ unchanged and remains a member of the PMO office, not its head.
 5. Never hand-edit `portal/static/assets/*.json` roll-ups independently of
    these seeds; they are projections, not a second source of truth.
 
+## Office directory modules (integrated with parallel CTO/CFO lanes)
+
+Two sibling lanes independently added per-office directory contracts under
+`registry/personas/offices/<office>/` (`charter.yaml`, `abilities.yaml`,
+`reports.yaml`, plus office-specific extras): CTO (issue #1573, PR #1579)
+and CFO (issue #1582, PR #1583). This lane reconciled them into one shape:
+
+- The canonical structural schema is
+  `registry/personas/offices/schema/office.schema.json` — CTO's originally
+  per-office schema (`cto/schema/office.schema.json`), moved to the shared
+  location and generalized (`office` widened from `const: "cto"` to
+  `enum: [ceo, cto, cfo, pmo]`; `schema` widened to a pattern covering all
+  four offices).
+- `registry/personas/offices/{ceo,pmo}/` were added in the same shape
+  (charter/abilities/reports/prompts) so all four offices are consistent.
+- CFO's `charter.yaml` predates the canonicalization and uses an
+  incompatible field shape (`schemaVersion`/`tenant`/`personaCardRef`/
+  `authority.{grants,denies}` instead of `schema`+`version`/
+  `scopeOfAuthority`/`mayApprove`/`mayNotApprove`). It is NOT force-fitted
+  onto the canonical schema (that would silently accept a shape the schema
+  doesn't actually check); it keeps validating against its own schema,
+  moved to `registry/personas/offices/schema/office-charter-legacy-cfo.schema.json`.
+  `registry/personas/tests/test_office_modules.py` asserts this delta
+  explicitly (a no-false-green proof: CFO's charter MUST fail the canonical
+  schema). Reshaping CFO onto the canonical schema is a follow-up.
+- `registry/personas/offices.yaml` now carries a `moduleDir` field per
+  office pointing at its directory module; `registry/personas/persona-
+  offices.schema.json` requires it.
+- `gateway/finops/budgets.yaml`'s `tenant-purebliss` monthly figure ($750)
+  is flagged as a proposal pending CFO office sign-off, not yet a reviewed
+  number — the CFO lane's own cost model
+  (`docs/cfo/COST-MODEL-2026-09-20.md`) had not covered a `purebliss` tenant
+  entry as of this integration.
+
 ## Known deferral: demo tenants in `portal/server/state.py`
 
 `portal/static/assets/fleet-hierarchy.json` still lists the pilot demo

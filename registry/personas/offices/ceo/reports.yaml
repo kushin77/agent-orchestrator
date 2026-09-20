@@ -1,0 +1,13 @@
+# CEO Office members (purebliss single-tenant org).
+#
+# Every id below must resolve to a real persona card in
+# registry/personas/cards/*.yaml (platform fallback) or
+# registry/personas/cards/purebliss/*.yaml (tenant shadow).
+office: ceo
+schema: ceo-office-reports/v1
+version: 1.0.0
+members:
+  - id: orchestrator
+    card: registry/personas/cards/orchestrator.yaml
+    lane: orchestration
+    defaultTierAtWriting: MED

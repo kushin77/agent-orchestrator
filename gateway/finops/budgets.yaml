@@ -37,7 +37,11 @@ defaultPolicy: warn
 budgets:
   # purebliss (single-tenant org, CEO/CFO/CTO/PMO offices): fallback to local
   # ollama beyond the soft threshold rather than stopping the org outright,
-  # since purebliss always has a free local-inference floor.
+  # since purebliss always has a free local-inference floor. PROPOSAL
+  # pending Finance (CFO office, registry/personas/offices/cfo/) sign-off:
+  # the $750 monthly figure is this lane's estimate (sum-adjacent to the
+  # $300+$250+$50+$100 office caps in registry/personas/org-charts/
+  # purebliss.yaml with headroom), not a CFO-reviewed number yet.
   tenant-purebliss:
     monthlyBudgetUsd: 750.00
     policy: fallback

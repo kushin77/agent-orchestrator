@@ -1,0 +1,96 @@
+# CTO office root/super-admin RBAC declaration (issue #1573, Parent: #1510).
+#
+# Extends, never replaces, the `cto` role already declared in
+# `identity/rbac/presets/csuite.yaml`. That role stays the baseline; this pack
+# adds the two permissions the CTO office's root/super-admin TECHNICAL scope
+# needs (audit:read for security-posture oversight, roles:read for read-only
+# visibility into the org's role graph it does not administer) plus a
+# documented, explicit, time-boxed break-glass path. Per AGENTS.md GR-5/GR-6
+# and this repo's identity/rbac doctrine, authority here is an EXPLICIT allow
+# list — the wildcard permission (`*:*`) stays reserved to the Owner preset
+# only (identity/rbac/model.py WILDCARD doctrine) and is never granted here,
+# even for "root admin."
+#
+# Pack schema: identity/rbac/README.md (same resource:action language,
+# two-gate scope+permission enforcement as every other preset pack).
+key: cto-superadmin
+name: CTO Office Root/Super-Admin (technical authority overlay)
+description: >
+  Overlay pack for tenants that want the CTO office to hold its full
+  root/super-admin TECHNICAL scope (registry/personas/offices/cto/charter.yaml
+  mayApprove: pull-request-merge-to-master, terraform-apply-authorization,
+  security-exception-with-expiry). It does NOT grant org/tenant
+  administration (roles:manage) or budget administration (budget:manage) —
+  those stay with CEO and CFO respectively per csuite.yaml, and this pack
+  layers on top of, not instead of, the cto role there.
+role_admin_permission: roles:manage   # unchanged; this pack never claims it
+roles:
+  - key: cto
+    name: CTO (super-admin overlay)
+    description: >
+      Adds explicit, named permissions to the baseline cto role
+      (identity/rbac/presets/csuite.yaml) for its root/super-admin technical
+      scope: read-only audit visibility for security-posture review, and
+      read-only role-graph visibility for architecture decisions that touch
+      agent boundaries. Every permission below is named; none is a wildcard.
+    level: org
+    permissions:
+      # Baseline (unchanged from csuite.yaml cto role — repeated here so this
+      # file is a complete, auditable statement of the overlay role, not a
+      # diff someone has to reconstruct by reading two files):
+      - org:read
+      - team:read
+      - agent:read
+      - agent:run
+      - agent:write
+      - session:read
+      - session:manage
+      - prompt:read
+      - prompt:write
+      - model:read
+      - budget:read
+      - tool:call
+      # Overlay additions (root/super-admin technical scope):
+      - audit:read       # security-posture review (charter.yaml domain)
+      - roles:read        # read-only visibility into the role graph for
+                           # architecture decisions; NOT roles:manage
+    is_system: true
+    explicitlyDenied:
+      # Named on purpose (least-privilege doctrine): these are the
+      # permissions a "root admin" label might imply but this role does NOT
+      # carry, so a reviewer never has to infer the boundary.
+      - roles:manage       # CEO only (no-lockout invariant, identity/rbac/README.md)
+      - budget:manage       # CFO only (csuite.yaml)
+      - org:manage           # CEO only
+
+# Break-glass: a time-boxed, logged, named-permission escalation — never a
+# standing wildcard grant and never a silent one.
+break_glass:
+  description: >
+    An emergency technical action (e.g. an irreversible IaC apply outside the
+    normal PMO-dispatch -> paperclip-ticket -> hermes -> verify -> merge
+    chain, delivery-lifecycle.yaml) that cannot wait for the normal gate.
+  procedure:
+    - "Open a paperclip ticket (ADR-0014 single join node) BEFORE acting,
+      tagged break-glass, naming the specific permission needed and its
+      expiry — never opened after the fact."
+    - "The grant is one of the EXPLICIT permissions already enumerated above
+      (or, exceptionally, budget:manage/roles:manage escalated FROM the CEO,
+      never self-granted by the CTO office) — never a wildcard, never
+      'temporary *'."
+    - "Expiry is mandatory and enforced the same way csuite.yaml's is_system
+      roles are enforced: a break-glass grant with no expiry is refused
+      fail-closed, matching identity/rbac/model.py's least-privilege
+      doctrine."
+    - "Every break-glass action is logged to the audit trail (audit:read is
+      how the CTO office itself later reviews it) and attested back to the
+      originating paperclip ticket, per delivery-lifecycle.yaml's attest
+      stage — the ticket stays the knowledge base of record, including for
+      emergencies."
+  neverGrants:
+    - "a wildcard permission (`*:*`, `*:action`, `resource:*`) — reserved to
+      the Owner preset only, identity/rbac/model.py"
+    - "a standing (non-expiring) elevation"
+    - "self-approval of the CTO office's own break-glass request — the CEO
+      (or, for a CEO-absent org, the board principal) approves it, matching
+      charter.yaml's separation-of-duties guardrail"
