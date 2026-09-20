@@ -293,10 +293,13 @@ FAKE_GH = """#!/usr/bin/env bash
 # A RECORDING fake gh for the landing arms. Never touches the network.
 #   pr view   -> the JSON at $AO_CGS_GH_VIEW_JSON
 #   pr merge  -> records the PR number in $AO_CGS_GH_MERGE_LOG, exits $AO_CGS_GH_MERGE_RC
-#   api ...   -> the REST transport scripts/merge-pr.sh uses (issue #1569). The
-#                stand-in does not implement jq: a GET of the pull answers with
-#                the fixture at $AO_CGS_GH_REST_PULL, which carries the renamed
-#                keys BOTH of the apply path's REST reads look up. The merge
+#   api ...   -> the REST transport scripts/merge-pr.sh AND its guard use (issues
+#                #1569, #1567). The stand-in does not implement jq: a GET of the
+#                pull answers with the fixture at $AO_CGS_GH_REST_PULL, which
+#                carries the union of the renamed keys those REST reads look up
+#                (the guard's title/body/headRefName, the apply path's
+#                baseRefName/headRefOid, and the delete's headRef/headRepo). The
+#                merge
 #                endpoint records the PR number in the same log and exits the
 #                same $AO_CGS_GH_MERGE_RC, so one knob scripts the outcome on
 #                either transport, and the head-ref DELETE records the branch it
@@ -816,24 +819,42 @@ def landing_venue(name, state="MERGED", head_green=True, merge_rc=0):
         "-c", "commit.gpgsign=false", "commit", "-q", "-m", "the head that is judged")
     head = head_of(path)
     git(path, "checkout", "-q", "master")
+    # The pull's identity, written ONCE: the squash-message guard reads this pull
+    # over REST (issue #1567) and the apply path reads it over GraphQL for the
+    # post-merge read-back and over REST for the merge and the head-branch delete
+    # (issue #1569). One source for the title/body/head ref keeps both shapes
+    # describing ONE pull, instead of letting a fixture drift into a body the guard
+    # never saw -- which is what starved the guard into CANNOT-ASSESS here and left
+    # the landing arms reading rc=2.
+    pr_title = "fix(gate): a fixture title"
+    pr_body = "What changed.\n\nRefs kushin77/agent-orchestrator#1382\n"
+    head_ref = "fixture-head"
     view = json.dumps({
-        "title": "fix(gate): a fixture title",
-        "body": "What changed.\n\nRefs kushin77/agent-orchestrator#1382\n",
+        "title": pr_title,
+        "body": pr_body,
         "baseRefName": "master",
-        "headRefName": "fixture-head",
+        "headRefName": head_ref,
         "headRefOid": head,
         "state": state,
         "mergeCommit": {"oid": "1" * 40},
     })
-    # the REST fixture (issue #1569): the apply path reads the pull over `gh api`
-    # and then resolves the head ref for its post-merge branch delete from the
-    # same endpoint. This venue's origin remote IS this path, so that is also the
-    # slug the delete is authorised against -- the fixture NAMES it rather than
-    # leaving it absent, so the delete is judged on a readable value.
+    # the REST fixture (issues #1569 + #1567): the apply path reads the pull over
+    # `gh api` and then resolves the head ref for its post-merge branch delete from
+    # the same endpoint, and the squash-message guard reads that SAME endpoint for
+    # the title/body it renders the landed message from. The fake answers
+    # after-the-filter rather than running jq, so this one fixture carries the union
+    # of the renamed keys those three `--jq` filters look up
+    # (title/body/headRefName, baseRefName/headRefOid, headRef/headRepo). This
+    # venue's origin remote IS this path, so that is also the slug the delete is
+    # authorised against -- the fixture NAMES it rather than leaving it absent, so
+    # the delete is judged on a readable value.
     write(path / "rest-pull.json", json.dumps({
+        "title": pr_title,
+        "body": pr_body,
+        "headRefName": head_ref,
         "baseRefName": "master",
         "headRefOid": head,
-        "headRef": "fixture-head",
+        "headRef": head_ref,
         "headRepo": str(path),
     }), 0o644)
     return path, view, "1" * 40, head, head_green, merge_rc
