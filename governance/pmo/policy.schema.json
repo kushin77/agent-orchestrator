@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "governance/pmo/policy.schema.json",
+  "title": "PMO priority/dispatch policy (issue #403 follow-on)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "wave_cap_default",
+    "priority_weights",
+    "aging_weights",
+    "fanout_weight_per_blocker",
+    "readiness_bonus",
+    "capacity_penalty_per_inflight",
+    "unsourced_terms",
+    "model_tiers",
+    "lanes",
+    "default_lane"
+  ],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "wave_cap_default": {"type": "integer", "minimum": 1},
+    "priority_weights": {
+      "type": "object",
+      "additionalProperties": {"type": "number"},
+      "required": ["P0", "P1", "P2", "unset"]
+    },
+    "aging_weights": {
+      "type": "object",
+      "additionalProperties": {"type": "number"},
+      "required": ["postmortem", "red", "attention", "watch", "none"]
+    },
+    "fanout_weight_per_blocker": {"type": "number", "minimum": 0},
+    "readiness_bonus": {"type": "number", "minimum": 0},
+    "capacity_penalty_per_inflight": {"type": "number", "minimum": 0},
+    "unsourced_terms": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["weight", "reason"],
+        "properties": {
+          "weight": {"type": "number"},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "model_tiers": {
+      "type": "object",
+      "additionalProperties": {"type": "string"},
+      "required": ["L0", "L1", "L2"]
+    },
+    "lanes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pillar", "lane", "owns", "tier", "sme"],
+        "properties": {
+          "pillar": {"type": "string", "minLength": 1},
+          "lane": {"type": "string", "minLength": 1},
+          "owns": {"type": "array", "items": {"type": "string"}},
+          "tier": {"type": "string", "enum": ["L0", "L1", "L2"]},
+          "sme": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "default_lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lane", "owns", "tier", "sme"],
+      "properties": {
+        "lane": {"type": "string", "minLength": 1},
+        "owns": {"type": "array", "items": {"type": "string"}},
+        "tier": {"type": "string", "enum": ["L0", "L1", "L2"]},
+        "sme": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
