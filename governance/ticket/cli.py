@@ -17,12 +17,20 @@ import sys
 from pathlib import Path
 
 from builder import build, verify
-from freshness import DEFAULT_MAX_AGE_HOURS, assess, parse_iso
+from freshness import CODE_BOARD_STALE, DEFAULT_MAX_AGE_HOURS, assess, parse_iso
 from model import (
     STORE_RELPATH,
     CannotAssess,
     Contribution,
 )
+
+# The self-heal orchestration (issue #1692) is shared with the dispatch-queue
+# consumer via governance/board_selfheal.py — NOT imported from
+# governance/dispatch directly: that package shares bare module basenames
+# (model, cli, snapshot) with this one, so a direct cross-import collides the
+# flat sys.modules namespace (see governance/board_selfheal.py's docstring).
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from governance import board_selfheal  # noqa: E402
 
 
 def _fail(violations, code: int = 1) -> int:
@@ -116,6 +124,20 @@ def main(argv: list[str] | None = None) -> int:
             "gate's assertion on the real snapshot never passes it."
         ),
     )
+    fresh.add_argument(
+        "--refresh",
+        action="store_true",
+        help=(
+            "self-heal (issue #1692): on a stale snapshot, run the ONE bounded board "
+            "refresh before failing — OFF by default, a READ verb must not reach the "
+            "network unasked"
+        ),
+    )
+    fresh.add_argument(
+        "--repo",
+        default=None,
+        help="the GitHub board a --refresh reads (default: the refresh verb's own default)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -141,10 +163,30 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "freshness":
             moment = parse_iso(args.now) if args.now else None
-            report = assess(args.root, max_age_hours=args.max_age_hours, now=moment)
+            max_age = DEFAULT_MAX_AGE_HOURS if args.max_age_hours is None else args.max_age_hours
+            if getattr(args, "refresh", False):
+                report, healed, refresh_detail = board_selfheal.self_heal(
+                    assess,
+                    args.root,
+                    max_age_hours=max_age,
+                    now=moment,
+                    repo=args.repo,
+                    stale_code=CODE_BOARD_STALE,
+                )
+            else:
+                report = assess(args.root, max_age_hours=max_age, now=moment)
+                healed, refresh_detail = False, ""
             if not report.ok:
-                return _fail(report.violations)
-            print(f"ticket-freshness: OK — {report.render()}")
+                code = _fail(report.violations)
+                if refresh_detail:
+                    print(f"  FAIL  self-heal refresh failed: {refresh_detail}", file=sys.stderr)
+                elif not getattr(args, "refresh", False):
+                    print("  FAIL  no self-heal attempted — run with --refresh to try it", file=sys.stderr)
+                return code
+            if healed:
+                print(f"ticket-freshness: OK (self-healed — {refresh_detail}) — {report.render()}")
+            else:
+                print(f"ticket-freshness: OK — {report.render()}")
             return 0
 
         result = verify(args.root, store=args.out)

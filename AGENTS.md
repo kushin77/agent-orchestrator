@@ -28,7 +28,17 @@ transcript is issue #3.
 - The architecture is **five pillars** — Agent Registry & Profiling, Model
   Gateways, State-machine execution, Security & guardrails, Observability —
   plus cross-cutting tenant identity/RBAC, control-plane/portal, and
-  autonomous ops/governance. Source of truth: `docs/ARCHITECTURE.md`.
+  autonomous ops/governance. Design reference: `docs/ARCHITECTURE.md`; the
+  as-built control chain (what actually runs today, per layer) is
+  `docs/ARCHITECTURE-2026-09.md`.
+- This repo also acts as the fleet's **CTO office** — root/super-admin
+  technical authority for everything in the CMR (module onboarding, gates,
+  tiers, the IaC mandate, dispatch). See `docs/CTO-OFFICE.md`.
+- Per **ADR-0033**, neither "Paperclip" nor "Hermes" is a top-level
+  orchestrator of agent work — the sole top-level orchestrator is
+  `fleet/brain.py` + `governance/dispatch/`. Paperclip is the ticket/
+  heartbeat/budget reporting surface; Hermes is a routing persona/inference
+  adapter. See `docs/decision-records/ADR-0033-paperclip-hermes-naming-resolution.md`.
 
 This repository IS the product (the control plane itself) — not a hub, and not
 a spoke's application.
@@ -117,6 +127,18 @@ superseded. If a doc in this repo contradicts this file, this file wins.
     session's, or whose commits omit the ticket reference is **not isolated** —
     `scripts/check-session-isolation.sh` (in `make verify`) fails it, and
     `governance/isolation/cli.py audit` names the broken property.
+
+    **Never `git stash` in the shared main checkout (issue #1544).** The shared
+    checkout is the repository's *main* working tree, not a lane worktree — its
+    `git-dir` equals its `git-common-dir` (measured 2026-09-20) — so a stash
+    taken there captures whatever **other** agents have left uncommitted in it.
+    Stashes are also repository-global: `refs/stash` lives in the common git
+    dir, so the entry is the *same ref* in every lane worktree and any lane can
+    pop another lane's stash. Measured at the same moment: `git stash list`
+    carried **11** entries, four of them naming shared-checkout incidents (for
+    example "shared-checkout unblock … uncommitted work preserved before
+    fast-forward"). Do not stash to unblock yourself — commit in your own lane
+    worktree instead.
 16. **End-to-end closure (institutional, issue #269).** A work item is not done
     when its PR merges; it closes **hygienically** only when *every* artifact it
     created is terminal. `governance/lifecycle/` names the closure invariants
@@ -345,6 +367,9 @@ describing what will land there; later issues fill the directories in.
 - **No editing `vendor/`** (pinned CMR submodule) and never commit cloned fleet
   repos under `.research/` (gitignored).
 - **Never edit another repo's files** — direction/needs go to that repo's board.
+- **Never `git stash` in the shared main checkout** — stashes are
+  repository-global, so it hides other lanes' uncommitted work (rule 15). Commit
+  in your own lane worktree instead.
 
 ## Verification (gate of record)
 
