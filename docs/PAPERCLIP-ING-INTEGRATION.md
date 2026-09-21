@@ -26,6 +26,10 @@ in [`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md), section
   there are **no two authoritative engines**. The fleet remains authoritative for
   dispatch, claims, budgets and audit; upstream is an operator surface mapped over
   the seam.
+- The declared policy registry (`governance/policy/registry.py`, #1763) is
+  delivered to upstream **read-only** by `integrations/paperclip/policy_map.py`,
+  which projects the registry's own rows and re-derives no policy domain itself
+  (issue #1764).
 
 This doc builds the seam; **it does not stand the process up**. Running
 `npx paperclipai onboard --yes` and wiring cross-boundary auth is the adoption
