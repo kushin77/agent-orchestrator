@@ -92,6 +92,8 @@ reachable from this index.
 | [`erp-finops/saas-metrics-current-state.md`](erp-finops/saas-metrics-current-state.md) | SaaS metrics current state — MRR/ARR, cloud compute burn, invoicing bottlenecks and the silo map (issue #668). |
 | [`erp-finops/token-baseline.md`](erp-finops/token-baseline.md) | DeepSeek token-flow baseline (issue #667, EPIC #665). |
 | [`BUILT-NOT-SHIPPED-AO.md`](BUILT-NOT-SHIPPED-AO.md) | Built-not-shipped inventory — every artifact that is built but not shipped, each with the mechanism that proves the claim (issue #1540, EPIC #1510). |
+| [`cfo/HARNESS-AUDIT-2026-09-20.md`](cfo/HARNESS-AUDIT-2026-09-20.md) | Read-only audit of the per-turn harness-injected prompt surface (skills, MCP, deferred tools) with a measured change set and MCP-fix diagnosis (refs #1582, CFO office). |
+| [`cfo/proposed-global-CLAUDE.md`](cfo/proposed-global-CLAUDE.md) | Compressed draft of `~/.claude/CLAUDE.md` (~36% smaller, every rule preserved), applied by `cfo/harness-audit-2026-09-20.patch` — see the audit doc above. |
 
 ## Planned (later issues)
 
