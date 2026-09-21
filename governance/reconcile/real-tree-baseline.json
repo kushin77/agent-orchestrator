@@ -3148,6 +3148,31 @@
       "kind": "worktree",
       "name": "/home/akushnir/ao-worktrees/ao-1441-858b8e03",
       "reason": "re-measured 2026-09-20 clearing the box's clock-driven check-reconcile red: a clean checkout of branch issue-1441 (HEAD 79f41941) with no uncommitted dirt. Recorded reviewed, not reclaimed."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1338-quarantine",
+      "reason": "re-measured 2026-09-21 landing PR #1624: unmerged lane branch (HEAD ac1179b4, 2 commits ahead of master, open work). Recorded reviewed, not reclaimed."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1424",
+      "reason": "re-measured 2026-09-21 landing PR #1624: unmerged lane branch (HEAD 18813b23, 2 commits ahead of master, open work). Recorded reviewed, not reclaimed."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1485",
+      "reason": "re-measured 2026-09-21 landing PR #1624: unmerged lane branch (HEAD d7b70cc4, 1 commit ahead of master, open work). Recorded reviewed, not reclaimed."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-gate-status-bytecount",
+      "reason": "re-measured 2026-09-21 landing PR #1624: unmerged lane branch (HEAD d29364c0, 1 commit ahead of master, open work). Recorded reviewed, not reclaimed."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1338-0a207946",
+      "reason": "re-measured 2026-09-21 landing PR #1624: a clean checkout of branch issue-1338-quarantine (HEAD ac1179b4) with no uncommitted dirt. Recorded reviewed, not reclaimed."
     }
   ]
 }

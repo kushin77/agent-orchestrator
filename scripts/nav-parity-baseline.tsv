@@ -1,0 +1,17 @@
+# Known built-but-unwired console surfaces (issue #1565). SHRINK-ONLY:
+# scripts/check-nav-parity.sh refuses a family that is missing from this file, and
+# refuses to add one here. Lower it (`--record`) as each row's owning issue lands;
+# the file disappears when the last row does — the gate then stands on its own.
+#
+# Why these are recorded rather than exempted: each one IS a console surface an
+# operator should be able to navigate to, so the gate's refusal is correct and the
+# row is a debt with a named owner, not a justification for the absence. Measured
+# on 5357190f, after #1520 wired FinOps and Ops/SLO (two of the six the
+# console-coverage audit found; the pre-#1520 run refuses all six).
+#
+# Format: <family><TAB><owning issue number><TAB><why it has no nav surface yet>
+board	1522	console: the fleet board has a backend (GET /api/board/rows, #880) and no view — #1522 builds it
+orgchart	1521	console: the org-chart surface has a backend (GET /api/orgchart/chart|health, #642) and no view — #1521 builds it
+skillstudio	1521	console: the skill-studio surface has a backend (GET/POST /api/skillstudio/*, #642) and no view — #1521 builds it
+taskboard	1522	console: the tenant task board has a backend (GET /api/taskboard/tickets, #642) and no view — #1522 builds it
+v1	1523	/api/v1/bridge is the versioned live-data contract (#339) with no resolved consumer yet — #1523 resolves exactly that
