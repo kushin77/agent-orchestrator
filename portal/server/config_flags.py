@@ -33,11 +33,19 @@ fail-closed ``"off"``, never an enabled surface.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
 #: The flag declaration the portal reads at boot (repo-root relative).
 CONFIG_RELATIVE = Path("portal") / "config" / "feature-flags.yaml"
+
+#: Local-runtime-only override (issue #1771, `make portal-demo`): with this set
+#: truthy every surface in ``DECLARED_SURFACES`` reads ``"on"`` regardless of
+#: ``portal/config/feature-flags.yaml``. It never writes to, or reads a
+#: substitute for, that file — production boots that never set the env var are
+#: unaffected, and the committed defaults (GR-5) are untouched.
+DEMO_OVERRIDE_ENV = "AO_PORTAL_DEMO"
 
 #: Surface keys declared in ``portal/config/feature-flags.yaml`` (issue #642).
 ORG_CHART_SURFACE = "org_chart"
@@ -86,6 +94,12 @@ def read_config_default(
     Fails closed: every unreadable or non-conforming input reads as ``"off"``.
     Only ``default: on`` or ``default: true`` returns ``"on"``.
     """
+    if surface in DECLARED_SURFACES and (os.environ.get(DEMO_OVERRIDE_ENV) or "").strip().lower() in (
+        "1",
+        "true",
+        "on",
+    ):
+        return "on"
     path = (
         Path(config_path)
         if config_path is not None

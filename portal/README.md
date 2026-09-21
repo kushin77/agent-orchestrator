@@ -30,6 +30,14 @@ python3 -m portal.server.main --port 8787
 
 To run the **fleet SPoG** (`/views/fleet.html` + `/api/fleet/*`) on a checkout with no external infra — a minted session the server accepts, plus the promoted surface registry — follow [`docs/PORTAL-OFFLINE-DEV.md`](../docs/PORTAL-OFFLINE-DEV.md): a **dev stopgap, not the production surface**.
 
+To see the merged workbook-11 surfaces (task board, org chart, skill studio,
+fleet projection, operator terminal) rendering against this checkout's real
+local data in one command, run `make portal-demo` (issue #1771): it mints a
+dev session, forces those surfaces on via a local-runtime-only env override,
+and starts the server at `http://127.0.0.1:8799/`, printing which surfaces
+have real data vs a missing root — never touching
+`infra/feature-flags/registry.yaml` defaults or terraform (GR-5).
+
 The console has **no login of its own**: an unauthenticated visitor is
 redirected to the shared-frontend OS auth gate (`/auth/login`), and a console
 session exists only once the portal has verified the auth-gate RS256

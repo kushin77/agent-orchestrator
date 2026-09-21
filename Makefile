@@ -212,6 +212,15 @@ operator:
 ## code, flag-gated OFF (GR-5), never a console click.
 console:
 	@bash scripts/console.sh --host $(CONSOLE_HOST) --port $(CONSOLE_PORT)
+
+## portal-demo — issue #1771: one-command local view of the merged workbook-11
+## portal surfaces (task_board, org_chart, skill_studio, fleet_projection,
+## operator_terminal), forced on via a local-runtime-only env override
+## (AO_PORTAL_DEMO=1 + an on-disk registry copy) — never touching
+## infra/feature-flags/registry.yaml defaults or any terraform file (GR-5).
+## Binds 127.0.0.1:8799. Ctrl-C to stop.
+portal-demo:
+	@python3 scripts/portal-demo.py
 ## lint — shell + YAML + JSON + docs (no secret scan)
 lint: shell-syntax python-syntax yaml-lint json-lint docs-lint squash-message chronological-dispatch issue-claims epic-focus capacity-gate issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary operator-access session-isolation github-lifecycle reconcile lease-policy fleet-state brain-profile knowledge-index lessons ao-ssh-access operator-terminal codeowners tagging
 	@echo ""
