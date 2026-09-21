@@ -78,6 +78,14 @@ REASON_BLOCKED = "blocked"
 REASON_ALREADY_CLAIMED = "already-claimed"
 REASON_NO_CHAIN_EDGE = "no-chain-edge"
 REASON_EPIC_NOT_WORKABLE = "epic-not-workable"
+# Escalation refusal (issue #1851). An issue carrying an `escalate:*` label has
+# already been through the tiered climb, so it is a terminal-ish state for the
+# FRONTIER: advertising it names work no reader can take — the same shape as
+# #1168's `epic-closed` refusal. `tiered.py` climbs tiers INSIDE one lane run
+# and never reads the frontier (its own docstring: "the loop applies the
+# ``escalate:*`` label and re-dispatches one tier up"), so skipping it here
+# loses nothing and needs no new marker — the `escalate:*` label IS the marker.
+REASON_ESCALATED = "escalated"
 # Epic focus (#707): the issue is outside the active epic, so while a focus is
 # active the fleet does not dispatch it. Distinct from `no-chain-edge` because
 # the issue is not being rejected as scavenging — it is being WAITING, and it is

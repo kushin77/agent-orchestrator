@@ -18,6 +18,7 @@ from model import (
     REASON_CHILD_OF_CLAIM,
     REASON_EPIC_CLOSED,
     REASON_EPIC_NOT_WORKABLE,
+    REASON_ESCALATED,
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
     REASON_NO_CHAIN_EDGE,
@@ -515,3 +516,94 @@ def test_wave_plan_is_deterministic_in_input_order():
     assert backward.admitted == (2,)
     assert forward.refusals[0].endswith("already owned by #1")
     assert backward.refusals[0].endswith("already owned by #2")
+
+
+# --- #1851: an `escalate:*` issue is not a frontier candidate ----------------
+#
+# The defect: the active-epic frontier named an issue the tier climb had already
+# exhausted, so no reader could take it (its only remedy is a governance action,
+# not another tier). `escalate:*` is the terminal marker; `tiered.py` climbs
+# tiers in-process and never reads the frontier, so the refusal is frontier-only.
+
+
+def _escalated_board() -> Snapshot:
+    """Mirrors the live board (issue #1851): #1529 is the lowest open issue and
+    carries ``escalate:L1``; #1531 is the next takeable one behind it."""
+    issues = {
+        1527: Issue(1527, "closed before the frontier", state="closed", milestone="M1"),
+        1529: Issue(
+            1529,
+            "escalated by the tier climb",
+            milestone="M1",
+            labels=("type:task", "tier:L0", "escalate:L1"),
+        ),
+        1531: Issue(1531, "the next takeable issue", milestone="M1", labels=("type:task", "tier:L0")),
+    }
+    return Snapshot(generated_at="2026-09-13T12:00:00Z", source="test", issues=issues)
+
+
+def test_an_escalated_issue_is_refused_by_name():
+    """The refusal is named, in the style of the other issue-property refusals."""
+    verdict = order.eligible(_escalated_board(), 1529)
+    assert verdict.eligible is False
+    assert verdict.reason == REASON_ESCALATED
+    assert "escalate:L1" in verdict.detail
+
+
+def test_the_frontier_advances_past_an_escalated_issue():
+    """frontier() and claimable_frontier() both skip it (issue #1851)."""
+    board = _escalated_board()
+    frontier = order.frontier(board, "M1")
+    assert frontier is not None and frontier.number == 1531, "the frontier advanced past #1529"
+
+    claimable = order.claimable_frontier(board, "M1")
+    assert claimable is not None and claimable.number == 1531
+
+
+def test_the_escalate_refusal_matches_the_prefix_not_one_label():
+    """`escalate:L2` is refused too — the match is the `escalate:` prefix."""
+    for label in ("escalate:L1", "escalate:L2"):
+        board = Snapshot(
+            generated_at="2026-09-13T12:00:00Z",
+            source="test",
+            issues={1529: Issue(1529, "escalated", milestone="M1", labels=("type:task", label))},
+        )
+        assert order.eligible(board, 1529).reason == REASON_ESCALATED, label
+
+
+def test_negative_control_an_unlabelled_issue_is_unaffected():
+    """NEGATIVE CONTROL: an issue with no labels at all is not refused."""
+    board = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            1529: Issue(1529, "no labels at all", milestone="M1"),
+            1531: Issue(1531, "behind it", milestone="M1", labels=("type:task", "tier:L0")),
+        },
+    )
+    assert order.frontier(board, "M1").number == 1529
+    assert order.eligible(board, 1529).eligible is True
+
+
+def test_negative_control_non_escalate_labels_are_not_refused():
+    """NEGATIVE CONTROL: the refusal reads `escalate:`, never the `tier:` prefix.
+
+    Every issue in the chain carries ``tier:L0`` (and the other house labels), so
+    matching ``tier:`` would refuse the whole board.
+    """
+    board = Snapshot(
+        generated_at="2026-09-13T12:00:00Z",
+        source="test",
+        issues={
+            1529: Issue(
+                1529,
+                "tiered but not escalated",
+                milestone="M1",
+                labels=("type:task", "tier:L0", "governance-tier", "priority:P2"),
+            ),
+        },
+    )
+    verdict = order.eligible(board, 1529)
+    assert verdict.eligible is True
+    assert verdict.reason == REASON_NEXT_IN_MILESTONE
+    assert order.frontier(board, "M1").number == 1529
