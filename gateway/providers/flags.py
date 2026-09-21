@@ -9,6 +9,22 @@ runtime override.
 The reader is deliberately small and dependency-light (PyYAML only) because it
 runs on every registry construction, and it never imports the chat surface's own
 reader: each flag-gated surface reads the single declaration itself.
+
+---knowledge---
+module_id: gateway.providers.flags
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [fail-closed, declared-authority]
+derives_from: gateway/chat/flags.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [read_hermes_default, hermes_enabled]
+invariants: "a missing, unreadable, or absent registry entry leaves the provider off"
+gotchas: "never imports gateway/chat/flags.py — each flag-gated surface reads the declaration itself"
+related: ["#1518"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
