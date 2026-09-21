@@ -1,7 +1,9 @@
 # `integrations/paperclip/reporting/` — the paperclip reporting half (issue #447)
 
-Paperclip is the fleet's reporting agent (the orchestration half is hermes,
-[ADR-0012](../../../docs/decision-records/ADR-0012-hermes-paperclip-boundary.md)).
+Paperclip is the fleet's reporting agent. The orchestration half is `governance/dispatch/`
+([ADR-0033](../../../docs/decision-records/ADR-0033-paperclip-hermes-naming-resolution.md));
+Hermes is a flag-OFF provider reached via `governance/dispatch/route.py`
+([ADR-0012](../../../docs/decision-records/ADR-0012-hermes-paperclip-boundary.md)).
 This package is the reporting duty the persona card declares as the
 `module-brief` capability: it composes **each mandatory module's distributable
 brief** — the organized, per-module statement of *what every repo must carry, at
