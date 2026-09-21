@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from conftest import require_real_hub
+
 import json
 import shutil
 import subprocess
@@ -29,6 +31,7 @@ def cli_of(tree: Path) -> Path:
 
 
 def test_compose_prints_the_committed_artifact(repo_root: Path):
+    require_real_hub()
     proc = run(repo_root / "integrations/paperclip/reporting/cli.py", "compose", repo=repo_root)
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout == (repo_root / ARTIFACT).read_text(encoding="utf-8")
@@ -36,6 +39,7 @@ def test_compose_prints_the_committed_artifact(repo_root: Path):
 
 
 def test_check_is_green_and_says_why(repo_root: Path):
+    require_real_hub()
     proc = run(repo_root / "integrations/paperclip/reporting/cli.py", "check", repo=repo_root)
     assert proc.returncode == 0, proc.stderr
     assert "claim(s) resolve" in proc.stdout
@@ -43,12 +47,14 @@ def test_check_is_green_and_says_why(repo_root: Path):
 
 
 def test_claims_reports_the_claim_count(repo_root: Path):
+    require_real_hub()
     proc = run(repo_root / "integrations/paperclip/reporting/cli.py", "claims", repo=repo_root)
     assert proc.returncode == 0, proc.stderr
     assert "claim(s) resolve" in proc.stdout
 
 
 def test_capability_reports_the_declaration(repo_root: Path):
+    require_real_hub()
     proc = run(
         repo_root / "integrations/paperclip/reporting/cli.py", "capability", repo=repo_root
     )

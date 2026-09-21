@@ -12741,7 +12741,7 @@
     {
       "number": 1501,
       "title": "gate: nine declared suites are red (or unrunnable) in a lane venue, so the gate of record cannot run them (#1497)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -12752,6 +12752,18 @@
         "type:bug"
       ],
       "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T18:29:37Z",
+      "files": []
+    },
+    {
+      "number": 1737,
+      "title": "gate: wire portal suite into check-pytest-suites (feature-flag defaults + no-hang confirmed)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "",

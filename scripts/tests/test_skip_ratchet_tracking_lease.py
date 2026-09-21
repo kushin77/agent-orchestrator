@@ -355,7 +355,24 @@ def test_the_committed_record_names_only_trackers_that_are_open_today() -> None:
 
     Skipped when `gh` is unavailable (the Cloud Build venue installs none), because a
     network-dependent arm must never read as a pass it did not earn.
+
+    Also skipped outside AO_GATE_VENUE=attestation (#1725): this reads the LIVE
+    GitHub issue-tracker state, the same "judges the shared box, not this tree"
+    class scripts/check-worktree-cap.sh already gates on that variable (#1620) —
+    a lane worktree cannot make a currently-open tracker close and should not
+    red every lane the moment one does. Still blocking, by design, under
+    AO_GATE_VENUE=attestation, the serial post-merge run where live state is
+    authoritative.
     """
+    import os
+
+    if os.environ.get("AO_GATE_VENUE", "lane") != "attestation":
+        import pytest
+
+        pytest.skip(
+            "live tracker state judges the shared board, not this tree; "
+            "assessed under AO_GATE_VENUE=attestation (#1725)"
+        )
     import shutil
 
     gh = shutil.which("gh")

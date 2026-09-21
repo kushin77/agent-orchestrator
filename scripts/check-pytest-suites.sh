@@ -60,26 +60,41 @@
 #   elsewhere" without either of them reading the other's state.
 #
 # WHAT IS NOT IN THIS LIST, AND WHY
-#   FIVE declared suites are NOT named here, so `scripts/check-gate-coverage.sh`
-#   still reports them `swept-only` and `scripts/gate-coverage-baseline.txt`
-#   carries one row each, tracked by an OPEN issue.
+#   ONE declared suite is NOT named here, so `scripts/check-gate-coverage.sh`
+#   still reports it `swept-only` and `scripts/gate-coverage-baseline.txt`
+#   carries one row, tracked by an OPEN issue.
 #
-#   #1501 measured NINE suites failing, hanging, or unable to run in a lane
-#   venue on origin/master, each ALONE in a worktree, its own pytest process,
-#   nothing else running. FOUR were suite-test defects (module-identity /
-#   stale-clock / stale-expectation bugs, never product bugs) and are now
-#   fixed and named above: governance/conformance (1 failed, now 128 passed),
-#   governance/ticket (1 failed, now 69 passed), governance/cto-overlay
-#   (4 failed, now 70 passed), governance/authority (2 failed, now 137
-#   passed). FIVE remain excluded, each a genuine lane-venue precondition:
-#     portal                            rc 124 after 240s, 3 failures
-#     scripts                           18 failed, 32 passed
-#     governance/knowledge              4 failed, 65 passed — vendor/CMR not
-#                                        initialised in a `git worktree add`
-#                                        checkout (validator path missing)
-#     integrations/paperclip/reporting  7 failed, 18 passed, 57 errors
-#     governance/modules                3 errors (no vendor/CMR in a worktree)
-#   (tracker #1501, OPEN).
+#   #1501 (CLOSED) measured NINE suites failing, hanging, or unable to run in a
+#   lane venue on origin/master, each ALONE in a worktree, its own pytest
+#   process, nothing else running. FOUR were suite-test defects
+#   (module-identity / stale-clock / stale-expectation bugs, never product
+#   bugs), fixed and named above by #1501 itself: governance/conformance
+#   (1 failed, now 128 passed), governance/ticket (1 failed, now 69 passed),
+#   governance/cto-overlay (4 failed, now 70 passed), governance/authority
+#   (2 failed, now 137 passed). FOUR MORE were fixed and named above by #1725:
+#   each one's real root cause was a `git worktree add` checkout leaving
+#   `vendor/CMR` as an empty gitlink placeholder — `.is_dir()` on it reads
+#   true, so a guard written against that check never fired — plus, for
+#   `scripts`, two tests that judge this shared box's own live state rather
+#   than the code under test. See `scripts/gate-coverage-baseline.txt` for the
+#   per-suite before/after counts and the exact fix in each:
+#     scripts                           18 failed, 32 passed -> 46 passed,
+#                                        20 skipped (AO_GATE_VENUE gating)
+#     governance/knowledge              4 failed, 65 passed -> 63 passed,
+#                                        6 skipped (validator-path skip guard)
+#     governance/modules                3 errors -> 119 passed, 5 skipped
+#                                        (catalog-dir skipif)
+#     integrations/paperclip/reporting  7 failed, 18 passed, 57 errors ->
+#                                        18 passed, 64 skipped (catalog-dir
+#                                        skip guard)
+#   ONE remains excluded, a genuine lane-venue precondition that #1725 could
+#   not repair here (portal/ is another lane's files):
+#     portal                            measured NOT hanging in this venue
+#                                        with pytest-timeout available (579
+#                                        passed, 8 failed, 164s); the 8
+#                                        failures are real portal findings
+#                                        (feature-flag default)
+#   (tracker #1737, OPEN — #1501 closed 2026-09-21 with portal unfixed).
 #
 #   THREE MORE WERE EXCLUDED, AND ARE NAMED AGAIN (#1509). They are the rows
 #   #1497 baselined because they failed in the CI venue (Cloud Build python:3.14,
@@ -149,7 +164,7 @@ if [ ! -d "$log_dir" ]; then
   exit 2
 fi
 
-LISTED=46
+LISTED=50
 ran=0
 failed=0
 
@@ -319,6 +334,22 @@ judge governance/cto-overlay $?
 
 timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/authority/tests > "$(suite_log governance/authority)" 2>&1
 judge governance/authority $?
+
+# The following four were repaired and wired in by #1725: each was a
+# vendor/CMR precondition (or a live-venue precondition, for `scripts`)
+# misread as unavailable by a stale `.is_dir()`/no-skip check, not a product
+# defect — see scripts/gate-coverage-baseline.txt for the root cause of each.
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q scripts/tests > "$(suite_log scripts)" 2>&1
+judge scripts $?
+
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/knowledge/tests > "$(suite_log governance/knowledge)" 2>&1
+judge governance/knowledge $?
+
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/modules/tests > "$(suite_log governance/modules)" 2>&1
+judge governance/modules $?
+
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q integrations/paperclip/reporting/tests > "$(suite_log integrations/paperclip/reporting)" 2>&1
+judge integrations/paperclip/reporting $?
 
 if [ "$ran" -ne "$LISTED" ]; then
   printf 'check-pytest-suites: NOT-OK — %d suite(s) ran but %d are named in this check; the list and the run disagree\n' \

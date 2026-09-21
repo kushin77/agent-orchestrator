@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from conftest import require_real_hub
+
 from pathlib import Path
 
 import pytest
@@ -21,6 +23,7 @@ def _subjects(findings, code: str) -> set:
 
 
 def test_the_shipped_persona_satisfies_the_contract(repo_root: Path):
+    require_real_hub()
     assert capability.check(repo_root, repo_root / HUB) == ()
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from conftest import require_real_hub
+
 import hashlib
 import subprocess
 import sys
@@ -46,6 +48,7 @@ def test_the_committed_artifact_is_current(repo_root: Path, composition):
 
 def test_the_composition_really_reads_the_hub_it_names(repo_root: Path):
     """A control: drop the revision and the composition must change."""
+    require_real_hub()
     import copy
 
     from governance.modules import registry as module_registry

@@ -9,6 +9,8 @@ named by its line in that record, and a trail that only ever grows.
 
 from __future__ import annotations
 
+from conftest import require_real_hub
+
 import json
 import subprocess
 import sys
@@ -38,6 +40,7 @@ def run_cli(tree: Path, *args: str):
 
 
 def test_a_clean_run_appends_exactly_one_record(repo_root: Path, tmp_path: Path):
+    require_real_hub()
     trail = tmp_path / "trail.jsonl"
     composition = composer.compose(
         _document(repo_root),

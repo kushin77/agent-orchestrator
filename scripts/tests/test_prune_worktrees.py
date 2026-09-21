@@ -14,8 +14,24 @@ import subprocess
 import time
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "prune-worktrees.sh"
+
+# These tests exercise prune-worktrees.sh's liveness/allowlist logic against
+# this checkout's OWN worktree state (live processes, the reap allowlist, the
+# fleet dir) — a shared box's reality, not this suite's fixtures. A lane
+# worktree (`git worktree add`) is one of many concurrent lanes on that same
+# box, so the reaper's view of "what else is live" is judged unstable there
+# and these tests are honoured skipped by name (#1725), same convention as
+# scripts/check-worktree-cap.sh (#1620): blocking only under
+# AO_GATE_VENUE=attestation, the serial post-merge run where the box's state
+# is authoritative.
+if os.environ.get("AO_GATE_VENUE", "lane") != "attestation":
+    pytestmark = pytest.mark.skip(
+        reason="worktree-reaper liveness judges the shared box; only assessed under AO_GATE_VENUE=attestation (#1725)"
+    )
 
 
 def run_script(repo: Path, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
