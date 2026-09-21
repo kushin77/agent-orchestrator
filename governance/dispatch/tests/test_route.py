@@ -80,6 +80,24 @@ def test_task_flows_claude_deepseek_hermes_paperclip_via_the_adapter(tmp_path):
         assert hop["runtime"] in record["reason"]
 
 
+def test_hermes_hop_is_classified_not_refused_as_unknown_runtime():
+    """The claude->deepseek->hermes->paperclip e2e path's hermes hop must be a
+    peer-check-recognized identity (issue #1562), not fall through to
+    ``unknown``. Fails before peers.classify_channel knows a hermes prefix,
+    passes after.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    import peers  # noqa: E402
+
+    rp = routing.policy()
+    hop_hermes = route.resolve({"capability": "code-author"}, routing_policy=rp)["hops"][0]
+    assert hop_hermes["runtime"] == "hermes"
+
+    channel, evidence = peers.classify_channel(f"{hop_hermes['runtime']}-agent-1")
+    assert channel == "hermes"
+    assert "hermes" in evidence.lower()
+
+
 def test_resolve_refuses_a_persona_outside_capability_space(tmp_path):
     """A capability-space persona route.py cannot hand off to is a named refusal."""
     rp = routing.policy()

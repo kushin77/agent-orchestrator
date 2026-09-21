@@ -139,6 +139,8 @@ def classify_channel(
         return "copilot", f"'{handle}' carries the Copilot runtime prefix"
     if lowered.startswith("deepseek") or lowered.startswith("agent-deepseek"):
         return "deepseek", f"'{handle}' carries the DeepSeek runtime prefix"
+    if lowered.startswith("hermes") or lowered.startswith("agent-hermes"):
+        return "hermes", f"'{handle}' carries the Hermes runtime prefix"
     email = (author or "").strip().lower()
     if "@" in email and not email.endswith(MINTED_DOMAIN):
         return "human", f"author '{author}' signs outside the minted fleet domain"
