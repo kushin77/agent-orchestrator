@@ -26,6 +26,22 @@ object that cannot be read fails closed by name (:class:`PolicyMapRefused`).
 The document is deterministic (``render`` twice yields identical bytes), so a
 gate or a reviewer can diff it. Import direction obeys ADR-0016: this is the
 seam (``integrations/paperclip/``) and it imports no ``adapters/**``.
+
+---knowledge---
+module_id: integrations.paperclip.policy_map
+system: integrations
+app: paperclip
+solution_class: pattern
+patterns: [policy-delivery-adapter, join-not-own, fail-honest, mapping-not-authority]
+derives_from: governance/policy/registry.py
+owner_sme: paperclip
+tier: L1
+interfaces: [PolicyMapRefused, policy_map, domain_named, render]
+invariants: "consumes exactly one source (PolicyRegistry.rows) and re-derives no domain; a domain the registry declares invisible, and an empty registry, are named in notes and never dropped; render() is deterministic; an unreadable registry fails closed by name"
+gotchas: "imports no adapters/** (ADR-0016 seam direction); deliberately does NOT re-check whether a declared source_file exists — that is the registry's honesty rule, and duplicating it here would be the second answer ADR-0012 forbids"
+related: ["#1764", "#1763", "#1809"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
