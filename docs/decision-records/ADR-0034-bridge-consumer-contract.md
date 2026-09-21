@@ -1,5 +1,5 @@
 ---
-id: ADR-0033
+id: ADR-0034
 status: accepted
 date: 2026-09-20
 deciders: [kushin77]
@@ -7,7 +7,7 @@ req: [issue #1523]
 supersedes: []
 ---
 
-# ADR-0033: the live-data bridge is an external-API contract, not a console pane
+# ADR-0034: the live-data bridge is an external-API contract, not a console pane
 
 ## Status
 

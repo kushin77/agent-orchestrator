@@ -10,7 +10,7 @@ versioned, authenticated address** for it and **one change signal** that says
 
 ## Consumers
 
-**This is an external-API contract, not a console pane** (ADR-0033, issue
+**This is an external-API contract, not a console pane** (ADR-0034, issue
 #1523). Its consumer is an out-of-process client — today the paperclip HTTP
 projection across the process boundary (`integrations/paperclip/api/`, which
 names `portal/server/bridge.py` and `/api/v1/bridge*` as its serving layer).
@@ -24,7 +24,7 @@ owns the data, and it ships as one artifact with this server. The version is
 what a client that cannot move with this repository needs. A console caller here
 would be a *second* read path for data the console already has, so an audit that
 finds no console caller has found the contract working as decided — see
-ADR-0033 before filing it as a gap.
+ADR-0034 before filing it as a gap.
 
 ## What already existed vs what this adds
 
