@@ -152,7 +152,8 @@ set -uo pipefail
 # the repository being SCANNED (its scratch-test doubles have no
 # `governance/isolation` package at all). content_landed()'s implementation is
 # always loaded from here, never from the target repo.
-self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+self_root="$(find_repo_root)"
 
 root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [ -z "$root" ]; then
