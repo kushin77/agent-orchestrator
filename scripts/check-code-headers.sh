@@ -113,6 +113,11 @@ import tempfile
 DOC_REL = "docs/CODE-HEADER-STANDARD.md"
 BASELINE_REL = "scripts/code-headers-baseline.tsv"
 SELF_REL = "scripts/check-code-headers.sh"
+# The shared shell library the gate `source`s at startup (#1753). The scratch
+# tree below must carry it too: without it the child cannot resolve its own root,
+# the `|| exit 2` fires, and every `--files` arm collapses to CANNOT-ASSESS —
+# measured as `2 of 47 arm(s) failed`, issue #1776.
+LIB_REL = "scripts/lib/common.sh"
 POLICY_REL = "governance/conformance/policy.yaml"
 TIERS_REL = "gateway/finops/tiers.yaml"
 CARDS_REL = "registry/personas/cards"
@@ -781,9 +786,16 @@ VALID = [
 
 
 def scratch_root(real_root, base):
-    """A scratch tree carrying only the authorities the gate reads."""
+    """A scratch tree carrying only the authorities the gate reads.
+
+    The tuple below is the full set of files the gate resolves at startup: keep
+    it in step with what the gate actually reads — it `source`s ``LIB_REL`` at
+    line 95 and runs ``SELF_REL`` as the child. A dependency missing here does
+    not fail loudly: the child's ``root`` resolves to nothing, its `|| exit 2`
+    fires, and every ``--files`` arm reports ``(2, False)`` (#1776).
+    """
     root = os.path.join(base, "root")
-    for rel in (DOC_REL, POLICY_REL, TIERS_REL, SELF_REL):
+    for rel in (DOC_REL, POLICY_REL, TIERS_REL, SELF_REL, LIB_REL):
         target = os.path.join(root, rel)
         os.makedirs(os.path.dirname(target), exist_ok=True)
         shutil.copy2(os.path.join(real_root, rel), target)
