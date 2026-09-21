@@ -113,11 +113,40 @@
 #   master is ignored. A baseline row naming an OPEN issue is owned instead, and
 #   the row is refused the moment that issue closes.
 #
+# WHAT A RED SUITE PUBLISHES (issue #1661)
+#   THIS check is the one whose output the venue quotes — its `judge()` prints
+#   `FAIL <suite> (pytest exit N — .verify/pytest-suites/<suite>.log)`. #1661
+#   measured that line, and nothing else, for a red suite: the transcript path
+#   named a file the ephemeral build workspace destroys, so the failing test was
+#   UNNAMEABLE from the venue's own evidence and the red could not be attributed
+#   to a lane. A red suite therefore publishes INLINE, and BOUNDED, what this run
+#   retained for it: the `FAILED <test>` ids pytest printed (at most
+#   `PYTEST_FAILED_IDS`, default 20) and the last `PYTEST_TAIL_LINES` lines of
+#   the transcript (default 25), every line truncated. A GREEN suite publishes
+#   none of it — the echo IS the finding, so printing it on a pass would bury
+#   the evidence it exists to surface.
+#
+#   The echo is SINGLE-SOURCED in `scripts/lib/pytest-tail.sh` and called by both
+#   this check and `scripts/run-pytest-suites.sh`: the sweep that REACHES a suite
+#   and the checker that PRINTS the finding must publish it identically, and one
+#   rule with two implementations is how the two drift apart (#1593 was repaired
+#   by this same move). The transcript key —
+#   `.verify/pytest-suites/<suite with / -> _>.log`, the same one the runner
+#   retains — is what the published line and the retained log agree on.
+#
+#   An all-skipped suite is CANNOT-ASSESS, never PASS: pytest exits 0 when every
+#   test skipped, so `rc 0` alone would let "nothing was assessed" be quoted as
+#   green. That arm is the same false green the runner already refuses, and it is
+#   refused here rather than left to the caller's rc.
+#
 # EXIT CONTRACT (guardrails/honesty tri-state, consumed not redefined)
 #   0  OK              every named suite ran and passed
 #   1  NOT-OK          a suite failed, timed out, or its `tests/` directory is
 #                      missing; or fewer/more suites ran than are named
-#   2  CANNOT-ASSESS   python3 is unavailable, or this is not a git work tree
+#   2  CANNOT-ASSESS   python3 is unavailable, this is not a git work tree, or a
+#                      named suite assessed nothing (every test skipped — rc 0
+#                      with no passing test is not a verdict, so it is never a
+#                      pass)
 #
 # Offline, deterministic, no network, no containers.
 #
@@ -148,26 +177,49 @@ fi
 LISTED=42
 ran=0
 failed=0
+noverdict=0
+
+# --- the bounded echo a red suite publishes (issue #1661) --------------------
+# SINGLE-SOURCED with `scripts/run-pytest-suites.sh` in
+# scripts/lib/pytest-tail.sh: the two callers publish a red suite identically
+# (one rule, one implementation — see "WHAT A RED SUITE PUBLISHES" above).
+# shellcheck source=scripts/lib/pytest-tail.sh
+source "$root/scripts/lib/pytest-tail.sh"
 
 suite_log() { # <suite> -> the transcript path for that suite
   printf '%s/%s.log' "$log_dir" "$(printf '%s' "$1" | tr '/' '_')"
 }
 
 judge() { # <suite> <rc> — the pytest line above it is the one that produced <rc>
-  local suite="$1" rc="$2"
+  local suite="$1" rc="$2" log npass
+  log="$(suite_log "$suite")"
   ran=$((ran + 1))
   if [ "$rc" -eq 0 ]; then
-    printf '  PASS  %s\n' "$suite"
+    # pytest exits 0 on an all-skipped suite: nothing was assessed, which is not
+    # a pass (AO-GR-4). Ask the transcript whether a test actually PASSED before
+    # reading rc 0 as one.
+    npass="$(grep -oE '[0-9]+ passed' "$log" 2>/dev/null | tail -1 | grep -oE '[0-9]+' || true)"
+    if [ -n "$npass" ] && [ "$npass" -gt 0 ]; then
+      printf '  PASS  %s\n' "$suite"
+      return 0
+    fi
+    noverdict=$((noverdict + 1))
+    printf '  CANNOT-ASSESS  %s (pytest exit 0 but no test passed — a suite that assessed nothing is never a pass; %s)\n' \
+      "$suite" "$log" >&2
+    pytest_emit_suite_tail "$suite" "$log"
     return 0
   fi
   failed=$((failed + 1))
   if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
     printf '  FAIL  %s (no verdict: exceeded SUITE_TIMEOUT=%ss — %s)\n' \
-      "$suite" "$suite_timeout" "$(suite_log "$suite")" >&2
+      "$suite" "$suite_timeout" "$log" >&2
   else
     printf '  FAIL  %s (pytest exit %s — %s)\n' \
-      "$suite" "$rc" "$(suite_log "$suite")" >&2
+      "$suite" "$rc" "$log" >&2
   fi
+  # This line IS the venue's red: name the failing test and publish a bounded
+  # tail of the transcript, or the red is unattributable (#1661).
+  pytest_emit_suite_tail "$suite" "$log"
   return 0
 }
 
@@ -311,6 +363,12 @@ if [ "$failed" -ne 0 ]; then
   printf 'check-pytest-suites: NOT-OK — %d of %d declared suites named by no other gate failed\n' \
     "$failed" "$LISTED" >&2
   exit 1
+fi
+
+if [ "$noverdict" -ne 0 ]; then
+  printf 'check-pytest-suites: CANNOT-ASSESS — %d of %d declared suites assessed nothing (every test skipped); rc 0 with no passing test is never a pass\n' \
+    "$noverdict" "$LISTED" >&2
+  exit 2
 fi
 
 printf 'check-pytest-suites: OK — %d of %d declared suites no other gate names ran and passed\n' \
