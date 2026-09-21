@@ -30,7 +30,11 @@
 
 #1756 (`portal/server/settings.py`, open, Parent #1667) aggregates **descriptive/observed** config: feature-flags.yaml, fleet-jobs.json, tier-policy.json, skip-budget.json, RBAC presets — read-only snapshot for the Settings view, explicit "no per-domain ad hoc readers" mandate.
 
-Policy centralization (this review) is **prescriptive/enforced** state: branch protection, GDC tag rules, Cloudflare ingress rules, GCS bucket policy — things that gate or block actions, not values a UI displays. **Verified separate concern**, not an extension of #1756: #1756's row schema (`domain, key, value, source_file, editable:false`) has no field for enforcement point or violation consequence, which a policy registry needs. Recommend a sibling module (`governance/policy/registry.py` or similar) that #1756's settings view can later read from as one more domain, not the other way around.
+Policy centralization (this review) is **prescriptive/enforced** state: branch protection, GDC tag rules, Cloudflare ingress rules, GCS bucket policy — things that gate or block actions, not values a UI displays. **Verified against #1756's specified row schema (module not yet built)** — separate concern, not an extension of #1756: #1756's row schema (`domain, key, value, source_file, editable:false`) has no field for enforcement point or violation consequence, which a policy registry needs. Recommend a sibling module (`governance/policy/registry.py` or similar) that #1756's settings view can later read from as one more domain, not the other way around.
+
+## Related closed issues (checked, not duplicates)
+
+Search hits for "policy registry" included #26 (22 Policy-as-code + gate engine, CLOSED) and #7 (03 Golden rules + policy spine, CLOSED). Both are EPIC-00 phase issues already closed; #26 built the rule-evaluation/gate engine, #7 codified docs/GOLDEN-RULES.md itself. Neither built a cross-domain aggregation/registry surface — #1763 is the registry those engines' policy state would be exposed through, not a re-do of either.
 
 ## Gap list
 
