@@ -23,6 +23,23 @@ Annotation keywords (``$schema``, ``$id``, ``title``, ``description``,
 ``examples``) and any other unrecognized keyword are ignored per the JSON
 Schema specification; unknown *instance* fields are still rejected when the
 schema declares ``additionalProperties: false``.
+
+
+---knowledge---
+module_id: guardrails.policy.schemas
+system: guardrails
+app: policy
+solution_class: enterprise
+patterns: [schema-validation, offline-by-construction, no-false-green]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [SchemaValidationError, validate, load_schema]
+invariants: "every supported keyword genuinely rejects a document that violates it, and each is covered by a negative test"
+gotchas: "the third-party jsonschema package is deliberately not used: startup validation must stay offline and deterministic"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

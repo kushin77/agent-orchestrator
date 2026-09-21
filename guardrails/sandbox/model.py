@@ -13,6 +13,23 @@ quotas). A closed category map binds the agent tool categories
 The wire contract is declared as JSON Schema (``*.schema.json``) and
 instantiated as YAML (``profiles.yaml``, ``categories.yaml``); this module is
 the typed, stdlib-only Python view of that contract.
+
+
+---knowledge---
+module_id: guardrails.sandbox.model
+system: guardrails
+app: sandbox
+solution_class: pattern
+patterns: [domain-model, closed-vocabulary, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [SecurityProfile, ExecutionRequest, ExecutionResult]
+invariants: "the category map is closed and binds every agent tool category to a profile, failing closed to restricted for any undeclared category"
+gotchas: "the isolation contract is adapted from the elevatedIQ sandbox pattern rather than copied; the wire contract is JSON Schema instantiated as YAML"
+related: ["#58", "#48"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

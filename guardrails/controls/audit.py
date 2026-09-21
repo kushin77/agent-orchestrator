@@ -17,6 +17,23 @@ Two sinks, both append-only by construction (no update/delete/rewrite API):
 The hash-chained, tamper-evident ledger is owned by the observability lane
 (``telemetry/ledger``); this lane provides the structured record seam it
 consumes, mirroring ``guardrails/policy/audit.py``.
+
+
+---knowledge---
+module_id: guardrails.controls.audit
+system: guardrails
+app: controls
+solution_class: enterprise
+patterns: [append-only, evidence-not-vibes, deterministic-output]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [utc_now_iso, ControlAuditRecord, build_toggle_record, InMemoryControlAuditLog, JsonlControlAuditLog]
+invariants: "every control flip writes exactly one append-only record; the sinks expose no update, delete or rewrite API"
+gotchas: "a downstream reader can render or verify a toggle without the registry present"
+related: ["#343"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

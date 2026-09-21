@@ -26,6 +26,23 @@ Strict, fail-closed reading — an envelope this lane cannot interpret is
 * ``kind`` is optional and defaults to ``"document"``; unknown keys are
   preserved verbatim so a producer can enrich the envelope without breaking
   this reader.
+
+
+---knowledge---
+module_id: guardrails.chat.envelope
+system: guardrails
+app: chat
+solution_class: pattern
+patterns: [contract-first, fail-closed, consume-never-restate]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [GroundingError, GroundingFragment, GroundingEnvelope]
+invariants: "an envelope this lane cannot interpret is undecidable, never empty"
+gotchas: "the grounding lane (gateway/mcp) is imported nowhere here on purpose, so the chat guards verify standalone"
+related: ["#507", "#504"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

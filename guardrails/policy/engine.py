@@ -31,6 +31,23 @@ in ``policy.controls`` is registered AND enabled in the
 :class:`~policy.controls.ControlRegistry` (default OFF, AO-GR-6).  A control
 that is not registered makes its policy inactive (and the startup gate rejects
 that bundle/registry pairing so it cannot ship).
+
+
+---knowledge---
+module_id: guardrails.policy.engine
+system: guardrails
+app: policy
+solution_class: enterprise
+patterns: [fail-closed, single-choke-point, evidence-not-vibes]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [PolicyEngine]
+invariants: "when no active policy governs an action the engine returns the configured uncovered_decision, which is BLOCK by default"
+gotchas: "a deployment that wants to observe while it authors policies must set uncovered_decision to log explicitly"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

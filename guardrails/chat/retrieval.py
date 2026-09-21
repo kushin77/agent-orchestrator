@@ -26,6 +26,23 @@ delimiter; retrieved text is never concatenated raw into the prompt.
 
 An envelope this lane cannot validate is *undecidable* (BLOCK, ``ran=False``),
 never "there was no grounding".
+
+
+---knowledge---
+module_id: guardrails.chat.retrieval
+system: guardrails
+app: chat
+solution_class: enterprise
+patterns: [fail-closed, quarantine-on-block, untrusted-input]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [FragmentAdmission, RetrievalOutcome, RetrievalGuard]
+invariants: "a blocked fragment never enters the grounding prefix, so a poisoned source cannot escalate into an instruction"
+gotchas: "the injection detector is consumed read-only from dlp.injection.InjectionDetector"
+related: ["#507", "#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

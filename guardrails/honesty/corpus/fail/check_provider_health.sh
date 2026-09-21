@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+# ---knowledge---
+# module_id: guardrails.honesty.corpus.fail.check_provider_health
+# system: guardrails
+# app: honesty
+# solution_class: template
+# patterns: [negative-control, offline-fixture]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L0
+# interfaces: [the skip-counted-as-pass formality shape]
+# invariants: ""
+# gotchas: "a provider that was never configured deliberately reports SKIP with exit 0, which reads as healthy"
+# related: ["#28"]
+# do_not_duplicate: null
+# ---knowledge---
 # corpus/fail -- real incident artifact (issue #28, acceptance criterion 5).
 # Source: leaderboard scripts/guard/check-formality.sh, documented spelling
 # #4 -- a SKIP counted as a pass in a health check reporting UP for a provider

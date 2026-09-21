@@ -9,6 +9,23 @@ negative controls that prove the guard can actually fail.
 Attestations are attached to every merge/verdict: a merge on a guard whose
 verdict is CANNOT-ASSESS, or whose evidence is empty, is a merge without
 evidence and is rejected by policy (no-false-green, AO-GR-3/AO-GR-4).
+
+
+---knowledge---
+module_id: guardrails.honesty.attestation
+system: guardrails
+app: honesty
+solution_class: enterprise
+patterns: [no-false-green, evidence-not-vibes, immutable-models]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [GuardAttestation]
+invariants: "a merge on a verdict of CANNOT-ASSESS, or on empty evidence, is a merge without evidence and is rejected by policy"
+gotchas: ""
+related: ["#28"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

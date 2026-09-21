@@ -7,6 +7,23 @@ security console/view consumes — it returns the events that need eyes, most
 recent first.
 
 All events are offline (in-memory and/or JSONL). Nothing here calls home.
+
+
+---knowledge---
+module_id: guardrails.dlp.telemetry
+system: guardrails
+app: dlp
+solution_class: pattern
+patterns: [offline-by-construction, read-model, deterministic-output]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SecurityEvent, SecurityTelemetry]
+invariants: "every security-relevant decision emits exactly one structured event, and nothing here calls home"
+gotchas: ""
+related: ["#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -17,6 +17,23 @@ real sandbox - it exists so the executor seam, the per-category profile
 defaults and the fail-closed rules are fully testable offline and in CI with no
 docker daemon and no network. Like every runtime it refuses to run while
 ``enabled`` is False.
+
+
+---knowledge---
+module_id: guardrails.sandbox.offline
+system: guardrails
+app: sandbox
+solution_class: enterprise
+patterns: [pure-function-core, fail-closed, single-source-vocabulary]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [OfflineRuntime]
+invariants: "every decision is derived from the profile fields rather than a parallel table, so editing profiles.yaml changes enforcement here"
+gotchas: ""
+related: ["#58"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

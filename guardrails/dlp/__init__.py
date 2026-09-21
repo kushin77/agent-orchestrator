@@ -23,6 +23,23 @@ Public surface (import as ``dlp`` with ``guardrails/`` on ``sys.path``):
 * :class:`~dlp.telemetry.SecurityTelemetry` — security-view event sink.
 * :class:`~dlp.pipeline.EgressPipeline` — the composed gate (scrub ->
   injection -> egress -> HMAC audit) used before any provider dispatch.
+
+
+---knowledge---
+module_id: guardrails.dlp
+system: guardrails
+app: dlp
+solution_class: class
+patterns: [package-contract, public-surface, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [RuleCatalog, ScrubRule, ScrubEngine, EgressGuard, HmacSigner, InjectionDetector, EgressPipeline, SecurityTelemetry]
+invariants: "the four mandatory egress gates (scrub, injection, allowlist, HMAC audit) are re-exported as one surface"
+gotchas: ""
+related: ["#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

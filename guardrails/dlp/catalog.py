@@ -15,6 +15,23 @@ Fail-closed contract (security lane):
 * duplicate rule ids are rejected so audit counts stay unambiguous.
 
 Nothing here can silently pass on a malformed catalog — every branch raises.
+
+
+---knowledge---
+module_id: guardrails.dlp.catalog
+system: guardrails
+app: dlp
+solution_class: enterprise
+patterns: [declared-authority, fail-closed, schema-validated-loader]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [CatalogError, ScrubRule, ScrubMatch, RuleCatalog]
+invariants: "a catalog that is missing, empty or carries an unknown class, severity or action is rejected, so the engine never runs against a catalog it cannot fully understand"
+gotchas: "a rule whose regex does not compile, and a redact rule without a placeholder, are hard errors and never skipped"
+related: ["#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

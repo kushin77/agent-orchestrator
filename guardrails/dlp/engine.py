@@ -21,6 +21,23 @@ Decision model:
 
 The audit-relevant counts (per rule id and per class) are always returned so a
 blocked or redacted consult is fully attributable.
+
+
+---knowledge---
+module_id: guardrails.dlp.engine
+system: guardrails
+app: dlp
+solution_class: enterprise
+patterns: [fail-closed, scrub-before-dispatch, single-choke-point]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [luhn_valid, ScrubResult, ScrubEngine]
+invariants: "if any block-class match is found the verdict is blocked and the payload is never returned for dispatch"
+gotchas: "every rule in the catalog is evaluated over the full payload before redaction is applied"
+related: ["#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

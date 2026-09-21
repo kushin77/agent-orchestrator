@@ -22,6 +22,23 @@ A malformed answer (not a mapping, claims not a list, a claim without text) is
 *undecidable* — BLOCK with ``ran=False``, never a quiet pass. Claim quotes are
 compared with whitespace collapsed on both sides, so re-wrapping a retrieved
 paragraph does not read as a contradiction while a changed word still does.
+
+
+---knowledge---
+module_id: guardrails.chat.inbound
+system: guardrails
+app: chat
+solution_class: enterprise
+patterns: [fail-closed, untrusted-input, named-refusal]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [InboundError, Claim, ModelOutput, ClaimReview, InboundOutcome, InboundValidator]
+invariants: "a model's answer is untrusted until re-validated, and a claim citing no supplied source is flagged rather than accepted"
+gotchas: ""
+related: ["#507", "#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

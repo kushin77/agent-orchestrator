@@ -4,6 +4,23 @@ One exception per failure surface so a caller can tell a policy denial apart
 from a configuration error and from a disabled runtime - and so every path
 fails closed: a denial is never turned into a silent success, and an
 unavailable sandbox never degrades into an unsandboxed run.
+
+
+---knowledge---
+module_id: guardrails.sandbox.errors
+system: guardrails
+app: sandbox
+solution_class: class
+patterns: [exception-taxonomy, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [SandboxError, SandboxDeniedError, SandboxDisabledError, SandboxConfigError, RuntimeNotEnabledError, RuntimeExecutionError]
+invariants: "a denial is never turned into a silent success, and an unavailable sandbox never degrades into an unsandboxed run"
+gotchas: ""
+related: ["#58"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

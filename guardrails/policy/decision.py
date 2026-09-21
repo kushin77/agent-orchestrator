@@ -5,6 +5,23 @@ with an honest tri-state decision (AO-GR-19): ``BLOCK`` (deny), ``WARN``
 (allow but flag) or ``LOG`` (allow and observe).  Every decision carries
 structured evidence so a downstream audit record can answer "which policy,
 which rule, why" without re-parsing prose, and a BLOCK always explains itself.
+
+
+---knowledge---
+module_id: guardrails.policy.decision
+system: guardrails
+app: policy
+solution_class: enterprise
+patterns: [closed-vocabulary, tri-state-exit, immutable-models]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [DecisionLevel, strongest, RuleHit, DecisionResult]
+invariants: "every decision carries structured evidence so an audit record can answer which policy and which rule, and a BLOCK always explains itself"
+gotchas: ""
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

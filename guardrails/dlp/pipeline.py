@@ -21,6 +21,23 @@ Order of gates (mirrors the external-LLM egress doctrine, scrub-then-sign):
 
 On the inbound side, :meth:`EgressPipeline.verify_inbound` recomputes the tag;
 an unsigned or tampered call is rejected (telemetry: ``tamper_detected``).
+
+
+---knowledge---
+module_id: guardrails.dlp.pipeline
+system: guardrails
+app: dlp
+solution_class: enterprise
+patterns: [request-pipeline, fail-closed, single-choke-point]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [CallOutcome, EgressPipeline]
+invariants: "every outbound commercial-model call passes all four gates in order, and a call that fails any gate never reaches the provider"
+gotchas: "the gate order mirrors the external-LLM egress doctrine: scrub then sign"
+related: ["#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

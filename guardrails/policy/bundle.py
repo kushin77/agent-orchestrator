@@ -15,6 +15,23 @@ Precedence is explicit and documented:
   order so a later bundle's policy *replaces* an earlier one with the same id
   (the base + tenant-overlay pattern used for per-tenant policy inheritance);
   all remaining policies are kept.
+
+
+---knowledge---
+module_id: guardrails.policy.bundle
+system: guardrails
+app: policy
+solution_class: enterprise
+patterns: [closed-vocabulary, named-refusal, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [PolicyBundle, assemble, policies_from_bundles]
+invariants: "a duplicate policy id is refused because two policies with one id make which-governs ambiguous"
+gotchas: "there is no hidden ordering among policies: a BLOCK anywhere is a BLOCK"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

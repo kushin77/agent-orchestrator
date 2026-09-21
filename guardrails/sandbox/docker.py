@@ -8,6 +8,23 @@ flag and only where a docker daemon exists. ``docker_run_flags`` is pure and
 offline so the profile-to-flags mapping is unit-tested without a daemon; the
 profile values it consumes come from ``profiles.yaml`` (restricted/standard/
 privileged), adapted from the elevatedIQ sandbox pattern (spike #48, #58).
+
+
+---knowledge---
+module_id: guardrails.sandbox.docker
+system: guardrails
+app: sandbox
+solution_class: enterprise
+patterns: [feature-flag-gated-off, fail-closed, pure-function-core]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [docker_run_flags, DockerRuntime]
+invariants: "constructing the runtime starts nothing, and run refuses while enabled is False"
+gotchas: "the profile-to-flags mapping is pure and offline so it is unit-tested without a docker daemon"
+related: ["#58", "#48"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

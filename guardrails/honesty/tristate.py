@@ -23,6 +23,23 @@ consumes this one and is out of scope here.
 Aggregation is fail-closed by design: a single NOT-OK fails the whole gate;
 otherwise any CANNOT-ASSESS keeps the gate from reading PASS (UNKNOWN is never
 a pass); only an all-OK set aggregates to OK.
+
+
+---knowledge---
+module_id: guardrails.honesty.tristate
+system: guardrails
+app: honesty
+solution_class: enterprise
+patterns: [tri-state-exit, closed-vocabulary, no-false-green]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [TriState, parse, from_exit_code, to_exit_code, aggregate, serialize, deserialize, to_json]
+invariants: "CANNOT-ASSESS never reads as a pass, and any non-contract exit code maps to it rather than to OK"
+gotchas: ""
+related: ["#28"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

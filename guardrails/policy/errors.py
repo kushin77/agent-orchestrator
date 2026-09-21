@@ -4,6 +4,23 @@ Every failure mode of the policy-as-code + gate engine is a typed exception so
 a caller can tell a *malformed policy* (fails at deploy time, in the startup
 validation gate) from an *evaluation failure* (fails closed at runtime) and a
 *missing resource* — without string-matching messages.
+
+
+---knowledge---
+module_id: guardrails.policy.errors
+system: guardrails
+app: policy
+solution_class: class
+patterns: [exception-taxonomy, named-refusal]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [PolicyError, PolicyValidationError, PolicyLoadError, DuplicatePolicyError, UnknownPolicyError, ControlError, EvaluationError, ConditionError]
+invariants: "a malformed policy and a runtime evaluation failure are distinguishable without string-matching messages"
+gotchas: ""
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

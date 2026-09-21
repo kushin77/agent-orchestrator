@@ -14,6 +14,23 @@ sandbox and is audited.
 Everything here is offline (stdlib + PyYAML), lives strictly under
 ``guardrails/sandbox/`` and is adapted - not copied - from the elevatedIQ
 ai-chatbot-orchestrator sandbox pattern (spike #48).
+
+
+---knowledge---
+module_id: guardrails.sandbox
+system: guardrails
+app: sandbox
+solution_class: class
+patterns: [package-contract, public-surface, feature-flag-gated-off, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [SandboxExecutor, SecurityProfile, ProfileCatalog, CategoryMap, SandboxEnablement, Runtime, DockerRuntime, FirecrackerMicroVmRuntime, OfflineRuntime, ExecutionRequest, ExecutionResult]
+invariants: "every agent tool call runs under a profile selected per tool category, with a fail-closed default of restricted for unknown categories"
+gotchas: "real Docker and Firecracker runtimes are declared behind a flag that ships OFF"
+related: ["#58", "#636", "#20"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

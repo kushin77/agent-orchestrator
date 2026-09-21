@@ -18,6 +18,23 @@ Model:
 * **default deny**: an empty or missing allowlist denies everything, an
   unlisted tenant is denied, and an unlisted provider/host/path is denied.
   There is no implicit default provider set — allowlisting is explicit.
+
+
+---knowledge---
+module_id: guardrails.dlp.egress
+system: guardrails
+app: dlp
+solution_class: enterprise
+patterns: [allowlist-not-denylist, fail-closed, tenant-scoped]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AllowedTarget, EgressDecision, EgressGuard]
+invariants: "only allowlisted providers and endpoints are reachable from a tenant context; anything else is denied and audited"
+gotchas: "a host of api.openai.com matches only that exact host, not a suffix match"
+related: ["#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

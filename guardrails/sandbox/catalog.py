@@ -8,6 +8,23 @@ with a fail-closed default. Loading is strict: a document that does not
 validate is a :class:`SandboxConfigError` - never a silent partial load and
 never a silent fallback to a weaker profile. Unknown categories resolve to the
 document's ``defaultProfile`` (restricted) - fail closed.
+
+
+---knowledge---
+module_id: guardrails.sandbox.catalog
+system: guardrails
+app: sandbox
+solution_class: enterprise
+patterns: [schema-validated-loader, fail-closed, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [read_yaml_document, ProfileCatalog, CategoryMap, load_profile_catalog, load_category_map, default_profile_catalog, default_category_map, resolve_profile_for_category]
+invariants: "a document that does not validate is an error: never a silent partial load and never a silent fallback to a weaker profile"
+gotchas: "an unknown category resolves to the document defaultProfile, which is restricted"
+related: ["#58"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

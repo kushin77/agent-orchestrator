@@ -13,6 +13,23 @@ the tenant dimension; an id-keyed / composite-derived store is enumerated as
 ``CANNOT-ASSESS`` (never hidden, never a pass).  ``tests``/``__pycache__``
 directories are excluded — test code deliberately probes isolation
 boundaries and is not the product's tenant-store surface.
+
+
+---knowledge---
+module_id: guardrails.isolation.selfcheck
+system: guardrails
+app: isolation
+solution_class: pattern
+patterns: [self-test, read-only-consumption, honest-absence]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [repo_root, self_check, self_check_exit]
+invariants: "a store the analyzer cannot fully model is enumerated as CANNOT-ASSESS rather than hidden or passed"
+gotchas: "nothing is imported or mutated: the self-check is a static scan over named tenant-scoped surfaces"
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

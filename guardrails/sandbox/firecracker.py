@@ -9,6 +9,23 @@ deterministic profile-to-limits mapping and an OFF-by-default runtime whose
 ``run`` refuses. No real Firecracker-go-sdk lifecycle is implemented - the seam
 is where a deployment would wire it once its flag is on. Like every runtime,
 nothing runs while ``enabled`` is False (fail closed).
+
+
+---knowledge---
+module_id: guardrails.sandbox.firecracker
+system: guardrails
+app: sandbox
+solution_class: enterprise
+patterns: [feature-flag-gated-off, fail-closed, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [MicroVmNetwork, MicroVmSpec, MicroVmHandle, microvm_limits, FirecrackerMicroVmRuntime]
+invariants: "nothing runs while enabled is False, and the microVM lifecycle is a declared seam rather than an implementation"
+gotchas: "no real Firecracker-go-sdk lifecycle is implemented: the seam is where a deployment wires it once its flag is on"
+related: ["#58"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

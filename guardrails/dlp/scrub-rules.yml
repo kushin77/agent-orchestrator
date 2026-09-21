@@ -27,6 +27,21 @@
 # to a leaked secret. Never relax below `block` for the secret/cloud/private-key
 # classes.
 
+# ---knowledge---
+# module_id: guardrails.dlp.scrub-rules
+# system: guardrails
+# app: dlp
+# solution_class: class
+# patterns: [declared-authority, policy-as-data, fail-closed]
+# derives_from: null
+# owner_sme: security-sme
+# tier: L0
+# interfaces: [the scrub rule catalog consumed by RuleCatalog]
+# invariants: "this file is the single source of truth for the outbound scrub gate"
+# gotchas: "it is declared data, not code: a rule's class, severity and action are validated by dlp.catalog before any call may be dispatched"
+# related: ["#27"]
+# do_not_duplicate: null
+# ---knowledge---
 schema_version: "1"
 ruleset_version: "1.0.0"
 

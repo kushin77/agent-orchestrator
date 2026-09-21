@@ -18,6 +18,23 @@ Exit codes follow the guard-honesty contract (issue #28): 0 = OK, 1 =
 NOT-OK (a finding / gate block), 2 = CANNOT-ASSESS (--strict self-check with
 unmodeled surfaces; unrecoverable scan error).  Dry-run repair and triage of
 non-blocking findings exit 0.
+
+
+---knowledge---
+module_id: guardrails.isolation.cli
+system: guardrails
+app: isolation
+solution_class: pattern
+patterns: [subcommand-table, tri-state-exit, detect-first]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [build_parser, main]
+invariants: "repair is a dry-run plan by default and mutates only when an operator passes --apply"
+gotchas: ""
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

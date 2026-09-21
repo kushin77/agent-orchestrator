@@ -30,6 +30,23 @@ Every finding answers one question -- "run it against the thing it is
 supposed to catch: what is the exit code?" -- and a line that has been
 reviewed carries a required reason: ``# formality-ok: <reason>`` and is then
 suppressed.
+
+
+---knowledge---
+module_id: guardrails.honesty.analyzer
+system: guardrails
+app: honesty
+solution_class: enterprise
+patterns: [no-false-green, static-analysis, named-refusal]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [Finding, AnalyzerResult, HonestyAnalyzer, analyze]
+invariants: "a guard whose success path and gave-up path produce the same exit code is a formality and is flagged"
+gotchas: "it inspects shell guard scripts statically, so a flagged shape must be provably formality-shaped rather than merely suspicious"
+related: ["#28"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

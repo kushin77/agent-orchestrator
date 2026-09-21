@@ -14,6 +14,23 @@ Key handling (fail closed):
 * :class:`HmacSigner` with no key raises :class:`HmacKeyError` — there is no
   embedded/fallback key in production code, so a misconfigured deployment
   cannot silently sign with a known key.
+
+
+---knowledge---
+module_id: guardrails.dlp.hmac_audit
+system: guardrails
+app: dlp
+solution_class: enterprise
+patterns: [tamper-evident, append-only, fail-closed, secrets-not-in-repo]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [HmacKeyError, HmacSigner, AuditIntegrity, HmacAuditLog]
+invariants: "no unaudited call: the pipeline refuses to dispatch until the audit append succeeds and returns the signature"
+gotchas: "the signing key comes from AO_DLP_HMAC_KEY or is injected; a signer with no key raises rather than signing with a default"
+related: ["#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

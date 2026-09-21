@@ -12,6 +12,23 @@ semantic rules (duplicate ids, mode/off consistency, ON-without-rationale).
 The :class:`PolicyEngine` consults it to decide whether a control-gated policy
 is active; a policy whose control is not registered is rejected by the startup
 gate (otherwise it would silently never enforce — an AO-GR-4 formality).
+
+
+---knowledge---
+module_id: guardrails.policy.controls
+system: guardrails
+app: policy
+solution_class: enterprise
+patterns: [feature-flag-gated-off, declared-authority, named-refusal]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Control, ControlRegistry]
+invariants: "a control ships disabled by default; one that ships ON must document its rationale or the registry fails validation"
+gotchas: "a policy whose control is not registered is rejected by the startup gate, otherwise it would silently never enforce"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

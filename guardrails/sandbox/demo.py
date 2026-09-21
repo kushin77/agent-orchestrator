@@ -5,6 +5,23 @@ Runs the executor through the per-category profile defaults, the fail-closed
 unknown-category path and the restricted-profile negatives against the offline
 runtime, then prints a PASS line. Every failed assertion raises, so the demo
 exits nonzero on any failure - it cannot silently pass (no-false-green).
+
+
+---knowledge---
+module_id: guardrails.sandbox.demo
+system: guardrails
+app: sandbox
+solution_class: class
+patterns: [offline-fixture, no-false-green, self-test]
+derives_from: null
+owner_sme: qa-sme
+tier: L0
+interfaces: [main]
+invariants: "every failed assertion raises, so the demo exits nonzero on any failure and cannot silently pass"
+gotchas: ""
+related: ["#58"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
