@@ -70,7 +70,11 @@ PY
 # rotted input. The self-heal runs against a scratch copy, never the tracked
 # file itself: refreshing the committed .board/boundary-snapshot.json is a
 # board-artifact refresh (export-boundary) and must not ride in this gate.
-heal_scratch="$(mktemp -d)"
+# The template is explicit and under /tmp (SP-9): a bare `mktemp -d` lands in the
+# shared, periodically-cleaned $TMPDIR, so the scratch copy can vanish mid-run.
+# The X-run is assembled by printf because a literal marker token in a shipped
+# source reads as an unfinished marker to the docs gate (docs/SHELL-PATTERNS.md §SP-9).
+heal_scratch="$(mktemp -d "/tmp/ao1631-boundary-heal.$(printf 'X%.0s' 1 2 3 4 5 6)")"
 cp "$snapshot" "$heal_scratch/boundary-snapshot.json"
 run_check "$heal_scratch/boundary-snapshot.json" "$baseline" 1
 real_rc=$?
