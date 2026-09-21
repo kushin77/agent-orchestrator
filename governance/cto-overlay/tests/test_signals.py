@@ -69,6 +69,17 @@ def test_secret_scan_passes_on_a_clean_checkout(make_repo, assess):
     assert state_of(report, "non-negotiable", "secret_scan") == engine.STATE_PASS
 
 
+def test_secret_shape_requires_a_word_boundary_before_the_openai_prefix():
+    # The rule must still bite at a boundary while declining a mid-word prefix
+    # (#1872 — an ordinary token ending in the bare prefix, such as the tail of
+    # "task", read as a key). Strings are assembled at run time on purpose: a
+    # literal key shape in this file would redden the repository's own secret
+    # gate for the wrong reason (see PLANTED_KEY above).
+    shape_re = engine.re.compile("|".join(engine.SECRET_SHAPES))
+    assert shape_re.search("ta" + "sk" + "-1-review-request") is None
+    assert shape_re.search("sk" + "-fake-should-never-leak") is not None
+
+
 def test_protected_files_detects_an_unreviewed_change(make_repo, assess):
     root = make_repo("protected")
     makefile = root / "Makefile"
