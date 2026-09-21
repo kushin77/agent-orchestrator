@@ -30,6 +30,22 @@
 # NOTE: this gate is intentionally NOT wired into `make verify` yet; the
 # orchestrator indexes it after merge (see docs/REGISTRY-PROVENANCE.md). Its
 # offline default mode is what makes that wiring safe.
+#
+# ---knowledge---
+# module_id: scripts.check-registry-parity
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, offline-hermetic, declared-authority, lane-isolation, schema-validation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#145"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

@@ -46,6 +46,22 @@
 #   bash scripts/check-shared-frontend-onboarding.sh --root DIR   # a scratch tree
 #     --root DIR checks DIR instead of the repo root and suppresses the
 #     self-proof, so the gate's own failure paths are testable without recursion.
+#
+# ---knowledge---
+# module_id: scripts.check-shared-frontend-onboarding
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, offline-hermetic, named-refusal, deterministic]
+# derives_from: null
+# owner_sme: pmo-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#703"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

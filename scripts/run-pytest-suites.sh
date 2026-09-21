@@ -21,6 +21,22 @@
 # Usage:
 #   bash scripts/run-pytest-suites.sh            # run all declared suites
 #   SUITE_TIMEOUT=300 bash scripts/run-pytest-suites.sh
+#
+# ---knowledge---
+# module_id: scripts.run-pytest-suites
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, no-false-green]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [record, run_one_suite]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#29"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

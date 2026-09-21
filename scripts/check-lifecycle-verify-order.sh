@@ -35,6 +35,22 @@
 #   7. MUTANT — the driver's order guard disabled     -> case 4 goes red (load-bearing)
 #   8. SQUASH (#1098) — a real squash merge, so the verified head is NOT an ancestor of
 #      anything on the default branch:
+#
+# ---knowledge---
+# module_id: scripts.check-lifecycle-verify-order
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, lane-isolation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#616", "#622", "#623", "#626"]
+# do_not_duplicate: null
+# ---knowledge---
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 #        a. a lane cut from the default branch after it contains the landing and the
 #           landing carries the verified tree         -> the record is PRODUCED, naming the

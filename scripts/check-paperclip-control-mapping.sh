@@ -42,6 +42,22 @@
 # or a row has gone stale, rc 2 when the file or its tree cannot be read. It is
 # the seam a plant is measured through — the internal provocation below uses it
 # too, so the control and the seam cannot drift apart.
+#
+# ---knowledge---
+# module_id: scripts.check-paperclip-control-mapping
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, named-refusal]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#1254", "#1262"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 verb="${AO_CONTROL_MAPPING_VERB:-fleet.drop}"

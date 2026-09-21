@@ -37,6 +37,22 @@
 #   bash scripts/merge-gate.sh             # full pre-merge contract
 #   bash scripts/merge-gate.sh --wiring    # gate-wiring integrity check
 #   bash scripts/merge-gate.sh --self-test # negative control
+#
+# ---knowledge---
+# module_id: scripts.merge-gate
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, lane-isolation, schema-validation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [log_and_run, rc_to_status, tree_is_dirty, run_verify_step, run_contract, step]
+# invariants: ""
+# gotchas: ""
+# related: ["#29", "#311"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

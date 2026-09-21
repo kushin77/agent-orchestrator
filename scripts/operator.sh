@@ -15,6 +15,22 @@
 # expensive (see fleet/README.md).
 #
 # Usage: bash scripts/operator.sh [--dry-run]
+#
+# ---knowledge---
+# module_id: scripts.operator
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [dry-run-default]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: ["#763"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 

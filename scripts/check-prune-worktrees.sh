@@ -31,6 +31,22 @@
 # check by the needle its own arm asserts.
 #
 # Tri-state: 0 the contract holds / 1 a rule is broken / 2 CANNOT-ASSESS.
+#
+# ---knowledge---
+# module_id: scripts.check-prune-worktrees
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, declared-authority, lane-isolation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#830", "#1159", "#1337", "#1345"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 root="$(git rev-parse --show-toplevel 2>/dev/null || true)"

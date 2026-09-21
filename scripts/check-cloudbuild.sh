@@ -132,6 +132,22 @@
 # EXIT CONTRACT (the repo's honesty tri-state, guardrails/honesty)
 #   0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (python3, git or the board snapshot is
 #   unavailable — never a pass).
+#
+# ---knowledge---
+# module_id: scripts.check-cloudbuild
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, no-false-green, offline-hermetic, declared-authority, named-refusal, feature-flag-gated-off, deterministic]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#6", "#1350", "#1354", "#1369"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

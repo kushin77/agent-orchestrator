@@ -26,6 +26,22 @@
 # pinned input exits 2, not 0.
 #
 # Usage: bash scripts/check-cross-repo-sync.sh [extra peer_triage.py args]
+#
+# ---knowledge---
+# module_id: scripts.check-cross-repo-sync
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, offline-hermetic, deterministic]
+# derives_from: null
+# owner_sme: sync-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#427"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

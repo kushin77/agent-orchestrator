@@ -16,6 +16,22 @@ declared.json is `{"want": {...}}` (see repo-settings.sh); live.json is the
 raw object `gh api repos/<owner>/<repo>` returns (a flat dict of scalars for
 every field this policy declares — no nesting to unwrap, unlike branch
 protection's `{"enabled": bool}` shape).
+
+---knowledge---
+module_id: scripts.repo-settings-compare
+system: scripts
+app: scripts
+solution_class: pattern
+patterns: [tri-state-exit, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [compare, main]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 from __future__ import annotations
 

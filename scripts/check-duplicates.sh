@@ -59,6 +59,22 @@
 #   bash scripts/check-duplicates.sh demo-cases         OPT-IN: scan + the dprs demo
 #   bash scripts/check-duplicates.sh --self-test        the provocation alone
 #   bash scripts/check-duplicates.sh --list             the protected-name table
+#
+# ---knowledge---
+# module_id: scripts.check-duplicates
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, named-refusal, schema-validation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#698", "#1164"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"

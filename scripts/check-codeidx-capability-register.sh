@@ -43,6 +43,22 @@
 #   scripts/check-codeidx-capability-register.sh --register PATH  # validate an
 #       alternate copy of the register (e.g. the subject as the sibling
 #       reconciliation lane #479 will merge it), never editing the tracked file
+#
+# ---knowledge---
+# module_id: scripts.check-codeidx-capability-register
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, offline-hermetic, feature-flag-gated-off, deterministic]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#472", "#473", "#479", "#480"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 if ! command -v python3 >/dev/null 2>&1; then

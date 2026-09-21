@@ -15,6 +15,22 @@ Usage:
 
 declared.json is `{"want": {...}, "has": {...}}` (see branch-protection.sh);
 live.json is the raw protection object GitHub returns.
+
+---knowledge---
+module_id: scripts.branch-protection-compare
+system: scripts
+app: scripts
+solution_class: pattern
+patterns: [tri-state-exit, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [flatten, compare, main]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 from __future__ import annotations
 

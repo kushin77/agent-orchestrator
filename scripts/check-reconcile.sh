@@ -57,6 +57,22 @@
 #          runs ONLY the §6 real-tree step against DIR (the same code path, so a
 #          driver outside the repo can provoke it with its own scratch tree) and
 #          exits 0/1/2. The no-argument form is the gate.
+#
+# ---knowledge---
+# module_id: scripts.check-reconcile
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, named-refusal, append-only, lane-isolation, deterministic, schema-validation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#304", "#628", "#1291", "#1321"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

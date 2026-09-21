@@ -52,6 +52,22 @@
 #   Being refused here is how you learn the shape; the fix (the good shape, side
 #   by side with the bad one) is in `docs/SHELL-PATTERNS.md`, and the repair is
 #   local to the file that was refused.
+#
+# ---knowledge---
+# module_id: scripts.check-shell-patterns
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, named-refusal]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#616", "#621", "#804"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"

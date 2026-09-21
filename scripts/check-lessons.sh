@@ -47,6 +47,22 @@
 # defect is never softened into "could not assess".
 #
 # Usage: bash scripts/check-lessons.sh [--strict]
+#
+# ---knowledge---
+# module_id: scripts.check-lessons
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, named-refusal]
+# derives_from: null
+# owner_sme: sync-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#141", "#766", "#1052", "#1178"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

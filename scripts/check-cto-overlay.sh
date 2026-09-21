@@ -25,6 +25,22 @@
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage: bash scripts/check-cto-overlay.sh
+#
+# ---knowledge---
+# module_id: scripts.check-cto-overlay
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, schema-validation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#147"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 # Every "does this report contain this string?" test below is bash-native (#852).

@@ -13,6 +13,22 @@ Usage:
     python3 scripts/lib/fleet_prose_sweep.py FILE [FILE ...]
 
 Rewrites files in place. Prints one line per line changed.
+
+---knowledge---
+module_id: scripts.lib.fleet_prose_sweep
+system: scripts
+app: lib
+solution_class: class
+patterns: [shared-helper-library]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [protected_spans, in_any_span, rewrite_line, sweep_file, main]
+invariants: ""
+gotchas: ""
+related: ["#923"]
+do_not_duplicate: null
+---knowledge---
 """
 from __future__ import annotations
 

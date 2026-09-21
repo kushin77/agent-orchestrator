@@ -18,6 +18,22 @@
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage: bash scripts/check-finops-chooser.sh
+#
+# ---knowledge---
+# module_id: scripts.check-finops-chooser
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, no-false-green, schema-validation]
+# derives_from: null
+# owner_sme: cfo
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#164"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

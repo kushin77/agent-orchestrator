@@ -76,6 +76,22 @@
 #   AO_INFRA_MAX_SCRATCH_MB  single scratch-file ceiling, MiB (default 4096)
 #   AO_INFRA_SCAN_ATTEMPTS   scan attempts before a failure   (default 3)
 #   AO_INFRA_SCAN_BACKOFF_MS delay between those attempts, ms (default 200)
+#
+# ---knowledge---
+# module_id: scripts.check-infra-limits
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, named-refusal, schema-validation]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#729", "#1381", "#1383", "#1392"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

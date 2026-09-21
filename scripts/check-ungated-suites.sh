@@ -87,6 +87,22 @@
 #                                                          # refusal, so the rule
 #                                                          # has ONE
 #                                                          # implementation.
+#
+# ---knowledge---
+# module_id: scripts.check-ungated-suites
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, no-false-green, declared-authority, named-refusal, lane-isolation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#698", "#891"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

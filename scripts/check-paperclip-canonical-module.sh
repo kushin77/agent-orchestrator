@@ -56,6 +56,22 @@
 #   bash scripts/check-paperclip-canonical-module.sh --root DIR
 #   bash scripts/check-paperclip-canonical-module.sh --enumerate
 #   bash scripts/check-paperclip-canonical-module.sh --no-controls
+#
+# ---knowledge---
+# module_id: scripts.check-paperclip-canonical-module
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, named-refusal, deterministic, schema-validation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#304", "#307", "#410", "#412"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

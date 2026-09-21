@@ -27,6 +27,22 @@
 #   bash scripts/qa-loop.sh
 #   bash scripts/qa-loop.sh --once
 #   bash scripts/qa-loop.sh --list-fixes
+#
+# ---knowledge---
+# module_id: scripts.qa-loop
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, no-false-green, lane-isolation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [list_fixes, run_gate, local_change_set, fix_trailing_ws]
+# invariants: ""
+# gotchas: ""
+# related: ["#29"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

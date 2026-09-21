@@ -233,6 +233,22 @@
 #   bash scripts/check-pr-contract.sh --landed           # landed verdict (record applied)
 #   bash scripts/check-pr-contract.sh --landed --range <r>  # predicate re-check, verbatim
 #   bash scripts/check-pr-contract.sh --selftest         # build mutants, prove it fails
+#
+# ---knowledge---
+# module_id: scripts.check-pr-contract
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, declared-authority, named-refusal]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#236", "#263", "#267", "#268"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

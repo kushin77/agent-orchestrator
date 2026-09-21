@@ -55,6 +55,22 @@
 #   bash scripts/check-budget-authority.sh --self-test  the provocation alone
 #   bash scripts/check-budget-authority.sh --list       the declared register
 #   bash scripts/check-budget-authority.sh --root DIR   scan another tree
+#
+# ---knowledge---
+# module_id: scripts.check-budget-authority
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, named-refusal]
+# derives_from: null
+# owner_sme: cfo
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#1458", "#1495"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

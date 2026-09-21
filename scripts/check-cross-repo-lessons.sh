@@ -40,6 +40,22 @@
 #
 # Usage: bash scripts/check-cross-repo-lessons.sh [extra lessons_sync.py args]
 #   e.g. bash scripts/check-cross-repo-lessons.sh --verify-cmr-source
+#
+# ---knowledge---
+# module_id: scripts.check-cross-repo-lessons
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, offline-hermetic, lane-isolation, deterministic]
+# derives_from: null
+# owner_sme: sync-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#79", "#84", "#181"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

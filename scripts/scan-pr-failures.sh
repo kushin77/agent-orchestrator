@@ -33,6 +33,22 @@
 #
 # Exit codes: 0 OK (including "found nothing", which is the normal case) /
 #             1 NOT-OK / 2 CANNOT-ASSESS (gh absent or the API refused).
+#
+# ---knowledge---
+# module_id: scripts.scan-pr-failures
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: ["#812", "#1207"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

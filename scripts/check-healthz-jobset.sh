@@ -42,6 +42,22 @@
 #   declaration that cannot be derived in this checkout.
 #
 # Usage: bash scripts/check-healthz-jobset.sh
+#
+# ---knowledge---
+# module_id: scripts.check-healthz-jobset
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, dry-run-default]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#241", "#706", "#1148"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

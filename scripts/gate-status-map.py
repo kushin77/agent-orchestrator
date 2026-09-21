@@ -39,6 +39,22 @@ would truncate the overflow itself, at a position this module does not choose.
 Usage:
     gate-status-map.py <rc>          -> prints the state, exit 0
     gate-status-map.py --self-test   -> asserts the whole table, exit 0/1
+
+---knowledge---
+module_id: scripts.gate-status-map
+system: scripts
+app: scripts
+solution_class: pattern
+patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [map_rc, summarize, venue_log_capability, self_test, main]
+invariants: ""
+gotchas: ""
+related: ["#739", "#1407"]
+do_not_duplicate: null
+---knowledge---
 """
 from __future__ import annotations
 

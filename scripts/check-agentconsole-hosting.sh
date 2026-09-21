@@ -56,6 +56,22 @@
 #   bash scripts/check-agentconsole-hosting.sh              # gate (self-test + tree)
 #   bash scripts/check-agentconsole-hosting.sh --self-test  # the provocation alone
 #   bash scripts/check-agentconsole-hosting.sh --root DIR   # analyse another tree
+#
+# ---knowledge---
+# module_id: scripts.check-agentconsole-hosting
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, declared-authority, named-refusal, deterministic]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#607", "#1029"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 # The script's OWN tree: the provocation stages from here, so `--root DIR` can

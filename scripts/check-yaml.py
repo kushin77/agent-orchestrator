@@ -5,6 +5,22 @@ Parses every *.yml / *.yaml under the repo (including .github/workflows,
 excluding vendor/, .research/, .git, and local caches) with PyYAML
 safe_load. Any file that does not parse is a hard failure — the gate never
 passes vacuously.
+
+---knowledge---
+module_id: scripts.check-yaml
+system: governance
+app: gates
+solution_class: enterprise
+patterns: [no-false-green]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [exit 0 OK, exit 1 NOT-OK]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -45,6 +45,22 @@
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 
+#
+# ---knowledge---
+# module_id: scripts.check-erp-ops
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, schema-validation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#645", "#649", "#698"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

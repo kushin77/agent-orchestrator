@@ -25,6 +25,22 @@
 #
 # Source contract: this file only defines functions and sets two variables; it
 # performs no work when sourced, so it is safe to source under `set -u`.
+#
+# ---knowledge---
+# module_id: scripts.discover-checks
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [discover_check_scripts]
+# invariants: ""
+# gotchas: ""
+# related: ["#559", "#698"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

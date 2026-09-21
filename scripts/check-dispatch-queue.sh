@@ -40,6 +40,22 @@
 #   provocation driver plants fixtures through; the NO-ARGUMENT invocation is
 #   the gate (scripts/discover-checks.sh passes none).
 
+#
+# ---knowledge---
+# module_id: scripts.check-dispatch-queue
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, offline-hermetic]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#878", "#928", "#1077", "#1189"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

@@ -17,6 +17,22 @@
 # outside this lane's owned files — but they are always printed by name.
 #
 # Usage: bash scripts/check-cmr-knowledge.sh
+#
+# ---knowledge---
+# module_id: scripts.check-cmr-knowledge
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, named-refusal]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#132", "#133", "#878", "#887"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

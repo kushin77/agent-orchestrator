@@ -142,6 +142,22 @@
 #   bash scripts/prune-worktrees.sh --branches --apply  # ...and delete them
 #   bash scripts/prune-worktrees.sh --schedule       # is THIS TOOL scheduled?
 #                                                     # exit 1 if nothing runs it
+#
+# ---knowledge---
+# module_id: scripts.prune-worktrees
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, no-false-green, declared-authority, lane-isolation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [live_paths_of, gate_held_reader, live_lane_worktrees, reap_root_lines, landed_in_master, on_a_remote_branch]
+# invariants: ""
+# gotchas: ""
+# related: ["#516", "#830", "#1159", "#1326"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 # The repo to operate on is the one this script is RUN IN, not the one it lives

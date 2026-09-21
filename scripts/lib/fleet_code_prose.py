@@ -26,6 +26,22 @@ Usage:
 
 Exit code: 0 if no findings, 1 if any findings (each printed as
 "path:line: retired term 'X': <line text>"), 2 on a usage/parse error.
+
+---knowledge---
+module_id: scripts.lib.fleet_code_prose
+system: scripts
+app: lib
+solution_class: class
+patterns: [tri-state-exit]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [artifact_stripped, find_findings, main]
+invariants: ""
+gotchas: ""
+related: ["#923"]
+do_not_duplicate: null
+---knowledge---
 """
 from __future__ import annotations
 

@@ -83,6 +83,22 @@
 #   be a DUPLICATE registration of the same name, which the gate of record
 #   refuses by name — the same reasoning the Makefile records for
 #   `check-isolation-landed`.
+#
+# ---knowledge---
+# module_id: scripts.check-nav-parity
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, declared-authority, named-refusal]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#1510", "#1540", "#1565"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

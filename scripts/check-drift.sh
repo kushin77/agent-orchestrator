@@ -18,6 +18,22 @@
 # Exit-code contract (guardrails/honesty tri-state, issue #28): 0/1/2.
 #
 # Usage: bash scripts/check-drift.sh
+#
+# ---knowledge---
+# module_id: scripts.check-drift
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, lane-isolation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#29", "#891"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

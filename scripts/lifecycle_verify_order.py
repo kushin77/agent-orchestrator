@@ -36,6 +36,22 @@ received commits after the squash, GitHub's ``head_commit`` is a tree that never
 drifted head beside it. The positive case is the drifted branch closing out green on the
 landed tree; the controls are the port refusing that drifted subject in its own words, and
 a mutant that removes the resolution and must red the positive case.
+
+---knowledge---
+module_id: scripts.lifecycle_verify_order
+system: scripts
+app: scripts
+solution_class: enterprise
+patterns: [tri-state-exit, provoked-negative-control, offline-hermetic, lane-isolation]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+invariants: ""
+gotchas: ""
+related: ["#786", "#1098", "#1149"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

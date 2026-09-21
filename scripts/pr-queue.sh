@@ -28,6 +28,22 @@
 #   - a PR touching anything under scripts/ gets its GATE-REGRESSION checked
 #     before it is merged (issue #1145): the PR's head commit is materialized
 #     into a scratch worktree, where a curated set of fast whole-tree content
+#
+# ---knowledge---
+# module_id: scripts.pr-queue
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, offline-hermetic, named-refusal, lane-isolation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [gate_paths, fetch_prs, classify_py, pr_head_and_files_py, gate_regression_worktree, gate_regression_run_all]
+# invariants: ""
+# gotchas: ""
+# related: ["#878", "#1053", "#1145"]
+# do_not_duplicate: null
+# ---knowledge---
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 #     scanners (GATE_REGRESSION_SCRIPTS — verdict-contains, shell-patterns,
 #     shell-syntax, python-syntax, secrets, json, docs; not every
