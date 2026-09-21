@@ -24,8 +24,25 @@ together. **The runner merges; sessions open PRs.**
 4. **Gather**: open non-draft PRs + head shas; evidence per `(pr, sha)` from
    the `control-plane-verify` check-run, the `ao/gate-of-record` status and the
    local markers; live builds; the hold set.
-5. **Plan** (`fleet/runner/plan.py`, pure) → ordered actions.
-6. **Execute**: cancel stale builds → verify up to the fan-out width in
+5. **Conclude** (issue #1506): every open non-draft head that carries **no**
+   `ao/gate-of-record` at all has the CI venue of record's **own concluded
+   verdict** published for it, through the poster's `conclude` verb. The heads
+   are filtered by the evidence table step 4 already read, so a head that is
+   already converged costs no call and cannot accumulate one status per tick;
+   the verdicts just published are read back into that table, so step 6 plans
+   from the context that now STANDS rather than from the one that did. This step
+   is `--apply`-gated, unlike the verify + post half below, because it exists
+   only to change what a head carries.
+
+   The venue cannot schedule this itself, and that is measured rather than
+   judged: `infra/cloudbuild/verify.yaml` posts nothing by design (#1415) and its
+   image carries neither `gh` nor `gcloud` (#1350/#1361). The rung is the
+   invoker, the verb is owned beside `post` in `fleet/runner/verify.py` (two
+   verbs, one question — which verdict STANDS for this head — and never two
+   producers of one required context), and
+   `scripts/check-gate-status-scheduled.sh` proves the schedule reaches it.
+6. **Plan** (`fleet/runner/plan.py`, pure) → ordered actions.
+7. **Execute**: cancel stale builds → verify up to the fan-out width in
    parallel, each in its own held worktree → merge the greens.
 
 The width is declared, never a literal: `AO_RUNNER_CAPACITY` (env contract;
@@ -53,7 +70,8 @@ floor, at a load above nproc), which is a red on the machine, not on the change.
 
 Merges are **dry-run unless `--apply`**: the merged-tree seam runs and
 `scripts/merge-pr.sh` runs in its own dry-run mode. The verify + post half is
-always real (a verify writes nothing to the repository but a commit status).
+always real (a verify writes nothing to the repository but a commit status);
+the `conclude` pass (step 5) is `--apply`-gated, because it does no other work.
 
 ## Evidence ranking (lesson 5)
 
