@@ -1,5 +1,21 @@
 """Worktree/branch audit — every artifact on disk must be explained (#628).
 
+---knowledge---
+module_id: governance.reconcile.audit
+system: governance
+app: reconcile
+solution_class: enterprise
+patterns: [fail-closed, offline-hermetic, injected-effects, lane-isolation, explain-every-artifact]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [AuditUnavailable, WorktreeEntry, Artifact, Explanation, AuditReport, AuditOps, parse_worktrees, read_beats, audit, describe]
+invariants: ""
+gotchas: ""
+related: ["#628", "#1291"]
+do_not_duplicate: null
+---knowledge---
+
 ``heartbeat.judge`` answers "is this session dead?" and ``sweep`` answers "what do
 I do with a dead one?". Both start from the sessions that *beat*, so both are
 blind to a lane that left no heartbeat at all: its worktree, its branch and the

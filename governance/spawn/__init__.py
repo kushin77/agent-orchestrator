@@ -1,5 +1,21 @@
 """`governance/spawn` — one spawn envelope, one producer (issue #793).
 
+---knowledge---
+module_id: governance.spawn
+system: governance
+app: spawn
+solution_class: class
+patterns: [provoked-negative-control, fail-closed, lane-isolation, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [produce, render_block]
+invariants: ""
+gotchas: ""
+related: ["#793"]
+do_not_duplicate: null
+---knowledge---
+
 `governance/**` is a large, well-tested surface — claim ledger, lane isolation,
 lifecycle close-out, reconcile, runaway guard, capacity, gate admission — and
 none of it was applied **by the act of spawning**. So a local subagent and a

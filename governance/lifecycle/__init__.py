@@ -1,5 +1,21 @@
 """End-to-end GitHub lifecycle: every work item closes hygienically (issue #269).
 
+---knowledge---
+module_id: governance.lifecycle
+system: governance
+app: lifecycle
+solution_class: template
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#269"]
+do_not_duplicate: null
+---knowledge---
+
 ``governance/isolation`` guarantees a lane *opens* correctly; this package covers
 the other half — the **close**. See ``README.md`` for the contract, ``model.py``
 for the invariants, ``audit.py`` for what is broken, ``closeout.py`` for how it

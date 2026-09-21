@@ -1,5 +1,21 @@
 """The lane's close-out — the ONE terminal verb for every artifact a lane bound (#1301).
 
+---knowledge---
+module_id: governance.lifecycle.lane_closeout
+system: governance
+app: lifecycle
+solution_class: enterprise
+patterns: [offline-hermetic, dry-run-default, injected-effects, lane-isolation, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LaneUnavailable, already_torn_down, leftover_detail, PullRequest, Step, LaneCloseout, LaneOps, closeout_lane, describe, archive_path, (+2 more)]
+invariants: ""
+gotchas: ""
+related: ["#834", "#1266", "#1270", "#1285", "#1301", "#1335"]
+do_not_duplicate: null
+---knowledge---
+
 ``closeout.py`` drives an *issue* to hygiene: merge, verify, delete the branch,
 consume the directive, release the claim, close the issue, reclaim the lane. That
 is the item's close-out, and it needs the board. This module is the **lane's**:

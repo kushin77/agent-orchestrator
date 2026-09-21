@@ -1,5 +1,21 @@
 """The declared tag controls, and the reader that holds the authority to them.
 
+---knowledge---
+module_id: governance.tagging.policy
+system: governance
+app: tagging
+solution_class: pattern
+patterns: [no-false-green]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ControlsUnavailable, load, control, check]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 `controls.yaml` states how the tag authority is governed; this module is what
 makes those statements binding. Every control is re-derived from the authority It
 governs and compared to the declaration, so:

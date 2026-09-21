@@ -1,5 +1,21 @@
 """No vendoring — the registry stores references, and the gate proves it.
 
+---knowledge---
+module_id: governance.modules.vendoring
+system: governance
+app: modules
+solution_class: pattern
+patterns: [deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [check_references, scan]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Acceptance 4: the registry stores **references** (id, repo, pin, path), and a
 gate finding fires when a module's *source* is carried in-tree instead of
 referenced. The only vendor path in this repository stays ``vendor/CMR`` — the

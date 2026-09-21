@@ -1,5 +1,21 @@
 """Detection logic for RCA + lessons enforcement (issue #141).
 
+---knowledge---
+module_id: governance.lessons.checker
+system: governance
+app: lessons
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [LedgerUnavailable, PolicyUnavailable, Policy, default_policy, load_policy, relpath, Ledger, parse_ledger_text, load_ledger, load_snapshot, (+3 more)]
+invariants: ""
+gotchas: ""
+related: ["#141", "#402", "#494", "#495", "#497", "#727"]
+do_not_duplicate: null
+---knowledge---
+
 ``load_ledger`` reads the canonical ledger; ``check_ledger`` decides whether the
 records it holds are complete, traceable and evidenced. Every rule below fails
 with a named finding and an actionable remediation — the point of the issue is

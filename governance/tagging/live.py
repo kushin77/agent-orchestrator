@@ -1,5 +1,21 @@
 """Live projection of the board's declared tags (issue #1175).
 
+---knowledge---
+module_id: governance.tagging.live
+system: governance
+app: tagging
+solution_class: pattern
+patterns: [offline-hermetic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LiveUnavailable, snapshot_age_minutes, project, render]
+invariants: ""
+gotchas: ""
+related: ["#1175"]
+do_not_duplicate: null
+---knowledge---
+
 The taxonomy can say what a tag *may* be; only the board can say what it *is*.
 This module is the live half: it projects the offline board snapshot
 (`.board/snapshot.json`) and the authority's ledger into one document that

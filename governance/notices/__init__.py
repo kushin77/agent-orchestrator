@@ -1,5 +1,21 @@
 """Standing notices and their acks (issue #1269, EPIC #1268).
 
+---knowledge---
+module_id: governance.notices
+system: governance
+app: notices
+solution_class: template
+patterns: [declared-authority]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1268", "#1269", "#1412"]
+do_not_duplicate: null
+---knowledge---
+
 A rule between runtimes is a RECORD with a schema and an acknowledgement, never a
 sentence in a chat. This package is the notice half of that:
 

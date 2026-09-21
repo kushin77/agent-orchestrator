@@ -1,5 +1,21 @@
 """A live projection of every beating session against the real disk (#885).
 
+---knowledge---
+module_id: governance.reconcile.live
+system: governance
+app: reconcile
+solution_class: pattern
+patterns: [provoked-negative-control, lane-isolation, explain-every-artifact]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LiveRow, project, validate, describe]
+invariants: ""
+gotchas: ""
+related: ["#885"]
+do_not_duplicate: null
+---knowledge---
+
 ``status`` already reports a session's heartbeat verdict (live/suspect/orphan)
 and, with ``--disk``, every worktree/branch no record explains. Neither one
 answers the question this module exists for: **does what a session's OWN

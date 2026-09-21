@@ -1,4 +1,21 @@
 """Operator CLI for the governance board enforcement gate (issue #143) and the
+
+---knowledge---
+module_id: governance.board.cli
+system: governance
+app: board
+solution_class: enterprise
+patterns: [honesty-tri-state, offline-hermetic]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [assess_boundary_freshness, cmd_check, cmd_exceptions, parse_edges, build_boundary_records, fetch_boundary_records, write_boundary_snapshot, cmd_export_boundary, load_boundary_baseline, apply_boundary_baseline, (+3 more)]
+invariants: ""
+gotchas: ""
+related: ["#143", "#358", "#388", "#1631"]
+do_not_duplicate: null
+---knowledge---
+
 cross-repo execution boundary (issue #388).
 
 Usage:

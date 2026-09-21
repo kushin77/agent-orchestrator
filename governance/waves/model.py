@@ -1,5 +1,21 @@
 """Wave ledger schema (issue #181, gap 3).
 
+---knowledge---
+module_id: governance.waves.model
+system: governance
+app: waves
+solution_class: pattern
+patterns: [append-only-ledger]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [WaveRecord]
+invariants: ""
+gotchas: ""
+related: ["#181"]
+do_not_duplicate: null
+---knowledge---
+
 One JSONL record per wave. Every record carries the same fields so the ledger
 can be queried for the "faster / cheaper / smarter" trend across waves, and the
 SLO fields form a **closed vocabulary** — no free-form keys sneak in.

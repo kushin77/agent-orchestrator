@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Lessons CLI — RCA + lessons enforcement (issue #141).
 
+---knowledge---
+module_id: governance.lessons.cli
+system: governance
+app: lessons
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [cmd_check, cmd_status, cmd_linkage, cmd_record, cmd_template, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#141", "#1178"]
+do_not_duplicate: null
+---knowledge---
+
 Honest tri-state exit codes (repo convention, GR-12 / no-false-green):
 
 * ``0`` — OK

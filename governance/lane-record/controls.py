@@ -1,5 +1,21 @@
 """The lane record's declaration, held to the code it describes (issue #1270).
 
+---knowledge---
+module_id: governance.lane-record.controls
+system: governance
+app: lane-record
+solution_class: pattern
+patterns: [provoked-negative-control]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ControlsUnavailable, load, problems, describe]
+invariants: ""
+gotchas: ""
+related: ["#1270"]
+do_not_duplicate: null
+---knowledge---
+
 ``controls.yaml`` is the DECLARATION; ``lane_record.py`` is the machine. This
 module is the mirror between them, and it refuses by name when they stop
 agreeing:

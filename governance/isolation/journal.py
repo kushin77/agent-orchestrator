@@ -1,5 +1,21 @@
 """The append-only audit-verdict trail — a durable record next to `audit.py` (issue #885).
 
+---knowledge---
+module_id: governance.isolation.journal
+system: governance
+app: isolation
+solution_class: class
+patterns: [provoked-negative-control, append-only-ledger]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [JournalEntry, journal_path, append, read_all, last_for]
+invariants: ""
+gotchas: ""
+related: ["#885"]
+do_not_duplicate: null
+---knowledge---
+
 `audit.py` re-derives isolation from git and the filesystem every time it is
 asked, and `cli.py cmd_audit` prints the verdict once, to a terminal a caller
 may not have kept. This module gives every audited verdict a durable record: a

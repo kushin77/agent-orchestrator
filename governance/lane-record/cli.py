@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The lane record's verb surface (issue #1270, EPIC #1268).
 
+---knowledge---
+module_id: governance.lane-record.cli
+system: governance
+app: lane-record
+solution_class: pattern
+patterns: [provoked-negative-control]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_runtimes, cmd_validate, cmd_evaluate, cmd_controls, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1268", "#1270"]
+do_not_duplicate: null
+---knowledge---
+
     runtimes    the DERIVED registered-runtime set, and why each is one
     validate    one record against the frozen shape and the runtime vocabulary
     evaluate    every record in a tree: shape, vocabulary, then the pair relation

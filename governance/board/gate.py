@@ -1,5 +1,21 @@
 """The enforcement gate (issue #143).
 
+---knowledge---
+module_id: governance.board.gate
+system: governance
+app: board
+solution_class: pattern
+patterns: [no-false-green]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [now_iso, load_exceptions, run_check, run_gate, write_report]
+invariants: ""
+gotchas: ""
+related: ["#139", "#140", "#141", "#142", "#143"]
+do_not_duplicate: null
+---knowledge---
+
 Re-runs the required CMR gates for real — it does not trust their cached
 ``.verify/*.json`` reports, because a report on disk could be stale relative
 to the working tree. Every check is a real subprocess with a real exit code;

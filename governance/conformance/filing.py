@@ -1,5 +1,21 @@
 """Derive declaring labels at the issue-filing path (issue #320).
 
+---knowledge---
+module_id: governance.conformance.filing
+system: governance
+app: conformance
+solution_class: enterprise
+patterns: [no-false-green, dry-run-default]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [FilingRefused, FilingRequest, FilingPlan, FilingResult, FilingSeamProblem, declared_class_for, derive_declaring_labels, plan_filing, file_issue, audit_filing_seam]
+invariants: ""
+gotchas: ""
+related: ["#140", "#174", "#253", "#254", "#255", "#259"]
+do_not_duplicate: null
+---knowledge---
+
 The conformance gate (#140) refuses an issue that declares no class — but it can
 only refuse it *after* the issue exists, and `governance/lifecycle`'s
 `FILING_LABELS_MISSING` invariant likewise only *detects* the result. A board that

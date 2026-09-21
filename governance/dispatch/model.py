@@ -1,5 +1,21 @@
 """Data model for claim-time issue-order enforcement (issue #157).
 
+---knowledge---
+module_id: governance.dispatch.model
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [provoked-negative-control, append-only-ledger, no-false-green, offline-hermetic, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Issue, Snapshot, Eligibility, Provenance, Arbitration, FileClaim, regions_overlap, file_claims_conflict, ClaimEvent, parse_provenance, (+2 more)]
+invariants: ""
+gotchas: ""
+related: ["#128", "#157", "#181", "#699", "#702", "#707"]
+do_not_duplicate: null
+---knowledge---
+
 The chronological-dispatch rule (`AGENTS.md` golden rule 14,
 `docs/GOVERNANCE.md` 8, `docs/EXECUTION-PLAN.md` 5) is declared in docs and
 gated by `scripts/check-chronological-dispatch.sh`. That gate is a *declaration*

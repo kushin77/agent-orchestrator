@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Per-surface target solution-class enforcement (issue #351).
 
+---knowledge---
+module_id: governance.conformance.surfaces
+system: governance
+app: conformance
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [SurfacePolicyUnavailable, Evidence, SurfaceSpec, SurfacePolicy, load_surface_policy, measure_path_evidence, measure_gate, measured_class, observed_roots, SurfaceRow, (+7 more)]
+invariants: ""
+gotchas: ""
+related: ["#140", "#351", "#590", "#883", "#1256"]
+do_not_duplicate: null
+---knowledge---
+
 The issue-class gate (`policy.yaml`, issue #140) holds a piece of *work* to a
 rung of the CMR quality ladder. This module is its surface counterpart: every
 product surface declares the rung it is held to, and the check fails while the

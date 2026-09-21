@@ -1,5 +1,21 @@
 """The spawn envelope — one versioned document, one producer (issue #793).
 
+---knowledge---
+module_id: governance.spawn.model
+system: governance
+app: spawn
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state, fail-closed, offline-hermetic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Refusal, EnvelopeRefused, admission_refusals, validate, assemble, parse, dumps]
+invariants: ""
+gotchas: ""
+related: ["#793", "#1371", "#1372", "#1377", "#1413"]
+do_not_duplicate: null
+---knowledge---
+
 `governance/**` is a large, well-tested surface — claim ledger, lane isolation,
 lifecycle close-out, reconcile, runaway guard, capacity, gate admission — and
 **none of it was applied by the act of spawning**. The remote path inlined

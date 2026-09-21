@@ -1,5 +1,21 @@
 """The futureproof capstone — every classification mechanism's chain, end to end.
 
+---knowledge---
+module_id: governance.futureproof.e2e
+system: governance
+app: futureproof
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state, fail-closed, bounded-work]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [CannotAssess, discovered_gates, denylisted_gates, gate_source, wired_problem, falsifiable_problem, probe_gate, assess_mechanism, completeness_problem, disjointness_problem, (+5 more)]
+invariants: ""
+gotchas: ""
+related: ["#1156", "#1164"]
+do_not_duplicate: null
+---knowledge---
+
 The repository has ten classification mechanisms (the operator's list): `class`,
 `pattern`, `template`, `rca`, `system`, `app`, `env-var`, `gov`, `issues`,
 `index`. Each already has a declared authority and a gate with its own negative

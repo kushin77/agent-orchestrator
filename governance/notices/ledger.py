@@ -1,5 +1,21 @@
 """Append-only, hash-chained notice ledger (issue #1269, EPIC #1268).
 
+---knowledge---
+module_id: governance.notices.ledger
+system: governance
+app: notices
+solution_class: pattern
+patterns: [append-only-ledger]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LedgerIntegrityError, canonical_bytes, entry_hash, file_digest, ledger_path, read, append, verify]
+invariants: ""
+gotchas: ""
+related: ["#1268", "#1269"]
+do_not_duplicate: null
+---knowledge---
+
 WHY A LEDGER, WHEN THE ACKS ARE ALREADY FILES
 --------------------------------------------
 The failure this lane closes was not "the ack file was lost" -- it was that

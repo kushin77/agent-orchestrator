@@ -1,5 +1,21 @@
 """Speculative-base attestation — the ISOLATION half of DG-3 (issue #699).
 
+---knowledge---
+module_id: governance.isolation.speculative
+system: governance
+app: isolation
+solution_class: enterprise
+patterns: [no-false-green, lane-isolation, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SpeculationRefused, SpeculativeAttestation, record_dir, record_path, read, forget, claim, reverify, verify]
+invariants: ""
+gotchas: ""
+related: ["#288", "#645", "#699", "#885"]
+do_not_duplicate: null
+---knowledge---
+
 A lane blocked only by file ownership (not by an unresolved question) no longer
 has to wait for the upstream lane's squash-merge before it can start: it may cut
 its worktree from the **upstream lane's branch** instead of ``master`` and work

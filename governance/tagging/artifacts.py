@@ -1,5 +1,21 @@
 """Artifact round trips — the frozen shapes, the ledger and the live projection.
 
+---knowledge---
+module_id: governance.tagging.artifacts
+system: governance
+app: tagging
+solution_class: enterprise
+patterns: [provoked-negative-control, append-only-ledger, honesty-tri-state]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The fourth check in `scripts/check-tagging.sh` provokes the taxonomy's refusals.
 This module provokes the *artifacts*: the frozen shape file, the append-only
 ledger and the live projection. The distinction matters, because these three can

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Scheduled peer-board triage for the cross-repo sync boundary (issue #427).
 
+---knowledge---
+module_id: governance.sync.peer_triage
+system: governance
+app: sync
+solution_class: enterprise
+patterns: [honesty-tri-state, offline-hermetic, deterministic, dry-run-default, injected-effects]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [CannotAssess, index_issues, load_ownership, load_triages, classify, run_pass, load_inputs, fetch_snapshot, main]
+invariants: ""
+gotchas: ""
+related: ["#427"]
+do_not_duplicate: null
+---knowledge---
+
 Issue #427 gives cross-repo sync an *owner and a machine surface*: a
 code-native, cron-scheduled pass that reviews the peer repositories' boards and
 produces a provenance-carrying report — instead of "the peers' boards point at

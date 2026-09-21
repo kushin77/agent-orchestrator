@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Lane isolation command line — mint, provision, export, audit, landed, close (#263).
 
+---knowledge---
+module_id: governance.isolation.cli
+system: governance
+app: isolation
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state, declared-authority, lane-isolation, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [lane_base, lane_own_commits, foreign_authored_commits, audit_lane_full, unregistered_runtime, cmd_open, cmd_env, cmd_audit, cmd_list, cmd_landed, (+5 more)]
+invariants: ""
+gotchas: ""
+related: ["#263", "#287", "#516", "#699", "#739", "#834"]
+do_not_duplicate: null
+---knowledge---
+
 Typical use, from the execution loop:
 
     python3 governance/isolation/cli.py open --issue 263 --agent copilot-brain --lane governance-isolation

@@ -1,5 +1,21 @@
 """The notice record, the ack record, and the evaluator the gate drives.
 
+---knowledge---
+module_id: governance.notices.notice_records
+system: governance
+app: notices
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, declared-authority]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [NoticeError, Notice, Report, utc_now, notices_dir, notice_dir, notice_path, pending_path, ack_path, validate_notice, (+4 more)]
+invariants: ""
+gotchas: ""
+related: ["#1268", "#1269"]
+do_not_duplicate: null
+---knowledge---
+
 THE RULE (issue #1269, EPIC #1268)
 ----------------------------------
 A standing notice is a RULE between runtimes, and it is only a rule when every

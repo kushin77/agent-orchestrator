@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Authority model — repo separation, scoped admin rights, SoD and closure.
 
+---knowledge---
+module_id: governance.authority.model
+system: governance
+app: authority
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AuthorityError, SchemaError, MatrixLoadError, Verdict, Decision, allow, deny, cannot_assess, assert_schema_supported, validate_instance, (+17 more)]
+invariants: ""
+gotchas: ""
+related: ["#144", "#150", "#1494"]
+do_not_duplicate: null
+---knowledge---
+
 Productizes the repo-separation doctrine of issue #150 (EPIC-00 #144) into an
 offline, deterministic enforcement engine over a schema-validated authority
 matrix (``governance/authority/matrix.yaml``):

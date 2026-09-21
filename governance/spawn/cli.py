@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Spawn envelope command line — the LOCAL spawn path, and the refusal it shares.
 
+---knowledge---
+module_id: governance.spawn.cli
+system: governance
+app: spawn
+solution_class: enterprise
+patterns: [provoked-negative-control, honesty-tri-state, offline-hermetic, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_open, cmd_build, cmd_check, cmd_render, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1301", "#1413"]
+do_not_duplicate: null
+---knowledge---
+
 Typical use, by an agent about to spawn a subagent locally:
 
     python3 governance/spawn/cli.py open --issue 793 --agent me --lane spawn-envelope

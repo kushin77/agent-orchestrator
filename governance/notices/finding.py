@@ -1,5 +1,21 @@
 """One refusal shape, shared by every module of the notice rule (issue #1269).
 
+---knowledge---
+module_id: governance.notices.finding
+system: governance
+app: notices
+solution_class: class
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Finding]
+invariants: ""
+gotchas: ""
+related: ["#1269"]
+do_not_duplicate: null
+---knowledge---
+
 A refusal is NAMED: ``str(finding)`` is ``code:subject`` and nothing else, so the
 refusal a gate greps is the refusal a human reads -- a reason appended to the name
 would make every needle depend on prose. The prose rides in ``reason`` and reaches

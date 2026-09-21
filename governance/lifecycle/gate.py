@@ -1,5 +1,21 @@
 """The gate's exit vocabulary, consumed by the close-out that asks it for evidence.
 
+---knowledge---
+module_id: governance.lifecycle.gate
+system: governance
+app: lifecycle
+solution_class: enterprise
+patterns: [honesty-tri-state, declared-authority, lane-isolation, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CannotAssess, interrupted, verdict_of, declared_verdict, verdict_of_run, reason_of, cap_of, retry_budget, GateAttempt, GateRun, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#724", "#836", "#840"]
+do_not_duplicate: null
+---knowledge---
+
 Close-out has exactly one question for the repository gate: *was this tree green?*
 To answer it, step 2 runs ``make verify`` in the lane worktree and reads the exit
 code. Until #840 the whole implementation was "non-zero means no green

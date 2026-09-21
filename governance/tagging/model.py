@@ -1,5 +1,21 @@
 """Tag authority domain model (issue #1175).
 
+---knowledge---
+module_id: governance.tagging.model
+system: governance
+app: tagging
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TaggingUnavailable, Finding, errors, warnings, resolve_pointer, filing_drift, Anchor, Dimension, Taxonomy, load_taxonomy, (+18 more)]
+invariants: ""
+gotchas: ""
+related: ["#698", "#1175", "#1182", "#1183"]
+do_not_duplicate: null
+---knowledge---
+
 The model keeps three ideas apart, because collapsing them is how a tagging
 system becomes a label list nobody reads:
 

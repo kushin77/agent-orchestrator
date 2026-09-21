@@ -1,5 +1,21 @@
 """Eligibility: is this issue the next step in the active dependency chain?
 
+---knowledge---
+module_id: governance.dispatch.order
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [provoked-negative-control, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [frontier, claimable_frontier, unclaimable_frontier, active_milestone, eligible, advance_candidates, WavePlan, wave_plan, closed_parent_remedy, dangling_on_closed_parent, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#132", "#701", "#707", "#721", "#726", "#740"]
+do_not_duplicate: null
+---knowledge---
+
 Rule (AGENTS.md golden rule 14 / GR-20): an agent may work an issue only when it
 is (a) a child of an issue the agent already holds open, (b) the successor of an
 issue the agent already took through the chain, (c) a child of the ACTIVE epic

@@ -1,5 +1,21 @@
 """The one ``Violation`` shape shared by the lane audit and its extensions.
 
+---knowledge---
+module_id: governance.isolation.violation
+system: governance
+app: isolation
+solution_class: class
+patterns: [lane-isolation, commit-trailer]
+derives_from: governance/isolation/audit.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [Violation]
+invariants: ""
+gotchas: ""
+related: ["#885"]
+do_not_duplicate: null
+---knowledge---
+
 Split out from :mod:`governance.isolation.audit` so a module that needs to
 report a named finding (e.g. :mod:`governance.isolation.speculative`) does not
 have to import the audit module itself and risk a cycle back into it.

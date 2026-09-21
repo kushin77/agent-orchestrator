@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """CTO overlay engine — four-layer per-repo governance with a truthful verdict.
 
+---knowledge---
+module_id: governance.cto-overlay.overlay
+system: governance
+app: cto-overlay
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state, fail-closed, offline-hermetic]
+derives_from: null
+owner_sme: cto
+tier: L1
+interfaces: [ConfigError, Indeterminate, EngineError, SchemaValidator, CheckSpec, LayerSpec, OverlayConfig, load_config, Context, run_command, (+31 more)]
+invariants: ""
+gotchas: ""
+related: ["#144", "#147", "#1721"]
+do_not_duplicate: null
+---knowledge---
+
 Issued as kushin77/agent-orchestrator#147 (parent #144). The overlay is a
 drop-in governance layer: a repository carries `governance/cto-overlay/`
 (this directory) and inherits four layers — executive, engineering, devops,

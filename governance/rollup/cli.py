@@ -1,5 +1,21 @@
 """Operator CLI for the enterprise/GDC roll-up (issue #151).
 
+---knowledge---
+module_id: governance.rollup.cli
+system: governance
+app: rollup
+solution_class: pattern
+patterns: [honesty-tri-state]
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [cmd_project, cmd_validate, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#151"]
+do_not_duplicate: null
+---knowledge---
+
     python3 governance/rollup/cli.py project        # the org view (pilot inputs)
     python3 governance/rollup/cli.py project --org … --inventory-dir …
     python3 governance/rollup/cli.py validate       # declarations only

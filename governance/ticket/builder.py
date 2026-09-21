@@ -1,5 +1,21 @@
 """The ticket projection builder (issue #401).
 
+---knowledge---
+module_id: governance.ticket.builder
+system: governance
+app: ticket
+solution_class: enterprise
+patterns: [provoked-negative-control, deterministic, bounded-work]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [Projection, VerifyResult, build, verify]
+invariants: ""
+gotchas: ""
+related: ["#401"]
+do_not_duplicate: null
+---knowledge---
+
 A projection is a *pure function of the committed ledgers*: two builds over one
 revision are byte-identical, and the projected store can be deleted and rebuilt
 to the same hash. That is what makes the ticket a **join**, not a second source

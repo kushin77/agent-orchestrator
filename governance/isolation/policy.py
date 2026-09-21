@@ -1,5 +1,21 @@
 """The lane-isolation surface's declared control policy — read, never duplicated (issue #885).
 
+---knowledge---
+module_id: governance.isolation.policy
+system: governance
+app: isolation
+solution_class: pattern
+patterns: [no-false-green, honesty-tri-state, declared-authority, lane-isolation, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PolicyUnavailable, IsolationControls, load]
+invariants: ""
+gotchas: ""
+related: ["#885"]
+do_not_duplicate: null
+---knowledge---
+
 `identity.py` and `speculative.py` used to hard-code the thresholds that
 decide isolation (the repo slug a "Refs" trailer points at, the branch and
 worktree naming prefixes, the reserved signature domain, the session-id

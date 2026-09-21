@@ -1,5 +1,21 @@
 """Assemble the federated registry — and answer membership honestly.
 
+---knowledge---
+module_id: governance.modules.registry
+system: governance
+app: modules
+solution_class: enterprise
+patterns: [deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [load_targets, load_register, build, render, findings, by_disposition, membership]
+invariants: ""
+gotchas: ""
+related: ["#591", "#952"]
+do_not_duplicate: null
+---knowledge---
+
 The registry is assembled from four surfaces, in this precedence:
 
 1. **the hub catalog** (``vendor/CMR/catalog``) — the authority on what a module

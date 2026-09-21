@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Sync plan/apply seam (issue #44, acceptance criterion 4).
 
+---knowledge---
+module_id: governance.sync.sync_plan
+system: governance
+app: sync
+solution_class: enterprise
+patterns: [offline-hermetic, dry-run-default, injected-effects]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [SyncPlanError, ContentUnavailableError, ReconcileAction, plan_provenance_sync, SyncEngine, AssetMaterializer, PackSyncAdapter]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The scheduled reconciler that keeps each consumer/tenant at a desired set of
 assets or packs. This tree owns the reconciliation *policy*; the primitives
 (install/upgrade/rollback for agent packs) are owned by ``registry/packs``

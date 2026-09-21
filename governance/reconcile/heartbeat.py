@@ -1,5 +1,21 @@
 """Per-session heartbeats — how a dead lane becomes visible (issue #304).
 
+---knowledge---
+module_id: governance.reconcile.heartbeat
+system: governance
+app: reconcile
+solution_class: enterprise
+patterns: [lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [now_epoch, iso, Session, Verdict, sessions_dir, path_for, stamp, read, list_sessions, clear, (+5 more)]
+invariants: ""
+gotchas: ""
+related: ["#304", "#917"]
+do_not_duplicate: null
+---knowledge---
+
 The fleet already beats per *rung*: `sister.heartbeat.json` and
 `brain.heartbeat.json` prove the loops are up. What did not exist is a beat per
 *dispatched lane*, so an orphaned worktree, a dead agent's claim and a stale

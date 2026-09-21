@@ -1,4 +1,21 @@
 """Cross-reference spine: typed relationship edges between knowledge nodes
+
+---knowledge---
+module_id: governance.knowledge.crossref
+system: governance
+app: knowledge
+solution_class: enterprise
+patterns: [deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [board_issue_numbers, ledger_records, adr_ids, gr_id_present, load_catalog, resolve_target, classify_marker_target, parse_markers, marker_findings, iter_tracked_markdown, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#138", "#384", "#402"]
+do_not_duplicate: null
+---knowledge---
+
 (EPIC #138, issue #384).
 
 The index catalogue carries *items* (nodes); this module carries the *edges*.

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Renderer + gate for the shared-frontend mandatory onboarding (issue #703).
 
+---knowledge---
+module_id: governance.onboarding.shared-frontend.render
+system: governance
+app: onboarding
+solution_class: enterprise
+patterns: [honesty-tri-state, lane-isolation]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [CannotAssess, sha256_bytes, read_bytes, load_yaml, default_repo_root, validate_template, validate_instance, validate_vocabulary, resolve_params, provenance_findings, (+8 more)]
+invariants: ""
+gotchas: ""
+related: ["#464", "#475", "#703"]
+do_not_duplicate: null
+---knowledge---
+
 WHAT THIS IS
 ------------
 One parameterized template (``template.yaml``) renders the two mandatory

@@ -1,5 +1,21 @@
 """The board's liveness contract and the state of its producers (issue #1179).
 
+---knowledge---
+module_id: governance.dispatch.liveness
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Declaration, Crontab, Liveness, read_manifest, declaration, read_crontab, assess]
+invariants: ""
+gotchas: ""
+related: ["#727", "#1179"]
+do_not_duplicate: null
+---knowledge---
+
 WHY THIS MODULE EXISTS
     ``governance/dispatch/snapshot.py`` refuses an answer derived from a board
     snapshot older than ``SNAPSHOT_STALENESS_MINUTES`` (15; declared once in

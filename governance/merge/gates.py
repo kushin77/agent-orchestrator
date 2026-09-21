@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Review gates + C-suite escalation on the tenant task lifecycle (issue #635).
 
+---knowledge---
+module_id: governance.merge.gates
+system: governance
+app: merge
+solution_class: enterprise
+patterns: [honesty-tri-state, declared-authority, fail-closed, injected-effects, bounded-work]
+derives_from: null
+owner_sme: code-review-sme
+tier: L1
+interfaces: [EscalationRole, EscalationTrigger, EscalationError, EscalationTerminated, GateBlocked, Escalation, root_escalation, escalation_chain, ReviewGateOutcome, review_gate, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#631", "#634", "#635"]
+do_not_duplicate: null
+---knowledge---
+
 Workbook-4 of the Paperclip enterprise-workbook delta (parent #631).  Workbook-3
 (issue #634, ``engine/core/tickets``) shipped the tenant task lifecycle
 ``created -> decomposed -> dispatched -> executed -> reviewed -> closed`` with a

@@ -1,5 +1,21 @@
 """Ticket projection model — the paperclip ticket as the single join node.
 
+---knowledge---
+module_id: governance.ticket.model
+system: governance
+app: ticket
+solution_class: enterprise
+patterns: [declared-authority, projection-not-authority, offline-hermetic, deterministic, bounded-work]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [Contribution, Violation, ProjectionWarning, CannotAssess, Contract, load_contract, issue_id, issue_number, short_ref, is_populated, (+4 more)]
+invariants: ""
+gotchas: ""
+related: ["#399", "#401", "#1077"]
+do_not_duplicate: null
+---knowledge---
+
 Issue #401 (EPIC #399, M26); the decision is
 :doc:`docs/decision-records/ADR-0014-ticket-single-join-node-contract-v2.md` and
 the frozen shape is ``docs/contracts/paperclip/ticket.schema.json`` (contract v2).

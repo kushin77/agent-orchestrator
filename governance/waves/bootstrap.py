@@ -1,5 +1,21 @@
 """Wave-bootstrap report (issue #181, gap 2): the delta query, code-native.
 
+---knowledge---
+module_id: governance.waves.bootstrap
+system: governance
+app: waves
+solution_class: pattern
+patterns: [offline-hermetic, deterministic]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [load_pins, offline_report, fetch_remote_deltas, build_report]
+invariants: ""
+gotchas: ""
+related: ["#181"]
+do_not_duplicate: null
+---knowledge---
+
 Each wave starts by running a report of what changed in the deepseek and
 code-indexing modules since the last wave, plus the codeidx context-pack
 deltas. The report is an **artefact**, not a conversation (sync rule 1).

@@ -1,5 +1,21 @@
 """Fail-closed JSON-Schema validation for the roll-up inputs (issue #151).
 
+---knowledge---
+module_id: governance.rollup.schema
+system: governance
+app: rollup
+solution_class: pattern
+patterns: [no-false-green, fail-closed, deterministic]
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [SchemaUnsupported, InputInvalid, check_keywords, definition, validate]
+invariants: ""
+gotchas: ""
+related: ["#151"]
+do_not_duplicate: null
+---knowledge---
+
 The roll-up is only as trustworthy as its inputs, so the inputs are validated
 against ``governance/rollup/schema.yaml`` before any aggregate is computed. Two
 properties matter more than coverage:

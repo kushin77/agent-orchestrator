@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Offline merge-governance engine (EPIC-00 issue #43, phase 8).
 
+---knowledge---
+module_id: governance.merge.engine
+system: governance
+app: merge
+solution_class: pattern
+patterns: [no-false-green, offline-hermetic, injected-effects]
+derives_from: null
+owner_sme: code-review-sme
+tier: L1
+interfaces: [MergeGovernanceResult, MergeGovernanceEngine]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Drives a PR through the merge-governance state machine with *injected*
 runtime signals so the whole pipeline runs offline (no network, no live
 GitHub API — where ``gh`` behavior is referenced, it is injected):

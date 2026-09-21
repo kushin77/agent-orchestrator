@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Wave sync CLI — bootstrap report + wave ledger (issue #181).
 
+---knowledge---
+module_id: governance.waves.cli
+system: governance
+app: waves
+solution_class: pattern
+patterns: [no-false-green, honesty-tri-state, offline-hermetic]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [cmd_bootstrap, cmd_ledger_append, cmd_ledger_query, main]
+invariants: ""
+gotchas: ""
+related: ["#181"]
+do_not_duplicate: null
+---knowledge---
+
 Tri-state exit codes (repo convention, GR-12):
 
 * ``0`` — OK (report written, record appended, query matched)

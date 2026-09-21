@@ -1,5 +1,21 @@
 """Knowledge-index domain model (issue #139 / M24).
 
+---knowledge---
+module_id: governance.knowledge.model
+system: governance
+app: knowledge
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Finding, errors, warnings, Provenance, Relationship, KnowledgeItem, Coverage, Index]
+invariants: ""
+gotchas: ""
+related: ["#139"]
+do_not_duplicate: null
+---knowledge---
+
 The index is the program's authoritative catalogue of institutional knowledge:
 its kinds, the provenance record every item must carry, and the findings that
 make an invalid index fail loudly rather than quietly.

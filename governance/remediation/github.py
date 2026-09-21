@@ -1,5 +1,21 @@
 """Routing remediation issues to GitHub (issue #142).
 
+---knowledge---
+module_id: governance.remediation.github
+system: governance
+app: remediation
+solution_class: pattern
+patterns: [no-false-green, dry-run-default, injected-effects]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [RoutingResult, existing_remediation_issues, find_existing, create_issue, comment_issue, escalate_issue, route]
+invariants: ""
+gotchas: ""
+related: ["#142"]
+do_not_duplicate: null
+---knowledge---
+
 The only network-touching path in this package, matching the convention in
 `governance/dispatch/snapshot.py`: an injectable ``runner`` (defaulting to
 ``subprocess.run``) so the routing logic is testable without a real ``gh``

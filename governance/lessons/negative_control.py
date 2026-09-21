@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The provoked negative control for the board/incident rule (issue #766).
 
+---knowledge---
+module_id: governance.lessons.negative_control
+system: governance
+app: lessons
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [Case, probe_area_label_is_not_an_incident, probe_record_label_without_a_record_is_refused, probe_ledger_incident_without_rca_is_refused, probe_record_label_with_a_record_is_accepted, probe_open_record_label_is_a_deviation, probe_exemptions_cannot_be_declared, probe_area_label_cannot_be_the_record_label, probe_shipped_policy_declares_the_record_label, probe_real_board_has_no_unrecorded_record_label, (+33 more)]
+invariants: ""
+gotchas: ""
+related: ["#141", "#494", "#495", "#497", "#766", "#900"]
+do_not_duplicate: null
+---knowledge---
+
 An AREA label was used as an incident marker: ``area:incident-response`` says
 where work *lives*, and the gate read it as "this issue *records* an incident,
 so it must carry an RCA". Four issues carried it and all four are work items, so

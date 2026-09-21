@@ -1,5 +1,21 @@
 """Session identity — the mint that ties one agent to exactly one issue.
 
+---knowledge---
+module_id: governance.isolation.identity
+system: governance
+app: isolation
+solution_class: enterprise
+patterns: [no-false-green, deterministic, lane-isolation, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [IdentityRefused, branch_for, branch_issue, session_id_for, worktree_name_for, commit_trailer, SessionIdentity, mint]
+invariants: ""
+gotchas: ""
+related: ["#885", "#917", "#934", "#1301"]
+do_not_duplicate: null
+---knowledge---
+
 Every fleet agent session is an *identity*, not an anonymous process: a session
 id, the issue it is bound to, the canonical branch for that issue, the worktree
 that branch is checked out in, and the git signature every commit it makes must

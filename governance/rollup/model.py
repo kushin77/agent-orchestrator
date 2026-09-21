@@ -1,5 +1,21 @@
 """The enterprise/GDC roll-up projection engine (issue #151).
 
+---knowledge---
+module_id: governance.rollup.model
+system: governance
+app: rollup
+solution_class: enterprise
+patterns: [honesty-tri-state, declared-authority, projection-not-authority, bounded-work]
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [money, InputUnreadable, Finding, finding, SmeFact, RepoFleet, Org, SpendView, RatioView, TenantRollup, (+5 more)]
+invariants: ""
+gotchas: ""
+related: ["#151"]
+do_not_duplicate: null
+---knowledge---
+
 Repos hold fleets; fleets belong to tenants; tenants belong to the
 enterprise/GDC org. This module computes the org-level view of that hierarchy
 from **declared inputs only**, and it computes nothing else — no discovery, no

@@ -1,5 +1,21 @@
 """Session reconciliation — heartbeats, TTL sweep, teardown, lock release (#304).
 
+---knowledge---
+module_id: governance.reconcile
+system: governance
+app: reconcile
+solution_class: template
+patterns: [lane-isolation, explain-every-artifact]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#304", "#628"]
+do_not_duplicate: null
+---knowledge---
+
 `governance/isolation` opens a lane and `governance/lifecycle` closes one that
 finished. This package handles the third case: a lane whose agent **died**. See
 ``README.md`` for the contract, ``heartbeat.py`` for detection, ``sweep.py`` for

@@ -1,5 +1,21 @@
 """The runtime vocabulary a lane record's ``runtime`` field is validated against (#1301).
 
+---knowledge---
+module_id: governance.isolation.runtimes
+system: governance
+app: isolation
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RegistryUnreadable, runtime_ids, registry_source, unregistered]
+invariants: ""
+gotchas: ""
+related: ["#1271", "#1301"]
+do_not_duplicate: null
+---knowledge---
+
 A lane is bound to one lane at creation whatever runtime opened it — a Claude
 session, a Claude subagent, the DeepSeek sister or executor, a Copilot agent,
 hermes, paperclip — and the record names that runtime as a registry id, never as

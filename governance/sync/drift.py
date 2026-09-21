@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Drift detection for vendored/mirrored assets (issue #44, criterion 2).
 
+---knowledge---
+module_id: governance.sync.drift
+system: governance
+app: sync
+solution_class: pattern
+patterns: [honesty-tri-state, offline-hermetic, dry-run-default]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [check_asset, check_manifest]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Compares each asset a consumer vendors against its recorded canonical source
 and reports an honest tri-state:
 

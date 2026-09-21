@@ -1,5 +1,21 @@
 """The notice rule's declared vocabulary, held to the code AND to its provocations.
 
+---knowledge---
+module_id: governance.notices.controls
+system: governance
+app: notices
+solution_class: pattern
+patterns: [provoked-negative-control, no-false-green, offline-hermetic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ControlsUnavailable, Controls, load, check]
+invariants: ""
+gotchas: ""
+related: ["#1269"]
+do_not_duplicate: null
+---knowledge---
+
 Issue #1269. ``controls.yaml`` is the declaration; this module is the machine that
 refuses it when it stops being true. Two questions are asked, and both must be
 answerable offline:

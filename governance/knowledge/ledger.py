@@ -1,5 +1,21 @@
 """Audit ledger for knowledge-surface CMR pin sync events (issue #887).
 
+---knowledge---
+module_id: governance.knowledge.ledger
+system: governance
+app: knowledge
+solution_class: pattern
+patterns: [append-only-ledger, no-false-green]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LedgerError, LedgerEvent, now_iso, validate_event, append_event, read_ledger]
+invariants: ""
+gotchas: ""
+related: ["#887"]
+do_not_duplicate: null
+---knowledge---
+
 Every :mod:`live_sync` check (drift-free or drifted) and every
 vendor-compliance gap measurement (:mod:`knowledge_controls`) is appended
 here as one JSON line — an append-only record of what the knowledge surface

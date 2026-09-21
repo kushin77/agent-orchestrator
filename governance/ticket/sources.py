@@ -1,5 +1,21 @@
 """Read-only source readers for the ticket projection (issue #401).
 
+---knowledge---
+module_id: governance.ticket.sources
+system: governance
+app: ticket
+solution_class: enterprise
+patterns: [offline-hermetic, bounded-work]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [read_board, board_contributions, read_claims, LessonIndex, read_lessons, read_budgets, read_attestations, read_derived]
+invariants: ""
+gotchas: ""
+related: ["#401", "#402"]
+do_not_duplicate: null
+---knowledge---
+
 Each reader is a **producer** whose name is exactly the ``authority`` value the
 frozen contract pins for the fields it supplies — that is what makes the
 ``authority{}`` rule checkable: the projection compares the producers that

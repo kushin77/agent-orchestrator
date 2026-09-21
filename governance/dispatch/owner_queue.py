@@ -1,5 +1,21 @@
 """The owner's committed dispatch queue (issue #928).
 
+---knowledge---
+module_id: governance.dispatch.owner_queue
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [idempotent]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [QueueError, load, validate, overlay, queue_blockers_open, queue_detail, next_claimable, prune_closed_text]
+invariants: ""
+gotchas: ""
+related: ["#878", "#928", "#1113"]
+do_not_duplicate: null
+---knowledge---
+
 `order.py`/`claims.py` already refuse an out-of-order `claim` when
 `Issue.blocked_by` is populated (`order.py:120` `REASON_BLOCKED`,
 `claims.py:487` `raise ClaimRefused(REASON_BLOCKED, ...)`). But nothing

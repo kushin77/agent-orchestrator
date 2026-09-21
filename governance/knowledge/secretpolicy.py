@@ -1,5 +1,21 @@
 """Secret policy for indexed material (issue #139).
 
+---knowledge---
+module_id: governance.knowledge.secretpolicy
+system: governance
+app: knowledge
+solution_class: class
+patterns: [injected-effects]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SecretFinding, scan_text, scan_file]
+invariants: ""
+gotchas: ""
+related: ["#139"]
+do_not_duplicate: null
+---knowledge---
+
 `make verify` already greps the tree for secrets. The indexer needs its own gate
 for a different reason: an asset that is *registered as institutional knowledge*
 must not carry credentials, because the catalogue is what people and agents trust

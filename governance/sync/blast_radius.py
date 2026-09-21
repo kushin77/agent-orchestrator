@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Blast-radius engine (issue #44, acceptance criterion 3).
 
+---knowledge---
+module_id: governance.sync.blast_radius
+system: governance
+app: sync
+solution_class: pattern
+patterns: [no-false-green, offline-hermetic, dry-run-default]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [BlastRadiusError, BlastRadiusEngine]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 When a change is proposed to a shared/provenance asset, the blast-radius
 engine computes the set of consumers and dependent assets that change would
 affect — before anything is applied — so a change to a widely-consumed asset

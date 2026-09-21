@@ -1,5 +1,21 @@
 """CLI for the ticket projection (issue #401).
 
+---knowledge---
+module_id: governance.ticket.cli
+system: governance
+app: ticket
+solution_class: pattern
+patterns: [provoked-negative-control, honesty-tri-state, deterministic, bounded-work]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [main]
+invariants: ""
+gotchas: ""
+related: ["#401", "#1077", "#1692"]
+do_not_duplicate: null
+---knowledge---
+
 ``project`` writes the projection; ``verify`` re-derives it, proves the store is
 rebuildable and fails on any difference. ``freshness`` states the age this
 consumer tolerates on the committed board snapshot and refuses a snapshot outside

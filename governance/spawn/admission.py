@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The three judges, called AT the spawn point (issue #1413).
 
+---knowledge---
+module_id: governance.spawn.admission
+system: governance
+app: spawn
+solution_class: enterprise
+patterns: [no-false-green, fail-closed, offline-hermetic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [AdmissionUnavailable, declared_runtime, declared_role, declared_task_class, declared_actor, declared_tier, declared_model, actor_findings, tier_findings, allowlist_findings, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#1272", "#1273", "#1275", "#1301", "#1371", "#1372"]
+do_not_duplicate: null
+---knowledge---
+
 #1377 (per-runtime allowlists), #1372 (``tiering.judge``) and #1371
 (``resolve_actor``) each landed a judge, and each reported the same gap: the
 Claude-subagent admission point is ``governance/spawn/model.py``

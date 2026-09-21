@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Remediation CLI — auto-generate violator remediation issues (issue #142).
 
+---knowledge---
+module_id: governance.remediation.cli
+system: governance
+app: remediation
+solution_class: pattern
+patterns: [no-false-green, honesty-tri-state, offline-hermetic, dry-run-default]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [now_iso, write_report, cmd_scan, cmd_route, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#140", "#142"]
+do_not_duplicate: null
+---knowledge---
+
 Consumes `governance/conformance` findings (issue #140) — board conformance
 and change-set mandate checks — and turns them into remediation issue
 payloads, deduped/merged across repeated findings, routed to GitHub with

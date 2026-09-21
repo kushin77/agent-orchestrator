@@ -1,5 +1,21 @@
 """The tag authority's append-only ledger (issue #1175).
 
+---knowledge---
+module_id: governance.tagging.ledger
+system: governance
+app: tagging
+solution_class: pattern
+patterns: [append-only-ledger, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LedgerRefused, ledger_path, row, semantic_problems, append, record, read, summarise]
+invariants: ""
+gotchas: ""
+related: ["#1175"]
+do_not_duplicate: null
+---knowledge---
+
 Every decision the authority makes — a plan derived, a board judged — is recorded
 as one row, in order, and never rewritten. The ledger is what turns "the tagging
 system says this tag set owes these gates" from an assertion into a record anyone

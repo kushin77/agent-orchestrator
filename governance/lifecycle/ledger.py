@@ -1,5 +1,21 @@
 """The lifecycle's append-only decision trail (issue #885).
 
+---knowledge---
+module_id: governance.lifecycle.ledger
+system: governance
+app: lifecycle
+solution_class: pattern
+patterns: [provoked-negative-control, append-only-ledger, honesty-tri-state]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LedgerUnavailable, render, append, record_decision, read_all]
+invariants: ""
+gotchas: ""
+related: ["#591", "#885"]
+do_not_duplicate: null
+---knowledge---
+
 ``governance/lifecycle/audit.py`` already carries an audit — the *board hygiene*
 audit, which names every item that did not close cleanly. This is a different
 trail, at a different layer: not "what is broken on the board" but "what this

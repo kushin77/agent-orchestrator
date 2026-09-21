@@ -1,5 +1,21 @@
 """End-to-end integration proof — the whole tagging chain in one offline run.
 
+---knowledge---
+module_id: governance.tagging.e2e
+system: governance
+app: tagging
+solution_class: pattern
+patterns: [provoked-negative-control, honesty-tri-state, offline-hermetic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main]
+invariants: ""
+gotchas: ""
+related: ["#1182"]
+do_not_duplicate: null
+---knowledge---
+
 The tag authority's gates each prove one link: `tagging-lint` the vocabulary,
 `tagging-refusals` the refusals, `tagging-mandate` the constitution. This module
 proves the CHAIN — that a tag set, fed into the real machinery, produces a plan

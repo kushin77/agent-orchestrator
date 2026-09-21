@@ -1,4 +1,21 @@
 """Point the disk audit at the REAL tree, with a reviewed, provenanced baseline
+
+---knowledge---
+module_id: governance.reconcile.real_tree_baseline
+system: governance
+app: reconcile
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state, fail-closed, offline-hermetic, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BaselineUnavailable, QuarantineUnavailable, BaselineEntry, QuarantineEntry, QuarantineVenue, QuarantineLease, RealTreeVerdict, branch_tip, worktree_head, artifact_tip, (+7 more)]
+invariants: ""
+gotchas: ""
+related: ["#628", "#740", "#830", "#885", "#1050", "#1118"]
+do_not_duplicate: null
+---knowledge---
+
 (#740, item 1 of the "Bounded proposal").
 
 Every invocation of ``audit()`` in ``scripts/check-reconcile.sh`` runs against a

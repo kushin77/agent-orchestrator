@@ -1,5 +1,21 @@
 """Institutional lane isolation for the fleet (issue #263).
 
+---knowledge---
+module_id: governance.isolation
+system: governance
+app: isolation
+solution_class: template
+patterns: [lane-isolation, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#263"]
+do_not_duplicate: null
+---knowledge---
+
 An agent session is a minted identity bound to a GitHub issue, running in its
 own ``git worktree`` on a branch named for that issue, committing under that
 session's own signature. See ``README.md`` for the contract and

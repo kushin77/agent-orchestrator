@@ -1,5 +1,21 @@
 """Live module-registry admission pin probe (issue #889, lane L10).
 
+---knowledge---
+module_id: governance.modules.sync.live
+system: governance
+app: modules
+solution_class: class
+patterns: [no-false-green]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [AdmissionOverclaim, UnknownAdmissionTarget, probe]
+invariants: ""
+gotchas: ""
+related: ["#889"]
+do_not_duplicate: null
+---knowledge---
+
 Reads two real, committed stores on every call:
 
 * the **admission register** — root ``module.json`` ``submodules``, via

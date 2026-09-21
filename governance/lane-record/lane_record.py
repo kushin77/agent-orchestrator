@@ -1,4 +1,21 @@
 """The lane record -- ONE schema for the lane brief and the lane result
+
+---knowledge---
+module_id: governance.lane-record.lane_record
+system: governance
+app: lane-record
+solution_class: enterprise
+patterns: [provoked-negative-control, honesty-tri-state, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SchemaUnavailable, RecordsUnreadable, RegistryUnavailable, Finding, load_schema, schema_for, mirror_problems, runtime_ids, records_dir, read_one, (+7 more)]
+invariants: ""
+gotchas: ""
+related: ["#1268", "#1270"]
+do_not_duplicate: null
+---knowledge---
+
 (issue #1270, EPIC #1268).
 
 THE RULE

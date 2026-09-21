@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The landing engine (#764): one green lane, landed, with no human step.
 
+---knowledge---
+module_id: governance.landing.engine
+system: governance
+app: landing
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state, declared-authority, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Step, LandingRequest, LandingResult, LandingEngine, describe]
+invariants: ""
+gotchas: ""
+related: ["#269", "#764", "#998", "#1054", "#1072", "#1114"]
+do_not_duplicate: null
+---knowledge---
+
     push -> open PR -> pre-merge contract -> merge decision -> squash-merge
          -> delete the source branch -> lifecycle close
 

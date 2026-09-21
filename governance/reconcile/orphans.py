@@ -1,4 +1,21 @@
 """The orphan walk — every artifact kind, classified by name, reclaimed only with
+
+---knowledge---
+module_id: governance.reconcile.orphans
+system: governance
+app: reconcile
+solution_class: enterprise
+patterns: [honesty-tri-state, fail-closed, deterministic, dry-run-default, injected-effects]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [venue_classify, Signal, Use, judge_use, Worktree, PullRequest, Directive, Orphan, OrphanReport, Unmeasured, (+6 more)]
+invariants: ""
+gotchas: ""
+related: ["#628", "#1254", "#1265", "#1301", "#1335", "#1436"]
+do_not_duplicate: null
+---knowledge---
+
 evidence, red above a declared budget (#1301 step 3).
 
 ``sweep`` reconciles *sessions* that beat; ``audit`` (#628) explains worktrees

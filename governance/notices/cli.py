@@ -1,5 +1,21 @@
 """Notice verbs (issue #1269): the surface a runtime's transport or the director drives.
 
+---knowledge---
+module_id: governance.notices.cli
+system: governance
+app: notices
+solution_class: enterprise
+patterns: [provoked-negative-control, honesty-tri-state]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_runtimes, cmd_publish, cmd_ack, cmd_evaluate, cmd_ledger, cmd_controls, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1268", "#1269"]
+do_not_duplicate: null
+---knowledge---
+
     python3 governance/notices/cli.py runtimes            # who is registered, and why
     python3 governance/notices/cli.py publish --id <id> --subject <text> --body <text>
     python3 governance/notices/cli.py ack --notice <id> --runtime <id> --evidence <what was read>

@@ -1,4 +1,21 @@
 """The lane's session — stamped by ``open``, cleared by close-out, judged by the
+
+---knowledge---
+module_id: governance.isolation.session
+system: governance
+app: isolation
+solution_class: pattern
+patterns: [no-false-green, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [default_ttl_minutes, stamp_for, clear_for, read_for, session_gone]
+invariants: ""
+gotchas: ""
+related: ["#917"]
+do_not_duplicate: null
+---knowledge---
+
 audit (issue #917).
 
 Measured on the shared checkout, 2026-09-16: ``.fleet/sessions/`` held **0**

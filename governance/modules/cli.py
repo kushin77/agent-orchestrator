@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """``governance/modules/cli.py`` — the ecosystem module registry's machine surface.
 
+---knowledge---
+module_id: governance.modules.cli
+system: governance
+app: modules
+solution_class: enterprise
+patterns: [append-only-ledger, honesty-tri-state, offline-hermetic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main]
+invariants: ""
+gotchas: ""
+related: ["#445", "#591"]
+do_not_duplicate: null
+---knowledge---
+
     python3 governance/modules/cli.py build                 # canonical registry JSON
     python3 governance/modules/cli.py build --out FILE      # … written instead of printed
     python3 governance/modules/cli.py verify                # drift + refusals (gate core)

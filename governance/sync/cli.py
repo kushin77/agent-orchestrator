@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Offline operator CLI for the governance/sync engine (issue #44).
 
+---knowledge---
+module_id: governance.sync.cli
+system: governance
+app: sync
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state, offline-hermetic, dry-run-default]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [cmd_provenance_generate, cmd_provenance_validate, cmd_drift, cmd_blast, cmd_sync_plan, cmd_sync_check, build_parser, main]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Everything runs offline (stdlib + optional PyYAML for spec files). Honest exit
 codes (GR-12 / no-false-green): ``0`` all good, ``1`` findings (drift /
 missing pin / validation error), ``2`` usage or a malformed input.

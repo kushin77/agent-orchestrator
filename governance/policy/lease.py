@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """One declared policy for every fleet lease and TTL (issue #322).
 
+---knowledge---
+module_id: governance.policy.lease
+system: governance
+app: policy
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state, declared-authority, lane-isolation, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Lease, values, Invariant, Mutation, mutation_by_name, violations, scan_findings, scan, cmd_check, cmd_scan, (+5 more)]
+invariants: ""
+gotchas: ""
+related: ["#322", "#740", "#1545"]
+do_not_duplicate: null
+---knowledge---
+
 The fleet honours at least seven independent timings, and their *relationships*
 are load-bearing: a session that is judged orphaned between two rung heartbeats
 loses a live lane, and a claim reaped before its session's TTL destroys work in

@@ -1,5 +1,21 @@
 """The reconcile package's own declared controls — read, never restated (#885).
 
+---knowledge---
+module_id: governance.reconcile.policy
+system: governance
+app: reconcile
+solution_class: pattern
+patterns: [no-false-green, honesty-tri-state, declared-authority, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ControlsUnavailable, Controls, load, dump, main]
+invariants: ""
+gotchas: ""
+related: ["#885"]
+do_not_duplicate: null
+---knowledge---
+
 `governance/policy/lease.py` already owns every timing this worker shares with
 the rest of the fleet. This module reads the two controls that belong to
 `governance/reconcile` alone, from the sibling artifact `controls.yaml`:

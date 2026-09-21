@@ -1,5 +1,21 @@
 """The claim ledger: claim records, the single-claim lock, and the audit.
 
+---knowledge---
+module_id: governance.dispatch.claims
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [provoked-negative-control, append-only-ledger, no-false-green, fail-closed, offline-hermetic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [speculative_claim, ClaimRefused, read_ledger, append_event, active_claims, is_expired, replay, find_file_conflict, reap, expired_claims, (+11 more)]
+invariants: ""
+gotchas: ""
+related: ["#170", "#363", "#601", "#602", "#603", "#604"]
+do_not_duplicate: null
+---knowledge---
+
 * **Claim record** — one JSON object per event. New events are written one file
   per event into ``.board/claims/`` (atomic, collision-proof, one path per
   event), so two concurrent lanes never share a file and a git conflict on the

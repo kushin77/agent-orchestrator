@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Pre-existing suite reds: attributed by MEASUREMENT, never by a claim (#764).
 
+---knowledge---
+module_id: governance.landing.attribution
+system: governance
+app: landing
+solution_class: enterprise
+patterns: [honesty-tri-state, declared-authority, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SuiteResult, Sweep, read_sweep, baseline_cache_path, measure_baseline, write_baseline_record, Attribution, attribute_suites, read_contract_signals, attribute_lane, (+3 more)]
+invariants: ""
+gotchas: ""
+related: ["#603", "#698", "#764"]
+do_not_duplicate: null
+---knowledge---
+
 WHY THIS EXISTS
     ``scripts/merge-gate.sh run`` (the pre-merge contract, issue #29) reports a
     ``tests`` signal that runs ``scripts/run-pytest-suites.sh``. That sweep is RED

@@ -1,5 +1,21 @@
 """Board-snapshot freshness — the age this consumer tolerates (issue #1077).
 
+---knowledge---
+module_id: governance.ticket.freshness
+system: governance
+app: ticket
+solution_class: pattern
+patterns: [provoked-negative-control, no-false-green, fail-closed, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [Freshness, parse_iso, assess]
+invariants: ""
+gotchas: ""
+related: ["#170", "#665", "#727", "#1029", "#1034", "#1043"]
+do_not_duplicate: null
+---knowledge---
+
 ``.board/snapshot.json`` is the **committed, offline stand-in for the live
 board**. Every consumer of it is therefore reading a *point-in-time* artifact
 whose frontier falls behind the board the moment the board moves. That is not a

@@ -1,5 +1,21 @@
 """Worktree provisioning — one lane, one branch, one signature.
 
+---knowledge---
+module_id: governance.isolation.worktree
+system: governance
+app: isolation
+solution_class: enterprise
+patterns: [offline-hermetic, idempotent, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ProvisionRefused, Provision, git, default_worktree_root, main_repo_root, is_linked_worktree, enable_worktree_config, filesystem_type, tmpfs_lane_root, resolve_base, (+19 more)]
+invariants: ""
+gotchas: ""
+related: ["#516", "#830", "#834", "#1265"]
+do_not_duplicate: null
+---knowledge---
+
 The hard part of lane isolation is not creating a worktree; it is making the
 *signature* lane-local. ``git config user.email`` run inside a linked worktree
 writes to the **shared** repository config, so two lanes on one machine would

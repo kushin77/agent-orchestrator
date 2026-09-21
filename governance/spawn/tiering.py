@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """governance/spawn/tiering — one tiers.yaml judges every runtime's spawn (issue #1274).
 
+---knowledge---
+module_id: governance.spawn.tiering
+system: governance
+app: spawn
+solution_class: pattern
+patterns: [honesty-tri-state]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TieringUnavailable, Judgment, allowed_tiers, load_table, default_tier, tier_for_model, judge, main]
+invariants: ""
+gotchas: ""
+related: ["#1274", "#1413"]
+do_not_duplicate: null
+---knowledge---
+
 ``gateway/finops/tiers.yaml`` already carries the cheapest-capable ladder
 (L0/L1/L2), the per-task-class ``defaultTier``/``maxTier`` and the security
 floor. Before this module, that table only gated the fleet's own spawn path

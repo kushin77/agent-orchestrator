@@ -1,5 +1,21 @@
 """Cross-repo execution-boundary detector (issue #125).
 
+---knowledge---
+module_id: governance.board.boundary
+system: governance
+app: board
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state, fail-closed, offline-hermetic]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [BoundaryPolicy, Finding, load_issues, check_issues, main]
+invariants: ""
+gotchas: ""
+related: ["#125", "#126", "#137", "#1254", "#1722"]
+do_not_duplicate: null
+---knowledge---
+
 This module is the **local signal for a signal that is not measurable here**.
 
 Issue #125 is filed in this repo but its backlog is *cross-repo*: it asks this

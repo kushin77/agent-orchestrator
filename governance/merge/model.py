@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Merge-governance state machine + merge policy (EPIC-00 issue #43, phase 8).
 
+---knowledge---
+module_id: governance.merge.model
+system: governance
+app: merge
+solution_class: enterprise
+patterns: [append-only-ledger, no-false-green, honesty-tri-state, declared-authority, offline-hermetic]
+derives_from: null
+owner_sme: code-review-sme
+tier: L1
+interfaces: [PrState, BlockReason, MergeGovernanceError, InvalidTransition, MergeGovernanceViolation, MergeSignals, merge_verdict, MergePr, AuditEntry, status_from_exit_code, (+1 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Productizes the fleet merge doctrine into an offline, deterministic
 PR-lifecycle state machine for the control-plane governance surface
 (``governance/merge``):

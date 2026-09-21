@@ -1,5 +1,21 @@
 """The envelope, rendered as the prompt block a subagent is spawned with.
 
+---knowledge---
+module_id: governance.spawn.render
+system: governance
+app: spawn
+solution_class: enterprise
+patterns: [deterministic, dry-run-default, lane-isolation, commit-trailer, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [standing_block, envelope_block, render, positioning, instructions, prompt]
+invariants: ""
+gotchas: ""
+related: ["#793", "#1145", "#1413"]
+do_not_duplicate: null
+---knowledge---
+
 This is the ONE copy of the spawn prose. Before #793 it lived inline in
 `fleet/terminal.py::build_prompt`, where nothing could check that a spawn had
 carried it: the governance guarantee was "somebody remembered to write it into

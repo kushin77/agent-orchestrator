@@ -1,5 +1,21 @@
 """Ledger -> board linkage (issue #1178).
 
+---knowledge---
+module_id: governance.lessons.linkage
+system: governance
+app: lessons
+solution_class: enterprise
+patterns: [offline-hermetic, deterministic]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [origin_of, orphan_declaration, reachable_issue, goal_of, Row, linkage_map, ledger_named_issues, findings, counts]
+invariants: ""
+gotchas: ""
+related: ["#1178"]
+do_not_duplicate: null
+---knowledge---
+
 The ledger is *the* register of what went wrong and what was learned, but a
 register that cannot be reached from the board is an island: a reader of the
 board cannot find the incident, and a reader of the ledger cannot find the
