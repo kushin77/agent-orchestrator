@@ -35,6 +35,7 @@ for and no other arm produces.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -368,9 +369,42 @@ def test_the_shipped_document_re_measures_its_own_rows():
     if not SHIPPED_DOCUMENT.exists():
         pytest.skip("the exemption document is not present in this checkout")
     lease, entries, venue = load_quarantine(SHIPPED_DOCUMENT)
-    assert venue.git_common_dir == repository_venue(REPO_ROOT), (
-        "this document speaks for another repository instance; re-measure it in the venue it names"
-    )
+
+    if os.path.realpath(venue.git_common_dir) != repository_venue(REPO_ROOT):
+        # The document is not in force in THIS repository instance (#1321) — which is
+        # a DESIGNED state, not a defect: `check_real_tree` reports every entry of a
+        # foreign document as inapplicable, honours nothing, and treats none of it as
+        # fatal. So the rows cannot be re-measured here; asserting instead that this
+        # checkout IS the instance the rows were measured on made the arm unable to
+        # pass anywhere but that one machine, and a pristine clone is exactly what the
+        # CI venue checks out — which redded the gate of record in the venue it must
+        # stay green (#1509). The contract the out-of-force state owes is asserted
+        # below, against the SHIPPED document, so the arm keeps its subject in every
+        # venue rather than skipping where it cannot re-measure.
+        verdict = check_real_tree(
+            REPO_ROOT,
+            REPO_ROOT / "governance/reconcile/real-tree-baseline.json",
+            quarantine_path=SHIPPED_DOCUMENT,
+            ops=RepoOps(REPO_ROOT),
+        )
+        # DOCUMENT-SCOPED properties only. `verdict.assessable` and
+        # `verdict.quarantine_applicable` describe the WHOLE real tree of whichever
+        # venue reads the document — a checkout carries its own young refs, and
+        # production never even evaluates the venue for an EMPTY document (there is
+        # nothing for the venue to govern) — so asserting either one here would be
+        # the same venue-bound mistake as the identity assert this branch replaces,
+        # one level down. Measured in a pristine clone of this branch: asserting
+        # `assessable` failed on the clone's OWN `issue-1509` ref.
+        assert verdict.quarantined == (), (
+            "a document that is not in force honours nothing, in whichever venue it is read"
+        )
+        assert [e.name for e in verdict.inapplicable_quarantine] == [e.name for e in entries], (
+            f"every one of the document's {len(entries)} row(s) must be reported inapplicable, by "
+            f"name, in a venue the document does not name: {verdict.describe()}"
+        )
+        if not entries:
+            assert "declares no exemptions" in verdict.describe(), verdict.describe()
+        return
 
     if not entries:
         verdict = check_real_tree(
