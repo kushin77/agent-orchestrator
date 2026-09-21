@@ -26,7 +26,17 @@ blueprint: [issue #4](https://github.com/kushin77/agent-orchestrator/issues/4).
 | Control plane / portal (cross-cutting) | `control-plane/` `portal/` | 7 |
 | Autonomous ops/governance (cross-cutting) | — | 8 |
 
-Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Design reference: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). As-built
+control chain (Paperclip → PMO → Hermes → agents → lanes/gates/attestation,
+per-layer implemented/declared-only/missing): [`docs/ARCHITECTURE-2026-09.md`](docs/ARCHITECTURE-2026-09.md).
+This repo's own role as the fleet's CTO office for the CMR:
+[`docs/CTO-OFFICE.md`](docs/CTO-OFFICE.md). Full ability inventory:
+[`docs/ABILITIES.md`](docs/ABILITIES.md).
+
+**Naming note (ADR-0033):** neither "Paperclip" nor "Hermes" is the top-level
+orchestrator — that's `fleet/brain.py` + `governance/dispatch/`. Paperclip is
+the ticket/heartbeat/budget reporting surface; Hermes is a routing persona and
+inference adapter.
 
 ## Repository layout
 
