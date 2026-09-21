@@ -51,6 +51,7 @@ from portal.server.ops_health import OpsHealthReports
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
 from portal.server.erp import ErpModuleError, ErpModuleSurface
 from portal.server.livestore import BoardSurface, TelemetryUnavailableError
+from portal.server import sessions as sessions_module
 from portal.server.sessions import SessionsView
 from portal.server.org_chart import OrgChartView
 from portal.server.skill_studio import (
@@ -694,7 +695,7 @@ class ConsoleApplication:
             if parts[0] == "board":
                 return self._route_board(parts, method)
             if parts[0] == "sessions":
-                return self._route_sessions(parts, method)
+                return self._route_sessions(parts, method, body, cookies, now_iso)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -900,21 +901,76 @@ class ConsoleApplication:
                 raise ApiError(503, "board_unavailable", str(exc)) from None
         raise ApiError(404, "not_found", f"no such board read: {'/'.join(surface)}")
 
-    def _route_sessions(self, parts: list[str], method: str) -> Response:
-        """The cross-engine Sessions view (issue #1563).
+    def _route_sessions(
+        self,
+        parts: list[str],
+        method: str,
+        body: dict[str, Any],
+        cookies: dict[str, str],
+        now_iso: str,
+    ) -> Response:
+        """The cross-engine Sessions view (issue #1563) and its operator controls (#1564).
 
         Reads: ``GET /api/sessions/rows`` — every session row joined from
         ``.fleet/claims/*``, ``.board/claims.jsonl`` and
         ``.deepseek-agent/sessions/*``, plus a ``missing`` list naming any of
-        those three roots absent from this checkout. GET-only; when the
-        view's flag is off the route never reaches here.
+        those three roots absent from this checkout.
+
+        Writes: ``POST /api/sessions/control/<action>`` with body
+        ``{"engine": <row.engine>, ...}`` — assign/pause/resume/escalate/kill,
+        mapped onto an EXISTING ``control-plane/control/verbs.yaml`` verb
+        (``sessions.SESSION_CONTROL_VERBS``) and delegated to the SAME remote
+        control family ``POST /api/control/<family>/<action>`` already serves
+        (``portal/server/control_api.py``, issue #554) — this route adds no
+        second lever, no second audit trail, only the engine gate a fleet.*
+        verb needs: it commands the single claude-fleet loop, so a row from
+        another engine is refused by name (``engine_not_controllable``) rather
+        than silently no-opped or forwarded anyway. When the view's own flag
+        is off neither route reaches here.
         """
-        if method != "GET":
-            raise ApiError(405, "method_not_allowed", "the sessions view is GET only")
         surface = parts[1:]
-        if surface == ["rows"]:
-            return self._ok(self.sessions.sessions())
-        raise ApiError(404, "not_found", f"no such sessions read: {'/'.join(surface)}")
+        if method == "GET":
+            if surface == ["rows"]:
+                return self._ok(self.sessions.sessions())
+            raise ApiError(404, "not_found", f"no such sessions read: {'/'.join(surface)}")
+        if method == "POST" and len(surface) == 2 and surface[0] == "control":
+            return self._sessions_control(surface[1], body, cookies, now_iso)
+        raise ApiError(
+            405, "method_not_allowed",
+            "the sessions view is GET (rows) or POST (control/<action>) only",
+        )
+
+    def _sessions_control(
+        self, action: str, body: dict[str, Any], cookies: dict[str, str], now_iso: str
+    ) -> Response:
+        """One session-view control button — delegated to the real control family.
+
+        Refuses by name, never by silent no-op: ``422 unknown_verb`` for an
+        action outside ``SESSION_CONTROL_VERBS`` (the sessions view's closed
+        button set), ``403 engine_not_controllable`` for a row whose engine is
+        not ``claude-fleet``. Anything past that — the flag, AuthN, capability,
+        the lever, the audit record naming the operator — is the existing
+        ``/api/control/<family>/<action>`` route's own refusal matrix; this
+        function calls into it rather than re-deriving any of it.
+        """
+        verb_id = sessions_module.SESSION_CONTROL_VERBS.get(action)
+        if verb_id is None:
+            raise ApiError(
+                422, "unknown_verb",
+                f"'{action}' is not a sessions control verb "
+                f"({sorted(sessions_module.SESSION_CONTROL_VERBS)})",
+            )
+        engine = body.get("engine") if isinstance(body, dict) else None
+        if engine != sessions_module.CONTROLLABLE_ENGINE:
+            raise ApiError(
+                403, "engine_not_controllable",
+                f"engine-not-controllable:{engine}: only "
+                f"{sessions_module.CONTROLLABLE_ENGINE} sessions accept operator control",
+            )
+        family, _, family_action = verb_id.partition(".")
+        return __import__(
+            "portal.server.control_api", fromlist=["control"]
+        ).control(self, [family, family_action], "POST", body, cookies, now_iso)
 
     def _route_erp(
         self, surface: list[str], method: str, body: dict[str, Any]

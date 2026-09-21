@@ -45,6 +45,59 @@
         CP.clear(app).appendChild(card);
       }
 
+      // Sessions-view operator controls (issue #1564): five buttons onto
+      // EXISTING control-plane/control/verbs.yaml verbs via the same remote
+      // control family operator.js:314 already posts to
+      // (POST /api/sessions/control/<action>, which delegates server-side to
+      // /api/control/<family>/<action> — see portal/server/app.py
+      // _sessions_control). A fleet.* verb commands the single claude-fleet
+      // loop, so only claude-fleet rows get live buttons; any other engine's
+      // buttons render disabled — never wired to an endpoint that would
+      // silently no-op.
+      var CONTROLS = [
+        { action: "assign", label: "assign" },
+        { action: "pause", label: "pause" },
+        { action: "resume", label: "resume" },
+        { action: "escalate", label: "escalate" },
+        { action: "kill", label: "kill", confirm: true } // irreversible (fleet.kill)
+      ];
+
+      function runControl(row, action, btn) {
+        btn.disabled = true;
+        CP.post("/api/sessions/control/" + action, { engine: row.engine })
+          .then(function () { btn.textContent = action + " ✓"; })
+          .catch(function (err) {
+            btn.textContent = action + " refused";
+            btn.title = err.message;
+          })
+          .then(function () { btn.disabled = false; });
+      }
+
+      function controlsCell(row) {
+        var td = CP.el("td", { class: "controls" });
+        var controllable = row.engine === "claude-fleet";
+        CONTROLS.forEach(function (c) {
+          var btn = CP.el("button", {
+            class: "btn ghost small",
+            text: c.label,
+            disabled: controllable ? undefined : true
+          });
+          if (!controllable) {
+            btn.title = "engine not controllable";
+          } else {
+            btn.addEventListener("click", function () {
+              if (c.confirm && !window.confirm(
+                    "This " + c.label + "s the whole fleet loop and cannot be undone. Continue?")) {
+                return;
+              }
+              runControl(row, c.action, btn);
+            });
+          }
+          td.appendChild(btn);
+        });
+        return td;
+      }
+
       function table(rows) {
         var tbl = CP.el("table", { class: "tbl", id: "sessionsTable" });
         tbl.appendChild(CP.el("thead", {},
@@ -52,7 +105,7 @@
             CP.el("th", { text: "Engine" }), CP.el("th", { text: "Issue" }),
             CP.el("th", { text: "Branch" }), CP.el("th", { text: "State" }),
             CP.el("th", { text: "Agent" }), CP.el("th", { text: "Lane" }),
-            CP.el("th", { text: "Age" }))));
+            CP.el("th", { text: "Age" }), CP.el("th", { text: "Controls" }))));
         var body = CP.el("tbody");
         rows.forEach(function (row) {
           body.appendChild(CP.el("tr", { "data-engine": row.engine },
@@ -62,7 +115,8 @@
             CP.el("td", {}, CP.el("span", { class: "badge info", text: row.state || "—" })),
             CP.el("td", { class: "mono", text: row.agent || "—" }),
             CP.el("td", { class: "mono", text: row.lane || "—" }),
-            CP.el("td", { class: "mono dim", text: row.age || "—" })));
+            CP.el("td", { class: "mono dim", text: row.age || "—" }),
+            controlsCell(row)));
         });
         tbl.appendChild(body);
         return tbl;
