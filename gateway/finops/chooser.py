@@ -30,6 +30,22 @@ Selection pipeline (all offline, deterministic, unit-testable):
 
 Health is an injected signal (dict or callable of model id -> healthy), so
 tests and the gateway can drive fallback behavior without a live provider.
+
+---knowledge---
+module_id: gateway.finops.chooser
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [cheapest-capable, escalate-on-observed-difficulty, security-floor]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ModelChooser, Choice, ChooserError, NoHealthyModelError, EscalationCapReached]
+invariants: "a task class tagged security, iac or governance is floored at L1 and can never be routed below it"
+gotchas: "escalation happens only on observed failure or difficulty and is capped by the task class's maxTier"
+related: ["#17"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

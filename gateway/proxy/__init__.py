@@ -35,6 +35,22 @@ Public surface
 - ``cli``  - offline demo/evidence CLI.
 
 See ``gateway/proxy/README.md`` for the full contract.
+
+---knowledge---
+module_id: gateway.proxy
+system: gateway
+app: proxy
+solution_class: class
+patterns: [package-contract, public-surface, delegate-never-re-derive]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [ModelGateway, build_real_gateway, Router, ModelBackend, CallRecordSink]
+invariants: "the package is the route-dispatch-log funnel and every sibling pillar is an injected seam, never an import"
+gotchas: "the proxies import as proxy when gateway/ is on sys.path; a package __init__ for gateway/ itself is a later phase"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

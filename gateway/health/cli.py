@@ -9,6 +9,22 @@ Runs directly (no network, no server, deterministic fake clock):
 
 The package is importable as ``health`` when ``gateway/`` is on sys.path; this
 script arranges that itself so it can run from any cwd.
+
+---knowledge---
+module_id: gateway.health.cli
+system: gateway
+app: health
+solution_class: enterprise
+patterns: [offline-cli, deterministic-fake-clock, evidence-walkthrough]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [main, cmd_config, cmd_status, cmd_demo, FakeClock]
+invariants: "the CLI runs offline and deterministic: no network, no server, no wall clock"
+gotchas: "the script arranges gateway/ on sys.path itself so it runs from any cwd"
+related: ["#18"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

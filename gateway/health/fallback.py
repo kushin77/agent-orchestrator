@@ -35,6 +35,22 @@ loop — and it lives outside the chains so the ``rungs[-1].local`` invariant is
 untouched. Its endpoint is read from a declared environment variable at call
 time. With no rung declared, resolution is byte-for-byte the previous
 behaviour.
+
+---knowledge---
+module_id: gateway.health.fallback
+system: gateway
+app: health
+solution_class: enterprise
+patterns: [failover-chain, local-last-resort, no-healthy-route]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [FallbackChain, ChainRegistry, FallbackRung, SharedServicesRung, load_default_chains, split_route]
+invariants: "the final rung of every chain is the local Ollama provider, and a chain with no healthy rung resolves to None rather than a guess"
+gotchas: "the resolver only lands on the local rung when it is healthy; the remote shared-services rung sits after the chain, not inside it"
+related: ["#18", "#375"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

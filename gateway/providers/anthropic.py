@@ -31,6 +31,22 @@ both flag-gated OFF by default (GR-28) via ``ProviderConfig.provider_options``
   enabled the adapter never also sends ``temperature`` - the two are
   rejected together (400) on current models, so a per-call
   ``ChatOptions.temperature`` is deliberately dropped, not silently ignored.
+
+---knowledge---
+module_id: gateway.providers.anthropic
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [injected-transport, consumed-tier-vocabulary, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [AnthropicProvider]
+invariants: "the adapter speaks the Messages API over the injected transport and never opens a socket itself"
+gotchas: "system messages are lifted out of the message list into the top-level system field"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

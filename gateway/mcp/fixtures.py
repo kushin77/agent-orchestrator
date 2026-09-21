@@ -20,6 +20,22 @@ forbids. So:
 The shapes are the real ones - a board snapshot, the budget policy config, a
 ledger chain built by the ledger's own store, a knowledge catalogue - so a test
 exercises the same readers a deployment does.
+
+---knowledge---
+module_id: gateway.mcp.fixtures
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [labelled-fixture, hermetic-authority-tree, refuse-fixture-outside-tests]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [FixtureBridge, write_fixture_authorities, fixture_catalog, FIXTURE_ONLY]
+invariants: "every stand-in is labelled a fake and a fixture-only source is refused outside tests, so a fake answer can never stand in for a measured one"
+gotchas: "nothing here is a production surface, and the labelling is what keeps the false-green failure out"
+related: ["#504"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

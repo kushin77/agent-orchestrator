@@ -25,6 +25,22 @@ Public surface
 The package is importable as ``limits`` when ``gateway/`` is on ``sys.path``
 (the tests arrange this in ``tests/conftest.py``; consumers of the merged
 contract should do the same or run the CLI directly).
+
+---knowledge---
+module_id: gateway.limits
+system: gateway
+app: limits
+solution_class: class
+patterns: [package-contract, public-surface, delegate-never-re-derive]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [LimitsEngine, build_engine, SemanticCache, BudgetController, RateLimiter, RollingTokenWindow]
+invariants: "the package re-exports the cost/capacity control layer; each rail lives in its own module"
+gotchas: ""
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from limits.backpressure import (

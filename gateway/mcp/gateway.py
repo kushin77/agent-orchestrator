@@ -23,6 +23,22 @@ composed from the cannibalized sources:
    the session's tenant; no argument can select another tenant's data.
 8. **audit** - exactly one append-only hash-chained record per call (allowed or
    denied) answering who/what/tenant/result.
+
+---knowledge---
+module_id: gateway.mcp.gateway
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [tenant-scoped-enforcement, ordered-gate-chain, in-process-json-rpc]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [MCPToolGateway]
+invariants: "every tools/call is enforced in a fixed order — tenant context, authN, authZ, allowlist, rate limit — before any tool acts"
+gotchas: "an explicit tenantId that disagrees with the verified session is refused: there is no cross-tenant fallback"
+related: ["#20"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

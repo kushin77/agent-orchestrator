@@ -51,6 +51,22 @@ EXIT CONTRACT (the repo's honesty tri-state)
   1  NOT-OK          a finding, refused by name
   2  CANNOT-ASSESS   the declaration is missing/unparseable, or a bad
                      invocation — never a pass
+
+---knowledge---
+module_id: gateway.finops.budget_authority
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [authority-declaration, single-reader, refuses-by-name, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Finding, ClassSite, enforcement_shaped, evaluate, materialise, self_test, load_authority]
+invariants: "the checker reads the declaration and the tree and never imports the symbols it censuses"
+gotchas: "a pointer wildcard expands to every value it reaches, and CANNOT-ASSESS is never reported as a pass"
+related: ["#1495", "#1458"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

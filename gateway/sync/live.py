@@ -11,6 +11,22 @@
 
 No-false-green: an unregistered/unknown catalog module id is refused BY NAME
 (:class:`UnknownCatalogModule`), never silently reported as unreachable.
+
+---knowledge---
+module_id: gateway.sync.live
+system: gateway
+app: sync
+solution_class: enterprise
+patterns: [live-read-never-cached, refuse-by-name, no-false-green]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [project, read_catalog_entry, UnknownCatalogModule]
+invariants: "reachability is reported unknown rather than fabricated when no live monitor is wired"
+gotchas: "an unregistered catalog module id is refused BY NAME, never silently reported as unreachable"
+related: ["#889"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

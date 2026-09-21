@@ -11,6 +11,22 @@ Field vocabulary is consumed from the merged phase-1 contracts, never
 redefined: ``model_tier`` uses the agent-profile tier vocabulary
 (LOW|MED|HIGH|MAX, registry/profiles/catalog.yaml) and ``task_type`` is a
 kebab-case taskType in the registry/prompts sense.
+
+---knowledge---
+module_id: gateway.limits.model
+system: gateway
+app: limits
+solution_class: pattern
+patterns: [pure-value-types, closed-vocabulary, no-io]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [ModelCallRequest, MeteringRecord, new_request_id, now_utc_iso]
+invariants: "model_tier and task_type are consumed from the merged phase-1 vocabularies, never redefined here"
+gotchas: "the telemetry pillar owns canonical usage/cost storage; this record is the local cost-control shape until it lands"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

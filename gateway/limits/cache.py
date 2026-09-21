@@ -9,6 +9,22 @@ Storage sits behind a CacheStore seam with an in-memory and a file-backed
 implementation, so a later phase can point the same API at Redis/ValKey
 without touching callers (mirrors the cannibalized fleet semantic-cache which
 used a file dir of keyed entries with TTL eviction).
+
+---knowledge---
+module_id: gateway.limits.cache
+system: gateway
+app: limits
+solution_class: enterprise
+patterns: [semantic-cache, ttl-lru, store-seam]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SemanticCache, CacheStore, MemoryCacheStore, FileCacheStore, CacheEntry, CacheResolution]
+invariants: "a cache hit is zero-cost and IS accounted: the provider is never called on a hit and the hit is still metered"
+gotchas: "storage sits behind a CacheStore seam so a later phase can point the same API at Redis/ValKey without touching callers"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

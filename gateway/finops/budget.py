@@ -41,6 +41,22 @@ when the decision is ``stop``.
 
 Standalone module: imports nothing from the rest of the package (the loader
 for budgets.yaml lives here too, mirroring the module's self-containment).
+
+---knowledge---
+module_id: gateway.finops.budget
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [pre-flight-budget-check, consumed-declaration, never-fail-open]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BudgetDecisionMaker, RoleBudgetEnforcer, BudgetLedger, RoleBudget, load_budgets, load_role_budgets]
+invariants: "a budget is consulted before any model call and a refused call raises rather than returning a zero-cost success"
+gotchas: "the per-role caps are consumed from the workbook declaration, never hardcoded, and the role ledger key can never collide with a tenant key"
+related: ["#17", "#633"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

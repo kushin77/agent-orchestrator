@@ -20,6 +20,22 @@ degradation apart (ADR-0018 decision 2; the no-false-green doctrine). Each
 backend is bound to exactly one tenant - a repo name that exists only in
 tenant B is simply absent from tenant A's index, so no tool result can ever
 leak another tenant's data (the no-cross-tenant-fallback doctrine).
+
+---knowledge---
+module_id: gateway.mcp.kb
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [consumed-shapes, declared-fixture, flag-gated-off]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CodeidxBackend, KbRegistry, TenantKb, MemoryKbBackend, IndexBackend, CodeidxClient, DEFAULT_CODEIDX_ENABLED]
+invariants: "the declared in-memory index answers only until an operator opts a tenant into the real backend, which is flag-gated OFF by default"
+gotchas: "the tool shapes are consumed from the published codeidx contract, never mirrored (ADR-0018)"
+related: ["#20"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

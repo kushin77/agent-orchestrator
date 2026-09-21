@@ -21,6 +21,22 @@ The ``ao`` extension rides inside the compatible envelope.  It is additive (an
 OpenAI-only client ignores it) and it is where the platform's own facts live:
 the resolved tier, the tier the client claimed, the citations envelope, the
 grounding state, the usage/cost figures and the guardrail verdicts.
+
+---knowledge---
+module_id: gateway.chat.contract
+system: gateway
+app: chat
+solution_class: enterprise
+patterns: [wire-contract, claims-never-authority, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ChatTurnRequest, parse_openai_request, parse_ollama_request, completion_body, delta_frame, sse_data, sse_error, ndjson]
+invariants: "nothing a request body says about identity or spend is authoritative: a claim is ignored or refused, never honoured"
+gotchas: "the tenant, agent and conversation come from the verified credential and the budget from telemetry/chat, never from the body"
+related: ["#503"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

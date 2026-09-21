@@ -16,6 +16,22 @@ Record shapes follow the fleet append-only conventions already merged:
 
 A hook/sink that raises propagates to the dispatcher (fail closed): an audit
 or metering record is never silently lost.
+
+---knowledge---
+module_id: gateway.proxy.sinks
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [append-only-sink, one-record-per-dispatch, phase-5-seam]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CallRecordSink, JsonlCallRecordSink, ListCallRecordSink, NoopCallRecordSink]
+invariants: "every dispatch emits exactly one full call record to the audit and metering sinks, whichever way it landed"
+gotchas: "the JSONL shape follows the fleet append-only one-object-per-line audit convention"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -16,6 +16,22 @@ Everything runs in-process and offline (stdlib + PyYAML): no network, no
 server, no MCP SDK required. The demo consumes, read-only, the merged
 identity/rbac store and the merged gateway/limits rate limiter from this
 checkout - it never modifies them.
+
+---knowledge---
+module_id: gateway.mcp.cli
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [offline-cli, assertion-demo, in-process]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [main, Demo]
+invariants: "the demo asserts and prints one PASS/FAIL line per step, exiting 0 only when every assertion holds"
+gotchas: "everything runs in-process and offline — no network, no server, stdlib plus PyYAML"
+related: ["#20"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -34,6 +34,22 @@ Honest-data contract (verified against this checkout, not assumed):
     discount is a point-in-time DeepSeek list price declared as a baseline
     constant below — it is NOT in the repo's rate card and must be re-verified
     against DeepSeek current pricing before any billing use.
+
+---knowledge---
+module_id: gateway.finops.cache_baseline
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [offline-baseline, bundled-sample, honesty-flag]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [ClassRow, main]
+invariants: "the baseline runs offline against a bundled synthetic sample: no live API and no network"
+gotchas: "a class whose cache share cannot be measured carries an honesty flag rather than an invented number"
+related: ["#667"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

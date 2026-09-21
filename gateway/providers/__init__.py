@@ -35,6 +35,22 @@ Public surface
 
 See ``gateway/providers/README.md`` for the full contract and configuration
 guide.
+
+---knowledge---
+module_id: gateway.providers
+system: gateway
+app: providers
+solution_class: class
+patterns: [package-contract, public-surface, delegate-never-re-derive]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [ModelProvider, ProviderRegistry, ProviderConfig, ChatResult, TenantModelMapping]
+invariants: "the package re-exports the adapter layer; the contract-freeze surface is providers/contract.py"
+gotchas: "the adapters import as providers when gateway/ is on sys.path, mirroring the identity/rbac package convention"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

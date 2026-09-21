@@ -30,6 +30,22 @@ the committed seeds, and no socket is opened.  Secrets are never defaulted —
 the signing key and the ledger's keystore are the caller's (env / GCP Secret
 Manager in a deployment); a missing one leaves the corresponding step
 *refusing*, never silently permissive.
+
+---knowledge---
+module_id: gateway.chat.wiring
+system: gateway
+app: chat
+solution_class: enterprise
+patterns: [composition-root, seam-injection, offline-testable]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [build_gateway, build_surface, build_offline_surface]
+invariants: "this is the only module that decides which implementation each seam gets"
+gotchas: "build_offline_surface opens no socket; only build_surface wires the real merged siblings"
+related: ["#503"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

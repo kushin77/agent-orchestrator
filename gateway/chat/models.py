@@ -22,6 +22,22 @@ honoured, so a client cannot address a provider directly.
 ``created`` is deliberately absent: OpenAI's field is a creation timestamp and
 this surface has no such fact about a provider module.  Inventing one is the
 fabrication AO-GR-19 forbids, so the field is omitted instead.
+
+---knowledge---
+module_id: gateway.chat.models
+system: gateway
+app: chat
+solution_class: enterprise
+patterns: [derived-never-hand-written, projection, read-only-authority]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ModelCatalogue, CatalogModule, CatalogUnavailable, advertised_ids]
+invariants: "the advertised list is a projection of the module catalog and the routing policy; it is never a hand-written list"
+gotchas: "a module added to the catalog appears here with no edit to this file, discovered by glob"
+related: ["#503"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

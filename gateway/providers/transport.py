@@ -15,6 +15,22 @@ to the real provider through ``StdlibHttpTransport`` in production (stdlib
   the key is never logged anywhere).
 - ``FailingTransport`` - raises ``ProviderUnavailableError`` on every request
   (used for retry/circuit-breaker negative tests).
+
+---knowledge---
+module_id: gateway.providers.transport
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [injected-transport, offline-recording-double, stdlib-only]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [HttpTransport, StdlibHttpTransport, RecordingTransport, FailingTransport, HttpResponse, now_ms]
+invariants: "adapters never open sockets themselves: every provider test runs offline against an injected transport"
+gotchas: "the real stdlib transport is never exercised by the offline suite; it requires no third-party HTTP client"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

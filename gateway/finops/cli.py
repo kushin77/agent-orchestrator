@@ -17,6 +17,22 @@ Usage (from the repo root):
 ``choose`` prints the routed choice as JSON; ``demo`` runs a small scripted
 batch (with per-tenant budgets, per-role caps, health, and a JSONL metering
 sink) to show the guardrail, escalation, budget, role-cap and health behavior.
+
+---knowledge---
+module_id: gateway.finops.cli
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [offline-cli, deterministic-output, evidence-walkthrough]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [main, build_parser]
+invariants: "every command exercises the chooser without a live provider and prints deterministic output for evidence"
+gotchas: "the CLI is self-contained: stdlib plus PyYAML only"
+related: ["#17"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

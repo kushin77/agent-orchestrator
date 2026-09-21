@@ -24,6 +24,22 @@ finops ``MeteringSink`` seam):
 Sinks implement the ``HealthSink`` protocol (``record(event)``). A sink that
 raises propagates to the caller (fail closed): a lost audit/alert record is
 never silent. Events carry no key material by construction.
+
+---knowledge---
+module_id: gateway.health.events
+system: gateway
+app: health
+solution_class: enterprise
+patterns: [structured-events, append-only-sink, fan-out]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [HealthEvent, HealthSink, ListHealthSink, JsonlHealthSink, NoopHealthSink]
+invariants: "every meaningful health transition emits exactly one event, and a sink never changes the monitor's verdict"
+gotchas: "the JSONL sink is append-only (one line each), matching the fleet audit-log pattern"
+related: ["#18"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -13,6 +13,22 @@ container is refused by the isolation layer rather than trusted.  The store is a
 thin log on top of that: turns are appended under deterministic, sequential
 keys, so a conversation's history is readable without any index this lane would
 have to keep in sync.
+
+---knowledge---
+module_id: gateway.chat.conversation
+system: gateway
+app: chat
+solution_class: enterprise
+patterns: [credential-scoped, append-only-log, delegate-never-re-derive]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ConversationStore, ConversationError, turn_key, replay_messages]
+invariants: "one conversation is exactly one engine/memory container, and a request claiming a different container is refused, never trusted"
+gotchas: "the container key comes from identity/chat's ChatIsolation, which delegates to engine.memory.model, so this lane never formats it itself"
+related: ["#503"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

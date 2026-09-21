@@ -30,6 +30,22 @@ Offline and reproducible: no network, no live API; deterministic output for a
 given input file, so the regression test pins the exact table.
 
 Standalone module (stdlib only); no cross-package imports.
+
+---knowledge---
+module_id: gateway.finops.cache_audit
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [offline-audit, honest-join, deterministic-render]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [UsageRow, QueryAggregate, AuditResult, parse_record, load_usage, audit, render]
+invariants: "the across-all aggregate row is printed even when every per-query join is absent, so the baseline number stays regressable"
+gotchas: "the ERPNext billing-query dimension is still in flight, so an absent join key is reported as no billing-query ids present rather than fabricated"
+related: ["#673", "#645"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -41,6 +41,22 @@ explicit outcome, never a silent pass:
 Tri-state: an unusable request (unknown key, out-of-range complexity) cannot be
 assessed -- ``TaskInvalid`` -- and the CLI maps that to rc 2, exactly like a
 malformed policy.
+
+---knowledge---
+module_id: gateway.sme-routing.router
+system: gateway
+app: sme-routing
+solution_class: enterprise
+patterns: [declared-policy-driven, deterministic-offline, escalation-ladder]
+derives_from: null
+owner_sme: orchestrator
+tier: L1
+interfaces: [Router, load_router, Decision, Outcome, Attempt, TierCaps, TaskInvalid]
+invariants: "the router hard-codes no policy value: every route, chain and tier comes from the validated policy bundle"
+gotchas: "an unknown or malformed task is TaskInvalid (rc 2) rather than a defaulted route"
+related: ["#149"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

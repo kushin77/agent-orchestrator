@@ -20,6 +20,22 @@ The closed event kinds here are the tool-call pair ``tool_call`` and
 (register/activate/...). The gateway writes through an injected
 :class:`AuditSink` so a deployment may substitute any append-only ledger with
 the same shape.
+
+---knowledge---
+module_id: gateway.mcp.audit
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [append-only, hash-chained, tamper-evident]
+derives_from: registry/events/event_log.py
+owner_sme: security-sme
+tier: L1
+interfaces: [HashChainAuditLog, AuditSink, AuditLogIntegrityError, now_utc, AuditLogError]
+invariants: "any edit, deletion or reordering breaks verify: each record chains to its predecessor from a fixed genesis hash"
+gotchas: "the record shape is consumed from the registry/events contract, one JSON object per line with a monotonic seq"
+related: ["#20", "#10"]
+do_not_duplicate: registry/events/event_log.py
+---knowledge---
 """
 
 from __future__ import annotations

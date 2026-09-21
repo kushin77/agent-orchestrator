@@ -43,6 +43,22 @@ dispatch, and :meth:`_finish` closes the turn (inbound re-validation,
 attribution, the conversation record).  Both the single-body and the streaming
 endpoints run **the same two steps** — the streaming one simply relays the
 proxy's ``dispatch_stream`` seam as it arrives.
+
+---knowledge---
+module_id: gateway.chat.surface
+system: gateway
+app: chat
+solution_class: enterprise
+patterns: [mount-dispatch-core, ordered-authority-chain, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ChatSurface, TurnPlan, TurnRecord, history_for]
+invariants: "the order of a turn is fixed — flag, credential, grounding, guardrail, budget, dispatch — and no step may be reordered"
+gotchas: "the flag is the first statement of every handler, so an unpromoted surface is invisible rather than merely unauthorised"
+related: ["#503"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

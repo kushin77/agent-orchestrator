@@ -14,6 +14,22 @@ without touching the funnel:
 
 Every protocol is ``@runtime_checkable`` so fakes and the real modules both
 satisfy it structurally.
+
+---knowledge---
+module_id: gateway.proxy.resolver
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [seam-declaration, duck-typed, standalone-testable]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [AgentResolver, TaskResolver, Chooser, HealthSignal, LimitsEngineLike, is_healthy]
+invariants: "the core is wired through duck-typed seams rather than importing sibling modules, so it stays standalone-testable"
+gotchas: "the health signal is consumed only as an injected callable, never by importing gateway/health"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

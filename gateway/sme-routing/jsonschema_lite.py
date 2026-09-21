@@ -29,6 +29,22 @@ Annotation keywords (``$schema``, ``$id``, ``title``, ``description``,
 ``examples``, ``$comment``, ``default``) and any other unrecognized keyword are
 ignored per the JSON Schema specification; unknown *instance* fields are still
 rejected when the schema declares ``additionalProperties: false``.
+
+---knowledge---
+module_id: gateway.sme-routing.jsonschema_lite
+system: gateway
+app: sme-routing
+solution_class: pattern
+patterns: [dependency-free-validator, draft-07-subset, mirror-not-import]
+derives_from: guardrails/policy/schemas.py
+owner_sme: orchestrator
+tier: L1
+interfaces: [validate, SchemaValidationError, subschema]
+invariants: "every supported keyword genuinely rejects a document that violates it, proven by mutation (no-false-green)"
+gotchas: "it deliberately mirrors guardrails/policy/schemas.py instead of importing it, keeping the lane at stdlib plus PyYAML"
+related: ["#149"]
+do_not_duplicate: guardrails/policy/schemas.py
+---knowledge---
 """
 
 from __future__ import annotations

@@ -74,6 +74,22 @@ an env var: ``gateway/providers/vault.py::load_master_key`` reads
 ``AO_VAULT_KEY`` with the same ``os.environ.get(env, "")`` shape. No key set
 means ``default_api_key()`` returns ``None`` and the provider fails closed at
 the API (401), never a literal fallback.
+
+---knowledge---
+module_id: gateway.providers.nous
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [openai-compatible, key-from-environment, published-contract]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [NousProvider, default_api_key]
+invariants: "the adapter is OpenAI-compatible and its calls are billed against the account's prepaid credits"
+gotchas: "the upstream x402 pay-per-request path is documented but deliberately not implemented here"
+related: ["#1559"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

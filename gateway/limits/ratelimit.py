@@ -6,6 +6,22 @@ same semantics: capacity = burst (max tokens instantly available), refill rate
 = limit/window_seconds.  ``check`` consumes one token when available and
 reports the seconds to wait when the bucket is empty (the proxy can either
 reject or sleep-and-retry).
+
+---knowledge---
+module_id: gateway.limits.ratelimit
+system: gateway
+app: limits
+solution_class: enterprise
+patterns: [token-bucket, per-scope-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RateLimiter, TokenBucket, RateLimitPolicy, RateLimitDecision, rate_scope]
+invariants: "each scope is its own bucket, so one tenant's burst cannot spend another's tokens"
+gotchas: "capacity is the burst and the refill rate is limit per window_seconds; a check consumes a token only when one is available"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

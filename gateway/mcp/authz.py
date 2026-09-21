@@ -16,6 +16,22 @@ permission-first, exactly as the rbac middleware contract requires:
 A denial keeps its cause (``scope`` vs ``permission``) so the transport can
 map it and observability can attribute it; there is deliberately no
 cross-tenant or cross-team fallback.
+
+---knowledge---
+module_id: gateway.mcp.authz
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [injected-guard, scope-then-permission, consume-never-reimplement]
+derives_from: identity/rbac/guard.py
+owner_sme: security-sme
+tier: L1
+interfaces: [RbacScopeGuard, PermissionGuard, AuthzDecision]
+invariants: "scope is gated before permission: a subject with no binding in the requested tenant is out of scope no matter what its role strings grant"
+gotchas: "the gateway depends only on the PermissionGuard shape, so the real rbac store is dropped in, never reimplemented"
+related: ["#20", "#12"]
+do_not_duplicate: identity/rbac/guard.py
+---knowledge---
 """
 
 from __future__ import annotations

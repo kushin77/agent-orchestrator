@@ -20,6 +20,22 @@ Neither the route table nor the prompt module is re-declared here: the module
 ids, their bodies and their output schemas are read from ``registry/chat``, and
 the capability/task-class pair each route names is consumed from
 ``registry/profiles/catalog.yaml`` and ``gateway/finops/tiers.yaml``.
+
+---knowledge---
+module_id: gateway.chat.resolver
+system: gateway
+app: chat
+solution_class: enterprise
+patterns: [composition-never-fork, refuse-to-override, seam-adapter]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ChatTaskResolver, ResolvedChatTask, ChatRouteError, load_chat_routes, chat_routing_config, task_type_for]
+invariants: "the surface refuses to load at all if the proxy policy already declares its two routes — a silent override is the second authority ADR-0023 forbids"
+gotchas: "the task resolver seam reads registry/chat's published, digest-pinned modules rather than carrying its own copy"
+related: ["#503", "#509"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

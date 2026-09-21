@@ -41,6 +41,22 @@ Public surface
   seam over ``registry/chat``.
 - :mod:`gateway.chat.wiring` — the composition root that wires the real
   siblings into a surface.
+
+---knowledge---
+module_id: gateway.chat
+system: gateway
+app: chat
+solution_class: class
+patterns: [package-contract, public-surface, delegate-never-re-derive]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [ChatSurface, build_surface, build_offline_surface, build_gateway, TurnPlan, TurnRecord]
+invariants: "the package composes its siblings: it mounts the proxy dispatch core and re-implements no model path of its own"
+gotchas: "surfaces.chat is checked before AuthN, so an unpromoted surface answers 404 to a valid credential as well as to an anonymous probe"
+related: ["#503"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

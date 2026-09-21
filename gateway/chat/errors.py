@@ -13,6 +13,22 @@ path that answers a refused turn with a success envelope.  The dispatch
 outcomes of ``gateway/proxy`` are mapped onto this taxonomy by
 :func:`refusal_for_outcome`, which reuses the proxy's own status contract
 (``proxy.handler.outcome_status``) rather than re-deriving one.
+
+---knowledge---
+module_id: gateway.chat.errors
+system: gateway
+app: chat
+solution_class: enterprise
+patterns: [typed-error-taxonomy, openai-compatible, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ChatSurfaceError, refusal_for_outcome, DispatchRefused, BudgetRefused, CrossTenantRefused]
+invariants: "every refusal is a typed error carrying the HTTP status it earns, so no code path can answer a refused turn with a success envelope"
+gotchas: "the proxy's own status contract is reused through refusal_for_outcome rather than restated here"
+related: ["#503"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -25,6 +25,22 @@ model degraded (the gateway routes away, ``is_healthy`` False) and it returns
 to healthy only once the rate falls to/below ``recover_failure_pct`` (which
 is strictly below the degrade threshold, so a rate oscillating around the
 threshold does not flap).
+
+---knowledge---
+module_id: gateway.health.policy
+system: gateway
+app: health
+solution_class: enterprise
+patterns: [state-machine, pure-decision-helpers, testable-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [HealthState, should_quarantine, should_degrade, should_clear_degraded, cool_off_elapsed, verdict_for, failure_rate_pct]
+invariants: "the transition table healthy to quarantined to probing to healthy is pure and clock-injected, never read from a global"
+gotchas: "policy holds no state: monitor.ModelHealth holds it and drives these helpers on every recorded outcome"
+related: ["#18"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

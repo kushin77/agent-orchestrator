@@ -15,6 +15,22 @@ transport rig (canned responses, no sockets) and the prompt/persona registries
 are read-only consumers of the committed seed data.  No file in another lane
 is modified — the merged modules are consumed through ``sys.path``/importlib
 and their own on-disk seeds.
+
+---knowledge---
+module_id: gateway.proxy.wiring
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [composition-root, offline-rig, seam-injection]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [build_real_gateway, WiredProxy, ProviderRig, PersonaAgentResolver, PromptTaskResolver, FinOpsChooserAdapter, ProviderRegistryBackend]
+invariants: "everything wired here stays offline: providers are driven through a scriptable transport rig with canned responses and no sockets"
+gotchas: "the persona and prompt registries are read read-only as seeds; the adapter seams are what make the real modules pluggable"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

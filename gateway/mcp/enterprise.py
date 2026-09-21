@@ -20,6 +20,22 @@ under is taken from the *verified session* - so a caller cannot widen its scope
 by asking. A caller that supplies ``tenant`` / ``tenant_id`` / ``tenantId`` is
 refused by name rather than silently ignored: an ignored scope selector teaches
 a caller the wrong lesson, and a refusal is auditable.
+
+---knowledge---
+module_id: gateway.mcp.enterprise
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [read-only-by-construction, declared-family, refuse-tenant-argument]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [enterprise_schemas, enterprise_descriptions, enterprise_handlers, WRITE_TOOLS, TenantArgumentRefused, UnknownArgumentRefused]
+invariants: "no tool in this family has a write path, and WRITE_TOOLS is empty on purpose so a test can hold the family to that"
+gotchas: "an action a turn wants is an approval proposal, never a write; a tenant may not be selected through a tool argument"
+related: ["#504", "#500"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

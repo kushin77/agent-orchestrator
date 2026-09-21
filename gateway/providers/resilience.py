@@ -14,6 +14,22 @@ Rules that keep the layer honest:
   raised immediately and never trip the breaker.
 - An OPEN circuit fails fast (``CircuitOpenError``) - no call is attempted
   until the recovery timeout elapses (HALF_OPEN probe).
+
+---knowledge---
+module_id: gateway.providers.resilience
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [circuit-breaker, exponential-backoff, transient-only-retry]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CircuitBreaker, CircuitBreakerManager, RetryPolicy, call_with_retries, backoff_delay, is_transient, CircuitState]
+invariants: "only transient failures are retried and counted against the breaker; a bad key, a bad request or invalid output is raised immediately and never trips it"
+gotchas: "one breaker exists per tenant:provider, held by a namespaced store"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

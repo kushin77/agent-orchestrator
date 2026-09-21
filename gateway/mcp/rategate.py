@@ -9,6 +9,22 @@ per (tenant, agent, tool) so one tenant's burst never starves another.
 Rate limiting ships flag-gated: a gateway built without a ``rate_gate`` does
 not limit (safe default OFF per the fleet doctrine); ``build_gateway`` wires a
 :class:`LimitsRateGate` so the shipped default limits every call.
+
+---knowledge---
+module_id: gateway.mcp.rategate
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [injected-seam, per-scope-isolation, safe-default-off]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RateGate, LimitsRateGate, UnlimitedRateGate, RateDecision, scope_for]
+invariants: "scopes are isolated per (tenant, agent, tool) so one tenant's burst never starves another"
+gotchas: "a gateway built without a rate_gate does not limit; build_gateway wires the limiting adapter so the shipped default limits every call"
+related: ["#20", "#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

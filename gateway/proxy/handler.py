@@ -8,6 +8,22 @@ phase-7 control-plane REST issue mounts this handler behind real HTTP and
 chunks the streaming events as SSE.  The real request auth (tenant identity)
 is out of scope here: ``tenantId`` rides on the task body exactly as the
 core's ``TaskRequest.tenant_id``.
+
+---knowledge---
+module_id: gateway.proxy.handler
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [transport-free-handler, fail-closed-parse, status-mapping]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [GatewayHandler, parse_task_request, outcome_status, TaskBodyError]
+invariants: "the handler is transport-free: it maps the REST semantic onto the dispatch core and opens no socket"
+gotchas: "request auth is out of scope here, so tenantId rides on the task body exactly as the core's TaskRequest.tenant_id"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

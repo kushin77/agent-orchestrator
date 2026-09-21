@@ -13,6 +13,22 @@ Two configuration layers:
    ``LOW`` or a task key such as ``summarize``) to a different provider/model
    (``"anthropic"`` or ``"anthropic/claude-opus-5"``). Overrides load from
    YAML (``example-tenant-overrides.yaml``) or the ``TenantOverrides`` API.
+
+---knowledge---
+module_id: gateway.providers.config
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [immutable-config, tenant-overrides, consumed-tier-vocabulary, cloud-to-local-fallback]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ProviderConfig, TenantModelMapping, TenantOverrides, default_provider_configs]
+invariants: "the tier to model map consumes the issue-#9 LOW/MED/HIGH/MAX catalog vocabulary rather than redefining it"
+gotchas: "the supported-model check is fail-closed, and the fallback chain degrades cloud to local Ollama"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -13,6 +13,22 @@ reserved server-error range ``-32000..-32099`` and mirror the HTTP posture of
 the cannibalized JWT + rate-limited MCP hub (``shared-services``
 ``mcp-hub/server/mcp-server.ts``): unauthenticated -> 401, denied -> 403,
 rate-limited -> 429.
+
+---knowledge---
+module_id: gateway.mcp.protocol
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [json-rpc-2.0, closed-error-range, consumed-pattern]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [JsonRpcError, result_body, error_body, parse_message, tool_content, tool_result]
+invariants: "enforcement failures use the reserved server-error range and mirror the HTTP posture of the cannibalized hub"
+gotchas: "a notification (absent id) produces no reply, and the only content type the gateway emits is text"
+related: ["#20"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -14,6 +14,22 @@ loop owns the two policies the acceptance criteria demand:
 - invalid typed output  -> retry once, then CANNOT-ASSESS (never silent pass);
 - provider unavailable  -> next candidate in the fallback chain (graceful
   degradation, cloud -> local Ollama).
+
+---knowledge---
+module_id: gateway.proxy.backend
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [injected-seam, output-and-availability-separate, offline-double]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ModelBackend, BackendResult, StaticBackend, BackendError, BackendUnavailableError, BackendOutputInvalidError]
+invariants: "the proxy core never talks to a provider directly: the backend reports output and availability separately so the dispatch loop owns both policies"
+gotchas: "invalid typed output is reported as its own error so the loop can retry once and then answer CANNOT-ASSESS"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

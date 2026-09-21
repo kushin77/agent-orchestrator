@@ -18,6 +18,22 @@ Commands:
 Run from the repo root (``gateway/`` is put on ``sys.path`` for you):
 
     python3 gateway/proxy/cli.py demo
+
+---knowledge---
+module_id: gateway.proxy.cli
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [offline-cli, no-sockets, evidence-walkthrough]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [main, build_parser, cmd_routes, cmd_route, cmd_dispatch, cmd_demo]
+invariants: "every provider call is served by the scriptable transport rig, so the CLI opens no socket"
+gotchas: "the real merged siblings are composed by wiring.build_real_gateway, not by the CLI itself"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
