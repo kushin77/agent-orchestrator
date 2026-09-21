@@ -19,8 +19,43 @@
 # to be able to fail, and two are the planted fixture in section 3 -- one of
 # which is the line that is SUPPOSED to read as a comment (it begins with a
 # quote, so the counter sees it, which is the conservative direction).
-# measured: 2026-09-16T12:01:31Z -- 112 site(s) in 51 file(s)
-15	scripts/check-pr-contract.sh
+#
+# RECORDED WITH A DOCUMENTED REASON (#1838) -- three files whose NEW occurrences
+# were read in context, measured, and judged a LEGITIMATE USE rather than the
+# shape this check exists to prevent (a containment test piped into a quiet
+# `grep`). None of the three is a containment test over the script's own report:
+#
+#   scripts/check-pr-contract.sh (17; was 15) -- the two new sites are NOT
+#     containment tests. `grep -qE '[^[:space:]]'` (line 940) asks whether the
+#     extracted section holds any non-whitespace character (a NON-EMPTY test),
+#     and `grep -qE '^<the code-review-sme report'` (line 942) is a LINE-ANCHORED
+#     prefix match; neither is expressible as the bash-native containment test
+#     this check enforces. Measured: this file's only `set` line is `set -u`
+#     (line 236) -- it does NOT set `pipefail`, so a SIGPIPE-killed `printf`
+#     cannot be promoted to a 141 and cannot flip either verdict. The
+#     pre-existing 15 remain the file's legacy verdict tests, untouched.
+#
+#   scripts/pr-body.sh (1) -- `printf '%s\n' "$labels" | grep -qx 'type:epic'`
+#     (line 55) is a WHOLE-LINE EXACT match over the issue's `gh` label list. A
+#     substring test (`contains`) would also match `type:epic-ish`, so grep's
+#     line semantics ARE the requirement here, and the producer is one issue's
+#     label list (bounded, small). Legitimate use, not a containment test.
+#
+#   scripts/prune-worktrees.sh (1) -- `printf '%s\n' "$manifest_jobs" | grep -q
+#     '^MANIFEST-ERROR:'` (line 240) is a LINE-ANCHORED probe that detects the
+#     manifest helper's error line; `contains` cannot express an anchored match.
+#     The producer is the output of one `python3` probe over
+#     config/fleet-jobs.json, bounded by the job count. Legitimate use.
+#
+# The fourth finding, scripts/run-lane.sh (2), WAS a genuine occurrence and was
+# FIXED rather than recorded (#1838): a self-test verdict over the script's own
+# captured output, both pure containment tests, in a file that sets `pipefail`
+# (line 45) -- converted to the bash-native `contains` from lib/common.sh.
+# measured: 2026-09-21 -- 113 site(s) in 50 file(s). This pass (#1838) raised
+# scripts/check-pr-contract.sh 15 -> 17 and added scripts/pr-body.sh (1) and
+# scripts/prune-worktrees.sh (1), each with the reason recorded above, and drove
+# scripts/run-lane.sh 2 -> 0 by fixing it.
+17	scripts/check-pr-contract.sh
 11	scripts/check-paperclip-skills.sh
 8	scripts/check-module-registry.sh
 6	scripts/check-paperclip-secrets.sh
@@ -67,6 +102,8 @@
 1	scripts/check-shared-frontend-onboarding.sh
 1	scripts/check-surface-class.sh
 1	scripts/check-ticket-projection.sh
+1	scripts/pr-body.sh
+1	scripts/prune-worktrees.sh
 1	scripts/qa-loop.sh
 1	scripts/run-pytest-suites.sh
 1	scripts/track-codeidx-capabilities.sh

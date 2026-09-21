@@ -97,15 +97,23 @@ SHIM
 
   # Case 2: flag-off refusal is RECORDED, not fatal — rc stays 0 (dry run)
   # and the refusal string names the flag by name.
-  if ! printf '%s\n' "$out" | grep -qF 'paperclip sync refused: enable_paperclip is off'; then
+  # The containment test is bash-native (`contains`, from lib/common.sh), never a
+  # pipe into `grep -q` (#852, scripts/check-verdict-contains.sh): a quiet grep
+  # exits on its FIRST match, SIGPIPEs the producer -- here `printf`, feeding it
+  # this script's OWN captured output -- and `set -o pipefail` (line 45) promotes
+  # that 141 to the whole pipeline's status. Written negated, that reports the
+  # flag-off refusal as ABSENT while it is PRESENT: a verdict test killing its own
+  # producer, which is the exact defect this file must not carry.
+  if ! contains "$out" 'paperclip sync refused: enable_paperclip is off'; then
     echo "run-lane --self-test: NOT-OK — flag-off refusal not recorded-but-nonfatal (rc=$rc)" >&2
     echo "$out" >&2
     failures=$((failures + 1))
   fi
 
   # Case 3: unknown issue -> claim step refuses BY NAME (CANNOT-ASSESS), the
-  # earlier steps still ran and printed.
-  if ! printf '%s\n' "$out" | grep -qE 'claim REFUSED|CANNOT-ASSESS'; then
+  # earlier steps still ran and printed. Same bash-native containment test, twice,
+  # rather than one `grep -qE 'claim REFUSED|CANNOT-ASSESS'` over the pipe.
+  if ! { contains "$out" 'claim REFUSED' || contains "$out" 'CANNOT-ASSESS'; }; then
     echo "run-lane --self-test: NOT-OK — unknown issue did not refuse by name at claim" >&2
     echo "$out" >&2
     failures=$((failures + 1))
