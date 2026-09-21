@@ -50,6 +50,24 @@ resource "google_cloud_run_v2_service" "this" {
         value = "off"
       }
 
+      # Secret Manager-backed env vars (issue #1748), projected -- never
+      # restated: the caller passes var.secret_env only when its flag gate is
+      # on, so with every flag closed this block iterates an empty map and
+      # injects nothing. No value ever appears here, only a secret id + version.
+      dynamic "env" {
+        for_each = var.secret_env
+        iterator = secret
+        content {
+          name = secret.key
+          value_source {
+            secret_key_ref {
+              secret  = secret.value.secret_id
+              version = secret.value.version
+            }
+          }
+        }
+      }
+
       resources {
         limits = {
           cpu    = var.cpu
