@@ -69,6 +69,7 @@ reachable from this index.
 | [`SURFACE-CLASS.md`](SURFACE-CLASS.md) | Per-surface target solution-classes — the CMR quality rung each product surface declares. |
 | [`MECHANICAL-EXECUTION-LAYER.md`](MECHANICAL-EXECUTION-LAYER.md) | Mechanical execution layer — concept & intent (intent-only spec, issue #239). |
 | [`BOARD-ATTACK-PLAN.md`](BOARD-ATTACK-PLAN.md) | Board attack plan (milestone → epic → class) — the PMO coordination artifact; no product code. |
+| [`PMO.md`](PMO.md) | PMO priority + dispatch engine — doctrine-to-implementation map for `governance/pmo`'s `priority`/`dispatch` (issue #403 follow-on). |
 | [`FLEET-STATE.md`](FLEET-STATE.md) | Unified fleet-state projection across the five stores one work item touches (issue #323). |
 | [`FLEET-CAPABILITY-DRIFT.md`](FLEET-CAPABILITY-DRIFT.md) | Capability drift — restarting a rung that does not implement what the repository declares (issue #319). |
 | [`FLEET-DASHBOARD-GAP-ANALYSIS.md`](FLEET-DASHBOARD-GAP-ANALYSIS.md) | Fleet dashboard gap analysis — terminal TUI vs web single-pane-of-glass (issue #330). |
