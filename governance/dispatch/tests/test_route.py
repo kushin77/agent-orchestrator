@@ -130,3 +130,46 @@ def test_tier_for_runtime_maps_capability_space_personas_into_tier_space():
     assert route.tier_for_runtime("hermes", routing_policy=rp) == "L0"
     assert route.tier_for_runtime("paperclip", routing_policy=rp) == "L0"
     assert route.tier_for_runtime("nobody", routing_policy=rp) is None
+
+
+def test_dispatch_hermes_refuses_by_name_while_enable_hermes_is_off(tmp_path):
+    """Live Nous dispatch (issue #1562) stays declared-off by default: the
+    registry the provider registry itself reads (``infra/feature-flags/registry.yaml``)
+    has no entry at this fixture path, so ``hermes_enabled`` fails closed and
+    ``dispatch_hermes`` refuses by name rather than reaching the network.
+    """
+    import tiered
+    import pytest
+
+    rp = routing.policy()
+    hop_hermes = route.resolve({"capability": "code-author"}, routing_policy=rp)["hops"][0]
+    assert hop_hermes["runtime"] == "hermes"
+
+    missing_registry = tmp_path / "no-such-registry.yaml"
+    with pytest.raises(tiered.TieredRefusal) as exc:
+        route.dispatch_hermes(hop_hermes, registry_path=missing_registry)
+    assert exc.value.reason == "hermes-disabled"
+
+
+def test_dispatch_hermes_reaches_the_real_provider_class_when_the_flag_is_on(tmp_path):
+    """When the declared flag is explicitly promoted 'on', dispatch_hermes wires
+    through to the real ``gateway/providers/hermes.py`` adapter (never a second,
+    parallel provider) — the ON1/ON2 gateway-wiring point issue #1562 asks for.
+    """
+    registry = tmp_path / "registry.yaml"
+    registry.write_text("services:\n  hermes:\n    default: on\n", encoding="utf-8")
+
+    rp = routing.policy()
+    hop_hermes = route.resolve({"capability": "code-author"}, routing_policy=rp)["hops"][0]
+
+    provider_cls = route.dispatch_hermes(hop_hermes, registry_path=registry)
+    assert provider_cls.__name__ == "HermesProvider"
+
+
+def test_dispatch_hermes_refuses_a_non_hermes_hop():
+    import tiered
+    import pytest
+
+    with pytest.raises(tiered.TieredRefusal) as exc:
+        route.dispatch_hermes({"runtime": "paperclip"})
+    assert exc.value.reason == "dispatch-hermes-wrong-runtime"
