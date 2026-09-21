@@ -118,3 +118,43 @@ by name; no state is reachable where a PR is open with nothing owning it.
 #1673 box-state checks by venue · #1674 rendered PR body · #1675 one landing
 verb · #1676 gate-of-record producer. Folded by reference: #1651 #1655 #1661
 #1620 #1602 #1593 #1276 #1295 #1136 #1569.
+
+## Retired under the single-developer method (2026-09-21)
+
+The owner removed the required gate-of-record status check from the default
+branch and retired the merge train and the PR runner. Landing a change is now
+two steps: the squash-message guard, then a squash merge — either driven by
+hand or through the single `make land` verb. There is no queue, no fold, and
+no separate runner process in between.
+
+The lane venue that used to carry the composite gate's verdict is code-only
+now: a lane's PR-time checks run against the diff itself, and box-state
+checks — the state of the machine a lane happened to run on — belong to the
+master attestation taken after landing, not to anything a lane asserts about
+itself.
+
+The gap items below named a mechanism that this method deleted. Each is
+closed by this record rather than by further code, because there is nothing
+left for the described mechanism to regress:
+
+- **Merge-queue service identity.** Described a service account distinct from
+  the owner's own identity, needed only because a queue process merged on
+  someone's behalf. With no queue, merges are the owner's own action under
+  the owner's own identity; there is no second identity to provision.
+- **Gate-of-record flake blocking waves.** Described a required status check
+  flaking and stalling a wave of queued PRs behind it. With the check no
+  longer required and no queue to stall, a flake on one PR cannot block any
+  other landing.
+- **Train re-cut on master move.** Described a fold needing to detect that
+  master moved under it and re-cut the batch. With no fold and no batch,
+  there is nothing to re-cut.
+- **Gate of record behind the box cap.** Described the composite gate being
+  starved because it competed with lane work for a capped number of boxes.
+  Landing no longer runs a composite gate at all, so it cannot be starved by
+  one.
+- **Train check attribution.** Described attributing a red status check on a
+  folded batch back to the one PR that caused it. With no folding, a check
+  result already belongs to exactly one PR.
+- **Runner manifest pin.** Described pinning the runner process to a known
+  manifest so its behavior was reproducible. With the runner retired, there
+  is no manifest to pin.
