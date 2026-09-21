@@ -46,7 +46,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`INFRA-LIMITS.md`](INFRA-LIMITS.md) | The sandbox + ephemeral-storage contract — the blocked network, the read-only-except-workspace filesystem, the shared `/tmp` tmpfs, the write-is-not-a-write-until-read-back rule, and the `scripts/check-infra-limits.sh` guard that enforces them (EPIC #708, issue #729). |
 | [`BOARD-METADATA-AUDIT.md`](BOARD-METADATA-AUDIT.md) | The live board-metadata pass — every open issue's `class/type/priority/area` (+`gdc`/`pillar`), milestone, `epic:<slug>` and declared chain edges, with the before/after coverage and the consumer transcripts (issue #1158). |
 | [`TAGGING.md`](TAGGING.md) | The tag authority end to end — one declared vocabulary per tag dimension (borrowing, never re-declaring, the `class` ladder, the FinOps tiers and the fleet roles), the new `posture` (`overall`/`saas`/`iac`/`no-human-needed`/`human-gated`) and `lifecycle` (SDLC stage) dimensions, the tag → gate derivation by channel (pr/ci/cd/ops), the generated matrix, and the gate whose negative control provokes all eleven refusals by name (issue #1175). |
-| [`BUILT-NOT-SHIPPED-AO.md`](BUILT-NOT-SHIPPED-AO.md) | The promotion-ledger disposition — every declared-off surface names its promotion owner (`promotion_issue:` or `posture: hold`), enforced by the `check-feature-flags.py` promotion-owner arm and its `--self-test` (issue #1618). |
+| [`PROMOTION-OWNER-LEDGER.md`](PROMOTION-OWNER-LEDGER.md) | The promotion-ledger disposition — every declared-off surface names its promotion owner (`promotion_issue:` or `posture: hold`), enforced by the `check-feature-flags.py` promotion-owner arm and its `--self-test` (issue #1618). |
 | [`../control-plane/cockpit/README.md`](../control-plane/cockpit/README.md) | The terminal cockpit (AgentConsole) — the operator client of the RC-3 control API and the authenticated SSE streams; keyboard-first, role-tiered, drillable, flag-gated OFF (EPIC #551, issue #566). |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
@@ -87,10 +87,12 @@ reachable from this index.
 | [`CHAT-MOUNT.md`](CHAT-MOUNT.md) | The chat mount contract — how the conversational surface appears in the OS shell (issue #511, EPIC #500). |
 | [`CODEIDX-CAPABILITY-REGISTER.md`](CODEIDX-CAPABILITY-REGISTER.md) | What the fleet needs from `kushin77/code-indexing`, per capability, and how we know we have it. |
 | [`DIAGRAMS-CAPABILITY-REGISTER.md`](DIAGRAMS-CAPABILITY-REGISTER.md) | What "fully capable" means for the fleet's diagrams surface (issue #467). |
+| [`VENDOR-COMPLIANCE-GAP-133.md`](VENDOR-COMPLIANCE-GAP-133.md) | Vendor-compliance gap #133 (`kushin77/googleworkspace`) — the measured declaration, its owners, and why it must not be closed on its own gate (issue #133). |
 | [`erp-finops/compliance-audit.md`](erp-finops/compliance-audit.md) | ERP/FinOps compliance audit — phase-4 validation & governance (issue #676, EPIC #665). |
 | [`erp-finops/current-state.md`](erp-finops/current-state.md) | Current-state money map — subscription flows and the manual reconciliation points (PF-1, issue #666, EPIC #665). |
 | [`erp-finops/saas-metrics-current-state.md`](erp-finops/saas-metrics-current-state.md) | SaaS metrics current state — MRR/ARR, cloud compute burn, invoicing bottlenecks and the silo map (issue #668). |
 | [`erp-finops/token-baseline.md`](erp-finops/token-baseline.md) | DeepSeek token-flow baseline (issue #667, EPIC #665). |
+| [`BUILT-NOT-SHIPPED-AO.md`](BUILT-NOT-SHIPPED-AO.md) | Built-not-shipped inventory — every artifact that is built but not shipped, each with the mechanism that proves the claim (issue #1540, EPIC #1510). |
 
 ## Planned (later issues)
 

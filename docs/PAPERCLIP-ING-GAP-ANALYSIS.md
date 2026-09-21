@@ -53,6 +53,9 @@ single most likely source of a wrong adoption call, so they are named here:
 
 The boundary between (1) and (2) is recorded in
 [`decision-records/ADR-0012-hermes-paperclip-boundary.md`](decision-records/ADR-0012-hermes-paperclip-boundary.md).
+The authoritative-artifact resolution for all four names — and the paired
+three-way "Hermes" disambiguation — is
+[`decision-records/ADR-0033-paperclip-hermes-naming-resolution.md`](decision-records/ADR-0033-paperclip-hermes-naming-resolution.md).
 
 ## Capability family map
 

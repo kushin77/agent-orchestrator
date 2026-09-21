@@ -80,7 +80,7 @@ registry/personas/
 ├── org-chart.yaml             # the platform C-suite org-chart declaration
 ├── registry.py                # registry API + CLI (discover/get/publish/retire/resolve/org-chart)
 ├── mapping.py                 # persona -> AgentProfile mapping + reviewer doctrine
-├── cards/                     # seed persona cards, one file per persona (31)
+├── cards/                     # seed persona cards, one file per persona (32)
 ├── versions/
 │   └── manifest.yaml          # append-only publish/retire ledger (sha256)
 └── tests/                     # pytest suite (offline)
