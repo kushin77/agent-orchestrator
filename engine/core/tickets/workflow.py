@@ -16,6 +16,22 @@ The anchors are the two ``EventKind`` members the engine ships for exactly
 this surface.  They are emitted by the :class:`TicketRuntime` (the engine
 appends ``workflow_started`` / ``workflow_completed`` itself), so the spec
 stays a plain ordered list of steps and no ``EventKind`` member is added.
+
+---knowledge---
+module_id: engine.core.tickets.workflow
+system: engine
+app: core
+solution_class: pattern
+patterns: [declared-authority, lifecycle-state-machine]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ticket_workflow]
+invariants: ""
+gotchas: "the spec nonce is monotonic so a rebuilt spec is never mistaken for the same one"
+related: ["#634"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

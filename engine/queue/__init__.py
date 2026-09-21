@@ -31,6 +31,22 @@ Public surface
 
 The package is importable as ``engine.queue`` when the repo root is on
 ``sys.path`` (tests arrange this in ``tests/conftest.py``).
+
+---knowledge---
+module_id: engine.queue.__init__
+system: engine
+app: queue
+solution_class: template
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [TaskState, LEASE_STATES, OPEN_STATES, TERMINAL_STATES, DEAD_LETTER_STATES, transition_allowed, Priority, Task, (+23 more)]
+invariants: ""
+gotchas: ""
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from engine.queue.backpressure import BackpressureError

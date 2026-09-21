@@ -18,6 +18,22 @@ PEP-420 namespace):
 Run from anywhere (self-bootstrapping):
 
     python3 engine/loop/cli.py
+
+---knowledge---
+module_id: engine.loop.cli
+system: engine
+app: loop
+solution_class: class
+patterns: [subcommand-table, tri-state-exit, offline-by-construction]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [FixedClock, TriageActor, LowConfidenceActor, make_profile, make_runtime, demo_basic, demo_escalation, demo_determinism, (+2 more)]
+invariants: ""
+gotchas: "determinism is demonstrated with a fixed clock and scripted actors"
+related: ["#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

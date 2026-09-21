@@ -17,6 +17,22 @@ duck-typed runner if one is exposed at module level; otherwise the explicit
 adapter classes are the wiring point.  A runnable that engine/loop exposes
 may be handed to :class:`LoopAgentRunner` (or straight into
 ``MultiAgentOrchestrator(runner=...)``) unchanged.
+
+---knowledge---
+module_id: engine.multiagent.loop_seam
+system: engine
+app: multiagent
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LoopSeamError, decision_to_agent_result, LoopAgentRunner, AgentLoopRunner, loop_runner_if_present]
+invariants: ""
+gotchas: "the loop is optional: an absent loop surface degrades honestly rather than failing the run"
+related: ["#24", "#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

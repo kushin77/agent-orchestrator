@@ -35,6 +35,22 @@ Offline embeddings
 Contract doc: ``engine/memory/README.md``. Owner lane: engine
 (``docs/EXECUTION-PLAN.md``). Import as ``engine.memory.*`` from the repo
 root (engine/ is a PEP-420 namespace package).
+
+---knowledge---
+module_id: engine.memory.__init__
+system: engine
+app: memory
+solution_class: template
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [MemoryScope, MemoryKind, MemoryEntry, MemoryIsolationError, normalize_text, MemoryStore, InMemoryStore, FileStore, (+25 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from .embedding import (BagOfWordsEmbedder, Embedder, cosine_similarity,

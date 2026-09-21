@@ -20,6 +20,22 @@ reporting every number:
 The emitted block is deterministic (``prompt_cache.render_memory_block``):
 the same logical memory set injects the same bytes, so provider prefix
 caching is not defeated by memory (see ``prompt_cache``).
+
+---knowledge---
+module_id: engine.memory.enrich
+system: engine
+app: memory
+solution_class: pattern
+patterns: [derived-view, join-not-own, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [EnrichmentPolicy, EnrichmentReport, ContextEnricher]
+invariants: ""
+gotchas: "enrichment is bounded and measured; it adds context and never rewrites the stored entry"
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -37,6 +37,22 @@ final answer with confidence + token usage).  The ``tools`` registry is the
 allowlist gate.  Neither is called by name here — both are duck-typed seams,
 so the real loop (over a live model gateway + tool sandbox) and the offline
 suite run the exact same code path.
+
+---knowledge---
+module_id: engine.loop.runtime
+system: engine
+app: loop
+solution_class: enterprise
+patterns: [lifecycle-state-machine, deterministic-output, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Action, Actor, DecisionContext, RealClock, AgentLoop, action_tool]
+invariants: "the actor loop is bounded and deterministic: the same inputs and clock yield the same run"
+gotchas: ""
+related: ["#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

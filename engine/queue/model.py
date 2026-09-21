@@ -4,6 +4,22 @@
 time; ``AuditEntry`` is one append-only ledger row recording a lifecycle
 transition (every transition, issue #22 acceptance). ``Priority`` orders
 claim selection.
+
+---knowledge---
+module_id: engine.queue.model
+system: engine
+app: queue
+solution_class: class
+patterns: [domain-model, closed-vocabulary]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [Priority, coerce_priority, TaskSpec, Task, AuditEntry]
+invariants: ""
+gotchas: ""
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

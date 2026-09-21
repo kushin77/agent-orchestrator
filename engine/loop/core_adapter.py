@@ -23,6 +23,22 @@ interrupted workflow resumes by replaying its event log: a loop step that was
 interrupted before completion is re-run to the *identical* decision (the
 engine never re-executes a step already recorded SUCCEEDED — see
 ``engine/core/tests/test_durable_resume.py`` for that invariant).
+
+---knowledge---
+module_id: engine.loop.core_adapter
+system: engine
+app: loop
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [policy_with_overrides, profile_with_overrides, register_agent_loop_handler, run_loop_step]
+invariants: ""
+gotchas: "wires the loop into a durable step without re-owning either side's policy"
+related: ["#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

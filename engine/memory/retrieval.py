@@ -15,6 +15,22 @@ the semantically closest memories that the caller may actually see:
   behind the same protocol);
 * hits below ``min_score`` are *counted, not returned* - relevance is a gate,
   and the enrichment layer reports exactly how many were gated out.
+
+---knowledge---
+module_id: engine.memory.retrieval
+system: engine
+app: memory
+solution_class: enterprise
+patterns: [derived-query-over-graph, explainable-score]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Hit, RetrieverResult, Retriever]
+invariants: "retrieval never crosses a scope boundary to fill a result"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

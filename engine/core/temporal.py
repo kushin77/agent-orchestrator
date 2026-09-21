@@ -27,6 +27,22 @@ The adapter protocol below is deliberately duck-typed (no Temporal SDK
 dependency in this repo, per the offline stack rule) so the future transport
 can be implemented against either the Temporal Python SDK or the REST/HTTP
 worker API without the core importing either.
+
+---knowledge---
+module_id: engine.core.temporal
+system: engine
+app: core
+solution_class: pattern
+patterns: [adapter, contract-first, offline-deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TemporalAdapter, workflow_status_to_temporal]
+invariants: ""
+gotchas: "a seam only: it declares the transport contract and ships no Temporal dependency"
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

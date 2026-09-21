@@ -22,6 +22,22 @@ function of the logical memory set (byte-stable - cache friendliness holds):
 The policy is configurable: ``dedupe_text`` toggles rule 1, ``drop_subsumed``
 toggles rule 2, so a tenant that deliberately keeps near-duplicate records
 can opt out.
+
+---knowledge---
+module_id: engine.memory.window
+system: engine
+app: memory
+solution_class: pattern
+patterns: [pure-function-core, deterministic-output]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [WindowPolicy, slide_window]
+invariants: "the window is a pure function of its policy and input; dropping context is deterministic"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

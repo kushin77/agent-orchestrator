@@ -19,6 +19,22 @@ Defaults follow the harvested sources: ``max_iterations=10`` (gmail's
 <=10-iteration tool loop), ``confirm_confidence=0.9`` / ``human_confidence=
 0.6`` (the gmail triage pattern the issue names), and the hermes complexity
 band thresholds 40/70.
+
+---knowledge---
+module_id: engine.loop.policy
+system: engine
+app: loop
+solution_class: enterprise
+patterns: [declared-authority, closed-vocabulary, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ComplexityPolicy, LoopPolicy, tier_rank, Profile, profile_allowlist]
+invariants: "bounds and cost caps are declared; an unparseable model output resolves to CANNOT-ASSESS, never to a guess"
+gotchas: ""
+related: ["#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

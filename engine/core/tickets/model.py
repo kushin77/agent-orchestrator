@@ -30,6 +30,22 @@ carry the product semantics:
 Every payload carries the tenant scope (``tenant`` + ``namespace_id``) and ``
 WorkflowExecution.from_events`` refuses a log that changes the tenant
 mid-flight, so a ticket can never leak across tenants.
+
+---knowledge---
+module_id: engine.core.tickets.model
+system: engine
+app: core
+solution_class: enterprise
+patterns: [domain-model, lifecycle-state-machine, tenant-scoped]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TicketState, lifecycle_order, legal_moves, TicketLifecycleError, next_ticket_state, DecompositionOutcome, TicketReview, TicketProjection]
+invariants: "the ticket lifecycle order is declared once; an out-of-order transition is refused"
+gotchas: ""
+related: ["#634"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

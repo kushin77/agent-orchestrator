@@ -11,6 +11,22 @@ last heartbeat — never from what a session says about itself:
   staleness window (the work has silently stopped).
 * ``CLAIM-MISMATCH`` — the session claims done but the issue is still open.
 * ``WASTED-EFFORT`` — the session is working an issue that is already closed.
+
+---knowledge---
+module_id: engine.core.leaderboard
+system: engine
+app: core
+solution_class: pattern
+patterns: [domain-model, tenant-scoped]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SessionRecord, LeaderboardSessionRegistry]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

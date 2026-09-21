@@ -15,6 +15,22 @@ Terminal statuses accept no further workflow-level events.  :func:`apply`
 raises :class:`InvalidTransitionError` for any other move, both while the
 engine runs and while it replays a stored log — so a corrupt or hand-edited
 history is refused, never silently accepted (no-false-green discipline).
+
+---knowledge---
+module_id: engine.core.machine
+system: engine
+app: core
+solution_class: enterprise
+patterns: [lifecycle-state-machine, pure-function-core, fail-closed]
+derives_from: null
+owner_sme: architecture-sme
+tier: L1
+interfaces: [next_status, is_workflow_event, legal_moves]
+invariants: "the legal-move table is the single determinism authority; an illegal move is refused"
+gotchas: "a pure function: it must not read a clock or any ambient state"
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

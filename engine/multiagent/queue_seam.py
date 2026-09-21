@@ -11,6 +11,22 @@ PASS doctrine), and the report reflects the queue's terminal state.
 
 Imported as ``engine.multiagent.queue_seam`` with the repo root on
 ``sys.path`` (mirrors ``engine.queue`` itself).
+
+---knowledge---
+module_id: engine.multiagent.queue_seam
+system: engine
+app: multiagent
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [QueueFanOutReport, QueueFanOut]
+invariants: ""
+gotchas: ""
+related: ["#24", "#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -14,6 +14,22 @@ implementations of the :class:`EventStore` seam ship here:
 Events are scoped by ``(namespace_id, workflow_id)``: reads filter on both,
 so a workflow that lives in tenant A is invisible to tenant B's store reads
 (namespace isolation even at the persistence layer).
+
+---knowledge---
+module_id: engine.core.events
+system: engine
+app: core
+solution_class: enterprise
+patterns: [append-only, persistence-seam, tenant-scoped]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [EventRecord, EventStore, InMemoryEventStore, FileJsonlEventStore]
+invariants: "the log is append-only; a reader never rewrites a recorded event"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

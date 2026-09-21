@@ -15,6 +15,22 @@ exhausted its attempt budget) and ``DEAD`` (a claim whose lease expired past
 its attempt budget — an orphaned/reaped task). ``FAILED`` and ``DEAD`` are the
 dead-letter buckets; ``replay()`` returns them to ``PENDING`` with the attempt
 budget reset. Every arrow above is a legal transition enforced centrally.
+
+---knowledge---
+module_id: engine.queue.state
+system: engine
+app: queue
+solution_class: enterprise
+patterns: [lifecycle-state-machine, closed-vocabulary, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TaskState, transition_allowed, assert_transition]
+invariants: "the transition table is the authority; an illegal transition is refused, never recorded"
+gotchas: ""
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

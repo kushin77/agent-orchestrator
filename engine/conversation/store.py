@@ -24,6 +24,22 @@ Design rules, each held by ``tests/``:
   reports what would go without touching it.
 * **Offline and deterministic.** Python stdlib only, no network, no model calls,
   and the clock is injected (``now=``) exactly as ``engine/memory`` does it.
+
+---knowledge---
+module_id: engine.conversation.store
+system: engine
+app: conversation
+solution_class: enterprise
+patterns: [domain-model, tenant-scoped, lifecycle-state-machine, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ConversationError, ConversationNotFound, ConversationIsolationError, ConversationValidationError, to_utc, Citation, Message, Conversation, (+3 more)]
+invariants: "a conversation is only ever readable from its own scope"
+gotchas: "purge is irreversible; retention is a declared policy, not a default"
+related: ["#513", "#500"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

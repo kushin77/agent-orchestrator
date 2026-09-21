@@ -19,6 +19,22 @@ claim the same task (only ``PENDING`` is claimable), and a task is never
 recorded SUCCEEDED except by an explicit ``ack`` from its lease holder — a
 task whose worker died (``set -e``-style) is reaped to PENDING/DEAD, never
 silently marked done (the leaderboard fanout-bug doctrine).
+
+---knowledge---
+module_id: engine.queue.queue
+system: engine
+app: queue
+solution_class: enterprise
+patterns: [declared-authority, lifecycle-state-machine, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [QueueError, DuplicateTaskError, NoSuchTaskError, NotClaimedError, LeaseError, NotReplayableError, JobQueue]
+invariants: "the queue is the single writer: leases and transitions are enforced in one place"
+gotchas: ""
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

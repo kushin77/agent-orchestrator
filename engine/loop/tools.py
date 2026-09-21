@@ -8,6 +8,22 @@ allowlisted tools, and returns a typed :class:`ToolResult` for everything
 silent no-op).  Executors are injected and deterministic for replay: the
 same tool call must return the same result, which is what makes two loops
 over the same inputs produce the same trace.
+
+---knowledge---
+module_id: engine.loop.tools
+system: engine
+app: loop
+solution_class: enterprise
+patterns: [closed-vocabulary, single-choke-point, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ToolExecutor, ToolExecutionError, ToolSpec, ToolRegistry, FunctionExecutor]
+invariants: "only an allowlisted tool may execute; an unregistered tool name is refused"
+gotchas: ""
+related: ["#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

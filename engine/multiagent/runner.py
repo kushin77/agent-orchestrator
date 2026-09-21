@@ -7,6 +7,22 @@ agent call goes through a duck-typed runner that satisfies
 see :mod:`engine.multiagent.loop_seam`.  Tests inject a deterministic
 :class:`ScriptedRunner` whose results are fully scripted, so orchestration
 logic is exercised without any real model calls (fully offline).
+
+---knowledge---
+module_id: engine.multiagent.runner
+system: engine
+app: multiagent
+solution_class: pattern
+patterns: [dependency-injection, contract-first, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [is_agent_runner, RunnerContractError, coerce_agent_result, ScriptedRunner, default_fail]
+invariants: "a runner that does not satisfy the contract is refused by name"
+gotchas: ""
+related: ["#24"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

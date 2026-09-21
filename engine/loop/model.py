@@ -18,6 +18,22 @@ src/agent/claude.ts``; the model-tier escalation vocabulary (TIER1..TIER3,
 confidence/error/timeout triggers) from ``hermes-agents
 services/escalation_handler.py``; and the deterministic bounded-runner
 discipline from ``leaderboard lib/agent-loop.sh``.
+
+---knowledge---
+module_id: engine.loop.model
+system: engine
+app: loop
+solution_class: class
+patterns: [domain-model, closed-vocabulary, immutable-models]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ModelTier, next_tier, tier_rank, LoopOutcome, ActionKind, EscalationTrigger, EscalationTargetKind, ParseStatus, (+16 more)]
+invariants: ""
+gotchas: ""
+related: ["#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

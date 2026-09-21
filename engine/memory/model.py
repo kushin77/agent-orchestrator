@@ -22,6 +22,22 @@ Store scope       vscode-memory ``MemoryType``  Meaning
 ``memoryScope`` as a subset of ``[user, session, repository]``. That enum is
 *consumed*, never redefined, here: ``MemoryScope.from_profile_value`` maps a
 profile value to the store scope it grants read/write over.
+
+---knowledge---
+module_id: engine.memory.model
+system: engine
+app: memory
+solution_class: class
+patterns: [domain-model, tenant-scoped, closed-vocabulary]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [utcnow, iso_now, to_utc, parse_iso, MemoryScope, MemoryKind, memory_id_for, scope_for, (+5 more)]
+invariants: "a memory id is a stable function of its scope and container"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

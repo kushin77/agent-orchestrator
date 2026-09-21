@@ -14,6 +14,22 @@ runtime injects whatever object satisfies the protocol — in production the
 real gateway proxy, in the offline suite a fake — so the engine stays
 deterministic and standalone-testable.  See ``engine/core/README.md`` for the
 exact mapping table.
+
+---knowledge---
+module_id: engine.core.gateway_port
+system: engine
+app: core
+solution_class: pattern
+patterns: [contract-first, dependency-injection, offline-deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [GatewayRequest, GatewayResult, ModelGateway, NullGateway]
+invariants: ""
+gotchas: "NullGateway is the honest absence, not a fake success"
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

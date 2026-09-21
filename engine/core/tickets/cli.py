@@ -13,6 +13,22 @@ what a restarted process does).
 
 Everything is offline and deterministic: the decomposer is scripted and the
 "agents" are scripted, so no network and no model provider is involved.
+
+---knowledge---
+module_id: engine.core.tickets.cli
+system: engine
+app: core
+solution_class: class
+patterns: [subcommand-table, tri-state-exit, offline-by-construction]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: []
+invariants: ""
+gotchas: "a demo surface driving stand-in planners and runners"
+related: ["#634"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

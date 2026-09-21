@@ -8,6 +8,22 @@ provider-agnostic model-gateway seam.
 Import as ``core`` with ``engine/`` on ``sys.path`` (the tests arrange this
 in ``tests/conftest.py``), mirroring the sibling packages
 (``registry/service``, ``gateway/proxy``).
+
+---knowledge---
+module_id: engine.core.__init__
+system: engine
+app: core
+solution_class: template
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [EngineError, NamespaceError, UnknownNamespaceError, NamespaceExistsError, CrossNamespaceError, WorkflowError, UnknownWorkflowError, WorkflowValidationError, (+41 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
