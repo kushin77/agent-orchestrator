@@ -63,7 +63,12 @@
     // workbook-9 author → test → publish surface over the pack registry — an
     // org-level studio, not scoped to one tenant, so it takes no ?tenant= and
     // its crumb is its own label.
-    { id: "skillstudio", label: "Skill Studio", icon: "⚒" }
+    { id: "skillstudio", label: "Skill Studio", icon: "⚒" },
+    // The Settings view (issue #1757) renders the workbook settings
+    // aggregator (portal/server/settings.py) — an org-wide, read-only join
+    // of IaC-declared config, not scoped to one tenant, so it takes no
+    // ?tenant= and its crumb is its own label.
+    { id: "settings", label: "Settings", icon: "⚙" }
   ];
 
   function isGlobalView(view) {

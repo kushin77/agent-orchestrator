@@ -69,6 +69,9 @@ FLEET_BOARD_SURFACE = "fleet_board"
 #: The cross-engine Sessions view (issue #1563) — joins `.fleet/`, `.board/`
 #: and `.deepseek-agent/` into one operator row set.
 SESSIONS_SURFACE = "sessions"
+#: The Settings view (issue #1757) — renders
+#: `portal.server.settings.SettingsAggregator`'s row join.
+SETTINGS_SURFACE = "settings"
 
 #: Every surface this module knows about, so a test can assert the set is closed.
 DECLARED_SURFACES = frozenset(
@@ -79,6 +82,7 @@ DECLARED_SURFACES = frozenset(
         ERP_MODULE_SURFACE,
         FLEET_BOARD_SURFACE,
         SESSIONS_SURFACE,
+        SETTINGS_SURFACE,
     }
 )
 

@@ -53,6 +53,7 @@ from portal.server.erp import ErpModuleError, ErpModuleSurface
 from portal.server.livestore import BoardSurface, TelemetryUnavailableError
 from portal.server import sessions as sessions_module
 from portal.server.sessions import SessionsView
+from portal.server.settings import SettingsView
 from portal.server.org_chart import OrgChartView
 from portal.server.skill_studio import (
     ACTION_AUTHOR,
@@ -175,6 +176,7 @@ class ConsoleApplication:
         erp_module_surface: Optional[ErpModuleSurface] = None,
         board_surface: Optional[BoardSurface] = None,
         sessions_view: Optional[SessionsView] = None,
+        settings_view: Optional[SettingsView] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -282,6 +284,13 @@ class ConsoleApplication:
             sessions_view
             if sessions_view is not None
             else SessionsView(repo_root=self.repo_root)
+        )
+        # The Settings view (issue #1757) — feature-flag-gated OFF, declared
+        # beside the other workbook-11 views for the same reason.
+        self.settings_view = (
+            settings_view
+            if settings_view is not None
+            else SettingsView(repo_root=self.repo_root)
         )
         # The operator terminal (issue #774) — feature-flag-gated OFF. It
         # composes the fleet projection (read) and the remote control family
@@ -667,6 +676,15 @@ class ConsoleApplication:
                 "(portal/config/feature-flags.yaml surfaces.sessions)",
             )
 
+        # The Settings view (issue #1757) ships the same way, gated before authN.
+        if parts[0] == "settings" and not self.settings_view.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the settings view is feature-flag-gated OFF "
+                "(portal/config/feature-flags.yaml surfaces.settings)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
@@ -696,6 +714,8 @@ class ConsoleApplication:
                 return self._route_board(parts, method)
             if parts[0] == "sessions":
                 return self._route_sessions(parts, method, body, cookies, now_iso)
+            if parts[0] == "settings":
+                return self._route_settings(parts, method)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -971,6 +991,22 @@ class ConsoleApplication:
         return __import__(
             "portal.server.control_api", fromlist=["control"]
         ).control(self, [family, family_action], "POST", body, cookies, now_iso)
+
+    def _route_settings(self, parts: list[str], method: str) -> Response:
+        """The Settings view (issue #1757).
+
+        Reads: ``GET /api/settings/rows`` — every row
+        ``portal.server.settings.SettingsAggregator.aggregate()`` joins,
+        grouped by domain. Observe-only: every row is ``editable: false``
+        (settings here are IaC-declared, never clicked), so this route has
+        no write side.
+        """
+        surface = parts[1:]
+        if method == "GET" and surface == ["rows"]:
+            return self._ok(self.settings_view.rows())
+        raise ApiError(
+            404, "not_found", f"no such settings read: {'/'.join(surface)}"
+        )
 
     def _route_erp(
         self, surface: list[str], method: str, body: dict[str, Any]

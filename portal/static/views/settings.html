@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — agent-orchestrator console</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Settings</h1>
+    <span class="hint" style="font-size:var(--os-font-size-xs)">IaC-declared config, observe-only</span>
+    <span class="grow"></span>
+    <span id="settingsCounts" class="badge" data-rows="0">—</span>
+  </header>
+
+  <main class="view-main" id="app"><div class="empty">loading…</div></main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    /* The Settings view (issue #1757). Renders
+     * portal.server.settings.SettingsAggregator's row join, grouped by
+     * domain, via GET /api/settings/rows. Every row is editable:false —
+     * settings here are IaC-declared, never clicked, so this view has no
+     * write side: no form, no button that mutates a row.
+     */
+    (async function () {
+      "use strict";
+      var app = document.getElementById("app");
+      var counts = document.getElementById("settingsCounts");
+
+      function fail(err) {
+        if (err.status === 401) { window.location.href = "/auth/login"; return; }
+        var card = CP.el("div", { class: "card" },
+          CP.el("div", { class: "empty error-text", text: err.message }));
+        if (err.code === "feature_disabled") {
+          card.appendChild(CP.el("div", { class: "hint", text:
+            "The settings view ships feature-flag-gated OFF " +
+            "(portal/config/feature-flags.yaml surfaces.settings)." }));
+        }
+        CP.clear(app).appendChild(card);
+      }
+
+      function table(domain, rows) {
+        var tbl = CP.el("table", { class: "tbl", "data-domain": domain });
+        tbl.appendChild(CP.el("thead", {},
+          CP.el("tr", {},
+            CP.el("th", { text: "Key" }), CP.el("th", { text: "Value" }),
+            CP.el("th", { text: "Source file" }), CP.el("th", { text: "Editable" }))));
+        var body = CP.el("tbody");
+        rows.forEach(function (row) {
+          body.appendChild(CP.el("tr", { "data-key": row.key },
+            CP.el("td", { class: "mono", text: row.key }),
+            CP.el("td", { class: "mono", text: String(row.value) }),
+            CP.el("td", { class: "mono dim", text: row.source_file }),
+            CP.el("td", {}, CP.el("span", {
+              class: "badge " + (row.editable ? "info" : "dim"),
+              text: row.editable ? "yes" : "no" }))));
+        });
+        tbl.appendChild(body);
+        return tbl;
+      }
+
+      var payload;
+      try {
+        payload = await CP.get("/api/settings/rows");
+      } catch (err) { fail(err); return; }
+
+      var data = payload.data || {};
+      var domains = data.domains || {};
+      var domainNames = Object.keys(domains).sort();
+      var totalRows = domainNames.reduce(function (n, d) { return n + domains[d].length; }, 0);
+      counts.textContent = totalRows + " row(s) · " + domainNames.length + " domain(s)";
+      counts.setAttribute("data-rows", String(totalRows));
+
+      CP.clear(app);
+
+      var schemaCard = CP.el("section", { class: "card" },
+        CP.el("div", { class: "spread" },
+          CP.el("strong", { text: "Source of truth" }),
+          CP.el("span", { class: "hint mono", text:
+            "IaC-declared config, joined read-only · " + data.schema })));
+      app.appendChild(schemaCard);
+
+      if (!domainNames.length) {
+        var empty = CP.el("section", { class: "card" },
+          CP.el("div", { class: "empty dim", text: "No settings domains." }));
+        app.appendChild(empty);
+        return;
+      }
+
+      domainNames.forEach(function (domain) {
+        var card = CP.el("section", { class: "card", "data-settings-domain": domain });
+        card.appendChild(CP.el("div", { class: "spread" },
+          CP.el("strong", { text: domain })));
+        card.appendChild(table(domain, domains[domain]));
+        app.appendChild(card);
+      });
+    })();
+  </script>
+</body>
+</html>
