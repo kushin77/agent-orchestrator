@@ -652,7 +652,7 @@ surfaces:
       independent of the guardrails service flag.
   operator_terminal:
     default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
-    promoted: false
+    promoted: true  # #1027/#607: shipped, promoted posture
     posture: hold
     service: portal
     tf_flag: enable_portal

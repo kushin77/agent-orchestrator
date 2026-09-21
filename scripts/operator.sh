@@ -17,7 +17,14 @@
 # Usage: bash scripts/operator.sh [--dry-run]
 set -uo pipefail
 
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+
+# Bash-builtin dirname (no external `dirname`): the honesty check below strips
+# PATH down to nothing to prove this path fails on a missing `tmux` by name
+# rather than dying on a missing coreutil first.
+_self="${BASH_SOURCE[0]}"
+_self_dir="${_self%/*}"
+[ "$_self_dir" = "$_self" ] && _self_dir="."
+source "$_self_dir/lib/common.sh"
 root="$(find_repo_root)"
 cd "$root" || exit 2
 

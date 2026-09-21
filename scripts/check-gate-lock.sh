@@ -776,7 +776,7 @@ verify_store.mkdir(parents=True, exist_ok=True)
 stores.append(verify_store)
 
 scratch = work / "scratch-wt"
-(scratch / "scripts").mkdir(parents=True, exist_ok=True)
+(scratch / "scripts" / "lib").mkdir(parents=True, exist_ok=True)
 (scratch / "fleet").mkdir(parents=True, exist_ok=True)
 
 # `fleet/lease.py` travels WITH `fleet/gatelock.py`: `scripts/gate-lock.sh`
@@ -800,6 +800,7 @@ orchestrator_files = (
     # ADMITTED assertion below fails for a reason that has nothing to do with
     # the wedge this gate proves (issue #1106).
     "fleet/lease.py",
+    "scripts/lib/common.sh",
 )
 identical = True
 for relative in orchestrator_files:

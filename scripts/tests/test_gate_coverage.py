@@ -134,8 +134,9 @@ def build_universe(
     re-implementation: they exercise the file this repository gates on.
     """
     root = Path(tmp_path) / "universe"
-    (root / "scripts").mkdir(parents=True, exist_ok=True)
+    (root / "scripts" / "lib").mkdir(parents=True, exist_ok=True)
     shutil.copy2(DETECTOR, root / "scripts" / "check-gate-coverage.sh")
+    shutil.copy2(REPO / "scripts" / "lib" / "common.sh", root / "scripts" / "lib" / "common.sh")
     for rel, text in _gate_surface(wire_probe).items():
         _write(root, rel, text)
     _write(root, "scripts/pytest-suites.txt", "%s\n" % SUITE)

@@ -1116,7 +1116,8 @@ fi
 #    provocation seat must be REFUSED on this repository's own tree, or the gate
 #    could be told that the producer is enabled.
 mk_live_fixture() { # mk_live_fixture <dir> <disabled: true|false>
-  mkdir -p "$1/infra/cloudbuild" "$1/governance/platform" "$1/scripts"
+  mkdir -p "$1/infra/cloudbuild" "$1/governance/platform" "$1/scripts/lib"
+  cp "$own_root/scripts/lib/common.sh" "$1/scripts/lib/common.sh"
   cat > "$1/governance/platform/branch-protection.yaml" <<'YAML'
 required_status_contexts:
   - ao/gate-of-record
