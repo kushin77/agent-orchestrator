@@ -88,6 +88,10 @@ Consequences, stated plainly:
   [`../infra/cloudflare/stub_cf_api.py`](../infra/cloudflare/stub_cf_api.py)
   bound to `127.0.0.1`. The cutover is that mechanism applied to this hostname.
 
+The ingress / WAF / DNS rules that mechanism obeys are stated once in
+[`CLOUDFLARE-POLICY.md`](CLOUDFLARE-POLICY.md) — that page is the policy; this
+section does not restate it.
+
 ## 3. Today, measured
 
 Captured `2026-09-16T16:55:54Z` from this checkout. These are the numbers the

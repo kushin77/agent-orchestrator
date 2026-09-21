@@ -103,6 +103,10 @@ the tunnel. State flows one way — from the fleet host **to** the console host.
    ```
    ```
 
+The ingress / WAF / DNS rules these steps obey are stated once in
+[`CLOUDFLARE-POLICY.md`](CLOUDFLARE-POLICY.md); this recipe does not restate
+them.
+
 ## Rollback
 
 Re-apply the backed-up tunnel ingress config (one PUT) — the previous origin

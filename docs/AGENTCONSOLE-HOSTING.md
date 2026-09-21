@@ -19,6 +19,10 @@
 > [§11](#11-the-modulecatalog-packaging-issue-813) below (the module/catalog
 > packaging).
 
+The Cloudflare ingress / WAF / DNS rules the live host is cut over by are stated
+once in [`CLOUDFLARE-POLICY.md`](CLOUDFLARE-POLICY.md); this page does not
+restate them.
+
 ## 1. The problem this page closes
 
 AgentConsole — the browser operator terminal — is merged (#774, rename #797) and

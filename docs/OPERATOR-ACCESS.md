@@ -288,6 +288,10 @@ four steps below and only the first has interesting logic:
 4. **Verify** the rule is present in the live configuration, and that the name
    resolves (A/AAAA).
 
+The ingress / WAF / DNS rules this route obeys are stated once in
+[`CLOUDFLARE-POLICY.md`](CLOUDFLARE-POLICY.md); this section does not restate
+them.
+
 ### Provision the tunnel and deploy the connector (`--provision`, `--connector`)
 
 Until issue #785 the publish step above *assumed the tunnel already existed* and

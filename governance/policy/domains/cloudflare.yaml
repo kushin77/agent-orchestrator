@@ -1,0 +1,16 @@
+# The Cloudflare edge policy domain (issue #1766).
+#
+# The single spec for this repository's Cloudflare ingress / WAF / DNS policy is
+# `docs/CLOUDFLARE-POLICY.md` (#1766): before it, the edge rules were implicit in
+# script logic across `infra/cloudflare/{ingress.py,provision.py,ao-ssh-access.sh}`,
+# `infra/feature-flags/registry.yaml` and five docs. The policy BITES AT DEPLOY
+# TIME: `infra/cloudflare/ao-ssh-access.sh` drives the flow, the pure merge and
+# provision functions in `ingress.py` / `provision.py` produce every edge mutation,
+# and the only mutating act (`--apply`) is refused while `surfaces.remote_ssh_access`
+# is OFF (`infra/feature-flags/registry.yaml`, GR-5). The route ships `default: off`.
+#
+# Schema: governance/policy/README.md.
+domain: cloudflare
+source_file: docs/CLOUDFLARE-POLICY.md
+enforcement_point: "deploy-time edge provisioning (infra/cloudflare/provision.py + ingress.py drive infra/cloudflare/ao-ssh-access.sh; --apply is refused while surfaces.remote_ssh_access is off, GR-5)"
+control_plane_visible: true
