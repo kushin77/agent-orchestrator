@@ -12,7 +12,10 @@ promoted:
   (5) every terraform `enable_*` flag in variables.tf has an explicit
       `default = false`, and the `enable_<service>` flags match the registry
       service names 1:1 (a flag without a registry entry — or vice versa — is a
-      drift finding).
+      drift finding),
+  (6) every not-yet-promoted `services:`/`surfaces:` entry carries a promotion
+      owner — a non-empty `promotion_issue:` or `posture: hold` (issue #1618) —
+      so a declared-off surface cannot drift with nobody responsible.
 
 Every branch above can genuinely fail; nothing here is a formality.
 """
@@ -66,7 +69,89 @@ def load_registry():
         return yaml.safe_load(fh)
 
 
-def main() -> None:
+def _owner_errors(reg: dict) -> list[str]:
+    """Promotion-owner findings (issue #1618): a declared-off surface with no
+    owner. Returns the error strings; pure (never exits, never prints)."""
+    findings: list[str] = []
+    for section in ("services", "surfaces"):
+        entries = reg.get(section)
+        if not isinstance(entries, dict):
+            continue
+        for name, entry in entries.items():
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("promoted"):
+                continue  # already shipped; promotion recorded by `promoted: true`
+            has_owner = bool(entry.get("promotion_issue"))
+            is_hold = entry.get("posture") == "hold"
+            if not has_owner and not is_hold:
+                findings.append(
+                    f"{section}.{name} is declared off with neither promotion_issue "
+                    "nor posture: hold"
+                )
+    return findings
+
+
+def _run_self_test() -> int:
+    """Prove both directions of the promotion-owner rule (issue #1618).
+
+    A missing owner is refused by name; a present owner (either `promotion_issue`
+    or `posture: hold`) passes; and the real registry is fully owned/held. A
+    probe that does not behave as asserted fails, so the arm cannot pass vacuously.
+    """
+    print("== check-feature-flags self-test (promotion-owner rule) ==")
+    failed = 0
+
+    def probe(name: str, want_errors: bool, reg: dict, needle: str = "") -> None:
+        nonlocal failed
+        errs = _owner_errors(reg)
+        ok = bool(errs) if want_errors else not errs
+        if ok and (not want_errors or not needle or any(needle in e for e in errs)):
+            detail = f" (correctly failed: {errs[0]})" if want_errors and errs else ""
+            print(f"  OK    {name}{detail}")
+        else:
+            print(f"  FAIL  {name}: errors={errs!r} (wanted {'a failure' if want_errors else 'clean'})", file=sys.stderr)
+            failed += 1
+
+    # (a) a non-promoted entry with neither field must be refused, by name.
+    probe(
+        "missing owner refused",
+        True,
+        {"services": {"probe_svc": {"default": "off", "promoted": False}}, "surfaces": {}},
+        needle="services.probe_svc",
+    )
+    # (b) the same entry with `posture: hold` passes.
+    probe(
+        "posture: hold accepted",
+        False,
+        {"services": {"probe_svc": {"default": "off", "promoted": False, "posture": "hold"}}, "surfaces": {}},
+    )
+    # (c) the same entry with a `promotion_issue` passes.
+    probe(
+        "promotion_issue accepted",
+        False,
+        {"services": {"probe_svc": {"default": "off", "promoted": False, "promotion_issue": "#1"}}, "surfaces": {}},
+    )
+    # (d) a promoted entry is exempt (already shipped).
+    probe(
+        "promoted entry exempt",
+        False,
+        {"services": {"probe_svc": {"default": "on", "promoted": True}}, "surfaces": {}},
+    )
+    # (e) the real registry is fully owned or held.
+    probe("real registry fully owned/held", False, load_registry())
+
+    if failed:
+        print(f"check-feature-flags self-test: {failed} probe(s) failed", file=sys.stderr)
+        return 1
+    print("check-feature-flags self-test: OK")
+    return 0
+
+
+def main(argv=None) -> int:
+    if "--self-test" in (argv or sys.argv[1:]):
+        return _run_self_test()
+
     reg = load_registry()
 
     # (1) default_policy
@@ -145,8 +230,13 @@ def main() -> None:
         if only_reg:
             fail(f"registry services without terraform enable_ flags: {', '.join(only_reg)}")
 
+    # (6) promotion owners: a declared-off surface with no owner is refused.
+    for finding in _owner_errors(reg):
+        fail(finding)
+
     finish()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
