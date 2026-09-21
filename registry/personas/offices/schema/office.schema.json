@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:office.schema:v1",
+  "title": "Office",
+  "description": "Canonical structural contract for a purebliss office module (charter.yaml, abilities.yaml, reports.yaml and, where an office declares one, delivery-lifecycle.yaml) under registry/personas/offices/<office>/. Originated as the CTO-only schema (issue #1573, Parent #1510) at registry/personas/offices/cto/schema/office.schema.json; generalized here to the shared canonical location (registry/personas/offices/schema/office.schema.json) when the CEO/CFO/PMO office directories were added (lane-purebliss-org) so every office validates against ONE schema instead of a per-office copy. Validated by registry/personas/tests/test_cto_office.py and test_office_modules.py, wired into the existing pytest-registry-personas suite (scripts/verify.sh). This schema validates STRUCTURE only; cross-references (member ids resolving to real cards, verb ids existing in control-plane/control/verbs.yaml) are checked by the test modules, not by this schema alone. NOTE (delta, not yet reconciled): registry/personas/offices/cfo/charter.yaml predates this canonicalization and uses a different, incompatible field shape (schemaVersion/tenant/personaCardRef/authority.{grants,denies} instead of schema+version/scopeOfAuthority/mayApprove/mayNotApprove) validated separately by registry/personas/offices/schema/office-charter-legacy-cfo.schema.json (moved next to this file, unmerged); reshaping it onto this schema is a follow-up, not done in this change.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["office", "schema", "version"],
+  "properties": {
+    "office": { "type": "string", "enum": ["ceo", "cto", "cfo", "pmo"] },
+    "schema": {
+      "type": "string",
+      "pattern": "^(ceo|cto|cfo|pmo)-office-(charter|abilities|reports|delivery-lifecycle)/v[0-9]+$"
+    },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "reportsTo": { "type": "string" },
+    "scopeOfAuthority": { "type": "object" },
+    "mayApprove": { "type": "array", "items": { "type": "string" } },
+    "mayNotApprove": { "type": "array", "items": { "type": "string" } },
+    "escalation": { "type": "object" },
+    "guardrails": { "type": "array", "items": { "type": "string" } },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "GR-10 provenance: required on every office file that declares harvested content (charter, abilities)."
+    },
+    "abilities": { "type": "array" },
+    "gaps": { "type": "array" },
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "card"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "card": { "type": "string", "pattern": "^registry/personas/cards/[a-z][a-z0-9-]*\\.yaml$" },
+          "lane": { "type": "string" },
+          "defaultTierAtWriting": { "type": "string", "enum": ["LOW", "MED", "HIGH", "MAX"] },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "chain": { "type": "array" },
+    "rootAdminScope": { "type": "string" },
+    "dispatchPlanContract": { "type": "object" },
+    "consumes": { "type": "array" },
+    "toolAllowlistExtends": {
+      "type": "string",
+      "description": "Pointer of the form '<card path>#toolAllowlist' this office's abilities.yaml extends rather than redefines."
+    }
+  }
+}

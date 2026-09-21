@@ -175,6 +175,13 @@ verify-attestation:
 worktrees:
 	@bash scripts/prune-worktrees.sh
 
+## finops — CFO office KPI gate: injected-prompt byte ceiling
+## (registry/personas/offices/cfo/cost-policy.yaml). Auto-discovered into
+## `make verify` as scripts/check-finops-kpi.sh; this target lets it run
+## standalone (docs/cfo/PROMPT-REDUCTION-PLAN.md).
+finops:
+	@bash scripts/check-finops-kpi.sh
+
 ## repo-settings — read back the live repo merge-message policy against the
 ## declaration (governance/platform/repo-settings.yaml, issue #1138); pass
 ## REPO_SETTINGS_ARGS=apply to PATCH the declared fields onto the live repo
