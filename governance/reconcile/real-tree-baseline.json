@@ -3173,6 +3173,26 @@
       "kind": "worktree",
       "name": "/home/akushnir/ao-worktrees/ao-1338-0a207946",
       "reason": "re-measured 2026-09-21 landing PR #1624: a clean checkout of branch issue-1338-quarantine (HEAD ac1179b4) with no uncommitted dirt. Recorded reviewed, not reclaimed."
-    }
+    },
+      {
+        "kind": "branch",
+        "name": "issue-1497",
+        "reason": "Recorded reviewed 2026-09-21 by the #1485 lane (origin/master 1e4050a0): the real-tree audit reports this artifact unmatched and past the 24h grace, so it reds the box on the clock \u2014 and verify is never attributable, so one violation refuses every landing on the box. Recorded rather than reaped because discarding work is the worker's decision to have authorised, not a cleanup (AGENTS.md rule 17). Measured: tip 82175ea74ad74ab27567847996345dd458354a5e (4 commits off merge-base 3b2a306ad0ba, 5 paths); git merge-base --is-ancestor origin/master rc 1, so not landed; its committed work IS preserved off this box \u2014 git for-each-ref --contains names origin/train/20260920T170357Z, pr/1502, pr/1590 and pr/1591. Issue #1497 is CLOSED, so the per-artifact owner call (land it under a fresh issue, or authorise its deletion) stays with issue #1338, which owns that decision and is measured open."
+      },
+      {
+        "kind": "branch",
+        "name": "issue-1504",
+        "reason": "Recorded reviewed 2026-09-21 by the #1485 lane (origin/master 1e4050a0): the real-tree audit reports this artifact unmatched and past the 24h grace, so it reds the box on the clock \u2014 and verify is never attributable, so one violation refuses every landing on the box. Recorded rather than reaped because discarding work is the worker's decision to have authorised, not a cleanup (AGENTS.md rule 17). Measured: tip 01ebf5b7e25a14559f4ae4264fdfd24884ba6cb8 (1 commit off merge-base, 2 paths); not an ancestor of origin/master; its committed work is preserved off this box \u2014 git for-each-ref --contains names pr/1517. Issue #1504 is CLOSED; the owner call stays with issue #1338."
+      },
+      {
+        "kind": "worktree",
+        "name": "/home/akushnir/ao-worktrees/ao-1489-fix",
+        "reason": "Recorded reviewed 2026-09-21 by the #1485 lane (origin/master 1e4050a0): the real-tree audit reports this artifact unmatched and past the 24h grace, so it reds the box on the clock \u2014 and verify is never attributable, so one violation refuses every landing on the box. Recorded rather than reaped because discarding work is the worker's decision to have authorised, not a cleanup (AGENTS.md rule 17). Measured: a clean checkout (git status --porcelain -uall empty) of branch ao1489-fix at HEAD 8cfe60a0a11e; not an ancestor of origin/master, and git for-each-ref --contains names NO remote ref at all \u2014 so its committed work exists nowhere but this disk, which is exactly the rule 17 class and why it is recorded rather than reaped. No /proc process holds it as cwd. The owner call (land it under a fresh issue \u2014 #1489 is CLOSED \u2014 or authorise its deletion) stays with issue #1338."
+      },
+      {
+        "kind": "worktree",
+        "name": "/home/akushnir/ao-worktrees/ao-1497-gatecov",
+        "reason": "Recorded reviewed 2026-09-21 by the #1485 lane (origin/master 1e4050a0): the real-tree audit reports this artifact unmatched and past the 24h grace, so it reds the box on the clock \u2014 and verify is never attributable, so one violation refuses every landing on the box. Recorded rather than reaped because discarding work is the worker's decision to have authorised, not a cleanup (AGENTS.md rule 17). Measured: a clean checkout (git status --porcelain -uall empty) of branch issue-1497 at HEAD 82175ea74ad7 \u2014 the same commit as the branch artifact above, whose work is carried by origin/train/20260920T170357Z and pr/1502/1590/1591. No /proc process holds it as cwd. The worktree directory is reclaimable; reclaiming it is the worker's decision (#1338), not a cleanup."
+      }
   ]
 }
