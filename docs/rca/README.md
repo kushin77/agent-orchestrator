@@ -26,3 +26,8 @@ Filename: `docs/rca/<yyyy-mm-dd>-<slug>.md`.
   #1268: per-integration frontend/backend/middleware status table, the
   tier-space/capability-space router split (#1701), and the dependency-ordered
   roadmap to e2e complete.
+
+The real-tree quarantine (governance/reconcile/real-tree-quarantine.json) held
+7 residual exemptions tracked while open; the earlier landing chain retired
+all 7 into the reviewed baseline, so the quarantine array is empty on the
+default branch.
