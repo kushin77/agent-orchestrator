@@ -1,0 +1,12 @@
+# GitHub issue-form configuration (.github/ISSUE_TEMPLATE/config.yml).
+#
+# Issue #1533. The three governed forms above only bind a brief that is FILED
+# through them; GitHub's default also offers "Open a blank issue", which routes
+# around every required field in all three and puts an unvalidated free-text box
+# on the board. Disabling blank issues is what makes those required fields
+# load-bearing rather than optional.
+#
+# `contact_links` is declared, even though it is empty, so the file states that
+# no fallback channel is offered rather than leaving the answer to a default.
+blank_issues_enabled: false
+contact_links: []

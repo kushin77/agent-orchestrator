@@ -105,6 +105,8 @@ Environment (every identifier is REQUIRED; a missing one is refused by name):
   AO_SSH_CONNECTOR_USER    with --connector: the SSH user on those host(s)
   AO_SSH_CONNECTOR_TOKEN   with --connector --apply: the tunnel token (env/Vault/GSM)
   AO_SSH_CONNECTOR_KEY     with --connector --apply: path to the SSH private key
+  AO_RESOURCE_CLAIM_HOLDER the identity this run holds the surface's lease as
+                           (default operator:<user>) -- see the resource lease below
   AO_SSH_CONNECTOR_IMAGE   the cloudflared image (default cloudflare/cloudflared:2026.7.2)
   AO_SSH_CONNECTOR_NETWORK the docker network (default bridge)
   AO_SSH_CONNECTOR_CONTAINER_PREFIX  the connector container name prefix (default ao-tunnel)
@@ -217,11 +219,45 @@ resolve_token() {
 
 scratch="/tmp/ao-ssh-access.$$.$(date +%s)"
 mkdir -p "$scratch" || refuse "cannot create a scratch directory at ${scratch}"
-trap 'rm -rf "$scratch"' EXIT
+
+# ── the live-resource lease (issue #1545) ──────────────────────────────────
+# `--apply` mutates ONE live resource -- this surface on this Cloudflare estate
+# -- and two owners pushing a phase of one surface at the same time is a
+# measured incident rather than a hypothetical: each side's push silently
+# reverted the other's phase. The lease is keyed by the RESOURCE, so a second
+# holder is refused BY NAME (holder + expiry quoted) instead of interleaving,
+# and it is released on exit -- or by its declared TTL if this run is killed
+# (`governance/policy/lease.py`). A DRY RUN takes no lease: it mutates nothing,
+# so it cannot become the second writer the lease exists to stop.
+RESOURCE_LEASE_MODULE="governance/dispatch/resource_lease.py"
+LEASE_RESOURCE="cloudflare-phase:${SURFACE}"
+LEASE_HOLDER="${AO_RESOURCE_CLAIM_HOLDER:-operator:${USER:-unknown}}"
+LEASE_ACQUIRED=false
+
+release_lease() {
+  # Cleanup must never turn a good run into a failed one, and the TTL is the
+  # backstop, so a release that cannot be written is not raised here.
+  if [ "$LEASE_ACQUIRED" = true ]; then
+    python3 "$RESOURCE_LEASE_MODULE" release \
+      --resource "$LEASE_RESOURCE" --holder "$LEASE_HOLDER" >/dev/null 2>&1 || true
+  fi
+}
+
+# This replaces the scratch-only trap: the lease is released FIRST, because the
+# release reads the tree the scratch removal would delete.
+trap 'release_lease; rm -rf "$scratch"' EXIT
 
 token_source="$(resolve_token)"
 CF_TOKEN="$(cat "$scratch/token")"
 rm -f "$scratch/token"
+
+if [ "$DRY_RUN" = false ]; then
+  if ! lease_out="$(python3 "$RESOURCE_LEASE_MODULE" acquire \
+        --resource "$LEASE_RESOURCE" --holder "$LEASE_HOLDER" --lane cloudflare-phase 2>&1)"; then
+    refuse "the live-resource lease on ${LEASE_RESOURCE} was not granted (${lease_out}). Another holder is pushing a phase of this surface: wait for its release or TTL instead of interleaving (issue #1545)."
+  fi
+  LEASE_ACQUIRED=true
+fi
 
 # The one function that talks to the API. Its only mutating entry point is
 # `cf_mutate`, which is unreachable in a dry run -- so "a dry run sends nothing"

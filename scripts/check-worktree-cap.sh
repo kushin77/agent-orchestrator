@@ -18,7 +18,10 @@
 # named `worktree-cap-exceeded:<n>/<cap>` / `reaper-unscheduled`) /
 # 2 CANNOT-ASSESS (`.fleet/lanes` exists but could not be read, or the
 # precondition otherwise cannot be measured — printed, never treated as a
-# passing or failing count).
+# passing or failing count). Both box-wide findings (worktree-cap-exceeded,
+# and since #1673 reaper-unscheduled too) are advisory NOTEs, not NOT-OK, in
+# the default lane venue; AO_GATE_VENUE=attestation still reds on them by
+# name (#1620).
 #
 # Usage:
 #   bash scripts/check-worktree-cap.sh              # check the real tree
@@ -26,6 +29,14 @@
 set -uo pipefail
 
 self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# #1620: AO_GATE_VENUE distinguishes a per-lane `make verify` (default —
+# box-wide, concurrency-sensitive counts are advisory) from the serial
+# post-merge master-attestation run (AO_GATE_VENUE=attestation — the same
+# counts are enforced for real). Read per-call (inside check_cap), not once
+# here, so a self-test can exercise both venues in the same process. See
+# governance/reconcile/real_tree_baseline.py and check-reconcile-orphans.sh
+# for the same distinction.
 
 self_test=0
 for arg in "$@"; do
@@ -190,9 +201,21 @@ check_cap() { # check_cap <repo> — prints findings, returns 0/1/2 per the cont
   fi
 
   local rc=0
+  local venue="${AO_GATE_VENUE:-lane}"
   if [ "$wt_count" -gt "$cap" ]; then
     excess=$((wt_count - cap))
-    echo "check-worktree-cap: NOT-OK — worktree-cap-exceeded:$wt_count/$cap" >&2
+    # #1620: the count is box-wide state — every concurrent session's
+    # worktrees, not just this one's — so it is non-deterministic under
+    # concurrent load. Blocking on it in a LANE venue (a PR's own `make
+    # verify`) means an unrelated diff can fail purely on fleet timing;
+    # the MASTER-ATTESTATION venue (AO_GATE_VENUE=attestation, run serially
+    # post-merge) still enforces it for real.
+    if [ "$venue" = "attestation" ]; then
+      echo "check-worktree-cap: NOT-OK — worktree-cap-exceeded:$wt_count/$cap" >&2
+      rc=1
+    else
+      echo "check-worktree-cap: NOTE — worktree-cap-exceeded:$wt_count/$cap (advisory in lane venue, #1620; blocking in AO_GATE_VENUE=attestation)" >&2
+    fi
     echo "check-worktree-cap: oldest unexplained worktree(s) (excess $excess):" >&2
     # Oldest-first by mtime of the worktree's own .git file/dir, naming ones
     # that are NOT claimed by an open lane record — those are "explained".
@@ -205,7 +228,6 @@ check_cap() { # check_cap <repo> — prints findings, returns 0/1/2 per the cont
       grep -qxF -- "$wtpath" "$claimed_file" 2>/dev/null && continue
       printf '  %s\n' "$wtpath" >&2
     done
-    rc=1
   fi
   rm -f "$claimed_file"
 
@@ -213,8 +235,16 @@ check_cap() { # check_cap <repo> — prints findings, returns 0/1/2 per the cont
   schedule_out="$(cd "$repo" && bash "$reaper_script" --schedule 2>&1)"
   schedule_rc=$?
   if [ "$schedule_rc" -eq 1 ]; then
-    echo "check-worktree-cap: NOT-OK — reaper-unscheduled: $schedule_out" >&2
-    rc=1
+    # #1673: box-wide scheduler state (crontab presence), same class as
+    # worktree-cap-exceeded above — a lane's own `make verify` cannot fix a
+    # missing crontab line, so it is advisory (NOTE) in the default lane
+    # venue and still enforced for real in AO_GATE_VENUE=attestation.
+    if [ "$venue" = "attestation" ]; then
+      echo "check-worktree-cap: NOT-OK — reaper-unscheduled: $schedule_out" >&2
+      rc=1
+    else
+      echo "check-worktree-cap: NOTE — reaper-unscheduled: $schedule_out (advisory in lane venue, #1673; blocking in AO_GATE_VENUE=attestation)" >&2
+    fi
   elif [ "$schedule_rc" -eq 2 ]; then
     echo "check-worktree-cap: CANNOT-ASSESS — reaper schedule could not be determined: $schedule_out" >&2
     [ "$rc" -eq 0 ] && rc=2
@@ -243,11 +273,21 @@ self_test() {
   for i in 1 2 3 4; do
     git -C "$over" worktree add -q --detach "$over/.wt-$i" master >/dev/null 2>&1 || true
   done
-  out="$(check_cap "$over" 2>&1)"; rc=$?
-  if [ "$rc" -eq 1 ] && [[ "$out" == *"worktree-cap-exceeded:"* ]]; then
-    ok "worktree-cap-exceeded fires by name when worktrees exceed lanes+slack"
+  # Text, not rc, is what proves the downgrade here: `check_cap` below runs
+  # in the default lane venue, so both worktree-cap-exceeded AND
+  # reaper-unscheduled (#1673) must appear as NOTE, not NOT-OK — that must
+  # not be conflated with whether either finding fires at all.
+  out="$(check_cap "$over" 2>&1)"
+  if [[ "$out" == *"NOTE — worktree-cap-exceeded:"* ]] && [[ "$out" != *"NOT-OK — worktree-cap-exceeded:"* ]]; then
+    ok "worktree-cap-exceeded is advisory (NOTE, not NOT-OK) in the default lane venue (#1620)"
   else
-    bad "worktree-cap-exceeded did not fire (rc=$rc): $out"
+    bad "worktree-cap-exceeded was not advisory in the lane venue: $out"
+  fi
+  outa="$(AO_GATE_VENUE=attestation check_cap "$over" 2>&1)"; rca=$?
+  if [ "$rca" -eq 1 ] && [[ "$outa" == *"NOT-OK — worktree-cap-exceeded:"* ]]; then
+    ok "worktree-cap-exceeded still fires by name (rc=1) in AO_GATE_VENUE=attestation (#1620)"
+  else
+    bad "worktree-cap-exceeded did not fire in the attestation venue (rc=$rca): $outa"
   fi
 
   # --- CANNOT-ASSESS: .fleet/lanes unreadable --------------------------------
@@ -279,10 +319,16 @@ self_test() {
   # match, which is exactly what "nothing installs this tool" looks like.
   cp "$self_root/scripts/prune-worktrees.sh" "$work/prune-worktrees-unscheduled-double.sh"
   out3="$(REAPER_SCRIPT="$work/prune-worktrees-unscheduled-double.sh" check_cap "$unsched" 2>&1)"; rc3=$?
-  if [[ "$out3" == *"reaper-unscheduled"* ]]; then
-    ok "reaper-unscheduled fires by name when nothing installs prune-worktrees.sh"
+  if [[ "$out3" == *"NOTE — reaper-unscheduled:"* ]] && [[ "$out3" != *"NOT-OK — reaper-unscheduled:"* ]]; then
+    ok "reaper-unscheduled is advisory (NOTE, not NOT-OK) in the default lane venue (#1673)"
   else
-    bad "reaper-unscheduled did not fire: $out3"
+    bad "reaper-unscheduled was not advisory in the lane venue: $out3"
+  fi
+  out3a="$(AO_GATE_VENUE=attestation REAPER_SCRIPT="$work/prune-worktrees-unscheduled-double.sh" check_cap "$unsched" 2>&1)"; rc3a=$?
+  if [ "$rc3a" -eq 1 ] && [[ "$out3a" == *"NOT-OK — reaper-unscheduled:"* ]]; then
+    ok "reaper-unscheduled still fires by name (rc=1) in AO_GATE_VENUE=attestation (#1673)"
+  else
+    bad "reaper-unscheduled did not fire in the attestation venue (rc=$rc3a): $out3a"
   fi
 
   # --- ratchet: live, honoured, NOTE ------------------------------------------
@@ -328,9 +374,9 @@ YAML
   for i in 1 2 3 4; do
     git -C "$expired_ratchet" worktree add -q --detach "$expired_ratchet/.wt-$i" master >/dev/null 2>&1 || true
   done
-  out5="$(check_cap "$expired_ratchet" 2>&1)"; rc5=$?
+  out5="$(AO_GATE_VENUE=attestation check_cap "$expired_ratchet" 2>&1)"; rc5=$?
   if [ "$rc5" -eq 1 ] && [[ "$out5" == *"worktree-cap-exceeded:"* ]] && [[ "$out5" != *"worktree-cap-ratchet:"* ]]; then
-    ok "an expired ratchet is ignored — the declared slack is the only cap, and it reds"
+    ok "an expired ratchet is ignored — the declared slack is the only cap, and it reds (attestation venue)"
   else
     bad "an expired ratchet still excused the pile (rc=$rc5): $out5"
   fi

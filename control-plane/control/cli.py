@@ -79,6 +79,9 @@ SOURCES: dict[str, set[str]] = {
         # issue #1189: the committed board snapshot states the age it
         # tolerates, and a reader must be able to ask it directly.
         "freshness",
+        # issue #1524: the tiered try-loop dispatcher (L0 -> L1 -> L2
+        # escalation) for one issue.
+        "try-loop",
     },
     "governance/reconcile/cli.py": {"stamp", "clear", "status", "sweep", "watch"},
     "governance/lifecycle/cli.py": {"audit", "status", "close", "collect", "retire"},

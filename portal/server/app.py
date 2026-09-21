@@ -1398,6 +1398,22 @@ class ConsoleApplication:
         )
 
     def _me(self, principal: Principal) -> Response:
+        """The caller's own identity — and, with it, its own control verbs.
+
+        ``controlVerbs`` is the subset of the closed control vocabulary *this*
+        caller's capabilities reach (issue #1523). It rides here rather than on a
+        new route because this is already the console's one session-scoped
+        "what may I do" read: the shell, ``agents``, ``budgets``, ``policies``
+        and ``approvals`` all gate on it today, and the operator terminal's
+        steer panel is the next consumer of the same question. The list is
+        computed by ``control_api`` — the module that owns both the vocabulary
+        and the capability decision — so the panel cannot render a verb the
+        dispatch path would refuse; ``None`` means the surface is off or the
+        store is unreadable, which the client renders as fail-closed.
+        """
+        control_api = __import__(
+            "portal.server.control_api", fromlist=["permitted_verb_ids"]
+        )
         return self._ok(
             {
                 "email": principal.email,
@@ -1409,6 +1425,7 @@ class ConsoleApplication:
                 "bindings": [
                     {"tenantId": tenant, "role": role} for tenant, role in principal.bindings
                 ],
+                "controlVerbs": control_api.permitted_verb_ids(self, principal),
             }
         )
 

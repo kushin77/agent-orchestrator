@@ -2,8 +2,9 @@
 
 Three shapes leave this package for disk (a ``ClaimEvent`` in the claims
 ledger, an ``Issue`` row in the board snapshot, the ``queue.yaml`` wave
-document) plus the new audit record (``audit.py``). Before this module existed
-none of the four was frozen anywhere: `model.py`'s ``to_json``/``parse_*``
+document) plus the audit record (``audit.py``) and the live-resource lease
+record (``resource_lease.py``, issue #1545). Before this module existed none
+of them was frozen anywhere: `model.py`'s ``to_json``/``parse_*``
 functions were the only proof of the shape, and nothing stopped them drifting
 from each other.
 
@@ -38,7 +39,14 @@ SHAPE_CLAIM_EVENT = "claimEvent"
 SHAPE_ISSUE_ROW = "issueRow"
 SHAPE_QUEUE_DOCUMENT = "queueDocument"
 SHAPE_AUDIT_RECORD = "auditRecord"
-SHAPES = (SHAPE_CLAIM_EVENT, SHAPE_ISSUE_ROW, SHAPE_QUEUE_DOCUMENT, SHAPE_AUDIT_RECORD)
+SHAPE_RESOURCE_CLAIM = "resourceClaim"
+SHAPES = (
+    SHAPE_CLAIM_EVENT,
+    SHAPE_ISSUE_ROW,
+    SHAPE_QUEUE_DOCUMENT,
+    SHAPE_AUDIT_RECORD,
+    SHAPE_RESOURCE_CLAIM,
+)
 
 
 class SchemaUnavailable(CannotAssess):

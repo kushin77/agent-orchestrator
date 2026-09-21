@@ -216,6 +216,15 @@ def _read(app, path: str, *, cookies: dict | None = None) -> tuple[int, dict]:
     return response.status, payload
 
 
+def _write(
+    app, path: str, body: dict, *, cookies: dict | None = None
+) -> tuple[int, dict]:
+    """One POST (a studio action); anonymous unless a session cookie is supplied."""
+    response = app.handle("POST", path, body=body, cookies=cookies or {})
+    payload = json.loads(response.as_bytes().decode("utf-8")) if response.is_json else {}
+    return response.status, payload
+
+
 # --------------------------------------------------------------------------- #
 # The probes
 # --------------------------------------------------------------------------- #
@@ -282,11 +291,89 @@ def probe_skill_studio_serves_the_studio_catalog() -> dict:
     }
 
 
+def probe_portal_view_documents() -> dict:
+    """The two new console view documents are served and wired to their backends.
+
+    The console ships its views as static frames with no build step, so "the
+    view exists and is reachable" is a fact about the served document, and "it
+    is wired to its backend" is a fact about the routes the document names in
+    its own script. Reading the served bytes (no browser) keeps the probe
+    offline while still asserting the wiring a browser would execute: the view
+    is what calls ``/api/orgchart/*`` and ``/api/skillstudio/*``, so the routes
+    must appear in the document itself.
+    """
+    app, _cookies = _app(enabled=True)
+    expected = {
+        "orgchart": ["/api/orgchart/chart", "/api/orgchart/health"],
+        "skillstudio": [
+            "/api/skillstudio/skills",
+            "/api/skillstudio/author",
+            "/api/skillstudio/test",
+            "/api/skillstudio/publish",
+        ],
+    }
+    observations = {}
+    for view, routes in expected.items():
+        response = app.handle("GET", f"/views/{view}.html", cookies={})
+        html = response.as_bytes().decode("utf-8") if not response.is_json else ""
+        observations[view] = {
+            "status": response.status,
+            "isHtml": "<!DOCTYPE html>" in html,
+            "wired": {route: route in html for route in routes},
+        }
+    return observations
+
+
+def probe_skill_studio_lifecycle_roundtrip() -> dict:
+    """The studio's three actions drive the workbook-9 lifecycle over HTTP.
+
+    ``author`` → ``draft``, ``test`` → ``tested`` (eval evidence recorded),
+    ``publish`` → refused without green evidence — the studio's own gate, not
+    the adapter's. Each POST is the ``ACTION_*`` edge the view's buttons issue,
+    so this is the backend half of "clicking each action reflects the result".
+    """
+    app, cookies = _app(enabled=True)
+    skill_id, version = "e2e-skill", "1.0.0"
+
+    s1, p1 = _write(
+        app, "/api/skillstudio/author",
+        {"skillId": skill_id, "skillVersion": version, "category": "analysis",
+         "description": "e2e probe skill"}, cookies=cookies,
+    )
+    s2, p2 = _write(
+        app, "/api/skillstudio/test",
+        {"skillId": skill_id, "skillVersion": version}, cookies=cookies,
+    )
+    s3, p3 = _write(
+        app, "/api/skillstudio/publish",
+        {"skillId": skill_id, "skillVersion": version}, cookies=cookies,
+    )
+    return {
+        "author": {
+            "status": s1,
+            "lifecycle": (p1.get("data") or {}).get("skill", {}).get("skillLifecycle"),
+        },
+        "test": {
+            "status": s2,
+            "lifecycle": (p2.get("data") or {}).get("skill", {}).get("skillLifecycle"),
+            "hasEvalEvidence": bool(
+                ((p2.get("data") or {}).get("skill", {}) or {}).get("evalEvidence")
+            ),
+        },
+        "publish": {
+            "status": s3,
+            "code": (p3.get("error") or {}).get("code"),
+        },
+    }
+
+
 PROBES = (
     ("flags-off-by-default", probe_flags_off_by_default),
     ("org-chart", probe_org_chart_renders_the_declaration),
     ("task-board", probe_task_board_replays_a_real_ticket),
     ("skill-studio", probe_skill_studio_serves_the_studio_catalog),
+    ("portal-view-documents", probe_portal_view_documents),
+    ("skill-studio-lifecycle", probe_skill_studio_lifecycle_roundtrip),
 )
 
 

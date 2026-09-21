@@ -192,3 +192,9 @@ entries:
   file: cards/cmo.yaml
   sha256: bcf980c036b36ea0ee908ec3ee1d1530342fc6111a14eef8718f0ad85fba57c7
   status: published
+- tenant: platform
+  persona: code-review-sme
+  version: 1.0.0
+  file: cards/code-review-sme.yaml
+  sha256: 127a89aea2e6374a2c9b48377667e89ac17b6cb5289db7da0e5b5db7ad04d422
+  status: published

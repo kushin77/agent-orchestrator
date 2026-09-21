@@ -62,6 +62,13 @@ json_ok() {
   python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$1" >/dev/null 2>&1
 }
 
+contains() { # contains <haystack> <needle> — the bash-native containment test (#852)
+  case "$1" in
+    *"$2"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # --- the real graph: every view runs, tri-state, never a pass on CANNOT-ASSESS
 echo "== views over the committed graph =="
 views=0
@@ -138,7 +145,7 @@ check_refused() {
     unproven=$((unproven + 1))
     return
   fi
-  if ! printf '%s\n' "$out" | grep -qF -- "$needle"; then
+  if ! contains "$out" "$needle"; then
     printf '  FAIL  control %s refused without naming %s\n' "$label" "$needle" >&2
     printf '%s\n' "$out" | sed 's/^/        /' >&2
     unproven=$((unproven + 1))
@@ -256,7 +263,156 @@ else
   unproven=$((unproven + 1))
 fi
 
-# --- 8. the enterprise project plan (issue #1648) runs offline and its
+# --- 8. priority + dispatch: run offline, tri-state, over the real graph ----
+echo "== priority + dispatch (issue #403 follow-on) =="
+for view in priority dispatch; do
+  rc=0
+  pmo "$view" --check --json > "$scratch/real-$view.json" 2> "$scratch/real-$view.err" || rc=$?
+  views=$((views + 1))
+  if [ "$rc" -eq 2 ]; then
+    echo "  FAIL  view $view could not assess the committed graph:" >&2
+    sed 's/^/        /' "$scratch/real-$view.err" >&2
+    unproven=$((unproven + 1))
+    continue
+  fi
+  if json_ok "$scratch/real-$view.json"; then
+    printf '  OK    view %-8s rc=%s (0 OK / 1 NOT-OK, 2 never treated as a pass)\n' "$view" "$rc"
+  else
+    echo "  FAIL  view $view did not emit a JSON document" >&2
+    unproven=$((unproven + 1))
+  fi
+done
+
+# --- 9. priority determinism: re-derive twice, identical (--check already
+# does this in-process; this control re-derives via two separate processes,
+# which is what would catch a formula that leaked the wall clock or depended
+# on PYTHONHASHSEED-sensitive dict/set order across runs) -------------------
+controls=$((controls + 1))
+pmo priority --root . --json > "$scratch/prio-1.json" 2>/dev/null
+pmo priority --root . --json > "$scratch/prio-2.json" 2>/dev/null
+if diff -q "$scratch/prio-1.json" "$scratch/prio-2.json" >/dev/null 2>&1; then
+  echo "  OK    control priority is byte-identical across two separate processes"
+else
+  echo "  FAIL  control priority differs across two separate processes" >&2
+  unproven=$((unproven + 1))
+fi
+
+# --- 10. dispatch refuses a real lane collision (crafted plan document) ----
+controls=$((controls + 1))
+collision_out="$(cd governance/pmo && python3 - <<'PY'
+from dispatch import validate_plan
+document = {
+    "wave": 1,
+    "assignments": [
+        {"ticket": "kushin77/agent-orchestrator#10", "lane": "registry"},
+        {"ticket": "kushin77/agent-orchestrator#11", "lane": "registry"},
+    ],
+    "deferred": [],
+    "unowned_risks": [],
+}
+findings = validate_plan(document)
+codes = {f.code for f in findings}
+assert "dispatch-lane-collision" in codes, findings
+detail = next(f.detail for f in findings if f.code == "dispatch-lane-collision")
+assert "#10" in detail and "#11" in detail, detail
+print("dispatch-lane-collision: " + detail)
+PY
+)"
+if [ $? -eq 0 ] && contains "$collision_out" "dispatch-lane-collision"; then
+  echo "  OK    control dispatch refuses a real lane collision, naming both tickets"
+else
+  echo "  FAIL  control dispatch did not refuse a crafted lane collision:" >&2
+  printf '%s\n' "$collision_out" | sed 's/^/        /' >&2
+  unproven=$((unproven + 1))
+fi
+
+# --- 11. dispatch refuses a silently dropped unowned R item ----------------
+controls=$((controls + 1))
+dropped_out="$(cd governance/pmo && python3 - <<'PY'
+from dispatch import validate_plan
+document = {
+    "wave": 1,
+    "assignments": [],
+    "deferred": [],
+    "unowned_risks": [],
+    "_assert_unowned_risks": ["kushin77/agent-orchestrator#99"],
+}
+findings = validate_plan(document)
+codes = {f.code for f in findings}
+assert "dispatch-unowned-risk" in codes, findings
+detail_subject = next(f.subject for f in findings if f.code == "dispatch-unowned-risk")
+assert detail_subject == "kushin77/agent-orchestrator#99", detail_subject
+print("dispatch-unowned-risk: " + detail_subject)
+PY
+)"
+if [ $? -eq 0 ] && contains "$dropped_out" "dispatch-unowned-risk"; then
+  echo "  OK    control dispatch refuses a silently dropped unowned risk, naming it"
+else
+  echo "  FAIL  control dispatch did not refuse a crafted unowned-risk drop:" >&2
+  printf '%s\n' "$dropped_out" | sed 's/^/        /' >&2
+  unproven=$((unproven + 1))
+fi
+
+# --- 12. a malformed policy.yaml is CANNOT-ASSESS, never a pass ------------
+malformed="$scratch/malformed-policy"
+make_fixture "$malformed" || { echo "check-pmo-rollup: CANNOT-ASSESS — fixture" >&2; exit 2; }
+write_board "$malformed" "2026-09-14T00:00:00Z" '[]'
+mkdir -p "$malformed/governance/pmo"
+cp governance/pmo/policy.schema.json "$malformed/governance/pmo/policy.schema.json"
+printf 'version: 1\n' > "$malformed/governance/pmo/policy.yaml"
+rc=0
+pmo priority --root "$malformed" --check > "$scratch/malformed.out" 2>&1 || rc=$?
+controls=$((controls + 1))
+if [ "$rc" -eq 2 ] && grep -qF "CANNOT-ASSESS" "$scratch/malformed.out"; then
+  echo "  OK    control a malformed policy.yaml is CANNOT-ASSESS (rc=2), never a pass"
+else
+  printf '  FAIL  control a malformed policy.yaml exited %s, expected 2\n' "$rc" >&2
+  cat "$scratch/malformed.out" | sed 's/^/        /' >&2
+  unproven=$((unproven + 1))
+fi
+
+# --- 13. dispatch --by-cluster: a schema-invalid clusters.json is
+# CANNOT-ASSESS (rc 2), never a pass, and a valid one dispatches by cluster --
+byclust="$scratch/byclust"
+make_fixture "$byclust" || { echo "check-pmo-rollup: CANNOT-ASSESS — fixture" >&2; exit 2; }
+write_board "$byclust" "2026-09-14T00:00:00Z" \
+  '[{"number": 10, "title": "one", "state": "OPEN", "labels": [], "parent": null, "blocked_by": [], "closed_at": ""}]'
+mkdir -p "$byclust/governance/pmo"
+printf '{"generated_at": "2026-09-14T00:00:00Z"}\n' > "$byclust/governance/pmo/clusters.json"  # missing required keys
+rc=0
+pmo dispatch --root "$byclust" --by-cluster --check > "$scratch/byclust-invalid.out" 2>&1 || rc=$?
+controls=$((controls + 1))
+if [ "$rc" -eq 2 ] && grep -qF "CANNOT-ASSESS" "$scratch/byclust-invalid.out"; then
+  echo "  OK    control a schema-invalid clusters.json is CANNOT-ASSESS (rc=2), never a pass"
+else
+  printf '  FAIL  control a schema-invalid clusters.json exited %s, expected 2\n' "$rc" >&2
+  cat "$scratch/byclust-invalid.out" | sed 's/^/        /' >&2
+  unproven=$((unproven + 1))
+fi
+
+cat > "$byclust/governance/pmo/clusters.json" <<'JSON'
+{"generated_at": "2026-09-14T00:00:00Z",
+ "source_repos": ["kushin77/agent-orchestrator"],
+ "clusters": [{"id": "c-rca-backfill-1", "family": "RCA backfill", "title": "Backfill RCA docs",
+   "recipe": "apply the standard RCA template", "sme": "sniper-generic", "tier": "L0",
+   "batchable": true, "wave": 1, "priority_rank": 1,
+   "evidence": "1 open issue matched family 'rca' by label scan",
+   "issues": [{"repo": "kushin77/agent-orchestrator", "number": 100, "title": "rca 100",
+     "labels": ["type:task"], "age_days": 10, "parent": null}]}],
+ "unclustered": [],
+ "hygiene": {"duplicates": [], "orphan_children": [], "empty_epics": [], "template_gaps": []}}
+JSON
+controls=$((controls + 1))
+by_cluster_flag="$(pmo dispatch --root "$byclust" --by-cluster --json 2>/dev/null \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["by_cluster"], len(d["assignments"]))')"
+if [ "$by_cluster_flag" = "True 1" ]; then
+  echo "  OK    control a valid clusters.json dispatches one agent per batchable cluster"
+else
+  echo "  FAIL  control a valid clusters.json produced: $by_cluster_flag (expected 'True 1')" >&2
+  unproven=$((unproven + 1))
+fi
+
+# --- 14. the enterprise project plan (issue #1648) runs offline and its
 # dependency-order-violation rule is provoked, not assumed ------------------
 echo "== plan (issue #1648) =="
 if pmo plan --json > "$scratch/plan-real.json" 2>"$scratch/plan-real.err"; then
@@ -300,7 +456,7 @@ YAML
 check_refused "plan dependency-order-violation (unknown dep)" "t-does-not-exist" \
   python3 governance/pmo/cli.py plan --root "$plan_fixture"
 
-expected_controls=8
+expected_controls=14
 if [ "$controls" -ne "$expected_controls" ]; then
   echo "check-pmo-rollup: FAIL — expected $expected_controls controls, ran $controls" >&2
   unproven=$((unproven + 1))

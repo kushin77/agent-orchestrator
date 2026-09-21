@@ -36,7 +36,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import board_selfheal  # noqa: E402
 import claims  # noqa: E402
 import focus as focus_mod  # noqa: E402
 import live as live_mod  # noqa: E402
@@ -46,6 +48,7 @@ import pool as pool_mod  # noqa: E402
 import owner_queue as queue_mod  # noqa: E402
 import queue_freshness  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
+import tiered  # noqa: E402
 from model import parse_file_claims  # noqa: E402
 
 EXIT_OK = 0
@@ -577,6 +580,78 @@ def cmd_pool(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_try_loop(args: argparse.Namespace) -> int:
+    """Run the tiered try-loop dispatcher for one issue (L0 -> L1 -> L2 escalation).
+
+    ``--dry-run`` resolves the tier -> model mapping and prints it without
+    dispatching, writing the ledger, or touching labels. ``--labels`` (JSON) and
+    ``--body-file`` let the caller supply the issue's labels/body directly, so the
+    deterministic fixture and the negative control run without ``gh``.
+    """
+    labels = args.labels
+    if labels is None:
+        labels = tiered._gh_labels(args.issue)  # noqa: SLF001
+    elif isinstance(labels, str):
+        try:
+            labels = json.loads(labels)
+        except json.JSONDecodeError as exc:
+            print(f"try-loop: CANNOT-ASSESS — --labels is not valid JSON: {exc}", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+
+    if args.body_file:
+        try:
+            body = Path(args.body_file).read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"try-loop: CANNOT-ASSESS — --body-file unreadable: {exc}", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+    else:
+        body = tiered._gh_body(args.issue)  # noqa: SLF001
+
+    # --no-gh / --no-dispatch swap the real side effects for no-ops so the loop
+    # can be driven against a fixture without touching GitHub or a live model.
+    noop = lambda *a, **k: None  # noqa: E731
+    try:
+        outcome = tiered.run(
+            args.issue,
+            body,
+            labels,
+            audit_path=args.audit,
+            max_attempts=args.max_attempts,
+            provider=args.provider,
+            agent=args.agent,
+            apply_label=noop if args.no_gh else None,
+            post_comment=noop if args.no_gh else None,
+            invoke=noop if args.no_dispatch else None,
+            dry_run=args.dry_run,
+        )
+    except tiered.TieredRefusal as exc:
+        print(f"try-loop REFUSED: {exc.reason} — {exc.detail}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+
+    if outcome.get("dry_run"):
+        print(json.dumps({
+            "dry_run": True,
+            "issue": outcome["issue"],
+            "tier": outcome["tier"],
+            "warning": outcome.get("warning"),
+            "provider": outcome["provider"],
+            "model": outcome["model"],
+            "acceptance_commands": outcome["commands"],
+        }, indent=2))
+        return EXIT_OK
+
+    print(json.dumps({
+        "issue": outcome["issue"],
+        "tier": outcome["tier"],
+        "warning": outcome.get("warning"),
+        "final_status": outcome["final_status"],
+        "final_tier": outcome.get("final_tier"),
+        "escalated_to": outcome.get("escalated_to"),
+        "attempts": [{"tier": a["tier"], "model": a["model"], "status": a["status"]} for a in outcome["attempts"]],
+    }, indent=2))
+    return EXIT_OK if outcome["final_status"] == "pass" else EXIT_NOT_OK
+
+
 def cmd_reap(args: argparse.Namespace) -> int:
     """Recover claims wedged by dead agents so their issues can be dispatched again."""
     reaped = claims.reap(
@@ -818,18 +893,36 @@ def cmd_freshness(args: argparse.Namespace) -> int:
         except ValueError as exc:
             print(f"freshness: CANNOT-ASSESS — --now {args.now!r} is not a timestamp ({exc})", file=sys.stderr)
             return EXIT_CANNOT_ASSESS
+    max_age = queue_freshness.DEFAULT_MAX_AGE_HOURS if args.max_age_hours is None else args.max_age_hours
     try:
-        verdict = queue_freshness.assess(
-            Path(args.snapshot), max_age_hours=args.max_age_hours, now=now
-        )
+        if getattr(args, "refresh", False):
+            verdict, healed, refresh_detail = board_selfheal.self_heal(
+                queue_freshness.assess,
+                Path(args.snapshot),
+                max_age_hours=max_age,
+                now=now,
+                repo=args.repo,
+                timeout=getattr(args, "refresh_window", None),
+                stale_code=queue_freshness.CODE_BOARD_STALE,
+            )
+        else:
+            verdict = queue_freshness.assess(Path(args.snapshot), max_age_hours=max_age, now=now)
+            healed, refresh_detail = False, ""
     except queue_freshness.CannotAssess as exc:
         print(f"freshness: CANNOT-ASSESS — {exc} (refresh it with: {queue_freshness.REFRESH_COMMAND})", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
     if verdict.ok:
-        print(f"freshness: OK — {verdict.render()}")
+        if healed:
+            print(f"freshness: OK (self-healed — {refresh_detail}) — {verdict.render()}")
+        else:
+            print(f"freshness: OK — {verdict.render()}")
         return EXIT_OK
     for finding in verdict.findings:
         print(f"  FAIL  {finding.render()}", file=sys.stderr)
+    if refresh_detail:
+        print(f"  FAIL  self-heal refresh failed: {refresh_detail}", file=sys.stderr)
+    elif not getattr(args, "refresh", False):
+        print("  FAIL  no self-heal attempted — run with --refresh to try it", file=sys.stderr)
     print(
         "freshness: FAIL — the committed board snapshot is outside the age this "
         "consumer tolerates (see above), so every exists/open answer is against a "
@@ -934,6 +1027,34 @@ def build_parser() -> argparse.ArgumentParser:
     release.add_argument("--issue", type=int, required=True)
     release.add_argument("--agent", required=True)
     release.set_defaults(func=cmd_release)
+
+    try_loop = sub.add_parser(
+        "try-loop",
+        help="tiered try-loop dispatcher (L0 -> L1 -> L2 escalation, #1524)",
+    )
+    try_loop.add_argument("--issue", type=int, required=True)
+    try_loop.add_argument("--agent", default="brain")
+    try_loop.add_argument("--provider", default=None, help="claude or deepseek (default: policy default_provider)")
+    try_loop.add_argument("--max-attempts", type=int, default=None, help="attempt budget per tier (default: issue body N=, else policy)")
+    try_loop.add_argument(
+        "--audit",
+        default=str(tiered.audit.DEFAULT_AUDIT_PATH),
+        help="the tiered-attempt audit trail (default: %(default)s)",
+    )
+    try_loop.add_argument(
+        "--labels",
+        default=None,
+        help="JSON list of labels to read instead of `gh issue view <n> --json labels`",
+    )
+    try_loop.add_argument(
+        "--body-file",
+        default="",
+        help="read the issue body from this file instead of `gh issue view <n> --json body`",
+    )
+    try_loop.add_argument("--dry-run", action="store_true", help="resolve the tier->model mapping and print it; no dispatch, no ledger, no labels")
+    try_loop.add_argument("--no-gh", action="store_true", help="do not apply escalate labels or post comments (fixture/negative-control)")
+    try_loop.add_argument("--no-dispatch", action="store_true", help="do not invoke a model (run acceptance commands only)")
+    try_loop.set_defaults(func=cmd_try_loop)
 
     status = sub.add_parser("status", help="show the active milestone, frontier and live claims")
     add_paths(status)
@@ -1051,6 +1172,26 @@ def build_parser() -> argparse.ArgumentParser:
             "wall clock, so a gate can provoke the refusal deterministically. The "
             "gate's assertion on the real snapshot never passes it."
         ),
+    )
+    fresh.add_argument(
+        "--refresh",
+        action="store_true",
+        help=(
+            "self-heal (issue #1692): on a stale snapshot, run the ONE bounded board "
+            "refresh before failing — OFF by default, a READ verb must not reach the "
+            "network unasked"
+        ),
+    )
+    fresh.add_argument(
+        "--refresh-window",
+        type=float,
+        default=None,
+        help="seconds the in-band refresh may take (default: the trigger window)",
+    )
+    fresh.add_argument(
+        "--repo",
+        default=snapshot_mod.DEFAULT_REPO,
+        help="the GitHub board a --refresh reads (default: %(default)s)",
     )
     fresh.set_defaults(func=cmd_freshness)
     return parser

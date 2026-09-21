@@ -17,19 +17,26 @@ view writes is its own stdout.
 ## Commands
 
 ```bash
-python3 governance/pmo/cli.py deps    # blocked_by + goal edges
-python3 governance/pmo/cli.py lanes   # owner × lane occupancy
-python3 governance/pmo/cli.py report  # tickets by goal / status / owner
-python3 governance/pmo/cli.py raid    # R / A / I / D + dependency edges
-python3 governance/pmo/cli.py aging   # what has been waiting, tiered
-python3 governance/pmo/cli.py gates   # review-gate state + escalation rung (#635)
-bash scripts/check-pmo-rollup.sh      # the gate (in `make verify`)
-make pmo                              # the gate, as a make target
+python3 governance/pmo/cli.py deps       # blocked_by + goal edges
+python3 governance/pmo/cli.py lanes      # owner × lane occupancy
+python3 governance/pmo/cli.py report     # tickets by goal / status / owner
+python3 governance/pmo/cli.py raid       # R / A / I / D + dependency edges
+python3 governance/pmo/cli.py aging      # what has been waiting, tiered
+python3 governance/pmo/cli.py gates      # review-gate state + escalation rung (#635)
+python3 governance/pmo/cli.py priority   # one explainable priority order (#403 follow-on)
+python3 governance/pmo/cli.py dispatch   # priority order -> agent/lane/tier plan
+bash scripts/check-pmo-rollup.sh         # the gate (in `make verify`)
+make pmo                                 # the gate, as a make target
+make pmo-dispatch                        # priority + dispatch wave 1, human-readable
 ```
 
 Options: `--root` (repository root), `--json` (the whole of stdout is the
 document), `--check` (gate mode — report findings as NOT-OK, re-derive to prove
 determinism, and reconcile `--against FILE`), `--now ISO` (override the clock).
+`priority`/`dispatch` additionally take `--live` (optional read-only GitHub
+label overlay, degrades to the offline board snapshot on any failure) and
+`dispatch` takes `--wave`/`--wave-cap` and `--apply` (off by default; see
+[`docs/PMO.md`](../../docs/PMO.md)).
 
 Exit-code contract: **0 OK / 1 NOT-OK / 2 CANNOT-ASSESS**. A graph that cannot be
 built (an unreadable board or ledger, a projection that refuses to build, no
@@ -135,11 +142,32 @@ saved view carries but the freshly derived graph does not is caught **by name**.
 The PMO writes no cache — it must merely be able to prove that a view it is
 handed is not one.
 
+### `priority` + `dispatch` — the priority/dispatch engine
+
+Full doctrine, scoring formula and worked examples: [`docs/PMO.md`](../../docs/PMO.md).
+In one line: `priority` scores every open ticket by summing five terms cited to
+their ledger source (`policy.yaml`'s own comments name each one) — board
+`priority:*` label, `aging` tier, `deps` blocking fan-out, `deps`
+unblocked-readiness, and the owner's `lanes` in-flight count as a
+depriotisation, never a hard exclusion. A term with no committed source in this
+repo (`sla_breach`) is carried under `unsourced` with its reason, at weight 0
+— never fabricated. `dispatch` walks that order and builds a **wave**: at most
+one task per lane (`docs/EXECUTION-PLAN.md`'s own "no two lanes share a file"
+rule), each attached to an SME profile + model tier (`policy.yaml`'s `lanes`
+table, sourced from `docs/EXECUTION-PLAN.md` §3) and a goal-first `Agent` brief
+skeleton. `dispatch` writes nothing unless `--apply` is passed (never used by
+the gate); the plan derivation itself (`governance/pmo/dispatch.py`) has no
+GitHub-writing code path at all — `--apply` lives in `cli.py`.
+
 ## Boundary
 
 The PMO **coordinates; it never does lane work**. It never merges, never
 reassigns an issue, never writes to another lane's files. Every subcommand is
 read-only over the projection; `report` output is a *view*, never an authority.
+
+`dispatch --apply` is the one narrow exception (one idempotent PMO comment +
+label per issue), and even that never executes lane work itself — it hands the
+plan to whoever runs it.
 
 ## `plan` — the enterprise project plan (issue #1648)
 

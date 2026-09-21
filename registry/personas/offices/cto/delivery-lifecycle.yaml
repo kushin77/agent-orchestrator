@@ -1,0 +1,100 @@
+# CTO Office delivery lifecycle (issue #1573)
+#
+# Owner directive (2026-09-20): "everything should be flowing through
+# paperclip -> HERMES downwards for ultimate control + knowledge base."
+# This file makes that chain explicit and names where the CTO office's
+# root/super-admin approval gates sit inside it. It is the contract the CTO
+# office enforces over every technical delivery; PMO owns dispatch
+# prioritization (governance/pmo, not edited by this lane — read-only source
+# of the dispatch-plan output shape below).
+office: cto
+schema: cto-office-delivery-lifecycle/v1
+version: 1.0.0
+
+chain:
+  - stage: pmo-dispatch
+    owner: pmo-sme
+    produces: "a dispatch plan (governance/pmo/cli.py deps|lanes|report views
+      over the ticket graph built by governance/ticket — see
+      governance/pmo/README.md, present on origin/master at time of writing).
+      CTO office does not alter PMO's prioritization; it consumes the plan."
+    ctoGate: none
+
+  - stage: paperclip-ticket
+    owner: integrations/paperclip
+    produces: "the ticket contract v2 (ADR-0014, docs/decision-records/
+      ADR-0014-ticket-single-join-node-contract-v2.md): the SINGLE join node.
+      Tasks, agents and evidence all reference this ticket; it is the
+      knowledge base of record for the delivery. See
+      docs/PAPERCLIP-ING-INTEGRATION.md section 3.1."
+    ctoGate: none
+    note: "the ticket stays authoritative for dispatch state; the fleet-side
+      ledger is never shadowed by a second store (ADR-0014 rule)."
+
+  - stage: hermes-routing
+    owner: hermes
+    produces: "hermes (registry/personas/cards/hermes.yaml) is the DEFAULT
+      executor/router: it claims the paperclip-ticketed work, routes to the
+      owning lane SME by capability tag, and authors code/tests/PR."
+    ctoGate: none
+    constraint: "hermes routes and executes; it NEVER bypasses the CTO
+      office's approval gates below. A hermes-authored change is not self-
+      merging and is not self-attesting (separation of duties, posture:
+      executor per persona-card.schema.json)."
+
+  - stage: lane-sme-execution
+    owner: "the routed lane SME (registry/personas/offices/cto/reports.yaml
+      members)"
+    produces: "the actual diff, test evidence, and the PR"
+    ctoGate: none
+
+  - stage: verify
+    owner: "make verify (scripts/verify.sh), the gate of record (GR-12)"
+    produces: "a real, falsifiable pass/fail (GR-8 no-false-green doctrine) —
+      evidence attached to the paperclip ticket, not asserted"
+    ctoGate: none
+
+  - stage: merge
+    owner: cto-office
+    produces: "PR merge to master"
+    ctoGate: REQUIRED
+    gateDetail: "CTO-office approval is the root/super-admin gate before an
+      irreversible merge lands (charter.yaml mayApprove:
+      pull-request-merge-to-master). Requires green verify evidence AND an
+      independent reviewer/auditor-posture persona on the PR — the CTO office
+      never merges its own unreviewed work (charter.yaml mayNotApprove)."
+
+  - stage: apply
+    owner: cto-office
+    produces: "terraform apply / infra activation, ALWAYS through the
+      governed IaC pipeline (GR-5), never ad-hoc"
+    ctoGate: REQUIRED
+    gateDetail: "CTO-office authorization is required before any
+      infrastructure change is applied (charter.yaml mayApprove:
+      terraform-apply-authorization). New infra still ships flag-gated OFF by
+      default regardless of this authorization."
+
+  - stage: attest
+    owner: cto-office
+    produces: "the merge/apply outcome and its evidence are written BACK to
+      the originating paperclip ticket (ADR-0014 evidence[] structure,
+      docs/PAPERCLIP-ING-INTEGRATION.md section 3.1 rule 4), closing the loop
+      so the ticket remains the single knowledge base of record — not a
+      parallel CTO-office log."
+    ctoGate: none
+
+rootAdminScope: >
+  The CTO office's root/super-admin authority in this chain is deliberately
+  narrow and named: it gates stage `merge` and stage `apply`, and it receives
+  the attestation. It does not gate pmo-dispatch, ticket creation, hermes
+  routing, lane-SME execution, or verify — those stay with their owning
+  actors. Root/super-admin means "the last gate before something irreversible
+  happens," not "touches every stage."
+
+dispatchPlanContract:
+  status: "present on origin/master at time of writing (governance/pmo/
+    README.md, governance/pmo/cli.py deps|lanes|report|raid|aging|gates)"
+  shape: "a query over the ticket graph (governance/ticket), never a second
+    store; JSON via --json, exit 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS"
+  note: "if this contract changes on master after this lane merges, the CTO
+    office consumes the new shape without re-deriving one — PMO owns it."
