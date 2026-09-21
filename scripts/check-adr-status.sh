@@ -17,6 +17,22 @@
 # Usage:
 #   bash scripts/check-adr-status.sh              the gate, over docs/decision-records/
 #   bash scripts/check-adr-status.sh --self-test   prove both directions
+#
+# ---knowledge---
+# module_id: scripts.check-adr-status
+# system: scripts
+# app: scripts
+# solution_class: enterprise
+# patterns: [self-proving-gate, closed-vocabulary]
+# derives_from: null
+# owner_sme: architecture-sme
+# tier: L1
+# interfaces: [check_one, run_gate, provoke, self_test]
+# invariants: "the status vocabulary is closed (reserved|proposed|accepted|live|superseded|deprecated); a value outside it is refused by name"
+# gotchas: ""
+# related: ["#1619"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -13,6 +13,22 @@ rows in the "## Canonical docs" table, with purpose text pulled from the
 file's first H1. The table is then re-sorted by link target so the same
 file set always produces the same byte-for-byte table, regardless of the
 order lanes added rows in.
+
+---knowledge---
+module_id: scripts.docs-index-fix
+system: scripts
+app: scripts
+solution_class: enterprise
+patterns: [derived-index, byte-stable-render]
+derives_from: null
+owner_sme: docs-sme
+tier: L0
+interfaces: [first_h1, main]
+invariants: "the same file set always produces the same byte-for-byte table, regardless of the order lanes added rows in"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 import glob
 import re

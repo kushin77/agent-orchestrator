@@ -12,6 +12,22 @@ unchanged (:mod:`dispatch`'s existing behaviour); when it is present but fails
 :data:`SCHEMA <governance/pmo/clusters.schema.json>`, that is CANNOT-ASSESS
 (rc 2) — an input that claims to be a cluster proposal but is not shaped like
 one is never silently accepted or silently dropped.
+
+---knowledge---
+module_id: governance.pmo.clusters
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [declared-vocabulary, tri-state-refusal]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [Cluster, Clusters, load]
+invariants: "a proposal that is not shaped like a cluster proposal is refused (rc 2), never silently accepted or dropped"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

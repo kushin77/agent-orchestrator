@@ -19,6 +19,22 @@
 #   bash scripts/land.sh <PR>                 # dry run
 #   AO_LAND_APPLY=1 bash scripts/land.sh <PR>  # land for real
 #   bash scripts/land.sh --self-test           # offline, fakes gh via PATH
+#
+# ---knowledge---
+# module_id: scripts.land
+# system: scripts
+# app: scripts
+# solution_class: enterprise
+# patterns: [trailer-enforced, automatic-close-out]
+# derives_from: scripts/check-squash-message.sh
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [usage, run_self_test]
+# invariants: "the PR body's Closes #N trailer closes the issue — nothing manual after the merge"
+# gotchas: ""
+# related: ["#1675"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

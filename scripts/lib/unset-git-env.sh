@@ -11,5 +11,21 @@
 #
 # Usage: source this file once, near the top of the script, before any
 # fixture-seeding function runs.
+#
+# ---knowledge---
+# module_id: scripts.lib.unset-git-env
+# system: scripts
+# app: lib
+# solution_class: enterprise
+# patterns: [fixture-isolation, fail-closed]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L0
+# interfaces: [unset an exported git repo/identity environment before a gate seeds a fixture]
+# invariants: "git -C does NOT override an exported GIT_DIR, so the environment is neutralised before any fixture is seeded"
+# gotchas: ""
+# related: ["#1642"]
+# do_not_duplicate: null
+# ---knowledge---
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR GIT_PREFIX
 unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL

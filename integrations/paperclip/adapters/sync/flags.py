@@ -4,6 +4,22 @@ Mirrors ``gateway/providers/flags.py`` (the ``enable_hermes`` reader): the
 registry (``infra/feature-flags/registry.yaml``) is the declaration, this is
 the reader, fail-closed. Never imports the hermes/gateway reader — each
 flag-gated surface reads the declaration itself.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.sync.flags
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: [flag-gated-off, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [read_paperclip_default, paperclip_enabled]
+invariants: "a missing, unreadable, or absent registry entry leaves the surface off"
+gotchas: "never imports the hermes/gateway reader — each flag-gated surface reads the declaration itself"
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

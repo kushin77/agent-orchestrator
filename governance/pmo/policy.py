@@ -7,6 +7,22 @@ plus a couple of semantic invariants JSON Schema cannot express, and hands back
 a small read-only :class:`Policy` object. A malformed policy is
 :class:`~graph.CannotAssess` — never a silent default, exactly like a graph
 that will not build.
+
+---knowledge---
+module_id: governance.pmo.policy
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [declared-policy]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [Lane, Policy, load]
+invariants: "a policy that cannot be assessed is CannotAssess (rc 2), never a silent default"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

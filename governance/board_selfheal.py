@@ -17,6 +17,22 @@ other collides the flat namespace. This module has no such dependency: it
 shells out to the refresh verb as a subprocess — the same command every
 refusal already names — so either consumer can call it without importing the
 other's internals.
+
+---knowledge---
+module_id: governance.board_selfheal
+system: governance
+app: governance
+solution_class: enterprise
+patterns: [self-heal, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [refresh, self_heal]
+invariants: "a board artifact that has drifted from its declaration is rewritten from the declaration, never patched in place"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

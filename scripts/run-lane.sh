@@ -26,6 +26,22 @@
 #   bash scripts/run-lane.sh <ISSUE>
 #   bash scripts/run-lane.sh <ISSUE> --apply
 #   bash scripts/run-lane.sh --self-test
+#
+# ---knowledge---
+# module_id: scripts.run-lane
+# system: scripts
+# app: scripts
+# solution_class: enterprise
+# patterns: [lane-isolation, front-half-chain]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [usage, run_self_test]
+# invariants: "a refused paperclip push is RECORDED, not fatal — the chain continues"
+# gotchas: ""
+# related: ["#1651"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

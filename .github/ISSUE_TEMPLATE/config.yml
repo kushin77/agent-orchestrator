@@ -8,5 +8,21 @@
 #
 # `contact_links` is declared, even though it is empty, so the file states that
 # no fallback channel is offered rather than leaving the answer to a default.
+#
+# ---knowledge---
+# module_id: github.issue_template.config
+# system: github
+# app: issue_template
+# solution_class: template
+# patterns: [issue-first, declared-template]
+# derives_from: null
+# owner_sme: pmo-sme
+# tier: L0
+# interfaces: [blank_issues_enabled, contact_links]
+# invariants: "blank issues are disabled, so the governed forms' required fields are load-bearing rather than optional"
+# gotchas: ""
+# related: ["#1533"]
+# do_not_duplicate: null
+# ---knowledge---
 blank_issues_enabled: false
 contact_links: []

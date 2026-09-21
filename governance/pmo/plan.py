@@ -22,6 +22,22 @@ The renderer (``render_table`` / ``render_paperclip``) is deterministic:
 sorted by ``(milestone order, -priority, id)``, no clock, no set/dict
 iteration leaking into output — so ``docs/PMO-PROJECT-PLAN.md`` and any
 ``--check`` freshness gate can diff it byte-for-byte across runs.
+
+---knowledge---
+module_id: governance.pmo.plan
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [derived-view, byte-stable-render]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [CannotAssess, Finding, load_plan, sorted_tasks, check_plan, render_table, paperclip_ticket, render_paperclip]
+invariants: "no dict or set iteration order leaks into output; the render is byte-identical across runs"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

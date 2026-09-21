@@ -13,6 +13,22 @@
 #
 # Usage:
 #   scripts/pr-body.sh <issue-number> [--refs] [--repo <owner/repo>]
+#
+# ---knowledge---
+# module_id: scripts.pr-body
+# system: scripts
+# app: scripts
+# solution_class: enterprise
+# patterns: [trailer-enforced, generated-never-hand-typed]
+# derives_from: scripts/check-squash-message.sh
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [render a PR body from the issue]
+# invariants: "the trailer paragraph is generated LAST and is the ONLY thing in the trailing paragraph"
+# gotchas: ""
+# related: ["#1674"]
+# do_not_duplicate: null
+# ---knowledge---
 set -euo pipefail
 
 repo="kushin77/agent-orchestrator"

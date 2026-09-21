@@ -15,6 +15,22 @@
 # deeper than the caller's own former `cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd`).
 # Call this directly from a script's top level (not from inside another
 # function), matching how the 188 duplicate call sites used it.
+#
+# ---knowledge---
+# module_id: scripts.lib.common
+# system: scripts
+# app: lib
+# solution_class: pattern
+# patterns: [single-source-shared-lib]
+# derives_from: null
+# owner_sme: mechanical-sme
+# tier: L0
+# interfaces: [find_repo_root, contains, log, die]
+# invariants: "find_repo_root is called from a script's top level, never from inside another function"
+# gotchas: ""
+# related: ["#1496"]
+# do_not_duplicate: null
+# ---knowledge---
 find_repo_root() {
   cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd
 }

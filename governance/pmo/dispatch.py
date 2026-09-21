@@ -17,6 +17,22 @@ under ``deferred``. :func:`validate_plan` is the falsifiable half (GR-12): it
 re-checks that invariant against an arbitrary plan document (including one a
 test hands it on purpose), so the property is provable, not merely "true by
 construction and untested".
+
+---knowledge---
+module_id: governance.pmo.dispatch
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [ticket-projection, declared-authority]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [paperclip_ticket_record, dispatch, validate_plan]
+invariants: "the property is provable by a test that hands it the failing input, never merely true by construction"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

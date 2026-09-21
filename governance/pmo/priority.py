@@ -29,6 +29,22 @@ board issue number ascending — unconditional, so two items that tie on every
 weighted term still produce one deterministic order (this is what
 ``--check``'s re-derive-and-compare is asserting: not just "the code ran
 twice" but "ties do not depend on dict/set iteration order").
+
+---knowledge---
+module_id: governance.pmo.priority
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [explainable-order, deterministic-ties]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [priority]
+invariants: "ties do not depend on dict or set iteration order, so re-deriving twice is stable"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

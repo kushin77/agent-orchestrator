@@ -14,6 +14,22 @@ Gated behind the ``enable_paperclip`` flag (``infra/feature-flags/registry.yaml`
 default off): ``push_plan``/``pull_plan`` refuse by name (``SyncRefused``,
 naming the flag) when the flag reads off, fail-closed like every other reader
 of that registry.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.sync.adapter
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: [adapters-boundary, flag-gated-off, refusal-recorded]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SyncRefused, push_plan, pull_plan]
+invariants: "a push is refused BY NAME, naming the flag, when the flag reads off"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

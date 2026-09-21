@@ -15,6 +15,22 @@ are two more engine roots (``.hermes-agent``, ``.paperclip-agent``) declared
 the same way — they contribute rows only when their root exists; with no root
 they are neither faked nor listed as "not reporting" (they are not one of the
 three roots this issue's Goal names), they are simply absent.
+
+---knowledge---
+module_id: portal.server.sessions
+system: portal
+app: server
+solution_class: enterprise
+patterns: [native-view, server-side-only]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [SessionsView]
+invariants: "a root that does not report is absent — never faked and never listed as 'not reporting'"
+gotchas: ""
+related: ["#1563"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

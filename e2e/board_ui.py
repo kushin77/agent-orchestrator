@@ -32,6 +32,22 @@ Lane note: this module deliberately READS ``e2e/workbook11_portal.py`` (its
 session-minting and ticket-driving helpers) rather than copying them —
 cannibalize, do not duplicate — and never writes it, so the two sibling lanes
 share no file.
+
+---knowledge---
+module_id: e2e.board_ui
+system: e2e
+app: e2e
+solution_class: enterprise
+patterns: [falsifiable-probe, real-surface-only]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [build_probe_app, probe_view_documents, probe_absent_view_is_not_served, probe_wiring_check_is_falsifiable, probe_shell_navigation, probe_flags_off_by_default, probe_board_rows_serve_the_joined_roster, probe_task_board_replays_a_real_ticket, probe_task_board_refuses_a_foreign_tenant]
+invariants: "a probe asserts against the real surface and can fail; an absent view is probed as absent, never faked"
+gotchas: ""
+related: ["#1521", "#1522"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
