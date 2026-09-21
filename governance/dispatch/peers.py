@@ -50,6 +50,22 @@ Usage::
     python3 governance/dispatch/peers.py --help
     python3 governance/dispatch/peers.py --standard
     bash scripts/peer-check.sh --agent ao-sub-1549 --issue 1549
+
+---knowledge---
+module_id: governance.dispatch.peers
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [fail-closed, declared-authority]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [branch_candidates, classify_channel, Sibling, PeerReport, overlap_paths, Collision, sibling_collisions, peer_check]
+invariants: "any sibling that intersects the caller's claimed files is refused by name"
+gotchas: "imports model.file_claims_conflict rather than re-implementing the intersect"
+related: ["#1549"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

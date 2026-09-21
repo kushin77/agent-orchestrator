@@ -36,6 +36,22 @@
 #   bash scripts/peer-check.sh --agent ao-sub-1549 --issue 1549 --files a.sh,b.py
 #   bash scripts/peer-check.sh --standard
 #   bash scripts/peer-check.sh --json
+#
+# ---knowledge---
+# module_id: scripts.peer-check
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [self-proving-gate, declared-authority]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [--agent, --issue, --files, --standard, --json]
+# invariants: "--ledger lets the caller point at a ledger elsewhere without touching the network"
+# gotchas: ""
+# related: ["#1549"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
