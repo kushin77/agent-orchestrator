@@ -1,5 +1,7 @@
 # PR-RUNNER.md — the shared-services PR runner
 
+> **Superseded 2026-09-21 (single-developer method).** `ao/gate-of-record` is no longer a required status check on `master` and merge trains / the PR runner are retired. A PR lands with `scripts/check-squash-message.sh --pr N` then `gh pr merge N --squash`; `make verify` on a PR branch is code-only and advisory, box-state checks live in `make master-attestation` (#1673, #1676). See `AGENTS.md` "Landing a PR". The text below is kept as history.
+
 `fleet/runner/` (issue #1343, parent #1295) is the institutionalised form of
 the 2026-09-18 prototype that ran as nohup shell scripts in `~/ao-runner` on
 192.168.168.42: on a schedule it verifies every open PR head that lacks

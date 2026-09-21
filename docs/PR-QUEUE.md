@@ -1,5 +1,7 @@
 # PR-QUEUE.md — the serial squash-merge queue
 
+> **Superseded 2026-09-21 (single-developer method).** `ao/gate-of-record` is no longer a required status check on `master` and merge trains / the PR runner are retired. A PR lands with `scripts/check-squash-message.sh --pr N` then `gh pr merge N --squash`; `make verify` on a PR branch is code-only and advisory, box-state checks live in `make master-attestation` (#1673, #1676). See `AGENTS.md` "Landing a PR". The text below is kept as history.
+
 `scripts/pr-queue.sh` codifies the by-hand PR-queue-clearing procedure done on
 2026-09-17 (10 PRs merged in order) as a repeatable, offline-testable tool
 (issue #1053, parent #878; see the RCA in `docs/RCA/` or the epic history for

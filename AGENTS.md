@@ -72,7 +72,8 @@ superseded. If a doc in this repo contradicts this file, this file wins.
    branch is **`master`**.
 3. **PR-gated `master` (GR-4).** `master` is protected by convention: every
    change lands via a PR (squash merge); never push straight to `master`.
-   Branch protection as code ships with issue #6.
+   Single-developer method (owner, 2026-09-21): no required status check and
+   no reviewer approval on `master`; see "Landing a PR" below.
 4. **Fully IaC (GR-5, owner IaC mandate).** Infrastructure is declared
    (Terraform/Cloud Build), never clicked in a console. New infra ships
    **flag-gated OFF** by default. Never ad-hoc `terraform apply`.
@@ -80,19 +81,22 @@ superseded. If a doc in this repo contradicts this file, this file wins.
    A mechanical secret scan runs in `make verify`.
 6. **SemVer is law (GR-7).** Releases are annotated `vX.Y.Z` tags on `master`
    at a gate-green commit (`RELEASING.md`).
-7. **Verify before done (GR-12).** `make verify` is the gate of record until CI
-   lands (issue #6). Run it and report **actual output** — never an unverified
-   "done".
+7. **Verify before done (GR-12).** `make verify` is the evidence of record.
+   Run it and report **actual output** — never an unverified "done". The lane
+   venue is code-only; box-state checks (real-tree drift, board-snapshot age,
+   gate-lock leftovers, orphan census, worktree-cap crontab, board-gate label
+   conformance, repo-settings, branch-protection) belong to the attestation
+   venue on `master` (`make master-attestation`) and never block a PR
+   (#1673, #1676).
 8. **No-false-green gates (fleet doctrine).** Every check in `make verify` can
    genuinely fail. A check whose pass/fail paths collapse into the same exit
    code is a formality and will be rejected.
 9. **Provenance (GR-10).** Cannibalized/harvested assets record their source
    (repo, path, license). The cannibalization index is tracked by issue #8.
-10. **Autonomous merge (owner mandate 2026-09-07).** In this fleet an agent
-    merges its own PRs autonomously **only after** green verification evidence
-    (GR-12). Never merge failing work. Verification replaces the human
-    reviewer. The runner merges; sessions open PRs (`fleet/runner/`,
-    docs/PR-RUNNER.md, issue #1343).
+10. **Autonomous merge (owner mandate 2026-09-07, single-developer method
+    2026-09-21).** An agent merges its own PRs autonomously once the code-only
+    lane checks are green. Verification replaces the human reviewer. Merge
+    trains are retired; PRs merge individually (see "Landing a PR").
 11. **Local-code-first (GR-17).** Debug against this checkout first; prefer
     this repo's own code/docs over guessing.
 12. **No-questions (GR-22).** Apply the documented default; escalate only when

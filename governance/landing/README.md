@@ -1,5 +1,7 @@
 # Landing driver — a green lane lands itself (issue #764)
 
+> **Superseded 2026-09-21 (single-developer method).** `ao/gate-of-record` is no longer a required status check on `master` and merge trains / the PR runner are retired. A PR lands with `scripts/check-squash-message.sh --pr N` then `gh pr merge N --squash`; `make verify` on a PR branch is code-only and advisory, box-state checks live in `make master-attestation` (#1673, #1676). See `AGENTS.md` "Landing a PR". The text below is kept as history.
+
 > Owner lane: **autonomous-ops / governance**. Parent: task #708 (the
 > autonomous landing driver). Doctrine: [`AGENTS.md`](../../AGENTS.md)
 > (golden rules 1/3/4/5/6/7/12, rule 16 end-to-end closure, the owner

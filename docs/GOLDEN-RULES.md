@@ -494,6 +494,8 @@ night** on a mismatch its own remedy could never clear, and did no work at all.
 
 ### AO-GR-22 — One gate per worktree, and the gate is admission-controlled
 
+> **Scope note 2026-09-21 (single-developer method).** The composite gate on a PR branch is the code-only lane venue and is advisory for landing; box-state checks run in `make master-attestation`. The concurrency cap below still applies to every `make verify` run.
+
 **Origin.** Issue #724 (measured 2026-09-14: 49 concurrent gates).
 
 **Rule.** At most **one** composite gate (`make verify`) runs per worktree at a
