@@ -29,7 +29,7 @@ ATTESTATION ?= .verify/attestation.json
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage codeowners squash-message chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
         brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
-        tf-validate shellcheck gitleaks pre-commit worktrees scratch-safety web-image-dryrun \
+        tf-validate shellcheck gitleaks pre-commit install-hooks worktrees scratch-safety web-image-dryrun \
         remediation remediation-scan remediation-dispatch \
         capacity-gate tagging epic-focus capability-drift conformance-change-set board-gate ao-ssh-access \
         control-verbs control-audit control-functions cockpit operator console operator-access operator-terminal
@@ -58,6 +58,9 @@ help:
 	@echo "  shellcheck    Run shellcheck on scripts/ (skipped if not installed)"
 	@echo "  gitleaks      Run gitleaks with .gitleaks.toml (skipped if absent)"
 	@echo "  pre-commit    Run pre-commit on all files (skipped if absent)"
+	@echo "  install-hooks OPT IN: install scripts/git-hooks/pre-commit (the file-lease"
+	@echo "                enforcement hook) into this checkout. Dry run by default;"
+	@echo "                AO_HOOKS_APPLY=1 writes. docs/LEASE-HOOK.md (issue #1541)"
 	@echo ""
 	@echo "Operator surfaces (issue #763; docs/OPERATOR-ACCESS.md):"
 	@echo "  operator      Report every operator surface, then open the live view"
@@ -171,6 +174,13 @@ verify-attestation:
 ## worktrees — reclaim stale lane worktrees (dry run by default)
 worktrees:
 	@bash scripts/prune-worktrees.sh
+
+## finops — CFO office KPI gate: injected-prompt byte ceiling
+## (registry/personas/offices/cfo/cost-policy.yaml). Auto-discovered into
+## `make verify` as scripts/check-finops-kpi.sh; this target lets it run
+## standalone (docs/cfo/PROMPT-REDUCTION-PLAN.md).
+finops:
+	@bash scripts/check-finops-kpi.sh
 
 ## repo-settings — read back the live repo merge-message policy against the
 ## declaration (governance/platform/repo-settings.yaml, issue #1138); pass
@@ -850,6 +860,55 @@ pre-commit:
 	else \
 		echo "pre-commit: not installed (skipped)"; \
 	fi
+
+## install-hooks — OPT IN: install scripts/git-hooks/pre-commit into this checkout
+## (issue #1541). That hook refuses a commit that stages a file leased to another
+## live claim — the git front-end of the claim/file-lease system in
+## governance/dispatch. Installing a hook changes what `git commit` does for EVERY
+## commit here, so nothing installs it as a side effect (`make verify` does not), and
+## this target is a DRY RUN until you ask for the write:
+##   make install-hooks                      # show exactly what would be installed
+##   AO_HOOKS_APPLY=1 make install-hooks     # install it
+## The destination defaults to this checkout's COMMON hooks dir (`git rev-parse
+## --git-common-dir`/hooks), which is the dir git reads for every linked worktree of
+## it; HOOKS_DEST overrides it. An existing hook that is not this repo's is never
+## overwritten unless AO_HOOKS_FORCE=1. The hook FAILS OPEN (docs/LEASE-HOOK.md).
+## Exit codes: 0 OK / 1 NOT-OK (a foreign hook would be clobbered) / 2 CANNOT-ASSESS.
+HOOKS_SRC ?= scripts/git-hooks/pre-commit
+HOOKS_DEST ?=
+install-hooks:
+	@src="$(HOOKS_SRC)"; \
+	common="$$(git rev-parse --git-common-dir 2>/dev/null)" || common=".git"; \
+	dest="$(HOOKS_DEST)"; \
+	if [ -z "$$dest" ]; then dest="$$common/hooks"; fi; \
+	target="$$dest/pre-commit"; \
+	if [ ! -f "$$src" ]; then \
+		echo "install-hooks: CANNOT-ASSESS — $$src does not exist" >&2; exit 2; \
+	fi; \
+	if [ "$(AO_HOOKS_APPLY)" != "1" ]; then \
+		echo "install-hooks: DRY RUN (nothing written) — a git hook changes what every commit here does"; \
+		echo "  would install: $$src -> $$target"; \
+		echo "  that is git's COMMON hooks dir (git rev-parse --git-common-dir): the hook then"; \
+		echo "  fires for every linked worktree of this checkout, not just this one"; \
+		if [ -f "$$target" ]; then \
+			echo "  note: $$target already exists (sha256 $$(sha256sum "$$target" | cut -c1-12))"; \
+		fi; \
+		echo "  carry on with: AO_HOOKS_APPLY=1 make install-hooks"; \
+		exit 0; \
+	fi; \
+	mkdir -p "$$dest" || exit 1; \
+	if [ -f "$$target" ] && [ "$(AO_HOOKS_FORCE)" != "1" ] && ! cmp -s "$$target" "$$src"; then \
+		echo "install-hooks: REFUSED — $$target exists and is not this repo's hook; refusing to clobber it" >&2; \
+		echo "  move it aside, or re-run with AO_HOOKS_FORCE=1" >&2; \
+		exit 1; \
+	fi; \
+	cp "$$src" "$$target" || exit 1; \
+	chmod 0755 "$$target" || exit 1; \
+	echo "install-hooks: installed $$target"; \
+	echo "  (git's COMMON hooks dir — this hook now fires for every linked worktree of this checkout)"; \
+	echo "  bypass: git commit --no-verify, or AO_LEASE_HOOK_OVERRIDE=\"<why>\" (docs/LEASE-HOOK.md)"
+
+.PHONY: install-hooks
 
 ## land — land ONE issue's lane end to end (issue #764): push -> PR (Closes #<n>,
 ## AI-assistance declared) -> pre-merge contract -> merge decision -> squash-merge

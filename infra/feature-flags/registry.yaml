@@ -8,6 +8,16 @@
 # scripts/check-feature-flags.py enforces this file mechanically and keeps it
 # in lock-step with infra/terraform/variables.tf (every `enable_*` flag must
 # default to `false`). A new surface cannot ship on by accident.
+#
+# Every `default: off` entry that is not yet `promoted` carries exactly one of
+# two promotion-ownership fields (issue #1618), enforced by the same check:
+#   `promotion_issue:` — the open issue whose lane owns the reviewed go-live
+#                       that promotes this surface; or
+#   `posture: hold`    — declared off with no promotion owner yet assigned, so
+#                       the surface is invisible debt until someone files the
+#                       promotion issue and replaces `hold` with the number.
+# An entry with neither is refused by name, so a drifting declared-off surface
+# can no longer hide behind "the answer is in the prose" (issue #1540's gap).
 
 schema_version: 1
 
@@ -50,54 +60,63 @@ services:
   registry:
     default: off
     promoted: false
+    posture: hold
     phase: 1
     tf_flag: enable_registry
     description: Agent Registry & Profiling.
   gateway:
     default: off
     promoted: false
+    posture: hold
     phase: 2
     tf_flag: enable_gateway
     description: Model Gateways (multi-provider proxy/router).
   engine:
     default: off
     promoted: false
+    posture: hold
     phase: 3
     tf_flag: enable_engine
     description: State-machine execution engine.
   guardrails:
     default: off
     promoted: false
+    posture: hold
     phase: 4
     tf_flag: enable_guardrails
     description: Security & guardrails (DLP, prompt-injection defense, budgets).
   telemetry:
     default: off
     promoted: false
+    posture: hold
     phase: 5
     tf_flag: enable_telemetry
     description: Observability, audit, FinOps metering.
   identity:
     default: off
     promoted: false
+    posture: hold
     phase: 6
     tf_flag: enable_identity
     description: Tenant identity / RBAC.
   portal:
     default: off
     promoted: false
+    posture: hold
     phase: 7
     tf_flag: enable_portal
     description: Admin control-plane portal.
   web:
     default: off
     promoted: false
+    posture: hold
     phase: 7
     tf_flag: enable_web
     description: Public web surface (portal + shared-frontend) served at ai.purebliss.app.
   paperclip:
     default: off
     promoted: false
+    posture: hold
     phase: 7
     tf_flag: enable_paperclip
     description: >
@@ -108,6 +127,7 @@ services:
   hermes:
     default: off
     promoted: false
+    promotion_issue: "#1518"
     phase: 2
     tf_flag: enable_hermes
     description: >
@@ -121,18 +141,24 @@ services:
       this row declares the independent rollout/kill-switch only; nothing in
       infra/terraform creates or gates a resource for it, and (like paperclip)
       it carries no infra/rollout/rollout-state.yaml entry. The declared
-      `enable_hermes` variable is the switch itself; the gateway provider does
-      not yet read it, so today the switch is a declared kill-switch surface
-      only, not a live gate on the in-process adapter — enforcing it in the
-      gateway is follow-up work, not claimed here. Inert until a reviewed
-      go-live promotes this flag. It declares no dedicated health-probe path
-      (unlike paperclip's GET /api/health): the health layer
+      `enable_hermes` variable is the switch itself, and it is a LIVE gate:
+      the provider registry reads it (gateway/providers/flags.py, issue #1518)
+      and, while it is off, drops hermes from the active provider set — hermes
+      is retired by default (gateway/catalog/modules/hermes/module.json status
+      is `retired`) and only a reviewed go-live that flips this flag
+      re-activates it. The dead local endpoint at http://localhost:8080/api/chat
+      is not re-created here: the namesake `~/hermes-agent` Flask product (port
+      9501,
+      ADR-0012) is a separate deployable, out of scope for this row. It
+      declares no dedicated health-probe path (unlike paperclip's GET
+      /api/health): the health layer
       (gateway/health/fallback.py) tracks hermes as a provider rung whose
       outcomes are recorded by the caller, and its only declared endpoint is
       the Ollama-compatible POST /api/chat chat surface above.
   chat:
     default: off
     promoted: false
+    posture: hold
     phase: 7
     tf_flag: enable_chat
     description: >
@@ -168,6 +194,7 @@ services:
   org_chart:
     default: off
     promoted: false
+    promotion_issue: "#1521"
     phase: 7
     tf_flag: enable_org_chart
     description: >
@@ -182,6 +209,7 @@ services:
   skill_studio:
     default: off
     promoted: false
+    promotion_issue: "#1521"
     phase: 7
     tf_flag: enable_skill_studio
     description: >
@@ -197,6 +225,7 @@ services:
   task_board:
     default: off
     promoted: false
+    promotion_issue: "#1522"
     phase: 7
     tf_flag: enable_task_board
     description: >
@@ -210,6 +239,7 @@ services:
   mcp_outbound:
     default: off
     promoted: false
+    posture: hold
     phase: 2
     tf_flag: enable_mcp_outbound
     description: >
@@ -224,6 +254,7 @@ services:
   sandbox_runtime:
     default: off
     promoted: false
+    posture: hold
     phase: 4
     tf_flag: enable_sandbox_runtime
     description: >
@@ -249,6 +280,7 @@ services:
   erp_module:
     default: off
     promoted: false
+    posture: hold
     phase: 7
     tf_flag: enable_erp_module
     description: >
@@ -271,6 +303,7 @@ services:
   erp_webhooks_bridge:
     default: off
     promoted: false
+    posture: hold
     phase: 7
     tf_flag: enable_erp_webhooks_bridge
     description: >
@@ -291,6 +324,7 @@ services:
   fleet_cron:
     default: off
     promoted: false
+    promotion_issue: "#706"
     phase: 7
     tf_flag: enable_fleet_cron
     description: >
@@ -321,6 +355,7 @@ surfaces:
   edge_cutover:
     default: off
     promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_portal
     description: >
@@ -335,6 +370,7 @@ surfaces:
   portal_surfaces:
     default: off
     promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_portal
     description: >
@@ -348,6 +384,7 @@ surfaces:
   finops_reports:
     default: off
     promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_portal
     description: >
@@ -360,6 +397,7 @@ surfaces:
   telemetry_live_feed:
     default: off
     promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_portal
     description: >
@@ -373,6 +411,7 @@ surfaces:
   ops_health:
     default: off
     promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_portal
     description: >
@@ -388,6 +427,7 @@ surfaces:
   live_bridge:
     default: off
     promoted: false
+    promotion_issue: "#1523"
     service: portal
     tf_flag: enable_portal
     description: >
@@ -404,6 +444,7 @@ surfaces:
   telemetry_exposition:
     default: off
     promoted: false
+    posture: hold
     service: telemetry
     tf_flag: enable_telemetry
     description: >
@@ -424,6 +465,7 @@ surfaces:
   fleet_health_export:
     default: off
     promoted: false
+    posture: hold
     service: control-plane
     description: >
       Fleet-health push exporter (issue #498, ADR-0022): rung state + beat age,
@@ -432,6 +474,7 @@ surfaces:
   chat:
     default: off
     promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_chat
     description: >
@@ -472,6 +515,7 @@ surfaces:
   cockpit:
     default: off
     promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_portal
     description: >
@@ -488,6 +532,7 @@ surfaces:
   remote_ssh_access:
     default: off
     promoted: false
+    posture: hold
     service: control-plane
     description: >
       Remote operator SSH route (issues #771, #785): provision a Cloudflare
@@ -521,6 +566,7 @@ surfaces:
   org_chart:
     default: off
     promoted: false
+    promotion_issue: "#1521"
     service: portal
     tf_flag: enable_org_chart
     description: >
@@ -535,6 +581,7 @@ surfaces:
   skill_studio:
     default: off
     promoted: false
+    promotion_issue: "#1521"
     service: portal
     tf_flag: enable_skill_studio
     description: >
@@ -549,6 +596,7 @@ surfaces:
   task_board:
     default: off
     promoted: false
+    promotion_issue: "#1522"
     service: portal
     tf_flag: enable_task_board
     description: >
@@ -561,6 +609,7 @@ surfaces:
   mcp_outbound:
     default: off
     promoted: false
+    posture: hold
     service: gateway
     tf_flag: enable_mcp_outbound
     description: >
@@ -575,6 +624,7 @@ surfaces:
   sandbox_runtime:
     default: off
     promoted: false
+    posture: hold
     service: guardrails
     tf_flag: enable_sandbox_runtime
     description: >
@@ -613,6 +663,7 @@ surfaces:
   erp_module:
     default: off
     promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_erp_module
     description: >

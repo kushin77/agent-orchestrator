@@ -379,6 +379,113 @@ if "window.OT" in js:
 else:
     fail("the pure model is not exposed for offline testing")
 
+# -- (i) the panel is the CALLER's catalogue, not the registry's (issue #1523) -
+#
+# The closed vocabulary is one declaration for every caller: it says which verbs
+# EXIST, not which ones the operator reading it may run. Rendered unfiltered, the
+# panel put a steer button for every exposed verb — the irreversible ones
+# included — in front of a caller whose capabilities reached a fraction of them,
+# so every click was a 403 the panel could have predicted. The panel now renders
+# the intersection of the registry's exposed set and the caller's own permitted
+# set, and the permitted set is computed from the SAME decision the dispatch path
+# refuses with, so the two cannot disagree.
+#
+# Every probe is paired one principal away (the partial caller vs the full one),
+# and the last one is a MUTATION: the catalogue is neutered and the probe that
+# depends on the filter has to notice — a filter nobody can break is a
+# decoration.
+from portal.server.fleet_authz import PLATFORM_ORG, SUBJECT_USER  # noqa: E402
+
+exposed_rows = [
+    row for row in Vocabulary.load(ROOT / "control-plane" / "control" / "verbs.yaml").verbs.values()
+    if row.exposed
+]
+NON_FLEET_VERB = "board.status"
+PARTIAL_EMAIL = "partial@acme.example.com"
+#: A platform preset role carrying `fleet:read` only — the regime this defect
+#: reaches (a non-owner operator can load the vocabulary and must not be offered
+#: the verbs it cannot run).
+PARTIAL_ROLE = "admin"
+
+store = steer_app.fleet_authz.store
+partial_role_id = steer_app.fleet_authz._role_id(store, PLATFORM_ORG, PARTIAL_ROLE)
+if partial_role_id is not None:
+    store.add_binding(PLATFORM_ORG, PARTIAL_EMAIL, SUBJECT_USER, partial_role_id)
+
+
+def permitted_for(app, cookies):
+    status, payload, _ = request(app, "GET", "/api/console/me", cookies)
+    if status != 200:
+        return None
+    return payload.get("data", {}).get("controlVerbs")
+
+
+partial_cookie = {SESSION_COOKIE: mint(PARTIAL_EMAIL, "acme")}
+full = permitted_for(steer_app, cookie)
+partial = permitted_for(steer_app, partial_cookie)
+
+if isinstance(full, list) and len({verb.split(".", 1)[0] for verb in full}) >= 3:
+    ok(
+        "the panel's catalogue spans >=3 families for a full caller ("
+        f"{sorted({verb.split('.', 1)[0] for verb in full})})"
+    )
+else:
+    fail(f"the full caller's catalogue is not multi-family: {full!r}")
+
+# the one-principal-away control: the partial caller's catalogue is a STRICT
+# subset, and the non-fleet verb is the thing it must not offer.
+if isinstance(partial, list) and partial and NON_FLEET_VERB not in partial and NON_FLEET_VERB in (full or []):
+    ok(
+        f"a partial caller is offered {len(partial)} of {len(exposed_rows)} exposed verbs "
+        f"and is not offered {NON_FLEET_VERB} (which the full caller is)"
+    )
+else:
+    fail(f"the partial caller's catalogue is not a strict subset: partial={partial!r}")
+
+# the refusal control: what the panel withholds, the plane refuses — and a verb
+# the catalogue DID list is not refused, so the probe is not a blanket 403.
+withheld_status, _p, _l = request(
+    steer_app, "POST", f"/api/control/{NON_FLEET_VERB.replace('.', '/')}", partial_cookie
+)
+allowed_verb = next((verb for verb in (partial or []) if verb.startswith("fleet.")), None)
+allowed_status = None
+if allowed_verb:
+    allowed_status, _p, _l = request(
+        steer_app, "POST", f"/api/control/{allowed_verb.replace('.', '/')}", partial_cookie
+    )
+if withheld_status == 403 and allowed_status == 200:
+    ok(
+        f"the withheld verb is refused 403 while a listed verb ({allowed_verb}) is served 200 — "
+        "the catalogue is the plane's own answer"
+    )
+else:
+    fail(
+        f"the catalogue disagrees with the plane: withheld->{withheld_status}, "
+        f"listed {allowed_verb}->{allowed_status}"
+    )
+
+# MUTATION: serve the registry unfiltered and require the probes above to fail.
+_real_permitted = control_api.permitted_verb_ids
+try:
+    control_api.permitted_verb_ids = lambda app, principal: [row.id for row in exposed_rows]
+    mutated = permitted_for(steer_app, partial_cookie)
+    if isinstance(mutated, list) and NON_FLEET_VERB in mutated:
+        ok(
+            "MUTATION: an unfiltered catalogue hands the partial caller "
+            f"{NON_FLEET_VERB} — the probes above can fail (AO-GR-4)"
+        )
+    else:
+        fail(f"the mutation did not take: the partial caller still lacks {NON_FLEET_VERB}")
+finally:
+    control_api.permitted_verb_ids = _real_permitted
+
+# ...and the client is wired to it: the session read is where the panel learns
+# the caller's own verbs, and the model exposes the narrowing so it is testable.
+if "/api/console/me" in js and "runnableRows" in js and "catalogueState" in js:
+    ok("the panel reads the caller's own verbs (/api/console/me) and narrows the catalogue")
+else:
+    fail("the panel does not read the caller's own permitted verbs")
+
 # -- (h) rollout + rollback: the surface's OWN readiness decides (issue #802) --
 #
 # The enterprise bar asks for a rollout AND a rollback, and the console surface

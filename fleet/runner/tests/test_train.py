@@ -270,6 +270,81 @@ def test_a_failing_check_with_no_script_is_unrunnable_never_green(tmp_path: Path
     assert out[0].line() == "red:check-does-not-exist <- unrunnable"
 
 
+def test_a_bare_named_red_resolves_its_check_script_and_is_pre_existing(tmp_path: Path):
+    """A red named the way a TRAIN SEAT names it must resolve, not be unrunnable.
+
+    `scripts/verify.sh:1032` names a check `name="${entry%%|*}"` — BARE — and
+    `:1180` writes that into `.verify/attestation.json`, which
+    `verify.py:parse_verify_evidence` PREFERS (`source = "attestation"`). The script
+    is `scripts/check-<name>.sh` in either shape. A resolver that only ever looked
+    for `scripts/<name>.sh` therefore answered `unrunnable` for every red a train
+    actually saw — and `pre-existing` ("the wave does not pay for it") is reachable
+    ONLY through a resolved script, so no red was ever attributable and the train
+    was retired every round (measured 2026-09-21: 21 of 21 attributions `unrunnable`,
+    4 trains abandoned, master unmoved, 30 PRs blocked — #1685).
+    """
+    git = git_fake(checks=("check-reconcile",))
+    sh = Fake(
+        lambda argv, kwargs: (
+            Result(1, "red on the base alone\n", "")
+            if "check-reconcile.sh" in " ".join(argv)
+            else Result(0)
+        )
+    )
+    out = train_mod.attribute_red(
+        ["reconcile"],
+        [],
+        repo=tmp_path,
+        git=git,
+        sh=sh,
+        runner_dir=tmp_path / "runner",
+        base_tip=TIP,
+        ledger=Ledger(tmp_path / "l.jsonl"),
+    )
+    assert any("check-reconcile.sh" in " ".join(argv) for argv in sh.argvs()), (
+        "a bare-named red must resolve scripts/check-<name>.sh — the script never ran"
+    )
+    assert [(a.verdict, a.pr) for a in out] == [("pre-existing", None)]
+    # The same line the PREFIXED shape produces (see the control at :252): a red is
+    # named the same way whichever shape the seat spelled it in.
+    assert out[0].line() == "red:reconcile <- pre-existing(master)"
+
+
+def test_a_bare_name_with_no_script_in_either_shape_is_still_unrunnable(tmp_path: Path):
+    """The control: resolving either shape must not turn a MISSING script green.
+
+    Without this, "resolves either shape" could be satisfied by inventing a script
+    name — reporting a red as run and measured when nothing ran at all.
+    """
+    git = git_fake(checks=())
+    out = train_mod.attribute_red(
+        ["reconcile"],
+        [],
+        repo=tmp_path,
+        git=git,
+        sh=Fake(name="sh"),
+        runner_dir=tmp_path / "runner",
+        base_tip=TIP,
+        ledger=Ledger(tmp_path / "l.jsonl"),
+    )
+    assert [(a.verdict, a.pr) for a in out] == [("unrunnable", None)]
+    assert out[0].line() == "red:reconcile <- unrunnable"
+
+
+def test_check_inputs_finds_a_bare_name_declared_under_the_prefixed_key(tmp_path: Path):
+    """`CHECK_INPUTS` is keyed `check-<name>`; a train seat asks in the bare shape.
+
+    Missing the declaration widens the candidate set silently — an undeclared check
+    is paid for by every PR in the wave, which is the cost the declaration exists
+    to avoid.
+    """
+    assert train_mod.check_inputs("verdict-contains", tmp_path) == ("**/*.sh",)
+    assert train_mod.check_inputs("check-verdict-contains", tmp_path) == ("**/*.sh",)
+    # Undeclared in both shapes and absent from the tree in both -> None,
+    # which means "every candidate is tested", never "nothing to test".
+    assert train_mod.check_inputs("no-such-check", tmp_path) is None
+
+
 # --- control 4: a base that moved never lands stale evidence --------------------
 def train_transports(*, gh_bodies, labels, git, sh, merge_commit="e" * 40):
     """The full cli-level transports for a train, with every seam faked."""
