@@ -122,16 +122,19 @@ def test_build_boundary_records_defaults_missing_fields():
     assert record["body"] == ""
 
 
-def test_committed_baseline_quarantines_the_eleven_children_by_name():
+def test_committed_baseline_quarantines_only_the_live_child_by_name():
+    """Issue #1722 retired the 22-entry #358 quarantine (10 subjects closed,
+    #132/#133's bodies no longer carry the excused marker/declaration). One
+    live entry survives: #132's genuine, still-open foreign-repo-declaration,
+    tracked by #132 itself so the quarantine expires the moment #132 closes.
+    """
     entries = load_boundary_baseline(ROOT / "governance/board/boundary-baseline.json")
     subjects = sorted({entry["subject"] for entry in entries})
-    assert subjects == ["#126", "#127", "#128", "#129", "#131", "#132", "#133", "#134", "#135", "#136", "#137"]
-    assert all(entry["tracked_by"] == "#358" for entry in entries)
+    assert subjects == ["#132"]
+    assert all(entry["tracked_by"] == "#132" for entry in entries)
     assert all(entry["code"] in BOUNDARY_VALID_CODES for entry in entries)
-    # Each child is excused for BOTH kinds the live body actually fires.
-    for subject in subjects:
-        kinds = {entry["code"] for entry in entries if entry["subject"] == subject}
-        assert kinds == {FINDING_SELF_PARENT, FINDING_FOREIGN_REPO_DECLARATION}
+    kinds = {entry["code"] for entry in entries if entry["subject"] == "#132"}
+    assert kinds == {FINDING_FOREIGN_REPO_DECLARATION}
 
 
 # --- quarantine honour / stale ----------------------------------------------
