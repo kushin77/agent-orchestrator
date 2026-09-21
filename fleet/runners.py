@@ -91,7 +91,7 @@ class RunnerProfile:
     reads_model_env: bool = True
     #: The mount in ``infra/fleet/secrets_contract.py`` that PROVISIONS this
     #: profile's credential. Naming it is the point (issue #1784, "all creds need
-    #: to be iac secrets"): an operator's remedy is to provision the declared
+    #: to be iac secrets"): the remedy is to provision the declared
     #: IaC secret, never to export a token, and a profile that needs a credential
     #: yet leaves this empty is refused rather than silently improvised.
     iac_secret: str = ""
