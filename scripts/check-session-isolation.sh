@@ -64,8 +64,11 @@ cd "$root" || exit 2
 # The ambient identity is removed before anything else runs (issue #934; the
 # reasoning is in the header). `GIT_IDENTITY_VARS` in governance/isolation/identity.py
 # is the same four names, and this gate's own lanes are signed by
-# `git config --worktree` — never by the caller's environment.
-unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+# `git config --worktree` — never by the caller's environment. GIT_DIR and
+# friends are neutralised too (issue #1642, SP-11): `git -C` does not override
+# an exported GIT_DIR.
+# shellcheck source=scripts/lib/unset-git-env.sh
+source "$root/scripts/lib/unset-git-env.sh"
 
 cli="governance/isolation/cli.py"
 terminal="fleet/terminal.py"

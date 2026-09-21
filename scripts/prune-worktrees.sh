@@ -197,50 +197,54 @@ allow_err="$scratch.allowerr"
 owned_wts="$scratch.owned"
 trap 'rm -f "$scratch" "$live_paths" "$live_wts" "$wt_paths" "$live_lanes" "$declared" "$crontab_err" "$gate_stores_file" "$gate_held" "$gate_err" "$venue_roots" "$allow" "$allow_err" "$owned_wts"' EXIT
 
-# --- is this tool actually scheduled? (issue #830) ---------------------------
+# --- is this tool actually scheduled? (issue #830, revised #1627) ------------
 #
-# ANSWERED BEFORE THE REPOSITORY CHECK, ON PURPOSE: a crontab is a fact about
-# the SCHEDULER, not about this checkout, so --schedule has to be answerable
-# where the schedule actually lives — including an image whose `.git` is
-# excluded from the build context. Everything after that check still needs a
-# repository, and still fails closed without one.
+# ANSWERED BEFORE THE REPOSITORY CHECK, ON PURPOSE: --schedule has to be
+# answerable where the schedule is declared — including an image whose `.git`
+# is excluded from the build context. Everything after that check still needs
+# a repository, and still fails closed without one.
 #
-# READ FROM THE LIVE CRONTAB, NEVER FROM THIS REPOSITORY. Every declaration of
-# this schedule — `config/fleet-jobs.json`, `fleet/cron.py`'s marker, the image's
-# `infra/fleet/inventory.yaml`, and the tests that pin all three — was in place
-# and green while nothing ran this tool, because a declaration is not an
-# installation. The only artifact that answers "does anything run this?" is the
-# crontab the scheduler actually reads.
-#
-# A commented-out line does NOT count. `fleet/cron.py disable` comments a line
-# out IN PLACE — the marker stays while the job cannot fire — so counting it
-# would answer SCHEDULED for a schedule that is switched off.
-#
-# An unreadable crontab is CANNOT-ASSESS, never NOT-SCHEDULED: "I could not
-# look" and "it is not there" are different answers, and collapsing them is how
-# a control fails open. The ONE exception is the crontab binary's own
-# "no crontab for <user>", which is a measured EMPTY schedule rather than an
-# unreadable one.
-#
-# The matching line is COUNTED, not echoed: the tool must not copy a crontab
-# line's text — which can carry an inline credential — into a log.
-crontab_rc=0
-crontab_text="$(crontab -l 2>"$crontab_err")" || crontab_rc=$?
+# SINCE THE SINGLE-DEVELOPER METHOD CUTOVER (docs/EXECUTION-PLAN.md §7,
+# 2026-09-21) THE HOST CRONTAB IS RETIRED: box-state checks no longer run
+# there, and `crontab -l` on this box is permanently empty regardless of
+# whether the job is meant to run. The schedule is now IaC — declared in
+# `config/fleet-jobs.json` and rendered by `fleet/cron.py` — so this probe
+# reads the manifest instead. A job entry with a `schedule` and `enabled: true`
+# IS the installation under this method; there is no separate crontab to
+# install it into. CANNOT-ASSESS only when the manifest itself is unreadable
+# (missing, unparsable) — "I could not look" and "it is not declared" stay
+# different answers.
 self_name="$(basename "${BASH_SOURCE[0]}")"
+manifest_path="$root/config/fleet-jobs.json"
 schedule_state="CANNOT-ASSESS"
 schedule_detail=""
-if [ "$crontab_rc" -ne 0 ] && ! grep -q '^no crontab for ' "$crontab_err"; then
-  schedule_detail="crontab -l failed with rc=$crontab_rc: $(head -n 1 "$crontab_err")"
+if [ ! -r "$manifest_path" ]; then
+  schedule_detail="cannot read $manifest_path"
+elif ! manifest_jobs="$(python3 -c '
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        manifest = json.load(fh)
+except Exception as exc:
+    print(f"MANIFEST-ERROR: {exc}")
+    sys.exit(0)
+for job in manifest.get("jobs", []):
+    cmd = job.get("command", "")
+    name = job.get("name", "?")
+    sched = job.get("schedule", "")
+    if sys.argv[2] in cmd and sched and job.get("enabled"):
+        print(name + " " + sched)
+' "$manifest_path" "$self_name" 2>"$crontab_err")"; then
+  schedule_detail="manifest probe failed: $(head -n 1 "$crontab_err")"
+elif [ -n "$manifest_jobs" ] && printf '%s\n' "$manifest_jobs" | grep -q '^MANIFEST-ERROR:'; then
+  schedule_detail="$(printf '%s\n' "$manifest_jobs" | head -n 1)"
+elif [ -n "$manifest_jobs" ]; then
+  schedule_count="$(printf '%s\n' "$manifest_jobs" | grep -c .)"
+  schedule_state="SCHEDULED"
+  schedule_detail="$schedule_count declared, enabled fleet-jobs.json entr(y|ies) invoke $self_name"
 else
-  schedule_lines="$(printf '%s\n' "$crontab_text" | grep -v '^[[:space:]]*#' | grep -F -- "$self_name" || true)"
-  if [ -n "$schedule_lines" ]; then
-    schedule_count="$(printf '%s\n' "$schedule_lines" | wc -l | tr -d ' ')"
-    schedule_state="SCHEDULED"
-    schedule_detail="$schedule_count installed crontab line(s) invoke $self_name"
-  else
-    schedule_state="NOT-SCHEDULED"
-    schedule_detail="no installed crontab line invokes $self_name — the declaration is not an installation (#830)"
-  fi
+  schedule_state="NOT-SCHEDULED"
+  schedule_detail="no enabled config/fleet-jobs.json entry with a schedule invokes $self_name"
 fi
 if [ "$schedule" -eq 1 ]; then
   printf 'prune-worktrees: schedule: %s — %s\n' "$schedule_state" "$schedule_detail"

@@ -73,11 +73,14 @@
 # Usage: bash scripts/check-isolation-landed.sh [--range <git-range>]
 set -uo pipefail
 
-# `GIT_IDENTITY_VARS` in governance/isolation/identity.py is the same four names.
-unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
-
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root" || exit 2
+
+# `GIT_IDENTITY_VARS` in governance/isolation/identity.py is the same four
+# names. GIT_DIR and friends are neutralised too (issue #1642, SP-11): this
+# script owns seed_repo(), and `git -C` does not override an exported GIT_DIR.
+# shellcheck source=scripts/lib/unset-git-env.sh
+source "$root/scripts/lib/unset-git-env.sh"
 
 cli="governance/isolation/cli.py"
 baseline="governance/isolation/landed-baseline.json"
