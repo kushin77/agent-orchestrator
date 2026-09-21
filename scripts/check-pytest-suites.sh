@@ -162,7 +162,7 @@ if [ ! -d "$log_dir" ]; then
   exit 2
 fi
 
-LISTED=51
+LISTED=52
 ran=0
 failed=0
 
@@ -294,6 +294,13 @@ judge integrations/paperclip/adapters/secrets $?
 
 timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q integrations/paperclip/adapters/skills/tests > "$(suite_log integrations/paperclip/adapters/skills)" 2>&1
 judge integrations/paperclip/adapters/skills $?
+
+# Issue #1822 — the paperclip sync adapter family, named here because no other
+# gate reaches it: registered in scripts/pytest-suites.txt (resolving the
+# scripts/check-ungated-suites.sh refusal) and NAMED as a pytest target here,
+# which is what scripts/check-gate-coverage.sh requires of a newly declared suite.
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q integrations/paperclip/adapters/sync/tests > "$(suite_log integrations/paperclip/adapters/sync)" 2>&1
+judge integrations/paperclip/adapters/sync $?
 
 timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q registry/parity/tests > "$(suite_log registry/parity)" 2>&1
 judge registry/parity $?
