@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -121,3 +122,57 @@ def test_schema_rejects_a_bool_wave_cap():
 
 def test_self_control_is_clean():
     assert focus.self_control() == []
+
+
+# --- stale committed focus self-heal (issue #1717) -------------------------
+
+
+def _write(path, active_epic, activated_at):
+    focus.save(focus.Focus(active_epic=active_epic, activated_at=activated_at), path)
+
+
+def test_stale_and_refreshable_uses_the_refreshed_epic(tmp_path, monkeypatch):
+    target = tmp_path / "focus.json"
+    _write(target, 706, "2026-09-01T00:00:00Z")  # >72h old
+    snap = board(
+        Issue(706, "epic old", state="closed", labels=("type:epic",)),
+        Issue(1510, "epic live", labels=("type:epic",)),
+    )
+
+    def fake_refresh(path=None):
+        _write(target, 1510, "2026-09-21T00:00:00Z")
+        return True, "refreshed"
+
+    monkeypatch.setattr(focus, "_refresh", fake_refresh)
+    ok, detail = focus.self_heal(snap, target)
+    assert ok and detail
+    assert focus.active(snap, target).number == 1510
+
+
+def test_stale_and_unrefreshable_fails_closed_by_name(tmp_path, monkeypatch):
+    target = tmp_path / "focus.json"
+    _write(target, 706, "2026-09-01T00:00:00Z")
+    snap = board(Issue(706, "epic old", state="closed", labels=("type:epic",)))
+
+    def fake_refresh(path=None):
+        return False, "offline: no gh auth"
+
+    monkeypatch.setattr(focus, "_refresh", fake_refresh)
+    ok, detail = focus.self_heal(snap, target)
+    assert not ok
+    assert "CANNOT-ASSESS" not in detail  # self_heal names the failure; the CLI adds the verdict word
+    assert "stale" in detail and "706" in detail
+
+
+def test_fresh_focus_is_left_untouched(tmp_path, monkeypatch):
+    target = tmp_path / "focus.json"
+    _write(target, 900, "2026-09-14T00:00:00Z")
+    snap = board(Issue(900, "epic a", labels=("type:epic",)))
+
+    def boom(path=None):
+        raise AssertionError("refresh must not be called for a fresh focus")
+
+    monkeypatch.setattr(focus, "_refresh", boom)
+    ok, detail = focus.self_heal(snap, target, now=datetime(2026, 9, 14, 1, 0, 0, tzinfo=timezone.utc))
+    assert ok and detail == ""
+    assert focus.active(snap, target).number == 900
