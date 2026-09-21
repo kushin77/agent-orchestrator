@@ -8,6 +8,22 @@
 #   -> scripts/prune-worktrees.sh --branches --apply (reclaim: removes the now
 #      landed lane worktree and its local branch)
 #
+# ---knowledge---
+# module_id: scripts.land
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [single-command-orchestration, guard-then-merge-then-reclaim]
+# derives_from: scripts/check-squash-message.sh
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [usage, run_self_test]
+# invariants: "the trailer guard always runs before merge; reclaim only runs after a successful merge"
+# gotchas: ""
+# related: ["#1675"]
+# do_not_duplicate: null
+# ---knowledge---
+#
 # No verify/attest step in this path -- those are advisory and run at another
 # venue (AGENTS.md rule 7). This script is code-only landing.
 #

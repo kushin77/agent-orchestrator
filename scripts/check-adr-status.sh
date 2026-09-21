@@ -14,6 +14,22 @@
 #     naming an ADR id that does not exist on disk
 #   - `status: live` with no (or empty) `live_resource:` key
 #
+# ---knowledge---
+# module_id: scripts.check-adr-status
+# system: scripts
+# app: scripts
+# solution_class: enterprise
+# patterns: [closed-vocabulary, refuse-by-name]
+# derives_from: docs/decision-records/README.md
+# owner_sme: docs-sme
+# tier: L1
+# interfaces: [check_one, run_gate, provoke, self_test]
+# invariants: "status is always one of the 6 closed values; superseded/live carry their companion key"
+# gotchas: ""
+# related: ["#1619"]
+# do_not_duplicate: null
+# ---knowledge---
+#
 # Usage:
 #   bash scripts/check-adr-status.sh              the gate, over docs/decision-records/
 #   bash scripts/check-adr-status.sh --self-test   prove both directions

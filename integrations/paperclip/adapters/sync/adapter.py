@@ -1,5 +1,21 @@
 """paperclip.adapters.sync.adapter — PMO plan <-> Paperclip project/ticket sync (issue #1649).
 
+---knowledge---
+module_id: integrations.paperclip.adapters.sync.adapter
+system: integrations
+app: paperclip
+solution_class: pattern
+patterns: [adapter, write-read-half-of-existing-derivation]
+derives_from: governance/pmo/plan.py
+owner_sme: paperclip
+tier: L1
+interfaces: [SyncRefused, push_plan, pull_plan]
+invariants: ""
+gotchas: ""
+related: ["#1649"]
+do_not_duplicate: null
+---knowledge---
+
 ``governance/pmo/plan.py::render_paperclip`` already derives the read-only
 payload (project + milestones + tickets) a PMO plan would push to Paperclip;
 this module is the missing write/read half named in that function's own

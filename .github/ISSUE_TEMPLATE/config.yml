@@ -1,5 +1,21 @@
 # GitHub issue-form configuration (.github/ISSUE_TEMPLATE/config.yml).
 #
+# ---knowledge---
+# module_id: github.issue_template.config
+# system: github
+# app: issue_template
+# solution_class: template
+# patterns: [blank-issue-disabled]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [blank_issues_enabled, contact_links]
+# invariants: "blank_issues_enabled stays false, or the three governed issue forms can be routed around"
+# gotchas: ""
+# related: ["#1533"]
+# do_not_duplicate: null
+# ---knowledge---
+#
 # Issue #1533. The three governed forms above only bind a brief that is FILED
 # through them; GitHub's default also offers "Open a blank issue", which routes
 # around every required field in all three and puts an unvalidated free-text box

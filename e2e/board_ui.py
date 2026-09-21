@@ -1,5 +1,21 @@
 """E2E probe: the console's board views (issue #1522).
 
+---knowledge---
+module_id: e2e.board_ui
+system: e2e
+app: e2e
+solution_class: pattern
+patterns: [probe-harness, wiring-falsifiability]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [build_probe_app, probe_view_documents, probe_absent_view_is_not_served, probe_wiring_check_is_falsifiable, probe_shell_navigation, probe_flags_off_by_default, probe_board_rows_serve_the_joined_roster, probe_task_board_replays_a_real_ticket]
+invariants: "a probe here catches a view that exists as a file but is not actually wired to a serving route"
+gotchas: "probes must fail when the route is unwired, not just when it is absent — see probe_wiring_check_is_falsifiable"
+related: ["#1522"]
+do_not_duplicate: null
+---knowledge---
+
 Issue #1522 adds the **views** for two backends that already serve and are
 already tested: the tenant task board (``GET /api/taskboard/tickets[/<id>]``,
 ``portal/server/task_board.py``) and the fleet board (``GET /api/board/rows``,

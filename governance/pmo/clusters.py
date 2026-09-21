@@ -1,5 +1,21 @@
 """Load + validate ``governance/pmo/clusters.json`` (``dispatch --by-cluster``).
 
+---knowledge---
+module_id: governance.pmo.clusters
+system: governance
+app: pmo
+solution_class: pattern
+patterns: [read-only-optional-input, schema-validated-loader]
+derives_from: governance/pmo/clusters.schema.json
+owner_sme: pmo-sme
+tier: L1
+interfaces: [Cluster, Clusters, load]
+invariants: "PMO never writes clusters.json; it is a read-only, optional input"
+gotchas: ""
+related: ["#1575"]
+do_not_duplicate: null
+---knowledge---
+
 PMO adds no ledger of its own (``governance/pmo/README.md``'s own rule). This
 file is a **read-only, optional input** — produced by the ``board-triage``
 lane (issue/PR #1575, ``governance/pmo/clusters.schema.json`` — the schema is

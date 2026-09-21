@@ -1,5 +1,21 @@
 """portal.server.sessions — the cross-engine Sessions view adapter (issue #1563).
 
+---knowledge---
+module_id: portal.server.sessions
+system: portal
+app: server
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [SessionsView]
+invariants: "joins existing fleet/claim/DeepSeek session sources; it owns no ledger of its own"
+gotchas: ""
+related: ["#1563"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: `.fleet/claims/*` + `.fleet/lanes/*` (the live fleet CLI's own
 claim/lane files), `.board/claims.jsonl` (the same claim log `livestore.py`
 already joins for the fleet board) and `~/.deepseek-agent` (DeepSeek's own

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Regenerate the "## Canonical docs" table in docs/README.md (issue #1672).
 
+---knowledge---
+module_id: scripts.docs-index-fix
+system: scripts
+app: scripts
+solution_class: class
+patterns: [union-then-regenerate]
+derives_from: docs/README.md
+owner_sme: docs-sme
+tier: L1
+interfaces: [first_h1, main]
+invariants: "every lane runs this rather than hand-editing the table directly"
+gotchas: ""
+related: ["#1672"]
+do_not_duplicate: null
+---knowledge---
+
 Union-then-regenerate: every lane that adds a docs/*.md file runs this
 (`make docs-index` / `check-docs.sh --fix`) instead of hand-editing the
 index, so two lanes adding different files never conflict on the same
