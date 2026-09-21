@@ -1,4 +1,19 @@
 /* agent-orchestrator console — shared frame API (issue #39)
+ * ---knowledge---
+ * module_id: portal.static.js.api
+ * system: portal
+ * app: static
+ * solution_class: pattern
+ * patterns: [shared-client-helper, per-frame-no-cascade, same-origin-theme-bridge]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L0
+ * interfaces: [window.CP, portal/static/views/*.html]
+ * invariants: "each view frame links tokens.css + console.css itself and applies its own theme - no cross-frame cascade reliance"
+ * gotchas: ""
+ * related: ["#39"]
+ * do_not_duplicate: null
+ * ---knowledge---
  * Every view frame is an isolated document: it links tokens.css + console.css
  * itself and applies its own theme (no cross-frame cascade reliance). This
  * helper supplies fetch/json helpers, tiny DOM builder, formatting, and the

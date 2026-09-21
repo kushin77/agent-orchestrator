@@ -9,6 +9,23 @@ the front-end JSON matches what the control-plane REST surface (issue #38)
 would return: agent statuses from registry/service, budgets from
 telemetry/budgets, audit records from telemetry/ledger, prompt FP/FN from
 registry/prompts.
+
+
+---knowledge---
+module_id: portal.server.catalog
+system: portal
+app: server
+solution_class: pattern
+patterns: [read-model, projection, no-second-source-of-truth]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [tenants_overview, tenant_overview, agents_tree, personas, prompts, budgets, usage, audit_records, approvals]
+invariants: "every view is a pure projection over ConsoleState, never a second source of truth"
+gotchas: ""
+related: ["#38", "#348"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

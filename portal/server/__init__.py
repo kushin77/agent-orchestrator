@@ -19,6 +19,23 @@ redefines) the frozen vocabularies of the merged pillar lanes:
 * ``telemetry/ledger`` (issue #31) - the audit verify-chain record vocabulary.
 * ``telemetry/budgets`` (issue #34) + ``registry/*`` (issues #9/#11/#13) -
   the budget/quota and agent/persona/prompt state this console displays.
+
+
+---knowledge---
+module_id: portal.server
+system: portal
+app: server
+solution_class: template
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [__version__]
+invariants: "the subtree owns portal/** only and consumes the pillar lanes' frozen vocabularies rather than redefining them"
+gotchas: ""
+related: ["#39"]
+do_not_duplicate: null
+---knowledge---
 """
 
 __version__ = "1.0.0"

@@ -1,4 +1,19 @@
 /* agent-orchestrator console — conversation view (issue #508, ADR-0023)
+ * ---knowledge---
+ * module_id: portal.static.js.chat
+ * system: portal
+ * app: static
+ * solution_class: pattern
+ * patterns: [client-half, honest-absence, tier-only-picker]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L1
+ * interfaces: [portal/static/views/chat.html]
+ * invariants: "the picker offers tiers only - the resolved model is displayed, never chosen; a fragment the envelope does not back renders data-supported=false"
+ * gotchas: "absence is a state, not an empty success - NO_DATA for grounding, no_data for an absent figure"
+ * related: ["#508", "#514"]
+ * do_not_duplicate: null
+ * ---knowledge---
  *
  * The client half of the conversational surface. It owns no authority: it
  * renders what the serving surface streamed and it says so when the surface

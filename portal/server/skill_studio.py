@@ -32,6 +32,23 @@ The surface ships **feature-flag-gated OFF** (GR-5): the flag is declared in the
 portal's own ``portal/config/feature-flags.yaml`` and read here through
 ``portal.server.config_flags``; while it is off the app refuses every
 ``/api/skillstudio/*`` route before authentication.
+
+
+---knowledge---
+module_id: portal.server.skill_studio
+system: portal
+app: server
+solution_class: pattern
+patterns: [delegate-never-re-derive, refusal-preserved, feature-flag-gated-off]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SkillStudioSurface, SkillStudioError]
+invariants: "an unknown skill is absent (404), never an invented empty shell; the adapter re-checks nothing the studio already refuses"
+gotchas: ""
+related: ["#642"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

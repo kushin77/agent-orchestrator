@@ -82,6 +82,23 @@ plane's machine codes and never echo the presented cookie, and the transport
 (``portal/server/httpd.py``) keeps its request log silent. The suite proves
 both with a provoked negative control rather than by inspection
 (``portal/tests/test_fleet_access_control.py``).
+
+
+---knowledge---
+module_id: portal.server.fleet_authz
+system: portal
+app: server
+solution_class: enterprise
+patterns: [row-ownership, scope-then-permission, no-cross-tenant-default]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [FleetAuthorizer, OrgIndex, FleetRow, RowOwner, FleetDenied]
+invariants: "one tenant never sees another's rows; the cross-org roll-up is an explicit administrative capability, never the default"
+gotchas: "a row naming no org/team/agent/lane is platform-owned and visible only to an in-scope principal"
+related: ["#333", "#331"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -29,6 +29,23 @@ same one:
 
 ``pyyaml`` is the repo's accepted stack (stdlib + PyYAML). A missing PyYAML is a
 fail-closed ``"off"``, never an enabled surface.
+
+
+---knowledge---
+module_id: portal.server.config_flags
+system: portal
+app: server
+solution_class: pattern
+patterns: [fail-closed, declarative-flags, value-not-exception]
+derives_from: portal/server/fleet.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [read_config_default, surface_enabled, DECLARED_SURFACES]
+invariants: "every failure reads as off; only an explicit promotion turns a surface on"
+gotchas: "the portal's own portal/config/feature-flags.yaml, not infra/feature-flags/registry.yaml (kept 1:1 with terraform by check-feature-flags.py)"
+related: ["#642", "#652"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
