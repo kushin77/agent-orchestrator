@@ -60,10 +60,12 @@
       else if (value === true) node.setAttribute(key, key);
       else node.setAttribute(key, value);
     }
-    children.forEach(function (child) {
+    function append(child) {
       if (child == null || child === false) return;
+      if (Array.isArray(child)) { child.forEach(append); return; }
       node.appendChild(child.nodeType ? child : document.createTextNode(String(child)));
-    });
+    }
+    children.forEach(append);
     return node;
   }
 

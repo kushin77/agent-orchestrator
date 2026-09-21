@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:office-charter.schema:v1",
+  "title": "OfficeCharter",
+  "description": "Schema for registry/personas/offices/<office>/charter.yaml. Sibling to persona-card.schema.json (registry/personas/persona-card.schema.json), which this schema extends conceptually (an office wraps a PersonaCard with authority/escalation) rather than duplicating any of its fields. Validated the same way persona cards are: `python3 -c \"import json,yaml,jsonschema; jsonschema.validate(yaml.safe_load(open('registry/personas/offices/cfo/charter.yaml')), json.load(open('registry/personas/offices/office-charter.schema.json')))\"`. Full wiring into registry/personas/registry.py's CLI (as a new `validate-office` subcommand) is a follow-up — this schema is authored and usable standalone today; not yet invoked from registry.py per the task's own scope caution against ad-hoc changes to a tested loader without an accompanying test.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "office", "tenant", "reportsTo", "personaCardRef", "authority", "escalation", "provenance"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "office": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "tenant": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "reportsTo": { "type": "string", "minLength": 1 },
+    "personaCardRef": { "type": "string", "minLength": 1 },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grants", "denies"],
+      "properties": {
+        "grants": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "denies": { "type": "array", "items": { "type": "object" }, "minItems": 1 }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "trigger"],
+      "properties": {
+        "path": { "type": "array", "items": { "type": "string" }, "minItems": 2 },
+        "trigger": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "provenance": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+  }
+}

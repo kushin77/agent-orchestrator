@@ -35,12 +35,14 @@ from conftest import ApiClient, console_sso  # noqa: E402
 from portal.server import control_api  # noqa: E402
 from portal.server.app import build_app  # noqa: E402
 from portal.server.control_api import (  # noqa: E402
+    PLATFORM_ORG,
     EffectRecord,
     LeverResult,
     RemoteControl,
     Vocabulary,
     install,
 )
+from portal.server.fleet_authz import SUBJECT_USER  # noqa: E402
 from portal.server.sso import AUTH_GATE_LOGIN_PATH, SESSION_COOKIE  # noqa: E402
 
 STATIC = REPO_ROOT / "portal" / "static"
@@ -122,19 +124,31 @@ def _authed(app, email=SUPER_ADMIN_EMAIL, tenant="acme"):
 # ---------------------------------------------------------------------------
 # the flag gate (BEFORE AuthN)
 # ---------------------------------------------------------------------------
-def test_flag_off_console_route_is_invisible(app):
+#: The three probes below force the flag OFF rather than reading the committed
+#: declaration. `surfaces.operator_terminal` is now `promoted: true`, so an app
+#: built with the default flags serves the surface and a probe that read the
+#: default would assert nothing — it was measured red on `origin/master` for
+#: exactly that reason (issue #1523 recorded the measurement). The flag is
+#: still a real probe when forced: a route that ignored it answers 200/302 here.
+FLAG_OFF = {"operator_terminal": False}
+
+
+def test_flag_off_console_route_is_invisible():
+    app = _terminal_app(**FLAG_OFF)
     response = app.handle("GET", "/console", cookies={})
     assert response.status == 404
     assert response.payload["error"]["code"] == "feature_disabled"
 
 
-def test_flag_off_view_is_invisible(app):
+def test_flag_off_view_is_invisible():
+    app = _terminal_app(**FLAG_OFF)
     response = app.handle("GET", "/views/console.html", cookies={})
     assert response.status == 404
     assert response.payload["error"]["code"] == "feature_disabled"
 
 
-def test_flag_off_script_is_invisible(app):
+def test_flag_off_script_is_invisible():
+    app = _terminal_app(**FLAG_OFF)
     response = app.handle("GET", "/js/operator.js", cookies={})
     assert response.status == 404
     assert response.payload["error"]["code"] == "feature_disabled"
@@ -255,3 +269,119 @@ def test_allowed_steer_is_audited():
     assert "fleet.pause" in ledger.finished
     assert "fleet.pause" in ledger.begun
     assert "fleet.pause" in ledger.ended
+
+
+# ---------------------------------------------------------------------------
+# the panel is the CALLER's catalogue, not the registry's (issue #1523)
+# ---------------------------------------------------------------------------
+#
+# The closed vocabulary is one declaration for every caller: it says which verbs
+# exist, not which ones the operator reading it may run. Rendered unfiltered, the
+# panel put a steer button for every exposed verb — irreversible ones included —
+# in front of a caller whose capabilities reached none of them, so every click was
+# a 403 the panel could have predicted. What is measured here is that the panel's
+# "what may I run" answer and the dispatch path's answer are THE SAME answer:
+# one decision, read twice, never a second implementation of the rule.
+
+#: A platform preset role that grants a PARTIAL capability set (`fleet:read`):
+#: enough to run the fleet/channel/recover reads, not enough for `board` or
+#: `closure`. The middle regime is the one that catches a filter that is really
+#: an all-or-nothing switch, which the two extremes would not.
+PARTIAL_ROLE = "admin"
+
+
+def _bind(app, email: str, role: str) -> None:
+    """Bind ``email`` to a platform preset role — the seam the console's own
+    super-admin rule uses (``FleetAuthorizer._bind_super_admin``), so the test
+    builds its principals out of the authority's own store rather than a stub."""
+    store = app.fleet_authz.store
+    role_id = app.fleet_authz._role_id(store, PLATFORM_ORG, role)
+    assert role_id is not None, f"{role} is not a role at {PLATFORM_ORG}"
+    store.add_binding(PLATFORM_ORG, email.lower(), SUBJECT_USER, role_id)
+
+
+def _permitted(client) -> list[str] | None:
+    status, payload = client.get("/api/console/me")
+    assert status == 200, payload
+    return payload["data"]["controlVerbs"]
+
+
+def test_me_reports_the_callers_own_control_verbs():
+    """The panel's catalogue: this caller's verbs, spanning several families."""
+    app = _steer_app()
+    permitted = _permitted(_authed(app))
+    assert isinstance(permitted, list)
+    families = {verb.split(".", 1)[0] for verb in permitted}
+    # The acceptance asks for at least two families BEYOND the fleet-steer one;
+    # a super-admin reaches every exposed family, so this is the strongest form.
+    assert families >= {"fleet", "board", "channel"}, sorted(families)
+    assert "board.status" in permitted, "a non-fleet verb the panel must offer"
+
+
+def test_the_permitted_set_and_the_dispatch_path_agree_verb_by_verb():
+    """ONE decision, read twice — the property that makes the panel honest.
+
+    For every exposed verb, membership in the caller-scoped catalogue is compared
+    against what the plane actually answers when that verb is dispatched. A
+    filter that withheld a verb the caller *could* run (a hidden capability) and a
+    filter that offered one it could not (a predicted 403) both fail here, by
+    verb id.
+    """
+    registry = Vocabulary.load(REGISTRY)
+    exposed = [row for row in registry.verbs.values() if row.exposed]
+    assert len(exposed) > 20, "the vocabulary has shrunk; re-measure this proof"
+
+    for email, role in (("root@platform.example.com", None),
+                        ("partial@acme.example.com", PARTIAL_ROLE)):
+        app = _steer_app()
+        if role is not None:
+            _bind(app, email, role)
+        client = _authed(app, email=email)
+        permitted = set(_permitted(client) or [])
+        mismatches = []
+        for row in exposed:
+            status, _payload = client.post(f"/api/control/{row.family}/{row.action}", {})
+            ran = status == 200
+            if ran != (row.id in permitted):
+                mismatches.append((row.id, status, row.id in permitted))
+        assert not mismatches, f"{email}: catalogue != dispatch for {mismatches}"
+
+
+def test_a_caller_with_no_capability_sees_none_and_is_still_refused():
+    """The negative control: what the panel withholds, the plane refuses."""
+    app = _steer_app()
+    client = _authed(app, email=SCOPED_USER_EMAIL, tenant="acme")
+    assert _permitted(client) == []
+    # The verb the panel would have offered before this change.
+    status, payload = client.post("/api/control/board/status", {})
+    assert status == 403
+    assert payload["error"]["code"] in ("permission_denied", "scope_denied")
+
+
+def test_a_partial_caller_sees_its_own_families_and_not_the_others():
+    """`board`/`closure` are absent for a caller whose capabilities stop short."""
+    app = _steer_app()
+    _bind(app, "partial@acme.example.com", PARTIAL_ROLE)
+    permitted = _permitted(_authed(app, email="partial@acme.example.com"))
+    assert permitted, "the partial role must still reach some verbs"
+    families = {verb.split(".", 1)[0] for verb in permitted}
+    assert families & {"channel", "recover"}, sorted(families)
+    assert "board" not in families, sorted(families)
+    assert not [verb for verb in permitted if verb.startswith("board.")]
+    # ...and the irreducible one it must never be offered is the irreversible
+    # closure verb, which no partial role reaches.
+    assert "closure.retire" not in permitted
+
+
+def test_no_permitted_set_is_reported_while_the_control_surface_is_off():
+    """`None` is "cannot be assessed", never `[]` — the client fails closed on it.
+
+    The two are different claims: "this caller may run nothing" is a verdict, and
+    an unpromoted surface is the absence of one. A client that conflated them
+    would render an empty panel that reads as an idle vocabulary.
+    """
+    app = _terminal_app()
+    install(app, RemoteControl(app=app, enabled=False, lever=RecordingLever(),
+                               commands=SpyLedger()))
+    assert _permitted(_authed(app)) is None
+

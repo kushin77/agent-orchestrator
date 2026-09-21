@@ -1,0 +1,45 @@
+# OrgChart: the purebliss tenant org chart (single-tenant IaC seed).
+#
+# Source: EPIC — purebliss single-tenant org (CEO/CTO/CFO/PMO offices).
+# Schema and validator are shared with the platform chart
+# (registry/personas/org-chart.yaml): this file is the tenant extension the
+# org-chart.schema.json description names explicitly ("a tenant extends the
+# chart by adding its own org-chart.yaml").
+#
+# Reporting lines (edges): cto/cfo/pmo -> ceo; ceo -> board.
+# Loaded explicitly (not auto-discovered) via
+# registry.load_org_chart(path=ORG_CHARTS_DIR / "purebliss.yaml") and
+# validated against registry/personas/cards/purebliss/*.yaml (tenant-first,
+# platform-fallback resolution) by
+# registry/personas/tests/test_purebliss_org_chart.py.
+orgChartSchema: persona-org-chart/v1
+id: purebliss-org
+tenant: purebliss
+version: 1.0.0
+principal: board
+root: ceo
+roles:
+  - id: ceo
+    title: Executive Strategy Director
+    reportsTo: board
+    defaultModelTier: MAX
+    monthlyBudgetCapUsd: 300
+    heartbeatSchedule: hourly
+  - id: cto
+    title: System Architect & Dev Lead
+    reportsTo: ceo
+    defaultModelTier: HIGH
+    monthlyBudgetCapUsd: 250
+    heartbeatSchedule: every-30m
+  - id: cfo
+    title: Financial & Compute Controller
+    reportsTo: ceo
+    defaultModelTier: LOW
+    monthlyBudgetCapUsd: 50
+    heartbeatSchedule: daily
+  - id: pmo
+    title: Program Management Office Head
+    reportsTo: ceo
+    defaultModelTier: MED
+    monthlyBudgetCapUsd: 100
+    heartbeatSchedule: every-15m

@@ -9,6 +9,15 @@
 # Load with:  registry.load_tenant_overrides("gateway/providers/example-tenant-overrides.yaml")
 
 tenants:
+  # purebliss (single-tenant org; CEO/CTO/CFO/PMO offices, registry/personas/
+  # offices.yaml): LOW -> local ollama (free floor), MED -> deepseek
+  # (CFO analysis tier), HIGH/MAX -> anthropic (CEO/CTO orchestration tier).
+  - tenantId: purebliss
+    mappings:
+      LOW: ollama
+      MED: deepseek
+      HIGH: anthropic
+      MAX: anthropic/claude-opus-5
   - tenantId: acme
     mappings:
       LOW: anthropic

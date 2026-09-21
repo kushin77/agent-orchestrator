@@ -7,7 +7,10 @@ Index of the repo's canonical documentation. Agents start at
 
 | Doc | Purpose |
 |-----|---------|
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Five-pillar control-plane architecture (source of truth; EPIC-00 = issue #4). |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Five-pillar control-plane architecture (design reference; EPIC-00 = issue #4). |
+| [`ARCHITECTURE-2026-09.md`](ARCHITECTURE-2026-09.md) | **As-built source of truth for the control chain** — Paperclip → PMO → Hermes → agents → lanes/gates/attestation, per-layer implemented/declared-only/missing, corrected against ADR-0033 (issue #1650, `Parent: #1510`). |
+| [`CTO-OFFICE.md`](CTO-OFFICE.md) | agent-orchestrator's job as the fleet's Chief Technology Office for everything in the CMR — authority, what it governs, how a spoke gets work and reports back (issue #1650, `Parent: #1510`). |
+| [`ABILITIES.md`](ABILITIES.md) | Ability inventory — every control verb/cockpit function/paperclip API path/MCP surface/gateway module, owner layer, status, proving gate (issue #1650, `Parent: #1510`). |
 | [`RELEASE-PLAN.md`](RELEASE-PLAN.md) | The v1.0.0 commitment and SemVer contract: surfaces under contract, v1.0.0 exit criteria mapped to issue #803's acceptance boxes, residual risks named (issue #1074). |
 | [`EXECUTION-PLAN.md`](EXECUTION-PLAN.md) | One-issue-one-lane parallel dispatch contract, phase/wave sequencing 0–8. |
 | [`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md) | Sourced fork-map of upstream `paperclip.ing` against the fleet's own primitives (issue #368). |
@@ -46,6 +49,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`INFRA-LIMITS.md`](INFRA-LIMITS.md) | The sandbox + ephemeral-storage contract — the blocked network, the read-only-except-workspace filesystem, the shared `/tmp` tmpfs, the write-is-not-a-write-until-read-back rule, and the `scripts/check-infra-limits.sh` guard that enforces them (EPIC #708, issue #729). |
 | [`BOARD-METADATA-AUDIT.md`](BOARD-METADATA-AUDIT.md) | The live board-metadata pass — every open issue's `class/type/priority/area` (+`gdc`/`pillar`), milestone, `epic:<slug>` and declared chain edges, with the before/after coverage and the consumer transcripts (issue #1158). |
 | [`TAGGING.md`](TAGGING.md) | The tag authority end to end — one declared vocabulary per tag dimension (borrowing, never re-declaring, the `class` ladder, the FinOps tiers and the fleet roles), the new `posture` (`overall`/`saas`/`iac`/`no-human-needed`/`human-gated`) and `lifecycle` (SDLC stage) dimensions, the tag → gate derivation by channel (pr/ci/cd/ops), the generated matrix, and the gate whose negative control provokes all eleven refusals by name (issue #1175). |
+| [`PROMOTION-OWNER-LEDGER.md`](PROMOTION-OWNER-LEDGER.md) | The promotion-ledger disposition — every declared-off surface names its promotion owner (`promotion_issue:` or `posture: hold`), enforced by the `check-feature-flags.py` promotion-owner arm and its `--self-test` (issue #1618). |
 | [`../control-plane/cockpit/README.md`](../control-plane/cockpit/README.md) | The terminal cockpit (AgentConsole) — the operator client of the RC-3 control API and the authenticated SSE streams; keyboard-first, role-tiered, drillable, flag-gated OFF (EPIC #551, issue #566). |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
@@ -67,8 +71,13 @@ reachable from this index.
 | [`OBSERVABILITY.md`](OBSERVABILITY.md) | Observability — the monitoring boundary for agent-orchestrator; declared and gated (issue #496, EPIC #494). |
 | [`QA-GATE.md`](QA-GATE.md) | QA gate stack — `make gate`, qa-loop and merge gate (issue #29). |
 | [`SURFACE-CLASS.md`](SURFACE-CLASS.md) | Per-surface target solution-classes — the CMR quality rung each product surface declares. |
+| [`cfo/COST-MODEL-2026-09-20.md`](cfo/COST-MODEL-2026-09-20.md) | CFO office enterprise cost model — every figure tagged MEASURED / DECLARED / UNKNOWN-with-source, each price traced to `telemetry/metering/rate_cards/*.yaml` and no billing number fabricated (CFO office, parent #1510). |
+| [`cfo/PROMPT-REDUCTION-PLAN.md`](cfo/PROMPT-REDUCTION-PLAN.md) | CFO office prompt-reduction program, target 90%+ — every baseline cell cites a row of the cost model's §6, plus the harness-injected surface measured from the transcript (parent #1510). |
+| [`cto/HARVEST.md`](cto/HARVEST.md) | CTO office harvest provenance (GR-10) — read-only mining of `/home/akushnir/leaderboard` and `capital-underwriting`, declarative doctrine only, no application code copied (issue #1573, parent #1510). |
+| [`tenancy/PUREBLISS-ORG.md`](tenancy/PUREBLISS-ORG.md) | The `purebliss` single-tenant org — CEO/CTO/CFO/PMO offices as declarative IaC seeds, with the file-by-file source-of-truth table (issue #1571). |
 | [`MECHANICAL-EXECUTION-LAYER.md`](MECHANICAL-EXECUTION-LAYER.md) | Mechanical execution layer — concept & intent (intent-only spec, issue #239). |
 | [`BOARD-ATTACK-PLAN.md`](BOARD-ATTACK-PLAN.md) | Board attack plan (milestone → epic → class) — the PMO coordination artifact; no product code. |
+| [`PMO.md`](PMO.md) | PMO priority + dispatch engine — doctrine-to-implementation map for `governance/pmo`'s `priority`/`dispatch` (issue #403 follow-on). |
 | [`FLEET-STATE.md`](FLEET-STATE.md) | Unified fleet-state projection across the five stores one work item touches (issue #323). |
 | [`FLEET-CAPABILITY-DRIFT.md`](FLEET-CAPABILITY-DRIFT.md) | Capability drift — restarting a rung that does not implement what the repository declares (issue #319). |
 | [`FLEET-DASHBOARD-GAP-ANALYSIS.md`](FLEET-DASHBOARD-GAP-ANALYSIS.md) | Fleet dashboard gap analysis — terminal TUI vs web single-pane-of-glass (issue #330). |
@@ -85,6 +94,7 @@ reachable from this index.
 | [`EDGE-CUTOVER.md`](EDGE-CUTOVER.md) | Edge cutover — how `ai.purebliss.app` is fronted and what is retired; a declaration, not a deployment (issue #731). |
 | [`CHAT-MOUNT.md`](CHAT-MOUNT.md) | The chat mount contract — how the conversational surface appears in the OS shell (issue #511, EPIC #500). |
 | [`CODEIDX-CAPABILITY-REGISTER.md`](CODEIDX-CAPABILITY-REGISTER.md) | What the fleet needs from `kushin77/code-indexing`, per capability, and how we know we have it. |
+| [`CODE-HEADER-STANDARD.md`](CODE-HEADER-STANDARD.md) | The machine-parseable knowledge block every source file carries, and the fields the indexer reads (issue #1535, EPIC #1510). |
 | [`DIAGRAMS-CAPABILITY-REGISTER.md`](DIAGRAMS-CAPABILITY-REGISTER.md) | What "fully capable" means for the fleet's diagrams surface (issue #467). |
 | [`VENDOR-COMPLIANCE-GAP-133.md`](VENDOR-COMPLIANCE-GAP-133.md) | Vendor-compliance gap #133 (`kushin77/googleworkspace`) — the measured declaration, its owners, and why it must not be closed on its own gate (issue #133). |
 | [`erp-finops/compliance-audit.md`](erp-finops/compliance-audit.md) | ERP/FinOps compliance audit — phase-4 validation & governance (issue #676, EPIC #665). |
@@ -93,6 +103,8 @@ reachable from this index.
 | [`erp-finops/token-baseline.md`](erp-finops/token-baseline.md) | DeepSeek token-flow baseline (issue #667, EPIC #665). |
 | [`BUILT-NOT-SHIPPED-AO.md`](BUILT-NOT-SHIPPED-AO.md) | Built-not-shipped inventory — every artifact that is built but not shipped, each with the mechanism that proves the claim (issue #1540, EPIC #1510). |
 | [`ISOLATION-4210-REVERIFY.md`](ISOLATION-4210-REVERIFY.md) | Re-verification of the "issue #4210" claim: the number resolves to a **merged PR in `kushin77/shared-services`** (not an issue in this repo), its `git -C`/`GIT_DIR` mechanism is confirmed and re-measured here, and this repo's own fixture-seeding gates are shown to carry the defect latently — 141 write-capable `git -C` sites, 17 files without the neutralisation (issue #1546; fix is #1642). |
+| [`cfo/HARNESS-AUDIT-2026-09-20.md`](cfo/HARNESS-AUDIT-2026-09-20.md) | Read-only audit of the per-turn harness-injected prompt surface (skills, MCP, deferred tools) with a measured change set and MCP-fix diagnosis (refs #1582, CFO office). |
+| [`cfo/proposed-global-CLAUDE.md`](cfo/proposed-global-CLAUDE.md) | Compressed draft of `~/.claude/CLAUDE.md` (~36% smaller, every rule preserved), applied by `cfo/harness-audit-2026-09-20.patch` — see the audit doc above. |
 
 ## Planned (later issues)
 
