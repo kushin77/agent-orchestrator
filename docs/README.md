@@ -86,10 +86,12 @@ reachable from this index.
 | [`CHAT-MOUNT.md`](CHAT-MOUNT.md) | The chat mount contract — how the conversational surface appears in the OS shell (issue #511, EPIC #500). |
 | [`CODEIDX-CAPABILITY-REGISTER.md`](CODEIDX-CAPABILITY-REGISTER.md) | What the fleet needs from `kushin77/code-indexing`, per capability, and how we know we have it. |
 | [`DIAGRAMS-CAPABILITY-REGISTER.md`](DIAGRAMS-CAPABILITY-REGISTER.md) | What "fully capable" means for the fleet's diagrams surface (issue #467). |
+| [`VENDOR-COMPLIANCE-GAP-133.md`](VENDOR-COMPLIANCE-GAP-133.md) | Vendor-compliance gap #133 (`kushin77/googleworkspace`) — the measured declaration, its owners, and why it must not be closed on its own gate (issue #133). |
 | [`erp-finops/compliance-audit.md`](erp-finops/compliance-audit.md) | ERP/FinOps compliance audit — phase-4 validation & governance (issue #676, EPIC #665). |
 | [`erp-finops/current-state.md`](erp-finops/current-state.md) | Current-state money map — subscription flows and the manual reconciliation points (PF-1, issue #666, EPIC #665). |
 | [`erp-finops/saas-metrics-current-state.md`](erp-finops/saas-metrics-current-state.md) | SaaS metrics current state — MRR/ARR, cloud compute burn, invoicing bottlenecks and the silo map (issue #668). |
 | [`erp-finops/token-baseline.md`](erp-finops/token-baseline.md) | DeepSeek token-flow baseline (issue #667, EPIC #665). |
+| [`BUILT-NOT-SHIPPED-AO.md`](BUILT-NOT-SHIPPED-AO.md) | Built-not-shipped inventory — every artifact that is built but not shipped, each with the mechanism that proves the claim (issue #1540, EPIC #1510). |
 | [`ISOLATION-42-FETCH-CLAIM.md`](ISOLATION-42-FETCH-CLAIM.md) | Measured verdict on the `.42` "fetch refused into checked-out branch" claim — confirmed as git behaviour on 2.53.0, with the minimal reproduction and its counterfactual (issue #1547). |
 
 ## Planned (later issues)
