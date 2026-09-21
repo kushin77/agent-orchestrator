@@ -935,8 +935,19 @@ install-hooks:
 ## state. Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 ##   make land ISSUE=764                     # dry run: show the plan
 ##   AO_LAND_APPLY=1 make land ISSUE=764     # land it for real
+## PR=<n> instead of ISSUE=<n> lands an ALREADY-OPEN PR under the
+## single-developer method (issue #1675, AGENTS.md rule 10): squash-guard ->
+## gh pr merge --squash (close-out is automatic via the PR's own Closes
+## trailer) -> reclaim (scripts/land.sh). No verify/attest step in this path
+## (advisory, other venue).
+##   make land PR=1675                       # dry run
+##   AO_LAND_APPLY=1 make land PR=1675       # land it for real
 land:
-	@bash scripts/land-lane.sh --issue "$(ISSUE)"
+	@if [ -n "$(PR)" ]; then \
+		bash scripts/land.sh "$(PR)"; \
+	else \
+		bash scripts/land-lane.sh --issue "$(ISSUE)"; \
+	fi
 
 .PHONY: land
 
