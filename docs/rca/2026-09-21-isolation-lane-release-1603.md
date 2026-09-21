@@ -33,3 +33,13 @@ There is no live lane record for any of the four lanes to release with
 reaper (`branch-content-landed`), not by the session-close verb; the other
 two have nothing to close. #1603's Done line (release the lane records) is
 satisfied vacuously.
+
+## Update — fresh, unrelated drift
+
+Re-running `scripts/check-isolation-landed.sh` from a clean `origin/master`
+worktree after the above (2026-09-21, later the same day) found it **NOT-OK**:
+one unrecorded violation, `commit-missing-ticket-trailer:83704ba13030`, on
+the then-tip commit ("docs(rca): record the real-tree quarantine is fully
+retired (#1742)"). None of the five lanes above appear in that finding — it
+is new drift on the newest master commit, unrelated to this issue's scope,
+and is not addressed here.
