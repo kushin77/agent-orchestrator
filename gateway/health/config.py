@@ -42,6 +42,22 @@ Configuration loads from ``health.yaml`` (shipped defaults) via
 ``load_config()``; the YAML keys mirror the dataclass field names in
 lowerCamelCase (``windowSize``, ``minSamples``, ...) to match the fleet
 configuration convention.
+
+---knowledge---
+module_id: gateway.health.config
+system: gateway
+app: health
+solution_class: enterprise
+patterns: [immutable-config, rolling-window-thresholds, declarative-defaults]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [HealthConfig, default_config, load_config, classify_error]
+invariants: "the window is fixed-size and never time-aged, so every degradation decision is deterministic and offline-reproducible"
+gotchas: "the shipped defaults mirror health.yaml; an error class is matched by type name, not by isinstance"
+related: ["#18"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -18,6 +18,22 @@ Handler contract: ``handler(args, session, backend) -> dict`` where ``backend``
 is the caller-tenant index backend (``None`` for tools that do not touch it).
 Handlers return data; the gateway wraps exceptions into an ``isError`` text
 result (failures are data, not protocol errors - codeidx).
+
+---knowledge---
+module_id: gateway.mcp.tools
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [declared-catalog, tenant-bound-handlers, read-only-family]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [declared_tools, build_registry]
+invariants: "handlers receive the per-tenant backend bound to the caller's tenant, so results can never cross a tenant boundary"
+gotchas: "the catalogue is three families: indexing, platform informational, and the issue-#504 enterprise read-only family"
+related: ["#20", "#504"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

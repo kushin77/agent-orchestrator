@@ -13,6 +13,22 @@ A hook raising propagates (fail closed): audit/metering records are never
 silently lost. Hook handlers must treat event content as untrusted and never
 log secrets (events carry no key material by construction - keys live only in
 the vault and the in-memory transport request, never in events/logs).
+
+---knowledge---
+module_id: gateway.providers.events
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [injectable-hook, fail-closed-fanout, no-key-material]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ModelCallEvent, EventRouter]
+invariants: "a hook raising propagates, so an audit or metering record is never silently lost"
+gotchas: "events carry no key material by construction; keys live only in the vault"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

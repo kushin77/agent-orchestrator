@@ -12,6 +12,22 @@ handling):
   hand-rolled cipher - honest fail-closed, never security theater.
 - Keys never appear in logs, exceptions, ``repr``/``str`` or the persisted
   vault file (which holds only ciphertext tokens + tenant/provider metadata).
+
+---knowledge---
+module_id: gateway.providers.vault
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [encrypted-at-rest, fail-closed-crypto, never-logged]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ApiKeyVault, VaultEntry, FernetBackend, CryptoBackend, load_master_key, new_master_key, fernet_available]
+invariants: "keys are stored encrypted at rest and never appear in logs, exceptions, repr/str or the persisted vault file, which holds only ciphertext plus metadata"
+gotchas: "the master key comes from AO_VAULT_KEY, and an absent cryptography library refuses rather than downgrading to plaintext or a hand-rolled cipher"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

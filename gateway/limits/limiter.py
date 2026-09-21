@@ -13,6 +13,22 @@ NEVER-FAIL-OPEN guarantee: a budget-exhausted or rate-limited call returns a
 GuardDecision whose ``served()`` is False and whose metering outcome is an
 explicit block (budget_exceeded/queued/degraded/rate_limited).  There is no
 path that turns a block into a silent success.
+
+---knowledge---
+module_id: gateway.limits.limiter
+system: gateway
+app: limits
+solution_class: enterprise
+patterns: [facade, never-fail-open, ordered-rail]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LimitsEngine, GuardDecision, CompleteResult, build_engine]
+invariants: "an allowed call reports served() True and a blocked one served() False with an explicit metering outcome; there is no third state"
+gotchas: "the rails run cache then budget then rate limit, and complete() is what meters real usage and enforces the output throttle"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

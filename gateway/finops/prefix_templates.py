@@ -26,6 +26,22 @@ the user message varies per call.
 Standalone module (stdlib only); no cross-package imports. The pytest
 bootstrap (``tests/conftest.py``) inserts this directory on ``sys.path`` so the
 module imports plainly.
+
+---knowledge---
+module_id: gateway.finops.prefix_templates
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [byte-stable-prefix, canonical-template, refuse-deviation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PREFIX_TEMPLATES, normalize, canonical_template, validate_prefix, footprint, PrefixTemplateError]
+invariants: "the cacheable prefix of every DeepSeek call is a pure function of its canonical template, so a stray id or timestamp cannot turn a hit into a miss"
+gotchas: "DeepSeek keys its prefix cache from token 0, so one embedded timestamp or reordered block invalidates the whole prefix"
+related: ["#670"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

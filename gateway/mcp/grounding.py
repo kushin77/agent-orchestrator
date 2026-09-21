@@ -23,6 +23,22 @@ source (a bridge family + revision, a tool-call id, or a ticket id), a
 *citation* that cannot name a source the turn did not read is refused, and a
 model that cites something it was not given is refused too - the two halves of
 "hold the model to what it was given".
+
+---knowledge---
+module_id: gateway.mcp.grounding
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [read-never-write, static-first-delta-last, cited-provenance]
+derives_from: engine/memory/prompt_cache.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [GroundingAssembler, CitationsEnvelope, Citation, GroundedTurn, ApprovalProposal, propose_approval, NoData, TokenBudget]
+invariants: "a citation names a source the turn actually read: fabricated provenance raises rather than being silently repaired"
+gotchas: "an action is only ever an approval proposal; no function here writes a file"
+related: ["#504", "#500"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

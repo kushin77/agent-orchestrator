@@ -11,6 +11,22 @@ resilient client, recorded in ``docs/CANNIBALIZATION.md``).
 The frozen team mapping (EPIC #253) routes ``hermes -> hermes/ollama``: hermes
 is the primary local hop and local Ollama is its terminal fallback, declared on
 the provider config in ``providers.config.default_provider_configs()``.
+
+---knowledge---
+module_id: gateway.providers.hermes
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [inherit-ollama-shape, vendored-module-adapter, declared-fallback]
+derives_from: gateway/providers/ollama.py
+owner_sme: platform-sme
+tier: L0
+interfaces: [HermesProvider]
+invariants: "request and response handling is inherited from OllamaProvider, the same adapter that serves the local Ollama runtime"
+gotchas: "the frozen team mapping routes hermes to hermes/ollama with local Ollama as its terminal fallback"
+related: ["#255", "#124"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -27,6 +27,22 @@ No-false-green guarantees (each is negative-tested):
   the quarantine (only recovery probes can) — a stray success or an absent
   log is not recovery;
 - a probe against a dead model (probe failure) keeps it quarantined.
+
+---knowledge---
+module_id: gateway.health.monitor
+system: gateway
+app: health
+solution_class: enterprise
+patterns: [rolling-window, circuit-breaker, composition-root]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [HealthMonitor, ModelHealth, WindowStats, Outcome]
+invariants: "a degraded or quarantined model is NOT healthy, so a caller routes to the fallback chain instead of the model"
+gotchas: "one ModelHealth entry exists per (provider, model); the monitor is the composition root that fans events out to sinks"
+related: ["#18"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

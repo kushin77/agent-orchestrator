@@ -12,6 +12,22 @@ gov-ai-scout provider gateway + llm-triage provider-neutral ABC, recorded in
 The tier -> model ids are default illustrative identifiers for the vendored
 module; operators override them via per-tenant model mapping exactly like every
 other provider config (``providers.config.TenantModelMapping``).
+
+---knowledge---
+module_id: gateway.providers.paperclip
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [inherit-shared-base, vendored-module-adapter, overridable-model-ids]
+derives_from: gateway/providers/base.py
+owner_sme: platform-sme
+tier: L0
+interfaces: [PaperclipProvider]
+invariants: "request and response handling is inherited from the shared OpenAI-compatible base"
+gotchas: "the tier to model ids are illustrative defaults for the vendored module and are overridable through per-tenant model mapping"
+related: ["#255", "#124"]
+do_not_duplicate: gateway/providers/base.py
+---knowledge---
 """
 
 from __future__ import annotations

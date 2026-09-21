@@ -14,6 +14,22 @@ Runs directly (no network, no server):
 
 The package is importable as ``limits`` when ``gateway/`` is on sys.path; this
 script arranges that itself so it can run from any cwd.
+
+---knowledge---
+module_id: gateway.limits.cli
+system: gateway
+app: limits
+solution_class: enterprise
+patterns: [offline-cli, tri-state-exit, evidence-walkthrough]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [main, cmd_demo, cmd_budget, cmd_cache, cmd_rate, build_parser]
+invariants: "the CLI runs offline and deterministic, and its demo is the verification evidence rather than a claim"
+gotchas: "the script arranges gateway/ on sys.path itself so it runs from any cwd"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

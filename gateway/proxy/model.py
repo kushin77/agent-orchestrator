@@ -14,6 +14,22 @@ vocabulary is CONSUMED from the merged sibling contracts and never redefined:
 
 These objects are the seam the injected resolvers and the core dispatch engine
 exchange; they are pure data (no I/O, no network).
+
+---knowledge---
+module_id: gateway.proxy.model
+system: gateway
+app: proxy
+solution_class: pattern
+patterns: [consume-never-redefine, closed-vocabulary, pure-value-types]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [TaskRequest, RouteDecision, TaskResult, GatewayCallRecord, ChatInvocation, TierChoice, AgentView]
+invariants: "task_type, capability and model_tier vocabularies are consumed from the merged sibling contracts, never redefined here"
+gotchas: "the FinOps ladder tier L0/L1/L2 is mapped onto the registry tier vocabulary by the router, not stored interchangeably"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -12,6 +12,22 @@ decision and never blocks (would_block=True when over cap); ``enforce`` blocks
 over-cap calls (allowed=False, reason="budget_exceeded").  The facade
 (limits.limiter) converts an enforce-block into an explicit backpressure
 decision — never a silent success.
+
+---knowledge---
+module_id: gateway.limits.budget
+system: gateway
+app: limits
+solution_class: enterprise
+patterns: [rolling-window-budget, observe-then-enforce, refuse-to-fail-open]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BudgetController, RollingTokenWindow, TokenBudgetPolicy, TokenBudgetDecision, Ledger, JsonlLedger, MemoryLedger]
+invariants: "a missing or invalid ledger raises rather than reporting zero, so a caller cannot fail open on an undeterminable spend"
+gotchas: "the default mode is observe, which never blocks; enforce is what actually refuses an over-cap call"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

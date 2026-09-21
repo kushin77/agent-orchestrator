@@ -14,6 +14,22 @@ exceptions/events, and never part of any stringified result.
 ``OpenAICompatProvider`` is the shared OpenAI ``chat/completions`` protocol
 used by the ``openai`` (Copilot/GPT via any OpenAI-compatible endpoint) and
 ``deepseek`` adapters.
+
+---knowledge---
+module_id: gateway.providers.base
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [shared-adapter-base, credentials-never-logged, fail-closed-validation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [HttpModelProvider, OpenAICompatProvider, Credentials, ParsedResponse]
+invariants: "the API key is attached to outbound request headers only: it is never logged, never in an exception, and never part of a stringified result"
+gotchas: "subclasses supply only the provider-specific endpoint, headers, payload and response parsing"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

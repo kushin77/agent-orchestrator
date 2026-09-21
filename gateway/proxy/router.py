@@ -13,6 +13,22 @@ per registry tier (cloud -> local Ollama by default).  The *tier choice* is
 delegated to the injected FinOps chooser (issue #17) and the *health* of the
 chain is the injected health signal (issue #18) — both consumed, never
 redefined.
+
+---knowledge---
+module_id: gateway.proxy.router
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [declarative-policy, delegated-tier-choice, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Router, RoutingConfig, load_routing_config, TaskRoute, AgentRoute, RoutingGroup]
+invariants: "the tier choice is delegated to the injected FinOps chooser and chain health to the injected health signal; the policy itself is declarative"
+gotchas: "the ordered provider chain per registry tier defaults to cloud then local Ollama"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

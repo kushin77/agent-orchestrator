@@ -13,6 +13,22 @@ caller's output schema (JSON Schema, matching the issue-#13 prompt-module
 prompt-library lane and importable in this environment). If it is absent the
 validator refuses to operate rather than hand-roll a partial checker -
 an honest fail-closed posture, never security/proof theater.
+
+---knowledge---
+module_id: gateway.providers.schema
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [fail-closed, strict-validation, refuse-rather-than-hand-roll]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [OutputSchemaValidator, parse_and_validate, load_schema]
+invariants: "the adapter never silently passes invalid output through, and an absent jsonschema engine refuses rather than downgrading to a partial checker"
+gotchas: "content that is not parseable JSON when a schema is required is rejected, as is content that parses but fails the schema"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

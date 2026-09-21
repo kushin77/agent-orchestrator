@@ -29,6 +29,22 @@ being silently accepted.
 Standalone module (stdlib + PyYAML, the repo's declared dependency); no
 cross-package imports, so the pytest bootstrap
 (``gateway/finops/tests/conftest.py``) simply puts this directory on ``sys.path``.
+
+---knowledge---
+module_id: gateway.finops.provider_credits
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [declaration-not-table, unknown-is-null, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CreditsTable, ProviderCreditBudget, CreditPlan, ModelRate, load_credits, CreditDeclarationError]
+invariants: "unknown is null, never 0: an unpublished price debits None so an unmetered call surfaces as unmetered rather than as free"
+gotchas: "each provider's numbers are declared with the contract they came from, so a price always has a stated source"
+related: ["#1559", "#33"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

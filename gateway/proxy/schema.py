@@ -11,6 +11,22 @@ satisfy the schema is an explicit invalid-output attempt.
 If ``jsonschema`` is unavailable the underlying validator refuses to operate
 (``SchemaDefinitionError``), so the proxy never downgrades to a partial
 hand-rolled checker.
+
+---knowledge---
+module_id: gateway.proxy.schema
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [fail-closed, consume-never-hand-roll, retry-once-then-cannot-assess]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [load_output_schema, validate_typed_output]
+invariants: "there is no silent pass-through of invalid output, and if jsonschema is unavailable the validator refuses rather than downgrading to a partial checker"
+gotchas: "content that does not parse as JSON or does not satisfy the schema is an explicit invalid-output attempt"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

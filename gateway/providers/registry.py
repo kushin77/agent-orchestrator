@@ -19,6 +19,22 @@ This is the composition root of the adapter layer. It:
 
 API keys are resolved through the ``ApiKeyVault`` (or an injected
 credentials factory); keys never enter chat options, results, events or logs.
+
+---knowledge---
+module_id: gateway.providers.registry
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [composition-root, resilient-client-pool, graceful-degradation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ProviderRegistry, ProviderClient, Route]
+invariants: "route resolution fails closed on an unknown provider or model, and the fallback chain is walked only on transient unavailability"
+gotchas: "one resilient client is built per (tenant, provider) and reused across calls"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

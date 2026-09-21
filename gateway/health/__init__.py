@@ -25,6 +25,22 @@ Public surface
 The package is importable as ``health`` when ``gateway/`` is on ``sys.path``
 (the tests arrange this in ``tests/conftest.py``; consumers of the merged
 contract should do the same or run the CLI directly).
+
+---knowledge---
+module_id: gateway.health
+system: gateway
+app: health
+solution_class: class
+patterns: [package-contract, public-surface, delegate-never-re-derive]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [HealthMonitor, HealthConfig, load_config, FallbackChain, ChainRegistry]
+invariants: "the package re-exports the health layer; the rolling-window logic lives in its modules"
+gotchas: ""
+related: ["#18"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from health.config import (

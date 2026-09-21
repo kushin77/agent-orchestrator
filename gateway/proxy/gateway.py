@@ -30,6 +30,22 @@ Contract-level guarantees (never-silent-pass / no-false-green):
 - an all-unhealthy route is an explicit ``no_healthy_route`` failure;
 - every dispatch emits one ``GatewayCallRecord`` to the audit and metering
   sinks, whatever the outcome.
+
+---knowledge---
+module_id: gateway.proxy.gateway
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [route-dispatch-log-funnel, seam-injected, ordered-enforcement]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ModelGateway]
+invariants: "every dispatch emits exactly one full gateway call record to the audit and metering sinks, however it landed"
+gotchas: "capability, context/token budget and rate are enforced before the call; typed output is validated after it"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

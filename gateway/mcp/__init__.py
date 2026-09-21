@@ -36,6 +36,22 @@ Public surface
 The package is importable as ``mcp`` when ``gateway/`` is on ``sys.path``
 (the tests arrange this in ``tests/conftest.py``, prepending ``gateway/`` so
 this package - not any third-party ``mcp`` - is what resolves).
+
+---knowledge---
+module_id: gateway.mcp
+system: gateway
+app: mcp
+solution_class: class
+patterns: [package-contract, public-surface, delegate-never-re-derive]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [MCPToolGateway, build_gateway, ToolRegistry, HashChainAuditLog, SessionIdentity]
+invariants: "every tools/call is tenant-scoped and enforced before any tool acts, and the package re-implements no enforcement layer of its own"
+gotchas: "the surface is in-process and offline: one JSON object per line, no transport"
+related: ["#20"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from .audit import (

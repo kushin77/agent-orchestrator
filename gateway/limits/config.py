@@ -4,6 +4,22 @@ Loads config/limits.yaml (or an override file with the same shape) into typed
 dataclasses and exposes component builders so the facade (limits.limiter) and
 the CLI wire a fully configured LimitsEngine offline.  Everything here is
 configuration data; no secrets ever live in these files (repo GR-6).
+
+---knowledge---
+module_id: gateway.limits.config
+system: gateway
+app: limits
+solution_class: enterprise
+patterns: [typed-config, no-secrets, component-builders]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [LimitsConfig, load_config, build_cache, build_budget, build_rate, build_throttle, build_backpressure]
+invariants: "these files carry configuration data only; no secret ever lives here (GR-6)"
+gotchas: "the override file must carry the same shape as config/limits.yaml"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

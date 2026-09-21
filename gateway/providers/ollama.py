@@ -6,6 +6,22 @@ Response usage maps ``prompt_eval_count`` / ``eval_count`` (the resilient
 ollama client semantics). No API key is required (``requires_key=false``);
 the local endpoint is the graceful-degradation target for every cloud
 provider (cloud -> local, the defragsuite + gov-ai-scout pattern).
+
+---knowledge---
+module_id: gateway.providers.ollama
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [keyless-local, terminal-fallback, injected-transport]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [OllamaProvider]
+invariants: "the local endpoint requires no API key and is the graceful-degradation target for every cloud provider"
+gotchas: "usage maps prompt_eval_count and eval_count, the resilient ollama client semantics"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

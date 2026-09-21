@@ -21,6 +21,22 @@ The two fail-closed errors:
 Adapted from the failure shapes of the cannibalized providers
 (GR-10 / docs/CANNIBALIZATION.md): ollama ``exceptions`` tree and the
 llm-triage/defragsuite transient-vs-fatal split.
+
+---knowledge---
+module_id: gateway.providers.errors
+system: gateway
+app: providers
+solution_class: pattern
+patterns: [dependency-free-taxonomy, transient-vs-terminal, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [ProviderError, ProviderUnavailableError, ProviderTimeoutError, CircuitOpenError, OutputValidationError, SchemaDefinitionError]
+invariants: "only transient failures are retried and counted against the circuit breaker; everything else is raised immediately and never retried"
+gotchas: "the module is dependency-free so every other provider module can import it without an import cycle"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

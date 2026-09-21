@@ -24,6 +24,22 @@ class whose ``maxTier`` sits below the security floor all raise
 Standalone module: no cross-package imports; the pytest bootstrap
 (tests/conftest.py) inserts this directory on ``sys.path`` so modules import
 plainly.
+
+---knowledge---
+module_id: gateway.finops.loader
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [declarative-contract, consume-never-redefine, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [load_tier_table, TierTable, LadderTier, TaskClass, EscalationConfig, parse_tier_table, ValidationError]
+invariants: "the table consumes the registry tier ids and capability ids already declared elsewhere and never redefines them"
+gotchas: "an invalid tier-table definition raises rather than defaulting, so a bad ladder cannot be loaded silently"
+related: ["#17"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

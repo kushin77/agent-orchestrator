@@ -45,6 +45,22 @@ default probe reports every server unreachable, which is the honest answer for
 a checkout with no network. A server that answers but whose version does not
 match the pin is refused the same way. Both refusals are values, not crashes,
 so a caller can branch on them and the audit ledger always records them.
+
+---knowledge---
+module_id: gateway.mcp.outbound
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [separate-from-inbound, closed-allowlist, pinned-versions, append-only-audit]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [OutboundRegistry, OutboundServer, OutboundAuditLog, build_registry, load_config, PinViolationError, EndpointOverrideError]
+invariants: "an inbound tool name can never resolve to an outbound server or vice versa: conflating the halves would let a called server masquerade as a served capability"
+gotchas: "outbound calls are audited in their own ledger with their own closed event kinds"
+related: ["#641"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

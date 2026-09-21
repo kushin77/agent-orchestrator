@@ -6,6 +6,22 @@ for on every call. Its claim vocabulary - ``tenantId`` / ``agentId`` / ``role``
 ``aud`` / ``iat`` / ``exp`` / ``jti`` - is consumed from the registry service
 identity contract (issue #10, ``registry/service/identity.py``) and from the
 rbac session role snapshot (issue #12); it is not redefined here.
+
+---knowledge---
+module_id: gateway.mcp.model
+system: gateway
+app: mcp
+solution_class: pattern
+patterns: [consume-never-redefine, pure-value-types, wire-vocabulary]
+derives_from: registry/service/identity.py
+owner_sme: platform-sme
+tier: L0
+interfaces: [SessionIdentity, ToolDefinition]
+invariants: "the session claim vocabulary is consumed from the registry service identity and rbac contracts and is not redefined here"
+gotchas: "the wire names are camelCase (tenantId/agentId/allowedTools) even though the Python fields are snake_case"
+related: ["#20", "#10", "#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

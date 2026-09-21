@@ -15,6 +15,22 @@ module is the reader.  Two properties matter and both are structural:
 The reader is deliberately small and dependency-light (PyYAML only) because it
 runs on the hot path of every request, and it never imports the portal's own
 reader: the portal is a **client** of this surface, not its owner.
+
+---knowledge---
+module_id: gateway.chat.flags
+system: gateway
+app: chat
+solution_class: enterprise
+patterns: [fail-closed, flag-gated-off, checked-before-authn]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [surface_enabled, require_surface, read_surface_default]
+invariants: "a registry that is missing, unreadable or carries no surfaces.chat entry leaves the surface off: only an explicit on enables it"
+gotchas: "no argument and no environment variable can promote the surface — promotion is a reviewed edit to the declared registry"
+related: ["#503"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -18,6 +18,22 @@ Production issuance of these sessions belongs to the registry / control plane
 verification only. ``mint_session`` exists so the gateway is fully exercisable
 offline (demo + tests) and is documented as an offline convenience - it is
 never the gateway's production issuance path.
+
+---knowledge---
+module_id: gateway.mcp.authn
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [consume-never-reimplement, delegate-to-canonical-codec, fail-closed]
+derives_from: identity/sso/jose.py
+owner_sme: security-sme
+tier: L1
+interfaces: [verify_token, session_to_token, mint_session]
+invariants: "encode and verify delegate to the identity lane's canonical HS256 codec; this module carries no base64url or HMAC of its own"
+gotchas: "the wire format is unchanged because it is now literally the same code, not a re-implementation"
+related: ["#20", "#1204"]
+do_not_duplicate: identity/sso/jose.py
+---knowledge---
 """
 
 from __future__ import annotations

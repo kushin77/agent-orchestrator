@@ -11,6 +11,22 @@ Normalization mirrors the fleet's prompt-cache normalization (leaderboard
 lib/semantic-cache.sh, #708) adapted to Python; by default it lowercases
 nothing and strips no punctuation (exact-ish dedup, provenance-safe).  Callers
 may opt into stronger collapsing for prose-heavy task types.
+
+---knowledge---
+module_id: gateway.limits.fingerprint
+system: gateway
+app: limits
+solution_class: enterprise
+patterns: [content-derived-key, scope-bound, normalization]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [cache_key, prompt_fingerprint, normalize_prompt, normalize_tier, scope_key, tenant_scope]
+invariants: "the cache key is scope-bound: distinct tenants or model tiers never share an entry"
+gotchas: "normalization by default lowercases nothing and strips no punctuation, so dedup stays provenance-safe unless a caller opts into stronger collapsing"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

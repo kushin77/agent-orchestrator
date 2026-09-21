@@ -6,6 +6,22 @@ error responses; a denial is an unconditional stop - there is no code path
 that turns a block into a fallback that retries in another scope (the rbac
 two-gate doctrine and the no-cross-tenant-fallback doctrine from the
 capital-underwriting tenant-scoped MCP pattern).
+
+---knowledge---
+module_id: gateway.mcp.errors
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [typed-error-taxonomy, denial-is-terminal, no-cross-tenant-fallback]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [GatewayError, AuthzDenied, ToolNotAllowedError, UnknownToolError, RateLimitedError, InvalidArgumentsError]
+invariants: "a denial is an unconditional stop: no code path turns a block into a fallback that retries in another scope"
+gotchas: "each failure type carries the JSON-RPC error code it maps to, so the mapping lives in exactly one place"
+related: ["#20"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

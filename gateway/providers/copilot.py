@@ -24,6 +24,22 @@ metering intake prices a call by the gateway record's *provider* id, so the
 copilot rate card (``telemetry/metering/rate_cards/copilot.yaml``) and the
 gateway catalog module (``gateway/catalog/modules/copilot/module.json``) are
 keyed on it, and the pane of glass must show copilot as its own agent hop.
+
+---knowledge---
+module_id: gateway.providers.copilot
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [rebind-not-reimplement, shared-wire-handling, first-class-provider]
+derives_from: gateway/providers/openai.py
+owner_sme: platform-sme
+tier: L0
+interfaces: [CopilotProvider]
+invariants: "the adapter carries no new request or response logic: it rebinds the OpenAI adapter to the copilot provider id"
+gotchas: "the inherited wire handling stays shared with OpenAI byte-for-byte, so the two cannot drift"
+related: ["#340"]
+do_not_duplicate: gateway/providers/openai.py
+---knowledge---
 """
 
 from __future__ import annotations

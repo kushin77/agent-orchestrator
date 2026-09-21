@@ -29,6 +29,22 @@ EXIT-CODE CONTRACT (tri-state, GR-12 / no-false-green):
 The directory is hyphenated so it cannot be an importable package; like
 ``control-plane/instructions`` this entry point arranges ``sys.path`` itself so
 it runs from any cwd.
+
+---knowledge---
+module_id: gateway.sme-routing.cli
+system: gateway
+app: sme-routing
+solution_class: enterprise
+patterns: [offline-cli, tri-state-exit, evidence-walkthrough]
+derives_from: null
+owner_sme: orchestrator
+tier: L0
+interfaces: [main, cmd_validate, cmd_vocabulary, cmd_sme, cmd_route, cmd_dispatch, cmd_demo, build_parser]
+invariants: "the tri-state exit contract is honoured: 0 assessed, 1 NOT-OK, 2 CANNOT-ASSESS"
+gotchas: "runs directly with no network, no server and no clock; --policies points the run at an alternate policy set"
+related: ["#149"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

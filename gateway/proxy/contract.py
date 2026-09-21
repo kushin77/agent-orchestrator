@@ -13,6 +13,22 @@ Outcomes are a closed set — every terminal dispatch result carries exactly one
 Any outcome that is not ``success``/``cache_hit`` is an *explicit* non-success
 and never carries fabricated typed content (no-false-green / never-silent-pass
 doctrine).
+
+---knowledge---
+module_id: gateway.proxy.contract
+system: gateway
+app: proxy
+solution_class: enterprise
+patterns: [closed-vocabulary, contract-freeze, no-false-green]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [outcome_is_served, ProxyError, CapabilityDeniedError, BudgetBlockedError, NoHealthyRouteError, UnknownTaskRouteError]
+invariants: "every terminal dispatch carries exactly one outcome and any non-success outcome carries no fabricated typed content"
+gotchas: "nothing here imports a sibling lane: it is the standalone vocabulary the whole proxy package and its consumers share"
+related: ["#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

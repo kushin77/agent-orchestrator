@@ -26,6 +26,22 @@ Call semantics:
   refusal to be metered.
 
 Standalone module (stdlib only); no cross-package imports.
+
+---knowledge---
+module_id: gateway.finops.metering
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [injectable-hook, append-only-sink, refusal-visible]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CallRecord, MeteringSink, RefusalRecord, JsonlMeteringSink, ListMeteringSink, NoopMeteringSink]
+invariants: "a refused call is recorded too, so a cap decision is never invisible to cost attribution"
+gotchas: "the chooser depends only on the record(record) protocol, so the Phase-5 store, a JSONL sink and a test sink all plug in unchanged"
+related: ["#17", "#31"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

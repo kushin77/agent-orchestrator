@@ -22,6 +22,22 @@ Components (each 0-25, weighted 0.25):
   rate
 
 Standalone module (stdlib only); imports nothing from the rest of the package.
+
+---knowledge---
+module_id: gateway.finops.complexity
+system: gateway
+app: finops
+solution_class: enterprise
+patterns: [deterministic-scoring, no-embedded-thresholds, escalate-only-on-difficulty]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [DifficultyScorer, DifficultyScore]
+invariants: "the scorer carries no tier knowledge and no thresholds: it returns a raw 0-100 score plus its component breakdown"
+gotchas: "the chooser interprets the score against the thresholds declared in tiers.yaml, never against constants held here"
+related: ["#17"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

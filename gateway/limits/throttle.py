@@ -6,6 +6,22 @@ runaway agent loop cannot grow unbounded output.  Caps are keyed by the
 kebab-case taskType vocabulary (registry/prompts); an unknown task type falls
 back to ``default_cap``.  The offline token estimate is characters/4 unless
 the caller supplies a real usage count.
+
+---knowledge---
+module_id: gateway.limits.throttle
+system: gateway
+app: limits
+solution_class: enterprise
+patterns: [output-cap, per-task-default-fallback, runaway-loop-guard]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [OutputThrottle, ThrottleVerdict]
+invariants: "a response over its task type's cap is trimmed or refused, so a runaway agent loop cannot grow unbounded output"
+gotchas: "an unknown task type falls back to default_cap rather than to no cap, and the offline token estimate is characters/4"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -6,6 +6,22 @@ raises :class:`UnknownToolError` (mapped to JSON-RPC ``-32601``) instead of
 falling through - the saas-rbac allowlist doctrine (allowlist, not denylist).
 Schemas enumerate in sorted name order so ``tools/list`` output is
 deterministic (the canonical-ordering property of the codeidx MCP server).
+
+---knowledge---
+module_id: gateway.mcp.registry
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [allowlist-not-denylist, fail-closed, deterministic-ordering]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ToolRegistry]
+invariants: "the registry answers only for tools it declares: an unknown name raises instead of falling through"
+gotchas: "schemas enumerate in sorted name order so tools/list output is deterministic"
+related: ["#20"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

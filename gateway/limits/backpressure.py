@@ -7,6 +7,22 @@ explicit decision — the request is either queued for later (strategy=queue,
 bounded) or degraded (strategy=degrade, no live provider call) — with a
 non-null reason and a ``succeeded=False`` flag a caller can test.  There is no
 code path that fabricates a success out of a block.
+
+---knowledge---
+module_id: gateway.limits.backpressure
+system: gateway
+app: limits
+solution_class: enterprise
+patterns: [never-fail-open, explicit-decision, bounded-queue]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BackpressureController, BackpressureQueue, BackpressureDecision, QueueJob]
+invariants: "an exhausted enforce-mode budget is never served silently: the outcome is an explicit queue/degrade decision with a non-null reason and succeeded=False"
+gotchas: "the queue is bounded, and there is no code path that fabricates a success out of a block"
+related: ["#19"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

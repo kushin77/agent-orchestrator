@@ -19,6 +19,22 @@ Exit-code mapping (tri-state, see ``cli.py``):
 * loaded cleanly                               -> OK            (0)
 
 Nothing here touches the network; the dependency surface is stdlib + PyYAML.
+
+---knowledge---
+module_id: gateway.sme-routing.smeroute_config
+system: gateway
+app: sme-routing
+solution_class: enterprise
+patterns: [two-layer-validation, schema-then-semantics, fail-closed]
+derives_from: null
+owner_sme: orchestrator
+tier: L1
+interfaces: [load_bundle, PolicyBundle, PolicyError, PolicyUnavailable, PolicyMalformed, PolicyInvariantViolated, normalise_task_type]
+invariants: "a shape violation is CANNOT-ASSESS (rc 2) and a broken declared invariant is NOT-OK (rc 1); the two are never collapsed"
+gotchas: "a violated invariant means the policy is evaluable but WRONG, which is a different verdict from unusable"
+related: ["#149"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

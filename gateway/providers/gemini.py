@@ -12,6 +12,22 @@ Auth is the ``x-goog-api-key`` header (Generative Language API); a Vertex AI
 deployment can be reached by overriding ``base_url`` + ``extra_headers`` in
 ``ProviderConfig`` (the capital-underwriting harvested client uses the same
 per-deployment override approach).
+
+---knowledge---
+module_id: gateway.providers.gemini
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [injected-transport, per-deployment-override]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [GeminiProvider]
+invariants: "the adapter speaks the generateContent protocol over the injected transport and never opens a socket itself"
+gotchas: "Gemini has no system role, so the system prompt goes into systemInstruction and assistant messages map to role model"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

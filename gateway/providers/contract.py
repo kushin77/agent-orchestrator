@@ -32,6 +32,22 @@ Provenance (GR-10 / docs/CANNIBALIZATION.md, adapted, not copied):
 Retries, backoff and circuit breaking are NOT the adapter's concern: they are
 applied per provider by ``ProviderClient`` (resilience.py + registry.py),
 mirroring the harvested ollama resilient client and defragsuite gateway.
+
+---knowledge---
+module_id: gateway.providers.contract
+system: gateway
+app: providers
+solution_class: enterprise
+patterns: [contract-freeze, closed-vocabulary, no-tenant-state-in-options]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ModelProvider, ChatMessage, ChatResult, CallContext, ChatOptions, Usage, is_valid_role]
+invariants: "this is the phase-2 contract-freeze boundary: later lanes consume these names and do not rename them"
+gotchas: "per-call sampling options carry no tenant or agent state; that stamp lives on CallContext"
+related: ["#15"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

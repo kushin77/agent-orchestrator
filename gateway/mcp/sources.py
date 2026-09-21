@@ -36,6 +36,22 @@ without a reason naming what was missing, and a ``fixture_only`` source is
 refused by :class:`SourceCatalog` itself when the catalogue runs in production
 mode - so a production grounding path cannot reach the declared fake index even
 by mistake.
+
+---knowledge---
+module_id: gateway.mcp.sources
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [consume-verbatim, no-second-projection, fail-closed-gate]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SourceCatalog, AuthoritySource, Fragment, ReadResult, BoardSource, BudgetSource, LedgerSource, RegistrySource, KnowledgeSource, content_revision]
+invariants: "every reader consumes an existing authority and returns it verbatim stamped with that authority's own revision; it owns no state and writes no file"
+gotchas: "two projections would be two engines (ADR-0012), so this module is a citation producer and asserts nothing of its own"
+related: ["#504"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

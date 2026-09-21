@@ -27,6 +27,22 @@ The layer is:
 The budget is measured in **characters** (deterministic and testable), the
 gateway's own canonical unit for a serialized response; token accounting is
 the metering layer's job downstream (``gateway/finops``), not this layer's.
+
+---knowledge---
+module_id: gateway.mcp.response_filter
+system: gateway
+app: mcp
+solution_class: enterprise
+patterns: [declarative-rules, truncate-before-context, closed-rule-registry]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ResponseFilter, TruncationRule, default_rule_registry, UnknownRuleError]
+invariants: "truncation happens before the output is serialized into the model context, so a verbose payload cannot inflate a cache miss"
+gotchas: "there is no imperative per-tool truncation code: a new tool is bounded by adding a declared rule"
+related: ["#672", "#665"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
