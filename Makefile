@@ -153,6 +153,21 @@ help:
 verify:
 	@bash scripts/verify.sh verify
 
+## verify-attestation — the same gate of record, but with AO_GATE_VENUE=attestation
+## (#1620): check-worktree-cap / check-reconcile-orphans stop treating
+## orphan-branch / orphan-issue-lane / worktree-cap-exceeded as advisory (a
+## bare `make verify` reports them as NOTE, since they measure box-wide state
+## shared with every OTHER concurrent session on the machine, not this
+## checkout's own diff) and enforce them for real. Use this — never plain
+## `make verify` — right before `make master-attestation`, since that
+## attestation is meant to speak for the WHOLE box's hygiene, not just one
+## lane's diff.
+##   make verify-attestation && make master-attestation
+verify-attestation:
+	@AO_GATE_VENUE=attestation bash scripts/verify.sh verify
+
+.PHONY: verify-attestation
+
 ## worktrees — reclaim stale lane worktrees (dry run by default)
 worktrees:
 	@bash scripts/prune-worktrees.sh
@@ -865,7 +880,7 @@ land:
 ## `make verify`/scripts/verify.sh itself — that file is held by an open PR
 ## (#1127) at the time this target was added; this is the seam a follow-up
 ## hooks scripts/verify.sh into once #1127 lands.
-##   make verify && make master-attestation
+##   make verify-attestation && make master-attestation
 master-attestation:
 	@python3 governance/landing/cli.py write-master-attestation --attestation "$(ATTESTATION)"
 
