@@ -545,9 +545,12 @@ def peer_check_cadence(agent_id: str, *, ledger: Path | str | None = None) -> st
         # The loop's own files come from its own live claim record (the same
         # fallback `peers.main` uses when no `--files` is named): the fleet loop
         # never claims files directly, so this is `()` unless the runtime itself
-        # is recorded holding one.
-        caller_files = peers._caller_files_from_live(live, agent_id, None)
-        report = peers.peer_check(caller_files, live, caller_agent=agent_id)
+        # is recorded holding one. The matching issue is carried too so
+        # `peer_check` excludes that record as the caller's OWN claim rather
+        # than judging it a sibling of itself.
+        own_issue = next((number for number, ev in live.items() if ev.agent == agent_id), None)
+        caller_files = peers._caller_files_from_live(live, agent_id, own_issue)
+        report = peers.peer_check(caller_files, live, caller_agent=agent_id, caller_issue=own_issue)
     except Exception as exc:  # noqa: BLE001 — never fatal, same contract as beat_runtime
         print(f"[peer-check] {agent_id} cadence check REFUSED — {exc}", file=sys.stderr, flush=True)
         return None

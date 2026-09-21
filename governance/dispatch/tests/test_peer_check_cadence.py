@@ -170,10 +170,11 @@ def test_tiered_run_falls_back_to_the_agents_own_live_claim(tmp_path):
 # --- cadence point 2: the fleet loop's cadence ------------------------------
 
 
-def _ledger_with_sibling_and_own_claim(tmp_path: Path, *, path: str = "a.sh") -> Path:
-    """A live ledger holding sibling #12 (agent-x) AND the loop's own claim
-    (#20, deepseek-sister) — both on ``path``, so the cadence hook's own
-    ``_caller_files_from_live`` lookup has something to judge against.
+def _ledger_with_sibling_and_own_claim(tmp_path: Path, *, path: str = "a.sh", own_path: str | None = None) -> Path:
+    """A live ledger holding sibling #12 (agent-x) on ``path`` AND the loop's own
+    claim (#20, deepseek-sister) on ``own_path`` (defaults to the same path, i.e.
+    OVERLAP), so the cadence hook's own ``_caller_files_from_live`` lookup has
+    something to judge against.
     """
     claims_dir = _ledger_with_sibling(tmp_path, path=path).parent / "claims"
     record = {
@@ -184,7 +185,7 @@ def _ledger_with_sibling_and_own_claim(tmp_path: Path, *, path: str = "a.sh") ->
         "lane": "sister-loop",
         "reason": "next-in-milestone",
         "ttl_hours": 24,
-        "files": [{"path": path, "regions": None}],
+        "files": [{"path": own_path or path, "regions": None}],
     }
     (claims_dir / "0002-00020-deepseek-sister-claim.json").write_text(json.dumps(record), encoding="utf-8")
     return claims_dir
@@ -207,6 +208,17 @@ def test_fleet_loop_cadence_is_a_noop_with_no_live_sibling(tmp_path):
     empty_ledger = tmp_path / "empty-claims"
     empty_ledger.mkdir()
     assert terminal.peer_check_cadence("deepseek-sister", ledger=empty_ledger) is None
+
+
+def test_fleet_loop_cadence_passes_a_disjoint_own_claim(tmp_path):
+    """The discriminating negative control: a live sibling exists, and the
+    loop's own claim exists, but the two claim DIFFERENT files — disjoint, not
+    merely absent. Distinct from the no-sibling-at-all noop above.
+    """
+    import terminal
+
+    ledger = _ledger_with_sibling_and_own_claim(tmp_path, path="a.sh", own_path="b.py")
+    assert terminal.peer_check_cadence("deepseek-sister", ledger=ledger) is None
 
 
 # --- cadence point 4: the SME card rule + the gate that asserts it ---------
