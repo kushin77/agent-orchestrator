@@ -697,9 +697,16 @@ mkdir -p "$scratch/infra/cloudflare" "$scratch/infra/feature-flags" \
 # consults for a promotion's live state (#967): a module-level import, so
 # without it here the reader raises ImportError and the ON control goes vacuous
 # exactly as described above (measured on the 2026-09-19 train: 3 violations).
+# `governance/dispatch/resource_lease.py` is the live-resource lease the route
+# takes on `--apply` before it mutates (issue #1545), and
+# `governance/policy/lease.py` is the one module that declares the TTLs it reads
+# -- same failure mode again: absent from the scratch tree, the route would
+# refuse its own lease and the ON control would be measuring a missing file
+# rather than the flag.
 for rel in "$script_rel" "$ingress_rel" portal/server/__init__.py \
   portal/server/fleet.py portal/server/surface_state.py \
-  infra/rollout/registry_projection.py; do
+  infra/rollout/registry_projection.py \
+  governance/dispatch/resource_lease.py governance/policy/lease.py; do
   mkdir -p "$scratch/$(dirname "$rel")"
   if ! cp "$rel" "$scratch/$rel"; then
     problem "the scratch tree could not copy ${rel}: the flag probe cannot drive the route"

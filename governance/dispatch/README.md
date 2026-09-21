@@ -523,10 +523,11 @@ genuinely load-bearing evidence, not documentation:
   with an advisory `fcntl.flock` so concurrent legitimate appends are never
   mistaken for a rewrite. Read by `tests/test_dispatch_audit.py` and any consumer of
   `audit.read()`.
-* **`dispatch.schema.json` + `schema.py`** — freezes the four shapes this
+* **`dispatch.schema.json` + `schema.py`** — freezes the five shapes this
   package persists: `ClaimEvent` (incl. `files`/`provenance`/`speculative_base`
-  reasons), the board's `Issue` row, `queue.yaml`'s wave document, and the new
-  audit record. Validated with the repository's stdlib-only JSON-Schema subset
+  reasons), the board's `Issue` row, `queue.yaml`'s wave document, the audit
+  record, and the live-resource lease record (`resourceClaim`, issue #1545).
+  Validated with the repository's stdlib-only JSON-Schema subset
   validator (`governance/modules/schema.py`), imported and reused rather than
   re-implemented — `schema.py:problems`/`schema.py:validate` delegate to it.
   `audit.append()`'s records and `claims.py`'s `ClaimEvent.to_json()` output
@@ -544,6 +545,73 @@ genuinely load-bearing evidence, not documentation:
 refused by name, a missing/short audit trail refused, a schema-invalid record
 refused, and a live projection made to drift from the real store refused.
 
+## Live-resource leases (`resource_lease.py`, issue #1545)
+
+Everything above leases FILES. A whole class of contention is not about files
+at all: two owners running a terraform apply against the same state, or two
+operators pushing a phase of the same Cloudflare surface, mutate ONE live
+resource each, and nothing mediated which goes first. The measured incident is
+a two-owner Cloudflare phase (capital-underwriting vs. shared-services) where
+both sides pushed a phase of one surface and each push silently reverted the
+other's.
+
+`resource_lease.py` extends the SAME claim machinery rather than building a
+parallel one: the record shape is frozen in `dispatch.schema.json`
+(`$defs/resourceClaim`) and validated by `schema.py`; the TTL policy is
+declared once in `governance/policy/lease.py`
+(`RESOURCE_CLAIM_TTL_SECONDS`, PER RESOURCE TYPE — an apply on shared state
+outlives a one-shot phase, and a lease that lapses mid-apply is a second writer
+on that state); and the ledger is append-only with the same read-back prefix
+proof `audit.py` uses. An unreadable ledger is CANNOT-ASSESS (exit 2), never
+"free".
+
+```bash
+python3 governance/dispatch/resource_lease.py acquire   --resource tf-state:onprem --holder '#1545'
+python3 governance/dispatch/resource_lease.py held      --resource tf-state:onprem
+python3 governance/dispatch/resource_lease.py release   --resource tf-state:onprem --holder '#1545'
+python3 governance/dispatch/resource_lease.py status
+python3 governance/dispatch/resource_lease.py self-control
+```
+
+The claim-check a mutating entrypoint calls is `guard`, which acquires, runs
+the command and releases — and **never starts the command** when another holder
+holds the resource:
+
+```bash
+python3 governance/dispatch/resource_lease.py guard --resource tf-state:onprem \
+  --holder '#1546' -- terraform -chdir=infra/terraform plan -input=false
+```
+
+A re-acquire by the SAME holder is a renewal, not a refusal: one owner running
+its own phases twice is not two owners contending.
+
+### What is wired, and what is not
+
+* **Wired, and driven in the gate:** `infra/cloudflare/ao-ssh-access.sh` takes
+  `cloudflare-phase:<surface>` on its `--apply` path — after the feature-flag
+  refusal (GR-5), so an OFF surface still refuses by its own name — and releases
+  it from its exit trap (or by TTL if the run is killed). A DRY RUN takes no
+  lease: it mutates nothing, so it cannot be the second writer. The holder is
+  `AO_RESOURCE_CLAIM_HOLDER`, defaulting to `operator:<user>`.
+* **NOT wired, and named here rather than implied:** the terraform apply route.
+  The only `terraform apply` in this repo is the Cloud Build pipeline
+  (`infra/cloudbuild/apply.yaml`), and a Cloud Build step runs in a workspace
+  that is fresh for every build — a workspace-local ledger cannot mediate two
+  concurrent builds, so a claim check added there would be a formality that can
+  never bite (GR-12). The one file the issue names for this half, a local
+  `tf-local.sh`, does not exist in this repo; the local terraform entry points
+  are `make terraform`/`tf-validate`/`tf-fmt`, which only fmt and validate and
+  mutate nothing. The honest remedy is a SHARED ledger venue (e.g. a lock
+  service or a versioned bucket) or a local mutating front door, and either is
+  its own issue. Until then `guard` is the drop-in for whichever arrives —
+  `scripts/check-resource-lease.sh` demonstrates it wrapping a real, provider-free
+  `terraform plan` (plan only, never apply).
+
+`scripts/check-resource-lease.sh` drives all of the above, including the route
+in a scratch tree with the surface promoted, plus the differential that proves
+the refusal is the lease: a FOREIGN holder is refused by name and never reaches
+the API, while the SAME holder gets past the lease and does.
+
 ## Layout
 
 | File | Role |
@@ -558,5 +626,6 @@ refused, and a live projection made to drift from the real store refused.
 | `policy.py` / `controls.yaml` | Dispatch's declared acceptance policy (issue #885) |
 | `audit.py` | Append-only arbitration audit trail (issue #885) |
 | `schema.py` / `dispatch.schema.json` | Frozen record shapes + stdlib-only validator reuse (issue #885) |
+| `resource_lease.py` | Live-resource leases: the `resourceClaim` ledger, its per-type TTL policy, the `guard` claim-check and the CLI (issue #1545) |
 | `live.py` | Live claim/frontier/ready-wave projection, exposed via `status --live` (issue #885) |
-| `tests/` | Eligibility, lock, TTL, audit, arbitration, the CLI refusal seam, the owner queue (`test_queue.py`), the declared controls, the audit trail, the frozen schema, the live feed, and the anti-formality controls |
+| `tests/` | Eligibility, lock, TTL, audit, arbitration, the CLI refusal seam, the owner queue (`test_queue.py`), the declared controls, the audit trail, the frozen schema, the live feed, the live-resource leases (`test_resource_lease.py`), and the anti-formality controls |
