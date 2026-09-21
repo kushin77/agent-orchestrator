@@ -796,7 +796,13 @@ SECRET_SHAPES = (
     r"AKIA[0-9A-Z]{16}",
     r"(ghp|gho|ghu|ghs)_[A-Za-z0-9]{36,}",
     r"github_pat_[A-Za-z0-9_]{20,}",
-    r"(sk|sk-ant|sk-proj)-[A-Za-z0-9_\-]{16,}",
+    # The negative lookbehind anchors the OpenAI-key shape at a word boundary.
+    # Without it the shape matches *inside* a word, so an ordinary token that
+    # merely ends in the bare prefix reads as a key (#1872 — 34 of the 38
+    # tree-wide matches were the tail of the word "task"). The alternation and
+    # quantifier are unchanged, so genuine key shapes and the boundary-anchored
+    # scanner fixtures still match.
+    r"(?<![A-Za-z0-9_])(sk|sk-ant|sk-proj)-[A-Za-z0-9_\-]{16,}",
     r"AIza[0-9A-Za-z_\-]{30,}",
     r"xox[baprs]-[A-Za-z0-9\-]{10,}",
 )
