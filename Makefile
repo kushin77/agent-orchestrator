@@ -956,6 +956,18 @@ land:
 
 .PHONY: land
 
+## run — issue #1651 (reduced scope): the front half of the single-dev lane
+## loop, one command. Chains PMO plan lookup -> paperclip sync push (refused
+## by name when enable_paperclip is off; recorded, not fatal) -> route.resolve
+## -> claim -> worktree/branch, then prints the next manual step. DRY RUN BY
+## DEFAULT. Pairs with `make land PR=<n>` (the back half, issue #1675):
+##   make run ISSUE=1651                     # dry run
+##   AO_LAND_APPLY=1 make run ISSUE=1651     # claim + provision for real
+run:
+	@bash scripts/run-lane.sh "$(ISSUE)"
+
+.PHONY: run
+
 ## master-attestation — publish master's own health after a green `make
 ## verify` run at origin/master's head (RCA 2026-09-17 fix #5 follow-up,
 ## #1114): `make land` already writes this after every FLEET-DRIVEN merge,

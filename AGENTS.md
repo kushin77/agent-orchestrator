@@ -362,6 +362,18 @@ describing what will land there; later issues fill the directories in.
 8. **Merge after green** per the autonomous-merge doctrine, then close the
    issue with the evidence comment.
 
+**One command per bracket (issue #1651, reduced scope).** Steps 1 and 7-8
+above are each already a single command, not a manual sequence:
+`make run ISSUE=<n>` (`scripts/run-lane.sh`) chains PMO plan lookup ->
+paperclip sync push (refused by name when `enable_paperclip` is off; the
+refusal is recorded, not fatal — no PMO/paperclip/hermes auto-dispatch daemon
+is in scope) -> `route.resolve` (tier/capability) -> claim -> worktree/branch,
+then prints the next step. `make land PR=<n>` (`scripts/land.sh`, #1675) is
+the other bracket: squash-guard -> `gh pr merge --squash` -> reclaim. Nothing
+between the two brackets is automated — writing the code (steps 2-6) stays
+manual. Both are dry-run by default; `AO_LAND_APPLY=1` opts either into
+executing for real.
+
 ## Hard DON'Ts
 
 - **No direct pushes to `master`** — never force-push or rewrite shared history.
