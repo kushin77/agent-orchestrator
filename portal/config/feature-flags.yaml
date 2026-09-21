@@ -90,3 +90,12 @@ surfaces:
       read-only at GET /api/board/rows. A row a malformed source document
       produced is refused by name (issue number + defect) rather than served,
       never a fabricated or best-effort row.
+  sessions:
+    default: off
+    phase: 11
+    description: >
+      Cross-engine Sessions view (issue #1563): joins .fleet/claims/*,
+      .board/claims.jsonl and .deepseek-agent/sessions/* into one operator row
+      set (engine, issue, branch, state, agent, lane, age). Served read-only
+      at GET /api/sessions/rows. A root that does not exist on this checkout
+      is named in the response's missing[] list rather than silently dropped.

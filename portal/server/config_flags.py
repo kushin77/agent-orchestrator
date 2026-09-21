@@ -58,6 +58,9 @@ ERP_MODULE_SURFACE = "erp_module"
 #: CLI/cron already treat as the source of truth, joined and schema-validated
 #: by ``portal.server.livestore.load_board_rows``.
 FLEET_BOARD_SURFACE = "fleet_board"
+#: The cross-engine Sessions view (issue #1563) — joins `.fleet/`, `.board/`
+#: and `.deepseek-agent/` into one operator row set.
+SESSIONS_SURFACE = "sessions"
 
 #: Every surface this module knows about, so a test can assert the set is closed.
 DECLARED_SURFACES = frozenset(
@@ -67,6 +70,7 @@ DECLARED_SURFACES = frozenset(
         TASK_BOARD_SURFACE,
         ERP_MODULE_SURFACE,
         FLEET_BOARD_SURFACE,
+        SESSIONS_SURFACE,
     }
 )
 

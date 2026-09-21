@@ -55,6 +55,10 @@
     // workbook-6 role-health feed — a single org-wide declaration, not scoped
     // to one tenant, so it takes no ?tenant= and its crumb is its own label.
     { id: "orgchart", label: "Org Chart", icon: "◱" },
+    // The cross-engine Sessions view (issue #1563) joins .fleet/, .board/ and
+    // .deepseek-agent/ into one operator row set — org-wide, not scoped to
+    // one tenant, so it takes no ?tenant= and its crumb is its own label.
+    { id: "sessions", label: "Sessions", icon: "⌘" },
     // The skill studio (issue #642 workbook-11, view via #1521) is the
     // workbook-9 author → test → publish surface over the pack registry — an
     // org-level studio, not scoped to one tenant, so it takes no ?tenant= and
