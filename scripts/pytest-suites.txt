@@ -101,6 +101,13 @@ integrations/paperclip/adapters/heartbeat
 integrations/paperclip/adapters/routines
 integrations/paperclip/adapters/secrets
 integrations/paperclip/adapters/skills
+# Issue #1822 — the paperclip sync adapter family. It ships a committed tests/ dir
+# that no gate ever named, so scripts/check-ungated-suites.sh refused it BY NAME
+# (#891: a committed suite no gate runs). Registered here AND named as a pytest
+# target from inside scripts/check-pytest-suites.sh -- declaring it alone would be
+# refused by scripts/check-gate-coverage.sh, which never grandfathers a newly
+# declared suite that no gate names.
+integrations/paperclip/adapters/sync
 integrations/paperclip/api
 integrations/paperclip/auth
 integrations/paperclip/reporting
