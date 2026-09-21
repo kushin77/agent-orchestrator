@@ -32,7 +32,8 @@
 # Usage: bash scripts/check-orphan-handoff.sh [--root DIR]
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 while [ $# -gt 0 ]; do
   case "$1" in
     --root) root="${2:?--root needs a directory}"; shift 2 ;;
@@ -49,12 +50,6 @@ if [ ! -r "$LOOP" ]; then
   exit 2
 fi
 
-contains() { # contains <haystack> <needle>
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 count_of() { # count_of <file> <fixed-string>
   awk -v needle="$2" 'index($0, needle) { n++ } END { print n + 0 }' "$1"

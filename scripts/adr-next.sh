@@ -3,7 +3,8 @@
 # digits — so two lanes minting an ADR in the same run ask this instead of
 # guessing off the highest file they each happen to see.
 set -euo pipefail
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 max=0
 for f in "$root"/docs/decision-records/ADR-[0-9][0-9][0-9][0-9]-*.md; do
   [ -e "$f" ] || continue

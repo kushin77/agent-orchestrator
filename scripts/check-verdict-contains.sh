@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # check-verdict-contains -- a verdict test must not be able to kill its own producer.
 #
 # WHAT IT CHECKS
@@ -59,7 +60,7 @@
 #        bash scripts/check-verdict-contains.sh --record
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+root="$(find_repo_root)" || exit 2
 baseline="$root/scripts/verdict-contains-legacy.tsv"
 record=0
 
@@ -106,12 +107,6 @@ idiom_re="[|][[:space:]]*${cmd_prefix_re}grep[[:space:]][^|]*(-[[:alnum:]]*q|--q
 # as 0. A widening nobody measures is an assertion, not a control.
 narrow_re='[|][[:space:]]*grep[[:space:]][^|]*(-[[:alnum:]]*q|--quiet)'
 
-contains() { # contains <haystack> <needle> -- bash-native; cannot kill its producer
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 count_with() { # count_with <regex> <file> <raw|joined> -> offending tests in it
   # argv is a FILE, never a pipe: the counter must not itself be a producer that a

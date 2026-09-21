@@ -35,7 +35,8 @@
 #   scripts/check-diagrams-capability-register.sh --register FILE  # alternate subject
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 exec python3 - "$root" "$@" <<'PY'
 import os
 import re

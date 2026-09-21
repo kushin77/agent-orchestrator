@@ -44,7 +44,8 @@
 # Usage: bash scripts/check-erp-tx.sh
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 name="check-erp-tx"

@@ -39,7 +39,8 @@
 #
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+ROOT="$(find_repo_root)" || exit 2
 
 fail=0
 note() { printf '  %-6s %s\n' "$1" "$2"; }

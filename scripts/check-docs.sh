@@ -55,7 +55,8 @@
 #                                                  index — run `make docs-index`
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 1
 
 fail=0

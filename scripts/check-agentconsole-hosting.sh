@@ -60,7 +60,8 @@ set -uo pipefail
 # analyse a DIFFERENT tree while the rules still prove themselves on the shipped
 # files. Staging from `--root` would make the provocation fail on every tree it
 # is asked to analyse, which is the opposite of its purpose.
-script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+script_root="$(find_repo_root)"
 root="$script_root"
 mode="full"
 while [ $# -gt 0 ]; do

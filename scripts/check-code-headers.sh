@@ -92,7 +92,8 @@
 # ---knowledge---
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "check-code-headers: CANNOT-ASSESS python3-missing: install python3 and put it on PATH" >&2

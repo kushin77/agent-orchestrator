@@ -125,7 +125,8 @@ wholly_generated=(.verify)
 # asserts the check; this is that record. Check 3 is now absolute — any tracked
 # file under a wholly-generated root fails by name, with no way to be excused.
 
-script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+script_root="$(find_repo_root)"
 root="$script_root"
 overridden=0
 if [ -n "${AO_GITIGNORE_ROOT:-}" ]; then

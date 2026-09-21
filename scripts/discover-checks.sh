@@ -27,7 +27,8 @@
 # performs no work when sourced, so it is safe to source under `set -u`.
 set -u
 
-_discover_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+_discover_root="$(find_repo_root)"
 
 # The denylist path. Overridable via CHECK_DENYLIST (an absolute path) for tests,
 # matching the SG_* seam pattern used by the other gate scripts.

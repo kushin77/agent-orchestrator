@@ -35,6 +35,7 @@
 #   7. MUTANT — the driver's order guard disabled     -> case 4 goes red (load-bearing)
 #   8. SQUASH (#1098) — a real squash merge, so the verified head is NOT an ancestor of
 #      anything on the default branch:
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 #        a. a lane cut from the default branch after it contains the landing and the
 #           landing carries the verified tree         -> the record is PRODUCED, naming the
 #                                                         verified commit, the landing and
@@ -63,7 +64,7 @@
 # Usage: bash scripts/check-lifecycle-verify-order.sh
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 if ! command -v python3 >/dev/null 2>&1; then

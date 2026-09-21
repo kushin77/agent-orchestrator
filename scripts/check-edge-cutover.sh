@@ -90,7 +90,8 @@
 #   bash scripts/check-edge-cutover.sh --root DIR   # analyse another tree
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 
 MODULE_REL="infra/terraform/modules/web-surface"
 DECL_REL="docs/EDGE-CUTOVER.md"

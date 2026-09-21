@@ -32,7 +32,8 @@
 # offline default mode is what makes that wiring safe.
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "check-registry-parity: CANNOT-ASSESS — python3 not found" >&2

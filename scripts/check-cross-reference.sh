@@ -19,7 +19,8 @@
 # Usage: bash scripts/check-cross-reference.sh
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 catalog="governance/knowledge/catalog.json"

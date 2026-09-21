@@ -78,7 +78,8 @@
 #   AO_INFRA_SCAN_BACKOFF_MS delay between those attempts, ms (default 200)
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 fail=0
@@ -389,12 +390,6 @@ guard_orphan_hogs() { # guard_orphan_hogs [dir] [max_mb]
 # test that can kill its own producer, latent until the report outgrows the pipe
 # buffer. Bash cannot fail that way, so this control always can be measured
 # (`scripts/check-verdict-contains.sh`, #843 / #852).
-contains() { # contains <haystack> <needle>
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 expect_fail() { # expect_fail <control> <needle> <rc> <output>
   local id="$1" needle="$2" rc="$3" out="$4"

@@ -32,14 +32,9 @@ set -uo pipefail
 # promotes that 141 to the status of the whole pipeline — so a *large* report
 # reports ABSENT for text that is PRESENT. Negated, that is a false red; positive,
 # the control silently stops controlling and the check fails OPEN.
-contains() { # contains <haystack> <needle>
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 cli="governance/lifecycle/cli.py"

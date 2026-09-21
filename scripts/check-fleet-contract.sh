@@ -33,7 +33,8 @@
 # Usage: bash scripts/check-fleet-contract.sh
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 contract="fleet/CONTRACT.md"

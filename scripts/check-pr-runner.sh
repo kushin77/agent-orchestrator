@@ -52,7 +52,8 @@
 # Usage: bash scripts/check-pr-runner.sh
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -91,12 +92,6 @@ ok()   { printf '  OK    %s\n' "$1"; }
 bad()  { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
 
 # contains <haystack> <needle> — bash-native containment (no pipe, no SIGPIPE).
-contains() {
-  case "$1" in
-    *"$2"*) return 0 ;;
-  esac
-  return 1
-}
 
 # plan_fixture <tree> <fixture> -> prints the plan (the cli's own output)
 #

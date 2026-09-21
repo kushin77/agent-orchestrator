@@ -28,6 +28,7 @@
 #   - a PR touching anything under scripts/ gets its GATE-REGRESSION checked
 #     before it is merged (issue #1145): the PR's head commit is materialized
 #     into a scratch worktree, where a curated set of fast whole-tree content
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 #     scanners (GATE_REGRESSION_SCRIPTS — verdict-contains, shell-patterns,
 #     shell-syntax, python-syntax, secrets, json, docs; not every
 #     scripts/check-*.sh — see that array's own comment for why) is run bare.
@@ -86,7 +87,7 @@
 # Usage: bash scripts/pr-queue.sh [--base BASE]
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 base="master"

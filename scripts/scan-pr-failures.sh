@@ -35,7 +35,8 @@
 #             1 NOT-OK / 2 CANNOT-ASSESS (gh absent or the API refused).
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 REPO="${AO_REPO:-kushin77/agent-orchestrator}"

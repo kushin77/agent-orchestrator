@@ -66,7 +66,8 @@
 # Usage: bash scripts/check-python-lint.sh
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 # The product trees. Literal on purpose: a glob would silently widen the scan, and
@@ -211,12 +212,6 @@ PY
 # pipeline -- so a negated test reports ABSENT for text that IS present and the
 # branch that proves a control works is the branch that gets skipped. REFUSED by
 # name by scripts/check-verdict-contains.sh if written the other way.
-contains() {
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 # --- the provocation (self-test) --------------------------------------------
 probe_dir="$(mktemp -d /tmp/check-python-lint.XXXXXX)"

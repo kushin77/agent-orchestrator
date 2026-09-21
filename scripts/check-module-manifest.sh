@@ -73,7 +73,8 @@
 #   bash scripts/check-module-manifest.sh --manifest FILE --schema FILE
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 scan_root="$root"
 
 mode="gate"

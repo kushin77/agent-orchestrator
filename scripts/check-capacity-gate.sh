@@ -44,7 +44,8 @@
 # Usage: bash scripts/check-capacity-gate.sh
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 if ! command -v python3 >/dev/null 2>&1; then

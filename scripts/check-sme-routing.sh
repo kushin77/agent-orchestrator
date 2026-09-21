@@ -28,7 +28,8 @@
 # Usage: bash scripts/check-sme-routing.sh
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 module="gateway/sme-routing"
@@ -45,12 +46,6 @@ note_ok()   { printf '  OK    %s\n' "$1"; }
 note_fail() { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
 
 # contains <haystack> <needle> <label>
-contains() {
-  case "$1" in
-    *"$2"*) note_ok "$3" ;;
-    *) note_fail "$3 — expected '$2' in: $1" ;;
-  esac
-}
 
 # --- 1. required files ------------------------------------------------------
 echo "== files =="

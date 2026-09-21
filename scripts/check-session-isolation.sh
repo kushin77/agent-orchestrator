@@ -58,7 +58,8 @@
 # Usage: bash scripts/check-session-isolation.sh
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 # The ambient identity is removed before anything else runs (issue #934; the
@@ -116,12 +117,6 @@ cannot=0
 # an extra process that under load can fail to start or be killed, which is the
 # same false verdict by another route. Bash substring matching cannot fail that
 # way, so a control that CAN be measured always is.
-contains() { # contains <haystack> <needle>
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 verdict_of() { # verdict_of <rc> <output> <expected-code> -> one verdict word
   local rc="$1" output="$2" code="$3"

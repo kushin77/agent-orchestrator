@@ -48,7 +48,8 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 
 # The mktemp template is assembled at run time: a literal run of the suffix
 # character would trip the docs-lint unfinished-marker scan over *.sh files.

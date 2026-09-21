@@ -45,7 +45,8 @@ set -uo pipefail
 # A gate must not leave bytecode caches in the tree it is judging.
 export PYTHONDONTWRITEBYTECODE=1
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "gate-lock: CANNOT-ASSESS — python3 not found" >&2

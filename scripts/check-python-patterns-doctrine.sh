@@ -51,7 +51,8 @@
 #   bash scripts/check-python-patterns-doctrine.sh --doc FILE    scan exactly this doc
 set -u
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+ROOT="$(find_repo_root)"
 DOC="$ROOT/docs/PYTHON-PATTERNS.md"
 VERIFY="$ROOT/scripts/verify.sh"
 FINOPS="$ROOT/scripts/check-chat-finops.sh"

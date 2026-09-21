@@ -29,7 +29,8 @@
 # Exit: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 
 # --- precondition: a missing interpreter is CANNOT-ASSESS, never three false FAILs ---
 command -v python3 >/dev/null 2>&1 || {
