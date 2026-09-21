@@ -487,6 +487,11 @@ checks=(
   'pmo-rollup|bash scripts/check-pmo-rollup.sh'
   'secrets|bash scripts/check-secrets.sh'
   'feature-flags|python3 scripts/check-feature-flags.py'
+  # feature-flags-self-test (issue #1618): proves both directions of the
+  # promotion-owner rule — a non-promoted entry with neither `promotion_issue`
+  # nor `posture: hold` is refused by name, and a present owner passes — so the
+  # new arm cannot pass vacuously.
+  'feature-flags-self-test|python3 scripts/check-feature-flags.py --self-test'
   'cloudbuild|bash scripts/check-cloudbuild.sh'
   'terraform|bash scripts/check-terraform.sh'
   # scratch-safety (issue #488): one agent scratch log reached 14.8 GB and filled
