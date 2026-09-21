@@ -1,0 +1,15 @@
+# The isolation policy domain — A2A leases (issue #1763).
+#
+# `governance/policy/lease.py` is the single source of truth for every fleet
+# lease and TTL (issue #322): the session lease, the claim lease, the heartbeat
+# and snapshot staleness windows, and the ordering invariants between them. The
+# dispatch path reads those values instead of restating them, so the policy is
+# enforced where a lease is actually granted or reaped — the dispatch-time lease
+# check (`governance/dispatch` claim/reap, plus `scripts/check-lease-policy.sh`
+# in the gate of record).
+#
+# Schema: governance/policy/README.md.
+domain: isolation
+source_file: governance/policy/lease.py
+enforcement_point: "dispatch-time lease check (governance/dispatch claim + reap against governance/policy/lease.py)"
+control_plane_visible: true
