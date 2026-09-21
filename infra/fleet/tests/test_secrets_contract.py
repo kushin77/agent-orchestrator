@@ -34,7 +34,16 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.p
 def test_declares_gh_gcloud_ssh() -> None:
     # issue #1329 adds a fourth mount (ar-reader-key) for promote_portal.py's
     # Artifact Registry read auth — same declaration shape as the other three.
-    assert set(secrets_contract.BY_NAME) == {"gh", "gcloud", "ssh", "ar-reader-key"}
+    # issue #1784 adds a fifth (deepseek): the fleet's MODEL credential, which
+    # was the one credential required as ad-hoc environment variables and the
+    # only one absent from this declaration.
+    assert set(secrets_contract.BY_NAME) == {
+        "gh",
+        "gcloud",
+        "ssh",
+        "ar-reader-key",
+        "deepseek",
+    }
 
 
 def test_every_mount_is_read_only() -> None:
@@ -53,6 +62,57 @@ def test_mount_pointed_inside_the_repo_is_refused_by_name() -> None:
     codes = {finding.code for finding in findings}
     assert "secret-source-inside-repo" in codes
     assert any("gh:" in finding.detail for finding in findings)
+
+
+def test_the_model_credential_is_declared_like_every_other() -> None:
+    """#1784: the credential the fleet cannot start without is declared too.
+
+    The runner refuses to dispatch until its model credential is present (#841).
+    That credential is provisioned by this declaration rather than exported by an
+    operator, so it must satisfy the same two properties as the other four:
+    sourced outside the checkout, and mounted read-only.
+    """
+    mount = secrets_contract.BY_NAME["deepseek"]
+    assert mount.read_only is True
+    assert secrets_contract._expands_outside_repo(
+        mount.default_host_path, Path(REPO_ROOT)
+    )
+
+
+def test_a_model_credential_pointed_inside_the_repo_is_refused_by_name() -> None:
+    """The new mount is load-bearing, not decorative.
+
+    Same provocation as the `gh` one above, aimed at the mount this change adds:
+    if the model credential's source could resolve inside the checkout, the
+    declaration would be defending nothing.
+    """
+    env = {"AO_FLEET_DEEPSEEK_CONFIG": str(Path(REPO_ROOT) / "infra" / "fleet")}
+    findings = secrets_contract.validate(env=env, repo_root=Path(REPO_ROOT))
+    codes = {finding.code for finding in findings}
+    assert "secret-source-inside-repo" in codes
+    assert any("deepseek:" in finding.detail for finding in findings)
+
+
+def test_the_module_source_spells_no_credential_variable_name() -> None:
+    """GR-6, made mechanical (issue #1784).
+
+    The module's own head states the rule — "No literal credential-variable name
+    is spelled out in this file (or its tests)" — but nothing checked it, so a
+    declaration added later could name a credential and still pass every arm.
+    That is how this test came to exist: the `deepseek` mount's `why` prose
+    spelled two such names on its first draft, and only a hand-run of the
+    scanner caught it.
+
+    The exception is the single example the regex comment uses to explain
+    itself. It is named here rather than exempted by pattern, so the rule cannot
+    widen silently: any NEW credential-shaped name fails this arm.
+    """
+    source = (
+        Path(REPO_ROOT) / "infra" / "fleet" / "secrets_contract.py"
+    ).read_text(encoding="utf-8")
+    assert secrets_contract.scan_for_secret_values(source) == [
+        "AO_FLEET_SAMPLE_TOKEN"
+    ], "a credential-variable name is spelled out in the module source"
 
 
 def test_home_and_tilde_prefixed_paths_are_outside() -> None:

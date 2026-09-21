@@ -115,6 +115,24 @@ SECRET_MOUNTS: tuple[SecretMount, ...] = (
             "(CANNOT-ASSESS) and escalates once; it never creates a key (GR-6)."
         ),
     ),
+    SecretMount(
+        name="deepseek",
+        host_env="AO_FLEET_DEEPSEEK_CONFIG",
+        default_host_path="${HOME}/.config/deepseek",
+        target="/root/.config/deepseek",
+        why=(
+            "issue #1784: the fleet's MODEL credential — the one credential no "
+            "rung can start without, and until now the only one missing from "
+            "this declaration. It was required as two ad-hoc environment "
+            "variables whose names belong to the TRANSPORT rather than the "
+            "provider (the declared vocabulary is DeepSeek: deepseek-v4-flash / "
+            "deepseek-v4-pro), and the native CLI reads its credential from its "
+            "own 0600 config. So this mount is a DIRECTORY of config, never a "
+            "value in the environment. Absent it, `fleet/runners.py`'s profile "
+            "is `unhonourable` and the loop parks its queue rather than "
+            "dispatching a lane that will die (#841)."
+        ),
+    ),
 )
 
 BY_NAME: dict[str, SecretMount] = {mount.name: mount for mount in SECRET_MOUNTS}

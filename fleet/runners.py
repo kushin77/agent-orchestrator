@@ -89,6 +89,12 @@ class RunnerProfile:
     #: (``fleet/terminal.py`` exports both). Recorded here so a profile that does
     #: NOT read it can say so rather than inheriting the assumption.
     reads_model_env: bool = True
+    #: The mount in ``infra/fleet/secrets_contract.py`` that PROVISIONS this
+    #: profile's credential. Naming it is the point (issue #1784, "all creds need
+    #: to be iac secrets"): an operator's remedy is to provision the declared
+    #: IaC secret, never to export a token, and a profile that needs a credential
+    #: yet leaves this empty is refused rather than silently improvised.
+    iac_secret: str = ""
 
     def model_for(self, tier: str) -> str | None:
         """The model id this profile would ask for at ``tier``, or ``None``."""
@@ -112,9 +118,13 @@ CLAUDE_BYOK = RunnerProfile(
         "auditor": "deepseek-v4-pro",
     },
     requires=("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN"),
+    iac_secret="deepseek",
     note=(
         "the Anthropic CLI pointed at DeepSeek's Anthropic-compatible surface via BYOK; "
-        "this is the pairing fleet/terminal.py's own argv comment describes"
+        "this is the pairing fleet/terminal.py's own argv comment describes. The "
+        "ANTHROPIC_* names are that TRANSPORT, never the provider: the declared "
+        "vocabulary is DeepSeek and the credential is DeepSeek's, provisioned by the "
+        "IaC-declared secret named in `iac_secret` (issue #1784)"
     ),
 )
 
@@ -137,6 +147,7 @@ DEEPSEEK_NATIVE = RunnerProfile(
     },
     requires=(),
     reads_model_env=False,
+    iac_secret="deepseek",
     note=(
         "the native DeepSeek CLI; one-shot by default (no -p), credential in its own "
         "0600 config. Its lane fitness is UNPROVEN — the contract is what is proven here"
@@ -192,6 +203,12 @@ def _missing_environment(profile: RunnerProfile, env: Mapping[str, str]) -> str:
         f"({', '.join(sorted(set(profile.models.values())))}): that pairing is the measured "
         "'unrecognized model' death. Set it, or select another profile with "
         f"{PROFILE_ENV}"
+    ) + (
+        f". Its credential is provisioned by the IaC-declared secret "
+        f"{profile.iac_secret!r} in infra/fleet/secrets_contract.py — provision "
+        "that declaration rather than exporting a token (issue #1784)"
+        if profile.iac_secret
+        else ""
     )
 
 
