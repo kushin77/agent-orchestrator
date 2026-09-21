@@ -61,6 +61,8 @@ tests) before any other step. For cross-repo or org-wide knowledge across the
 `kushin77` fleet, query the **CMR indexer KB** instead of guessing or
 re-cloning.
 
+Registered as a policy domain: [`governance/policy/domains/local-dev.yaml`](governance/policy/domains/local-dev.yaml).
+
 ## Verification
 
 ```bash

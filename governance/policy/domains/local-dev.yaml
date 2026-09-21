@@ -1,0 +1,47 @@
+# The local-dev policy domain (issue #1768) — hub GR-17, "local-code-first".
+#
+# The rule: debug against THIS checkout first (grep / usage search / tests)
+# before guessing or reaching for another source; for cross-repo or org-wide
+# `kushin77` knowledge, query the CMR indexer KB instead of re-cloning.
+#
+# THE DECLARED HOME, measured at origin/master 0979df35 (2026-09-21):
+#   * `AGENTS.md:100` — numbered doctrine item 11, "Local-code-first (GR-17)".
+#     `AGENTS.md` is the canonical, model-agnostic instruction file (precedence
+#     1), so it is the `source_file` below. Mirrored by the thin per-runtime
+#     pointers `CLAUDE.md:36` and `.github/copilot-instructions.md:38`.
+#   * `GOLDEN-RULES.md:56` — the root ratification pointer's own
+#     "## Debugging (local-code-first)" section (hub GR-17 / AO delivery spine).
+#
+# CORRECTED CITATION. Issue #1768 located the declaration at
+# `docs/GOLDEN-RULES.md:366`. Measured, that line is a DIFFERENT rule:
+# `### AO-GR-17 — Tamper-evident audit ledger`, whose Control is
+# `check-audit-read-model.sh` / `suite:telemetry/ledger`. The citation conflated
+# the HUB `GR-17` numbering with the product spine's `AO-GR-17` numbering —
+# `docs/GOLDEN-RULES.md` carries no local-code-first rule at all, so the
+# cross-reference to this registry entry is placed at the real declaration
+# (root `GOLDEN-RULES.md`), never at the audit-ledger entry.
+#
+# BOTH files #1768 names as "enforcement files" were READ (2026-09-21), and
+# neither asserts this rule. Stated as measured rather than rounded to a gate
+# (AO-GR-4: a control that cannot fail is a formality):
+#   * `.pre-commit-config.yaml` — present. Its complete hook set is
+#     `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-json`,
+#     `check-merge-conflict`, `detect-aws-credentials`, `detect-private-key`
+#     (pre-commit-hooks v4.6.0) and `gitleaks` (v8.18.4, config `.gitleaks.toml`).
+#     Those are commit-time hygiene plus secret scanning (AO-GR-7); no hook
+#     asserts that an agent consulted this checkout before guessing.
+#   * `.claude/settings.json` — present, and it declares NO hook: its `hooks`
+#     object is empty (`"hooks": {}`) and its `_orchestrator_prompt_intake` block
+#     records `"project_hooks": "none-by-design"`.
+# The rule's real bite is therefore session doctrine — every agent session loads
+# `AGENTS.md` (and the runtime pointers that mirror it) — which is exactly the
+# honest GAP already recorded at `governance/controls/spine-coverage.yaml:343`:
+# "No scripts/check-*.sh mechanically asserts an agent consulted local code
+# before guessing — this is agent-behavior guidance, not a repo-state invariant
+# a gate can check today."
+#
+# Schema: governance/policy/README.md.
+domain: local-dev
+source_file: AGENTS.md
+enforcement_point: 'agent-session doctrine at session start — AGENTS.md numbered item 11, mirrored by CLAUDE.md and .github/copilot-instructions.md; no mechanical gate asserts it: .pre-commit-config.yaml carries only commit-time hygiene and secret hooks, and .claude/settings.json declares "hooks": {} (project_hooks: none-by-design). The honest GAP is recorded at governance/controls/spine-coverage.yaml:343'
+control_plane_visible: true
