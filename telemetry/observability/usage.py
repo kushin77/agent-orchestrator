@@ -1,5 +1,22 @@
 """telemetry/observability — per-tenant usage / chargeback reporter (#32).
 
+---knowledge---
+module_id: telemetry.observability.usage
+system: telemetry
+app: observability
+solution_class: enterprise
+patterns: [offline-aggregation, no-fabricated-cost]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [UsageReporter, UsageRow, GROUP_TENANT, GROUP_PROVIDER, GROUP_MODEL, GROUP_AGENT]
+invariants: "spend is whatever the recording pillars attached; no cost is fabricated here"
+gotchas: ""
+related: ["#32", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Aggregates the telemetry store into per-tenant (and per provider/model)
 usage rows — calls, tokens, estimated spend — the offline feed that the
 billing/metering surface (issue #33) consumes.  Spend is whatever the

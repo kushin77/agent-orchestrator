@@ -1,5 +1,22 @@
 """telemetry/metering — usage metering + cost engine (issue #33, phase 5).
 
+---knowledge---
+module_id: telemetry.metering.__init__
+system: telemetry
+app: metering
+solution_class: pattern
+patterns: [package-contract, offline-only]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: []
+invariants: "the lane is billing-grade and fully offline: stdlib plus PyYAML only, no network and no external servers"
+gotchas: "importable from the repo root as telemetry.metering through the PEP-420 namespace"
+related: ["#33", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The billing-grade usage/cost layer of the telemetry pillar: per-call usage
 records (tenant/agent/provider/model/route, tokens in+out, cache-hit,
 cost-estimate), multi-provider YAML rate cards with context tiers, durable

@@ -1,5 +1,22 @@
 """telemetry/budgets — per-tenant chargeback report generator (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.chargeback
+system: telemetry
+app: budgets
+solution_class: enterprise
+patterns: [deterministic-report, formatter-never-fabricates]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ChargebackReportGenerator, ChargebackRow, CSV_HEADER]
+invariants: "a formatter over the metering rollups: it never fabricates a cost figure"
+gotchas: ""
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Produces the per-tenant chargeback lines for tenant billing from the
 durable metering feed (issue #33) — calls, cache hits, tokens and estimated
 cost per tenant per month — as deterministic CSV/JSON.  Adapted from

@@ -1,5 +1,22 @@
 """Exception hierarchy for telemetry/ledger (issue #31).
 
+---knowledge---
+module_id: telemetry.ledger.errors
+system: telemetry
+app: ledger
+solution_class: pattern
+patterns: [typed-error-hierarchy, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [LedgerError, LedgerValidationError, LedgerCorruptError, LedgerIntegrityError, KeyUnavailableError, CipherUnavailableError, DecryptionError, RepairRefusedError]
+invariants: "the security-sensitive leaves stay distinct so callers fail closed with intent rather than by string matching"
+gotchas: ""
+related: ["#31", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Kept in one module so the rest of the package raises typed errors without
 import cycles. Every error subclasses :class:`LedgerError`; the security-
 sensitive leaves (key missing, cipher unavailable, decryption failure,

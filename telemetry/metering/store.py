@@ -1,5 +1,22 @@
 """telemetry/metering — durable usage store + idempotent ingest (issue #33).
 
+---knowledge---
+module_id: telemetry.metering.store
+system: telemetry
+app: metering
+solution_class: enterprise
+patterns: [append-only-jsonl, idempotent-ingest, durable-sum-over-append-log]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [JsonlUsageStore, MemoryUsageStore, UsageStore, load_records, append_records]
+invariants: "aggregation always re-scans the full append log, so no count is ever lost across restarts or instances sharing the store"
+gotchas: ""
+related: ["#33", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The store is the durable aggregation source the rollups/report read: an
 append-only JSON Lines file of canonical ``UsageRecord``s (one record per
 line, camelCase keys, ``_schemaVersion`` envelope marker like the sibling

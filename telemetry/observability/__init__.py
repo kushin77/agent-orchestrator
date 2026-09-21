@@ -1,5 +1,22 @@
 """telemetry/observability — observability pillar (issue #32, phase 5).
 
+---knowledge---
+module_id: telemetry.observability.__init__
+system: telemetry
+app: observability
+solution_class: pattern
+patterns: [package-contract, offline-only]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: []
+invariants: "the lane is fully offline; importable from the repo root as telemetry.observability through the PEP-420 namespace"
+gotchas: ""
+related: ["#32", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Full-trace telemetry for agent + model calls: span/trace recording with
 correlation ids end-to-end (gateway -> guardrails -> engine), an offline
 JSONL store, per-tenant SLOs (availability / latency / cost) from

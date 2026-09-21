@@ -1,5 +1,22 @@
 """telemetry/metering — offline operator CLI (issue #33).
 
+---knowledge---
+module_id: telemetry.metering.cli
+system: telemetry
+app: metering
+solution_class: enterprise
+patterns: [offline-cli, tri-state-exit, evidence-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main, build_parser, EXIT_OK, EXIT_UNMETERED]
+invariants: "fully offline over stdlib plus PyYAML: no network, no server"
+gotchas: "an unmetered call gets its own exit code and is never folded into a zero-cost success"
+related: ["#33", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Evidence/demo surface for the usage metering + cost engine.  Fully offline
 (stdlib + PyYAML): no network, no server.  Run from the repo root:
 

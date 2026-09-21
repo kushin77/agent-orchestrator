@@ -1,5 +1,22 @@
 """telemetry/metering — usage intake + cost resolution (issue #33).
 
+---knowledge---
+module_id: telemetry.metering.intake
+system: telemetry
+app: metering
+solution_class: enterprise
+patterns: [normalize-into-one-record, cost-resolution, consumed-provider-shapes, idempotent]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [MeteringIntake, IngestOutcome, IngestSummary]
+invariants: "every merged model-call record shape is normalized into one canonical UsageRecord before aggregation"
+gotchas: "a cache-hit outcome is the explicit zero-cost record, not a missing price"
+related: ["#33", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The intake normalizes every merged model-call record shape into this lane's
 canonical ``UsageRecord`` and resolves its cost from the YAML rate cards:
 

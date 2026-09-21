@@ -1,5 +1,22 @@
 """telemetry/metering — observe->enforce daily token budget toggle (issue #33).
 
+---knowledge---
+module_id: telemetry.metering.budget
+system: telemetry
+app: metering
+solution_class: enterprise
+patterns: [observe-then-enforce, flag-gated-off, durable-total]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [DailyTokenBudget, DailyTokenBudgetPolicy, load_budget_config, BudgetVerdict, BUDGET_MODES, DECISION_*]
+invariants: "the budget defaults to observe and never blocks; a tenant flips to enforce only after a recorded track record"
+gotchas: "no blocking control ships before a recorded track record"
+related: ["#33", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The safe-rollout control for per-tenant daily token budgets: by default the
 budget **observes** (computes and reports what *would* be blocked) and never
 blocks; a tenant (or the global default) can be flipped to **enforce** only

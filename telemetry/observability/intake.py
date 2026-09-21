@@ -1,5 +1,22 @@
 """telemetry/observability — intake hook contract (issue #32, phase 5).
 
+---knowledge---
+module_id: telemetry.observability.intake
+system: telemetry
+app: observability
+solution_class: enterprise
+patterns: [emit-contract, contextvar-correlation, sink-abstraction]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TelemetryRecorder, TelemetrySink, NoopSink, MemorySink, TraceContext, current_trace, PendingSpan]
+invariants: "correlation ids are propagated end-to-end with contextvars so one request carries a single trace_id across gateway, guardrails and engine"
+gotchas: ""
+related: ["#32", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 This module is the **emit contract** the other pillars call to feed the
 observability store: the gateway proxy (issue #16) already writes its
 JSONL model-call-audit records; guardrails (issue #26-30) and the engine /

@@ -1,5 +1,22 @@
 """telemetry/chat — prompt-cache accounting for one chat turn (issue #506).
 
+---knowledge---
+module_id: telemetry.chat.cache_accounting
+system: telemetry
+app: chat
+solution_class: enterprise
+patterns: [pure-function-shape, cache-accounting]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [account_prefix, CacheAccounting, PrefixAccounting, KINDS, KIND_COLD, KIND_PARTIAL, KIND_FULL]
+invariants: "the prefix shape is a pure function of the text; a cache-hit turn is visibly cheaper than the same turn cold"
+gotchas: ""
+related: ["#506", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Prompt/prefix caching is a *provider* feature (Anthropic ``cache_control``,
 DeepSeek automatic prefix caching): the stable system + memory prefix is
 billed once and then served from cache, so a turn that reuses a prefix costs

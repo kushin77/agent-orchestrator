@@ -1,4 +1,21 @@
 """Intake adapter for registry/events-shaped audit records (telemetry/ledger,
+
+---knowledge---
+module_id: telemetry.ledger.adapter
+system: telemetry
+app: ledger
+solution_class: enterprise
+patterns: [shape-adapter, consumed-registry-events]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ingest_registry_event]
+invariants: "the registry lifecycle event shape is consumed and mapped into an audit record, never re-declared"
+gotchas: ""
+related: ["#31", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
 issue #31).
 
 The agent registry (``registry/events``, issue #10) maintains its own

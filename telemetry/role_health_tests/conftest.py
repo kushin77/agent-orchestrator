@@ -1,5 +1,22 @@
 """Pytest bootstrap + fixtures for telemetry/role_health (issue #637).
 
+---knowledge---
+module_id: telemetry.role_health_tests.conftest
+system: telemetry
+app: role_health_tests
+solution_class: pattern
+patterns: [path-bootstrap, fixture-injection]
+derives_from: null
+owner_sme: qa-sme
+tier: L0
+interfaces: ["fixtures consumed by the role_health suites"]
+invariants: "the bootstrap inserts the repo root so the suites import their lanes no matter where pytest is invoked"
+gotchas: "the directory is named role_health_tests rather than tests because duplicate basenames break pytest module naming"
+related: ["#637", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 ``telemetry/`` carries no ``__init__.py`` (per-issue package directories), so
 this inserts the repo root at the front of ``sys.path`` and every test imports
 ``telemetry.role_health`` plus the consumed sibling lanes

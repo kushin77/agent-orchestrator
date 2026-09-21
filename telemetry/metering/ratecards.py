@@ -1,5 +1,22 @@
 """telemetry/metering — multi-provider rate cards + cost estimator (issue #33).
 
+---knowledge---
+module_id: telemetry.metering.ratecards
+system: telemetry
+app: metering
+solution_class: enterprise
+patterns: [yaml-rate-cards, context-tier-step-up, unknown-is-none]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RateCard, RateCardStore, CostEstimate, load_card_file, ModelRate, RateCardEntry]
+invariants: "unknown resolves to None, never to a fabricated zero: a cost total is an honest sum over priced records"
+gotchas: "input and output are priced separately because output is priced far above input on every provider"
+related: ["#33", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Rate cards are YAML, one file per provider under ``rate_cards/``.  A model's
 entry declares a ``standard`` USD price per 1,000,000 tokens (input and
 output split — output is priced far above input on every provider, so a

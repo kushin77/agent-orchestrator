@@ -1,5 +1,22 @@
 """telemetry/budgets — per-tenant + per-vendor/model budget enforcer (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.budget
+system: telemetry
+app: budgets
+solution_class: enterprise
+patterns: [consumed-decision-ladder, durable-spend-ledger, warn-then-block]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BudgetEnforcer, TenantBudgetPolicy, BudgetLimit, VendorBudgetCap, load_budget_policies]
+invariants: "spend is read from the durable metering feed through the SpendLedger protocol, never a per-process counter"
+gotchas: ""
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The hard cost/token budget rail.  Each tenant has a budget policy (YAML
 under ``config/policies.yaml``): a cost limit over a window (monthly USD by
 default), a token limit over a window (daily tokens by default), and

@@ -1,5 +1,22 @@
 """telemetry/budgets — machine-readable budget/SLO state exporter (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.exporter
+system: telemetry
+app: budgets
+solution_class: enterprise
+patterns: [machine-readable-snapshot, formatter-never-decides, consumed-slo-feed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BudgetStateExporter, slo_row]
+invariants: "a formatter: it reads current state off the injected enforcers, ledger and audit and makes no policy decision itself"
+gotchas: ""
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The export surface for tenant dashboards and alerting: a single offline
 snapshot of the operational safety rails — kill-switch state, per-tenant
 budget positions, per-tenant quota statuses, the SLO feed (CONSUMED from

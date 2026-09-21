@@ -1,5 +1,22 @@
 """Encryption at rest for audit payloads (telemetry/ledger, issue #31).
 
+---knowledge---
+module_id: telemetry.ledger.crypto
+system: telemetry
+app: ledger
+solution_class: enterprise
+patterns: [encrypt-at-rest, versioned-envelope, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [encrypt_payload, decrypt_payload, cipher_available, normalize_key, ENVELOPE_VERSION, ENVELOPE_ALG]
+invariants: "the clear payload is never stored; every ciphertext is a self-describing versioned envelope"
+gotchas: "a missing cipher is refused rather than degrading to plaintext"
+related: ["#31", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Sensitive payloads are encrypted with AES-256-GCM before they enter the hash
 chain; the clear payload is never stored. Each ciphertext is wrapped in a
 self-describing envelope so a consumer can see, without the key, which

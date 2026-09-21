@@ -1,5 +1,22 @@
 """telemetry/observability — per-tenant SLO definition + evaluation (#32).
 
+---knowledge---
+module_id: telemetry.observability.slos
+system: telemetry
+app: observability
+solution_class: enterprise
+patterns: [parameterized-templates, honest-evaluation, error-budget]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SloEvaluator, SloDefinition, SloResult, SloTemplate, load_slo_templates, definitions_from_templates, SLO_KINDS, VERDICTS]
+invariants: "SLOs evaluate actual span outcomes and a missing window is NO_DATA, never an assumed pass"
+gotchas: ""
+related: ["#32", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Per-tenant Service Level Objectives over the telemetry store, parameterized
 from offline YAML templates (``slo_templates/`` — availability, latency and
 cost kinds, adapted from the monitoring-stack Sloth templates) with honest

@@ -1,5 +1,22 @@
 """telemetry/observability — trace/span data model (issue #32, phase 5).
 
+---knowledge---
+module_id: telemetry.observability.model
+system: telemetry
+app: observability
+solution_class: pattern
+patterns: [value-objects, consumed-vocabulary]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [OUTCOMES, SERVED_OUTCOMES, FAILURE_OUTCOMES, POLICY_OUTCOMES, is_served, is_failure, is_attempt]
+invariants: "the closed outcome vocabulary is consumed from the gateway proxy contract and the camelCase key shape is mirrored, never redefined"
+gotchas: ""
+related: ["#32", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The observability pillar's own value objects.  Field vocabulary is CONSUMED
 from the merged sibling contracts and never redefined:
 

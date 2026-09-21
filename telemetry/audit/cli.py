@@ -1,5 +1,22 @@
 """Command-line interface for the audit read model (telemetry/audit, #347).
 
+---knowledge---
+module_id: telemetry.audit.cli
+system: telemetry
+app: audit
+solution_class: enterprise
+patterns: [read-only-projection, offline-cli, tri-state-exit]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main]
+invariants: "reads through the ledger; it owns no storage, no key material and no chain crypto"
+gotchas: ""
+related: ["#347", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Serves the tamper-evident audit trail as a read-only, filterable view — the
 backend the shell's Audit view consumes. Chain crypto and storage belong to
 [`telemetry/ledger`](../ledger/README.md); this CLI only reads through it.

@@ -1,5 +1,22 @@
 """Shared legacy-model-id alias table (issue #971, #895 follow-up).
 
+---knowledge---
+module_id: telemetry.metering.model_aliases
+system: telemetry
+app: metering
+solution_class: pattern
+patterns: [single-source-alias-table, consumed-not-duplicated]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [normalize_model, LEGACY_MODEL_ALIASES]
+invariants: "one alias table: the gateway and metering resolve a retired model id through the exact same map"
+gotchas: "gateway/providers/config.py re-exports this table rather than carrying a second copy"
+related: ["#971", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Single source of truth for mapping a retired Claude model id to its current
 replacement. ``gateway/providers/config.py`` owns the *consumer-facing* fail-
 closed model check (``ProviderConfig.normalize_model``) but the alias table

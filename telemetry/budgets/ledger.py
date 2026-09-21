@@ -1,5 +1,22 @@
 """telemetry/budgets — spend ledger protocol + metering-feed adapter (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.ledger
+system: telemetry
+app: budgets
+solution_class: pattern
+patterns: [narrow-protocol, adapter-over-rollups]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SpendLedger, StaticLedger, MeteringReporterLedger]
+invariants: "the enforcers never keep a per-process counter: spend survives restarts and is shared across instances"
+gotchas: "the metering vocabulary it consumes is never redefined here"
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The budget/quota enforcers must never keep a per-process counter — spend has
 to survive restarts and be shared across instances pointing at the same
 store.  The durable source of truth is the metering lane's append-only usage

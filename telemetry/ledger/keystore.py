@@ -1,5 +1,22 @@
 """Injected per-tenant key store (telemetry/ledger, issue #31).
 
+---knowledge---
+module_id: telemetry.ledger.keystore
+system: telemetry
+app: ledger
+solution_class: enterprise
+patterns: [injected-keys, fail-closed, no-plaintext-fallback]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Keystore, DictKeystore, EnvKeystore, FileKeystore, KeyMaterial, parse_key_hex]
+invariants: "keys never live in code or in the ledger; when no key resolves for a tenant the append is refused with no plaintext fallback"
+gotchas: "key sources are resolved in a fixed order: injected mapping, then environment, then keystore file"
+related: ["#31", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Every tenant's sensitive payloads are encrypted with a per-tenant AES-256 key.
 Keys NEVER live in code or in the ledger: they are injected from environment,
 a keystore file, or an in-process mapping supplied by the operator. If no key

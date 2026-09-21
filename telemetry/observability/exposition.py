@@ -1,5 +1,22 @@
 """telemetry/observability/exposition — the OTLP/HTTP push exporter (#497).
 
+---knowledge---
+module_id: telemetry.observability.exposition
+system: telemetry
+app: observability
+solution_class: enterprise
+patterns: [flag-gated-off, otlp-http-push, frozen-exit-boundary, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [read_surface_default, PRODUCER_SERVICE, SIGNAL_METRICS, SIGNAL_LOGS, EXPOSITION_SURFACE, REASON_*]
+invariants: "the exporter is OFF unless the surface flag is on; every refusal names a reason rather than failing quietly"
+gotchas: "ADR-0022 froze the telemetry exit boundary, so this is the single declared way telemetry leaves the process"
+related: ["#497", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 WHY this module exists
 ----------------------
 The telemetry pillar is real and complete — per-tenant SLOs with a closed

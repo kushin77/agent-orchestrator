@@ -1,5 +1,22 @@
 """telemetry/budgets — per-tenant soft/hard quota enforcer (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.quota
+system: telemetry
+app: budgets
+solution_class: enterprise
+patterns: [soft-hard-quota, injected-state-probe, durable-usage]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [QuotaEnforcer, QuotaPolicy, QuotaLimit, StateProbe, StaticProbe, load_quota_policies, quota_status]
+invariants: "soft limits warn and hard limits refuse; concurrency and storage are supplied by an injected probe, never guessed"
+gotchas: ""
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The soft/hard resource-quota rail the gateway/engine consult before
 dispatch: per-tenant limits over **calls**, **tokens**, **concurrency** and
 **storage**.  Soft limits warn; hard limits refuse the request (the

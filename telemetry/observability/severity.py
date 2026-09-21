@@ -1,5 +1,22 @@
 """telemetry/observability — alert severity state machine (issue #342).
 
+---knowledge---
+module_id: telemetry.observability.severity
+system: telemetry
+app: observability
+solution_class: enterprise
+patterns: [state-machine, bidirectional-escalation-recovery, named-reason]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [STATES, STATE_RANK, STATE_SEVERITY, STATE_DESCRIPTIONS, SEVERITIES, REASON_*]
+invariants: "severity is a state, not a verdict: a breach escalates immediately and recovery is only after a sustained window"
+gotchas: "the transition is deliberately not one-directional; it records since-when and what moved the subject"
+related: ["#342", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 WHY this exists: ``breach.py`` answers *one* question per evaluation — "is an
 SLO out of budget **right now**" — and answers it from the current window
 alone. That is a *verdict*, not a *state*: an operator surface needs to know

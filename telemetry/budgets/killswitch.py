@@ -1,5 +1,22 @@
 """telemetry/budgets — global kill switch (platform-wide pause) (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.killswitch
+system: telemetry
+app: budgets
+solution_class: enterprise
+patterns: [safe-rollout, check-before-act, hard-stop, audit]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [KillSwitchController, KillSwitchStore, JsonKillSwitchStore, MemoryKillSwitchStore, load_killswitch_state]
+invariants: "while the switch is engaged every non-critical billable call is refused before dispatch, regardless of tenant headroom"
+gotchas: "new controls default OFF; the pause is owner-triggerable with a reason and an exemption list"
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 A single switch that halts all **non-critical** billable model calls
 platform-wide: while it is engaged every prospective call that is not
 explicitly critical (or on an exempt service) is refused *before* dispatch —

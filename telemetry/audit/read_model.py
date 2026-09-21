@@ -1,4 +1,21 @@
 """Read-only, filterable read model over the tamper-evident audit trail
+
+---knowledge---
+module_id: telemetry.audit.read_model
+system: telemetry
+app: audit
+solution_class: enterprise
+patterns: [read-only-projection, tamper-evident-consumer, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [AuditReadModel, open_read_model, ChainVerdict, severity_of, FilterError, ReadModelError]
+invariants: "read-only by construction: the model exposes only read methods and owns no storage, key material or chain crypto"
+gotchas: ""
+related: ["#347", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
 (telemetry/audit, issue #347).
 
 This module is the **serving seam** for the audit surface: the backend the

@@ -1,5 +1,22 @@
 """telemetry/chat — chat-turn value objects + attribution record (issue #506).
 
+---knowledge---
+module_id: telemetry.chat.model
+system: telemetry
+app: chat
+solution_class: pattern
+patterns: [value-objects, single-vocabulary-no-second]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ChatTurn, TurnAttribution, TurnError, SCHEMA_VERSION, RECORD_KIND]
+invariants: "the turn is the unit of chat FinOps: one exchange served by exactly one gateway call record"
+gotchas: ""
+related: ["#506", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The **turn** is the unit of chat FinOps: one user/agent exchange through the
 chat surface, which the gateway served with exactly one call record.  This
 module owns the two value objects the rest of the package works with:

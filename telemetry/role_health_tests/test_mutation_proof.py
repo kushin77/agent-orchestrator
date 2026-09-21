@@ -1,5 +1,22 @@
 """telemetry/role_health — the staleness and burn alert checks must be able to fail (#637).
 
+---knowledge---
+module_id: telemetry.role_health_tests.test_mutation_proof
+system: telemetry
+app: role_health_tests
+solution_class: enterprise
+patterns: [mutation-proof, a-check-that-cannot-fail-is-a-formality]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: ["pytest suite that mutation-proves the staleness and burn checks"]
+invariants: "each check is killed at the source and the assertions that depend on it must die with it, reporting the real failure line"
+gotchas: ""
+related: ["#637", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 A check that cannot fail is a formality.  This file kills each check at the
 source and proves the assertions that depend on it die with it, reporting the
 real FAIL line — the same mutation-proof pattern the sibling lane uses

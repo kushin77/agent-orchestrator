@@ -1,5 +1,22 @@
 """telemetry/observability — breach detection + alerts (issue #32, phase 5).
 
+---knowledge---
+module_id: telemetry.observability.breach
+system: telemetry
+app: observability
+solution_class: enterprise
+patterns: [outcome-not-liveness, silence-is-not-healthy, alert-on-actual-outcome]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BreachDetector, Alert, AlertPolicy, SEVERITIES, REASON_*]
+invariants: "alerts fire on actual outcome metrics from the telemetry store, never on heartbeat presence"
+gotchas: "a tenant with no data in the SLO window is an alertable gap, not a passing check"
+related: ["#32", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Implements the **outcome-not-liveness** doctrine cannibalized from the
 leaderboard ``loop-outcome-check.sh`` ("HEALTHY IS NOT WORKING"): alerts fire
 on actual outcome metrics computed from the telemetry store, never on

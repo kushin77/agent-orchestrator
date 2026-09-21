@@ -1,5 +1,22 @@
 """telemetry/role_health — per-role chargeback + the portal-consumable feed (#637).
 
+---knowledge---
+module_id: telemetry.role_health_tests.test_chargeback_and_feed
+system: telemetry
+app: role_health_tests
+solution_class: enterprise
+patterns: [consumable-feed-assertion, additive-snapshot]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: ["pytest suite over the per-role chargeback rows and the portal feed"]
+invariants: "consumability is asserted against the exporter that already consumes the shape, so a role row that breaks the feed breaks this test"
+gotchas: ""
+related: ["#637", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Two acceptance criteria live here: chargeback rows per role (the CFO's cap
 visibility) and an exporter feed the portal can consume.  "Consumable" is
 asserted against the exporter that already consumes this shape — the budgets

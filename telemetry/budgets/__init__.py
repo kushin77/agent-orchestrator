@@ -1,5 +1,22 @@
 """telemetry/budgets — per-tenant budgets, quotas, global kill switch + SLO export (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.__init__
+system: telemetry
+app: budgets
+solution_class: pattern
+patterns: [package-contract, consumed-never-redefined]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: []
+invariants: "the package docstring declares the lane contract; the vocabulary it names is consumed from the merged sibling lanes"
+gotchas: ""
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Operational safety rails for the multi-tenant AI SaaS (EPIC-00, phase 5):
 per-tenant soft/hard quotas enforced before dispatch (calls, tokens,
 concurrency, storage), a per-tenant + per-vendor/model budget enforcer with a

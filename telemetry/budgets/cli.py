@@ -1,5 +1,22 @@
 """telemetry/budgets — offline operator CLI (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.cli
+system: telemetry
+app: budgets
+solution_class: enterprise
+patterns: [offline-cli, tri-state-exit, pep420-namespace]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main]
+invariants: "runs fully offline from the repo root; exit codes follow the repo honesty tri-state"
+gotchas: ""
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Runs the per-tenant budgets + quotas + global kill-switch + SLO-export rail
 fully offline from the repo root (PEP-420 namespace):
 

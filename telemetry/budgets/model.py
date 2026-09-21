@@ -1,5 +1,22 @@
 """telemetry/budgets — decision/resource/window vocabulary + value objects (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.model
+system: telemetry
+app: budgets
+solution_class: pattern
+patterns: [consumed-vocabulary, single-vocabulary-no-second]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [DECISIONS, ALLOWED_DECISIONS, BLOCKING_DECISIONS, DECISION_* , RESOURCE_*, MODE_OBSERVE, MODE_ENFORCE, KIND_*]
+invariants: "the decision ladder and the non-billable outcome strings are consumed from gateway/finops and the merged lanes, never redefined"
+gotchas: ""
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 This lane is the per-tenant budgets + quotas + global kill-switch contract of
 the telemetry pillar.  Vocabulary is CONSUMED from the merged sibling lanes
 and never redefined:
