@@ -17,7 +17,9 @@
 # This file is that declaration, and `scripts/branch-protection.sh` is the thing
 # that makes it reproducible and keeps it honest.
 #
-# STATUS CHECKS — the #724 precondition, now DISCHARGED
+# STATUS CHECKS — the #724 precondition, discharged; the requirement it
+# justified was RETIRED on 2026-09-21 (see "`required_status_checks` IS `null`"
+# below)
 # `required_status_checks` stayed `null` until the poster was observed posting
 # a REAL status from the runner, never a hand-typed one. Requiring a context
 # before anything writes it is the #724 defect (an inert control whose own gate
@@ -58,32 +60,44 @@
 # rigid and un-annotatable, by design — ADR-0028/`gate-status-map.py`); this
 # paragraph is that record instead.
 #
-# THIS DECLARATION is written with `required_status_checks` filled in because
-# the precondition (a real status, correctly observed, twice) is met, the
-# shape is provable end to end, and the one remaining red item is an accepted,
-# host-local straggler rather than a code defect. `required_status_checks`
-# applies to each PR's OWN head SHA once protection is applied (not
-# retroactively to whatever is posted on `master`'s tip at apply time), so
-# accepting today's straggler here does not exempt any future PR from posting
-# its own green `ao/gate-of-record` before it can merge.
+# `required_status_checks` IS `null` — declared, not drifted
 #
-#   strict: false
-#     No CI produces a required check on every push, so `strict: true` would
-#     force every PR to rebase onto master's latest tip AND get a freshly
-#     posted status each time master moves — with a human/agent poster instead
-#     of Actions, that wedges the repo within a day. `strict: false` requires
-#     the context to be green on the PR's own head SHA, which is the control
-#     this epic exists to add, without inventing a rebase treadmill nothing here
-#     can keep up with.
+# Everything above is HISTORY, and its CONCLUSION is superseded. It argued that
+# a `null` here was "a host-local straggler rather than a code defect", so the
+# field should be filled in. That reasoning predates the owner-adopted
+# **single-developer method (2026-09-21)**, which says the opposite in three
+# placed documents:
 #
-#   contexts: [ao/gate-of-record]
-#     The one context ADR-0028 defines, and the one name `required_status_contexts`
-#     below also names — `scripts/check-gate-status.sh` asserts those two
-#     declarations never drift into two different strings. `branch-protection-
-#     compare.py` normalizes this field to just {strict, contexts} before
-#     comparing, since GitHub's live response also carries server-generated
-#     fields (`url`, `contexts_url`, `checks`) that are not this repo's to
-#     declare and must not manufacture false drift.
+#   AGENTS.md:75                "Single-developer method (owner, 2026-09-21): no
+#                               required status check and no reviewer approval
+#                               on `master`"
+#   docs/GOVERNANCE.md:129      "`master` carries no required status check."
+#   docs/EXECUTION-PLAN.md:210  "no required status check and no reviewer
+#                               requirement; a PR lands with ..."
+#
+# The live repository already reflects the method: measured 2026-09-21,
+# `gh api repos/kushin77/agent-orchestrator/branches/master/protection` returns
+# `required_status_checks = None`. This file was the side that disagreed with
+# the method AND with live, and that single field was the last box-wide
+# `make verify` red on this host — it refused every lane's `make land`
+# (issue #1815).
+#
+# POSTED IS NOT REQUIRED, and nothing about the gate of record is retired here:
+# `required_status_contexts` below still names `ao/gate-of-record`, ADR-0028's
+# poster (`scripts/gate-status.sh post`) still publishes it, and
+# `scripts/check-gate-status.sh`'s producer rule still insists that every
+# context this file declares has a producer on the path that evaluates a pull
+# request. What changes is that an absent or slow poster can no longer BLOCK a
+# merge: the gate of record stays the evidence of record (`make verify`,
+# `AGENTS.md` rule 7), not a platform precondition for landing.
+#
+# The field is DECLARED as `null` rather than omitted, so the comparator still
+# owns it and cannot silently hide a live change to it:
+# `branch-protection-compare.py` normalizes `required_status_checks` to just
+# `{strict, contexts}` (dropping GitHub's server-generated `url`,
+# `contexts_url` and `checks`, which are not this repo's to declare) and
+# compares `null` against `null` as a MATCH — and a live status-checks object
+# against this `null` declaration as drift.
 #
 #   required_pull_request_reviews: null
 #     Requiring a human review would break the autonomous-merge doctrine
@@ -111,18 +125,20 @@ protection:
   # remove the only override point the operating model names.
   enforce_admins: false
   required_signatures: false
-  required_status_checks:
-    strict: false
-    contexts:
-      - ao/gate-of-record
+  # No required status check: the owner-adopted single-developer method
+  # (2026-09-21) — rationale above, and issue #1815. The context is still
+  # POSTED (`required_status_contexts` below); it is simply not REQUIRED.
+  required_status_checks: null
   required_pull_request_reviews: null
   restrictions: null
   required_conversation_resolution: false
   lock_branch: false
   block_creations: false
 
-# ADR-0028 — the status context the gate of record publishes, and which
-# `protection.required_status_checks` above now requires.
+# ADR-0028 — the status context the gate of record PUBLISHES. Nothing above
+# REQUIRES it: `protection.required_status_checks` is `null` under the
+# owner-adopted single-developer method (2026-09-21), so this key declares what
+# the poster writes, not a precondition for a merge.
 #
 # This key stays OUTSIDE `protection` on purpose: `protection` is what
 # `scripts/branch-protection.sh apply` PUTs to GitHub, and this key is instead
