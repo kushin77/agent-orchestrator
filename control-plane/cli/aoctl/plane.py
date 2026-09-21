@@ -26,6 +26,23 @@ object cannot carry a credential at all.
 What this module deliberately does **not** do: it never inspects the fleet's
 files, never signals a process, and never writes anything — the only side effect a
 command can have is the plane applying it.
+
+
+---knowledge---
+module_id: control-plane.cli.aoctl.plane
+system: control-plane
+app: cli
+solution_class: enterprise
+patterns: [delegate-never-re-derive, one-transport, last-moment-credential, named-refusal]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Plane, Request, mint_command_id, path_for, envelope_code, DEFAULT_PLANE]
+invariants: "the session token is attached at Plane.send, the last moment before the wire, so a --dry-run request object cannot carry a credential at all"
+gotchas: "every call imports integrations/paperclip/client.py; there is no urllib call here, no second opinion about headers and no second retry policy"
+related: ["#556", "#554"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

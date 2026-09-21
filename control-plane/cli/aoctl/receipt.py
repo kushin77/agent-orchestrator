@@ -18,6 +18,23 @@ There are two receipts, and the difference is the point:
 JSON is the machine surface and text is the human one (the CLI is not a
 dashboard — ADR-0022, consumed by ADR-0025 §6.2); both are rendered from the same
 receipt, so they cannot disagree.
+
+
+---knowledge---
+module_id: control-plane.cli.aoctl.receipt
+system: control-plane
+app: cli
+solution_class: enterprise
+patterns: [one-receipt-per-action, no-silent-success, dual-rendering]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [render, envelope, replay_receipt, FIELDS, OUTPUT_LIMIT]
+invariants: "a receipt exists only if the plane returned one, so nothing is inferred from a status code; JSON and text are rendered from the same receipt and cannot disagree"
+gotchas: "a replay hands the ORIGINAL receipt back inside the refusal message after the marker portal/server/control_audit.py declares, as canonical JSON"
+related: ["#556", "#554"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

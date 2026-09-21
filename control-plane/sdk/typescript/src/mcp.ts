@@ -9,6 +9,22 @@
  * is derived from the verified session claims so a caller cannot cross
  * tenants, and `context.session` rides on every `tools/call` (the platform
  * enforces identity, allowlist, rate and audit — issue #20).
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.src.mcp
+ * system: control-plane
+ * app: sdk
+ * solution_class: enterprise
+ * patterns: [json-rpc-2.0, tenant-scoped, fail-closed]
+ * derives_from: control-plane/sdk/python/aosdk/mcp.py
+ * owner_sme: platform-sme
+ * tier: L1
+ * interfaces: [McpClient, McpClientOptions, PROTOCOL_VERSION, DEFAULT_MCP_PATH]
+ * invariants: "the client never asserts a tenant of its own choosing: context.tenantId is derived from the verified session claims so a caller cannot cross tenants"
+ * gotchas: "the platform enforces identity, allowlist, rate and audit for every tools/call"
+ * related: ["#41", "#20"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 import { SessionToken, TokenSource, verifyNotExpired } from "./auth.js";

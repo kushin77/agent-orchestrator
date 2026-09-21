@@ -5,6 +5,22 @@
  * carries the platform's stable machine `code` plus the HTTP `status`; error
  * codes are the envelope/error codes of the merged control-plane REST
  * contract (issue #38) and the gateway outcome/status semantics (issue #16).
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.src.errors
+ * system: control-plane
+ * app: sdk
+ * solution_class: class
+ * patterns: [closed-error-taxonomy, machine-code-not-string-matching]
+ * derives_from: control-plane/sdk/python/aosdk/errors.py
+ * owner_sme: platform-sme
+ * tier: L0
+ * interfaces: [SdkError, ConfigurationError, TransportError, ApiError, UnauthorizedError, ScopeDeniedError, PermissionDeniedError, McpError, ErrorCode]
+ * invariants: "ApiError carries the platform's stable machine code plus the HTTP status so a caller can map failures without string-matching"
+ * gotchas: "the family mirrors the Python SDK's error taxonomy so both SDKs read the same envelope and gateway codes"
+ * related: ["#41"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 /** The platform's stable machine error code (envelope `error.code`). */

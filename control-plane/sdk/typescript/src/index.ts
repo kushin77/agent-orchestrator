@@ -13,6 +13,22 @@
  *   outcome never carries fabricated typed content.
  *
  * @module
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.src.index
+ * system: control-plane
+ * app: sdk
+ * solution_class: class
+ * patterns: [public-surface, re-export-only, offline-by-construction]
+ * derives_from: null
+ * owner_sme: platform-sme
+ * tier: L0
+ * interfaces: [SDK_VERSION, re-exports of model, errors, auth, transport, envelope, gateway, controlPlane, mcp]
+ * invariants: "the package's public surface is exactly these re-exports, so a consumer imports the SDK and never a deep module path"
+ * gotchas: "every client takes an injected Transport, so the module is offline by construction"
+ * related: ["#41"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 export * from "./model.js";

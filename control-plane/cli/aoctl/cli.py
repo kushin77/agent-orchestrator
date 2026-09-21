@@ -23,6 +23,23 @@ One invocation does five things, in this order, and the order is the contract:
 ``--dry-run`` needs no session and prints the request it *would* send, including
 whether a session is configured; the value is never printed, because the terminal
 is shared.
+
+
+---knowledge---
+module_id: control-plane.cli.aoctl.cli
+system: control-plane
+app: cli
+solution_class: enterprise
+patterns: [declared-command-table, dry-run-first, fail-closed, tri-state-exit]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main, build_parser, surface_table, PROG, PLANE_ENV, SESSION_ENV]
+invariants: "one invocation does five things in one order: read the vocabulary, resolve the verb to one declared command id, check the local preconditions, build the request, send it once"
+gotchas: "--dry-run of an irreversible verb is allowed and prints the request it would send, because the confirmation guards the send and never the inspection"
+related: ["#556", "#551"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -16,6 +16,23 @@ modules it consumes own:
 
 The keyboard language is ONLY declared mnemonics plus the fixed cockpit keys.
 No ad-hoc verb exists anywhere in this package.
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit.app
+system: control-plane
+app: cockpit
+solution_class: enterprise
+patterns: [role-lens-narrowing-only, declared-mnemonics-only, consume-never-restate]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [Cockpit, ROLES, WORKSPACE_KEYS, COCKPIT_KEYS, HELP_TEXT]
+invariants: "the keyboard language is ONLY declared mnemonics plus the fixed cockpit keys; no ad-hoc verb exists anywhere in this package"
+gotchas: "selecting a function outside the role lens is refused by name (role_lens), never silently widened"
+related: ["#566"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

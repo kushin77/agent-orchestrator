@@ -15,6 +15,23 @@ transport and exposes the lifecycle a governed consumer needs —
 
 The client never asserts a tenant of its own choosing: ``context.tenantId``
 is derived from the verified session claims so a caller cannot cross tenants.
+
+
+---knowledge---
+module_id: control-plane.sdk.python.aosdk.mcp
+system: control-plane
+app: sdk
+solution_class: enterprise
+patterns: [json-rpc-2.0, tenant-scoped, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [McpClient, new_request_id, PROTOCOL_VERSION, DEFAULT_MCP_PATH]
+invariants: "the client never asserts a tenant of its own choosing: context.tenantId is derived from the verified session claims so a caller cannot cross tenants"
+gotchas: "the platform enforces identity, allowlist, rate and audit for every tools/call"
+related: ["#41", "#20"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

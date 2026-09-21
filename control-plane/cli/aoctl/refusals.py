@@ -38,6 +38,23 @@ Two tables, and the difference between them matters:
 ``REASONS``
     code -> the operator-facing reason and the verdict. The set is closed on
     purpose: a code with no reason here would be a refusal the CLI cannot explain.
+
+
+---knowledge---
+module_id: control-plane.cli.aoctl.refusals
+system: control-plane
+app: cli
+solution_class: enterprise
+patterns: [named-refusal, tri-state-exit, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Refusal, named_refusal, local_refusal, MATRIX, REASONS, EXIT_OK, EXIT_REFUSED, EXIT_CANNOT_ASSESS]
+invariants: "every failure mode maps to ONE named reason and one exit code; an unreachable plane exits 2 and a command that cannot be delivered is never reported as delivered"
+gotchas: "argparse also exits 2 on a usage error; that coincidence is stated in cli's help rather than papered over"
+related: ["#556", "#554"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

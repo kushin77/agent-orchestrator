@@ -8,6 +8,23 @@ frame, never on a hand-built dict (the trap this issue names explicitly).
 
 Colour is opt-in per frame: ``enable_color(False)`` is the default, so tests
 see plain glyphs and text, exactly like ``fleet/console.py``'s contract.
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit.frame
+system: control-plane
+app: cockpit
+solution_class: enterprise
+patterns: [pure-function-render, deterministic-output, opt-in-color]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [compose, bordered, tile, rule, paint, severity_color, enable_color, WIDTH]
+invariants: "every frame is a pure function of (declared functions, fixtures, state), so a headless test asserts exactly what an operator sees on the REAL rendered frame"
+gotchas: "the ANSI palette and the alternate-screen technique are byte-identical to fleet/console.py so the same facts get the same colours in both surfaces; colour is opt-in and off by default"
+related: ["#566"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

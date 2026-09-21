@@ -12,6 +12,23 @@ a level at a function the registry does not declare renders
 The offline source reads a committed fixture (the same fixture technique
 ``cockpit_render`` proves); a live source would answer the same levels from the
 declared reads. A level with no rows renders ``NO_DATA`` — named, never green.
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit.drill
+system: control-plane
+app: cockpit
+solution_class: enterprise
+patterns: [declared-function-map, no-data-is-never-ok, offline-fixture]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [Drill, DrillSource, FixtureDrillSource, Row, LEVELS, load_drill]
+invariants: "the level-to-function map is carried by the fixture as data, not by code; a level with no rows renders NO_DATA, which is named and never green"
+gotchas: "an undeclared function renders UNDECLARED-FUNCTION, which is the registry-conformance gate's provoked mutant"
+related: ["#566"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

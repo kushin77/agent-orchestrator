@@ -7,6 +7,22 @@
  * `identity/edges`), the session-token claims (issues #10/#35), and the MCP
  * tool vocabulary (issue #20 `gateway/mcp`).  Wire keys are the platform's
  * camelCase JSON keys.
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.src.model
+ * system: control-plane
+ * app: sdk
+ * solution_class: enterprise
+ * patterns: [consume-never-restate, closed-vocabulary, typed-wire-models]
+ * derives_from: control-plane/sdk/python/aosdk/model.py
+ * owner_sme: platform-sme
+ * tier: L1
+ * interfaces: [TaskResult, TaskRequest, TaskEnvelope, OUTCOMES, isServedOutcome, OUTCOME_STATUS, decodeClaims, SessionClaims]
+ * invariants: "field vocabulary is CONSUMED from the merged contracts and never redefined, and a non-served outcome never carries fabricated typed content"
+ * gotchas: "wire keys are the platform's camelCase JSON keys"
+ * related: ["#41"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 // --------------------------------------------------------------------------- //

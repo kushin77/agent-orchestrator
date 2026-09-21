@@ -18,6 +18,22 @@
 #
 #     make verify
 #     bash .agent-orchestrator/scripts/verify.sh
+#
+# ---knowledge---
+# module_id: control-plane.sdk.template.consumer-repo.verify
+# system: control-plane
+# app: sdk
+# solution_class: enterprise
+# patterns: [no-false-green, born-compliant, content-digest]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [bash .agent-orchestrator/scripts/verify.sh, make verify]
+# invariants: "every check produces a REAL exit code: a missing file, an invalid manifest, a drifted managed layer or an unwired layer fails the gate"
+# gotchas: "a locally edited auto-synced layer is a failure, because every managed layer must match the recorded sha256 in the drift manifest"
+# related: ["#41"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

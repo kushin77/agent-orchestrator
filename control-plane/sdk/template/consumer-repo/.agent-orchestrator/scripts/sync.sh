@@ -16,6 +16,22 @@
 #
 # A live fetch authenticates with the short-lived session token in the env
 # var named by sync.yaml auth.tokenEnv — never a hardcoded key.
+#
+# ---knowledge---
+# module_id: control-plane.sdk.template.consumer-repo.sync
+# system: control-plane
+# app: sdk
+# solution_class: pattern
+# patterns: [offline-safe-default, managed-vs-local-layers, content-digest]
+# derives_from: null
+# owner_sme: sync-sme
+# tier: L1
+# interfaces: [bash .agent-orchestrator/scripts/sync.sh --check, bash .agent-orchestrator/scripts/sync.sh --fetch]
+# invariants: "only the AUTO-SYNCED (managed) instruction layers are refreshed and the sha256 drift manifest is regenerated; local tenant-owned layers are never touched"
+# gotchas: "a live fetch authenticates with the short-lived session token in the env var named by sync.yaml auth.tokenEnv, never a hardcoded key"
+# related: ["#41"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

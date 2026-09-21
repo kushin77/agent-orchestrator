@@ -35,6 +35,23 @@ because the gate's negative controls assert that a provoked defect is refused
 
 Tri-state exit contract, consumed from ``guardrails/honesty``: 0 OK / 1 NOT-OK /
 2 CANNOT-ASSESS. CANNOT-ASSESS must never read as a pass.
+
+
+---knowledge---
+module_id: control-plane.functions.cockpit_registry
+system: control-plane
+app: functions
+solution_class: enterprise
+patterns: [consume-never-restate, declared-authority, closed-vocabulary, named-findings]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [Registry, Function, Parameter, Scope, Stream, Derived, load, from_document, validate, derive, resolve_call, recommended, cockpit_panels]
+invariants: "it is not a second vocabulary: every closed set it enforces is CONSUMED from the authority that already owns it, and the gate proves each is the live article rather than a copy"
+gotchas: "the effect classes, capabilities and verbs come from portal.server.control_api.Vocabulary over control-plane/control/verbs.yaml, and the route set from RC-3's own Vocabulary plus ROUTE_ROOT"
+related: ["#565", "#551"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

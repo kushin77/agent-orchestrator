@@ -35,6 +35,23 @@ recorded here and in the README.
 The registry's **closed sets** — effect classes and refusal codes — are read here
 too, so the CLI's refusal matrix can be checked against the same declaration the
 server enforces instead of a remembered copy.
+
+
+---knowledge---
+module_id: control-plane.cli.aoctl.vocabulary
+system: control-plane
+app: cli
+solution_class: enterprise
+patterns: [declared-command-table, cross-reference-both-directions, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Registry, Row, SURFACE, VocabularyError, VocabularyUnreadable, UnknownCliVerb, SurfaceDrift]
+invariants: "the CLI owns no vocabulary: every verb is a reference into control-plane/control/verbs.yaml read at run time, so every verb maps to exactly one declared command id"
+gotchas: "a registry that renames or withholds a verb makes the CLI refuse, never silently drift into asking the plane for a verb it does not have"
+related: ["#556", "#553"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

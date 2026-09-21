@@ -14,6 +14,23 @@ Wraps the model-gateway dispatch surface ``POST /v1/agents/{agentId}/tasks``
 
 Every request carries a short-lived per-tenant session token from the
 :class:`~aosdk.auth.TokenSource` (env or callback) — never a hardcoded key.
+
+
+---knowledge---
+module_id: control-plane.sdk.python.aosdk.gateway
+system: control-plane
+app: sdk
+solution_class: enterprise
+patterns: [typed-client, closed-outcome-set, streaming-then-terminal]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [GatewayClient]
+invariants: "the SDK never fabricates content for a non-served outcome: content is the schema-validated typed object on a served outcome and outcome is one of the closed set otherwise"
+gotchas: "stream yields the incremental dispatch events then the terminal TaskResult, mirroring the platform's streaming handler"
+related: ["#41", "#16"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

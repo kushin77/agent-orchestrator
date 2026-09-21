@@ -21,6 +21,23 @@ Contract::
 The validator here is pure Python (stdlib only) and is the load-bearing
 enforcement path; the JSON Schema documents are the machine-readable contract
 and are exercised against this validator in the test suite.
+
+
+---knowledge---
+module_id: control-plane.instructions.aoi.override
+system: control-plane
+app: instructions
+solution_class: enterprise
+patterns: [frozen-contract, closed-schema, reject-unknown-field]
+derives_from: null
+owner_sme: docs-sme
+tier: L1
+interfaces: [validate_override, check_override_applies, local_extra_rules, apply_local_rules, OVERRIDE_SCHEMA, OverrideError]
+invariants: "a tenant may customise only within the closed schema-bounded contract (branding plus local-layer rules); anything outside it is REJECTED"
+gotchas: "the pure-Python validator is the load-bearing enforcement path and the JSON Schema documents are exercised against it in the test suite"
+related: ["#42"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

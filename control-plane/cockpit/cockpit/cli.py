@@ -12,6 +12,23 @@ mnemonics (resolved through ``cockpit_registry``) — no ad-hoc verb exists here
 Exit contract (this repo's tri-state): 0 OK · 1 REFUSED · 2 CANNOT-ASSESS.
 A flag-off cockpit, an unreadable registry, or an unreachable plane each exit
 non-zero with a NAMED reason — never a silent no-op.
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit.cli
+system: control-plane
+app: cockpit
+solution_class: enterprise
+patterns: [declared-mnemonics-only, tri-state-exit, named-refusal]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [main, build_parser, PROG, PLANE_ENV, SESSION_ENV]
+invariants: "the command line's language is ONLY RC-2's declared verbs and RC-10's declared mnemonics resolved through cockpit_registry; no ad-hoc verb exists here"
+gotchas: "a flag-off cockpit, an unreadable registry or an unreachable plane each exit non-zero with a NAMED reason, never a silent no-op"
+related: ["#566"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

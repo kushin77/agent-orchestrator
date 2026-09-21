@@ -15,6 +15,23 @@ Design rules (see ``control-plane/sdk/README.md`` for the full contract):
   outcome never carries fabricated typed content.
 
 Public surface:
+
+
+---knowledge---
+module_id: control-plane.sdk.python.aosdk
+system: control-plane
+app: sdk
+solution_class: class
+patterns: [package-contract, public-surface, offline-by-construction, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [aosdk.auth, aosdk.gateway, aosdk.controlplane, aosdk.mcp, aosdk.model, aosdk.errors, aosdk.transport]
+invariants: "every client takes an injected transport so no SDK test touches the network, and a non-served gateway outcome never carries fabricated typed content"
+gotchas: "auth is always a short-lived per-tenant session token from AGENTORCH_SESSION_TOKEN or an injected callback, never a hardcoded key"
+related: ["#41"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

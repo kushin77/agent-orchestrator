@@ -19,6 +19,23 @@ Each mirror embeds a machine-readable ledger comment (rendered by
 4. checks the four mirrors agree with each other (structural equivalence).
 
 Any mismatch is a conformance failure (negative-testable).
+
+
+---knowledge---
+module_id: control-plane.instructions.aoi.conformance
+system: control-plane
+app: instructions
+solution_class: enterprise
+patterns: [structural-equivalence, ledger-cross-check, negative-testable]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [conformance_check, check_mirror, extract_ledger, HARNESS_MAP, ConformanceError]
+invariants: "identical rules and precedence in every mirror means a given task yields the same behaviour regardless of harness, and any mismatch is a conformance failure"
+gotchas: "every rule's statement text is checked to be actually present in the mirror body, so a ledger cannot claim a rule the file does not carry"
+related: ["#42"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

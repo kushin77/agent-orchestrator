@@ -12,6 +12,23 @@ Subcommands (all offline):
 
 Exit codes: 0 pass, 1 failure (invalid override / drift / non-conformance /
 byte-stable mismatch), 2 usage error.
+
+
+---knowledge---
+module_id: control-plane.instructions.aoi.cli
+system: control-plane
+app: instructions
+solution_class: pattern
+patterns: [subcommand-table, tri-state-exit, offline-by-construction]
+derives_from: null
+owner_sme: docs-sme
+tier: L1
+interfaces: [main, build_parser, cmd_render, cmd_validate_override, cmd_drift, cmd_conformance, cmd_pin]
+invariants: "every subcommand is offline, and the exit contract is 0 pass, 1 failure (invalid override, drift, non-conformance, byte-stable mismatch), 2 usage error"
+gotchas: "a byte-stable mismatch is a failure here, because mirrors are regenerated from the canonical source and never hand-edited"
+related: ["#42"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

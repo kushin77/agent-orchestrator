@@ -11,6 +11,23 @@ accident (GR-5 / AO-GR-6).
 A cockpit that starts while its flag is off must not render a frame that reads
 as healthy: :func:`render_flag_off` is the named ``FLAG_OFF`` condition, and
 the CLI exits non-zero on it.
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit.flags
+system: control-plane
+app: cockpit
+solution_class: enterprise
+patterns: [flag-gated-off, fail-closed, consume-never-restate]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [read_default, read_surface, enabled, FlagState, render_flag_off, SURFACE]
+invariants: "a missing registry, an unreadable or invalid document, a missing surfaces section or a missing entry all read as off; only an explicit default: on turns the surface on"
+gotchas: "the flag reader is the one portal.server.fleet.read_surface_default declares; a cockpit that starts flag-off renders the named FLAG_OFF condition rather than a frame that reads as healthy"
+related: ["#566"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -16,6 +16,23 @@ CANNOT-ASSESS must never read as a pass.
 Usage:
     python3 control-plane/functions/cli.py validate
     python3 control-plane/functions/cli.py call LOG tail=999 bogus=1
+
+
+---knowledge---
+module_id: control-plane.functions.cli
+system: control-plane
+app: functions
+solution_class: enterprise
+patterns: [cross-reference-both-directions, declare-before-render, tri-state-exit]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [main, build_parser, cmd_validate, cmd_list, cmd_show, cmd_call, cmd_render, cmd_frames, cmd_panels, cmd_derive]
+invariants: "the closed function set is declared before any client renders it, and CANNOT-ASSESS must never read as a pass"
+gotchas: "call resolves an operator invocation and refuses an unknown parameter BY NAME"
+related: ["#565", "#551"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

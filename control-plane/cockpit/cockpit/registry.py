@@ -12,6 +12,23 @@ one seam that loads both:
   ``load_fixtures`` technique ``cockpit_render`` proves);
 * :func:`resolve` — one operator invocation resolved into the endpoint and argv
   the control API would forward, refusing an unknown parameter by name.
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit.registry
+system: control-plane
+app: cockpit
+solution_class: enterprise
+patterns: [delegate-never-re-derive, declared-authority, refuse-unknown-parameter]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [load, modules, panel_fixtures, resolve, workspace_ids]
+invariants: "the cockpit renders ONLY what the registry declares and only with the RC-10 renderer, never with a hand-built string of markup"
+gotchas: "the modules are imported from the directory they live in exactly as their own tests import them, so the cockpit cannot drift into a copy of either"
+related: ["#566", "#565"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -5,6 +5,23 @@ platform's stable machine ``code`` plus the HTTP ``status`` so a caller can map
 failures without string-matching; the codes are the envelope/error codes of the
 merged control-plane REST contract (issue #38) and the gateway outcome/status
 semantics (issue #16).  Nothing here performs I/O or carries a secret.
+
+
+---knowledge---
+module_id: control-plane.sdk.python.aosdk.errors
+system: control-plane
+app: sdk
+solution_class: class
+patterns: [closed-error-taxonomy, machine-code-not-string-matching]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [SdkError, ConfigurationError, TransportError, ApiError, UnauthorizedError, ScopeDeniedError, PermissionDeniedError, TaskNotServedError, McpError]
+invariants: "ApiError carries the platform's stable machine code plus the HTTP status so a caller can map failures without string-matching"
+gotchas: "nothing here performs I/O or carries a secret"
+related: ["#41"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
