@@ -143,6 +143,11 @@ class Persona:
     tier: str
     owned_lanes: Tuple[str, ...] = ()
     expertise: Tuple[str, ...] = ()
+    reports_to: str = ""
+    """The card's declared ``reportsTo`` (registry/personas/persona-card.schema.json),
+    e.g. ``cto`` reports to ``ceo``. Empty when the card declares none (issue #1573:
+    lets the org adapter project the real CEO -> CTO -> SME hierarchy instead of
+    flattening every agent under the default owner)."""
 
 
 @dataclass(frozen=True)

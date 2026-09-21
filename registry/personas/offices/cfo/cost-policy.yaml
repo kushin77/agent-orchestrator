@@ -1,0 +1,51 @@
+# registry/personas/offices/cfo/cost-policy.yaml — CFO office cost policy.
+#
+# This file does NOT restate model prices: it REFERENCES the existing single
+# source, telemetry/metering/rate_cards/*.yaml, per the advisor guidance this
+# office followed ("if prices are already declared there, cost-policy.yaml
+# must reference them, not fork a second copy"). It declares budget-policy
+# defaults (also referencing gateway/finops/budgets.yaml's vocabulary rather
+# than redefining it) and the one number this office DOES own: the
+# injected-prompt byte ceiling the KPI gate enforces.
+
+schemaVersion: 1
+office: cfo
+
+tierPrices:
+  source: telemetry/metering/rate_cards
+  note: "Single source of truth. This file does not carry its own price table."
+
+budgetPolicyDefaults:
+  source: gateway/finops/budgets.yaml
+  vocabulary: [stop, warn, fallback]
+  note: "Policy names and semantics are consumed from gateway/finops/budgets.yaml, not redefined here."
+
+kpi:
+  id: repo_tracked_injected_prompt_bytes
+  description: >-
+    Sum of wc -c over the repo-tracked instruction files loaded every turn
+    (AGENTS.md, CLAUDE.md, .cursorrules). Ratchet metric: must not grow.
+    Explicitly NOT a measurement of harness-injected skill/MCP/tool-schema
+    surfaces — see docs/cfo/PROMPT-REDUCTION-PLAN.md "Headline finding" for
+    why those are out of this gate's reachable scope.
+  files:
+    - AGENTS.md
+    - CLAUDE.md
+    - .cursorrules
+  baselineBytes: 28585
+  measuredOn: "2026-09-20"
+  measuredBy: "wc -c AGENTS.md CLAUDE.md .cursorrules"
+  ceilingBytes: 30604
+  ceilingReason: >-
+    Raised from 28585 to 30604 (2026-09-21): AGENTS.md grew by 1683 bytes from
+    two legitimate, independently-landed additions in the same merge train —
+    #1650 (CTO-office / as-built architecture pointers, ADR-0033 naming
+    resolution) and #1544 (the git-stash-in-shared-checkout invariant). Neither
+    is prompt bloat to trim; the ceiling is raised to the measured total rather
+    than silently, per this gate's own documented remedy.
+  target90PctNote: >-
+    The owner's 90%+ prompt-reduction objective is tracked in
+    docs/cfo/PROMPT-REDUCTION-PLAN.md against total inbound bytes, most of
+    which this repo cannot measure (harness-injected, not file-backed). This
+    KPI is the ratchet on the fraction this repo CAN measure and enforce;
+    it deliberately does not claim the 90% figure for itself.

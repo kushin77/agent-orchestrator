@@ -1,0 +1,17 @@
+# PMO Office abilities (purebliss single-tenant org). Mirrors
+# registry/personas/cards/purebliss/pmo.yaml and registry/personas/cards/
+# pmo-sme.yaml capabilitySet/toolAllowlist — extends, never redefines.
+office: pmo
+schema: pmo-office-abilities/v1
+version: 1.0.0
+abilities:
+  - id: epic-decomposition
+    description: "Decompose an intake into epics/tickets with cross-repo dependency mapping."
+  - id: status-rollup
+    description: "Roll up status and RAID across the offices, ledger-backed (cite a path or command output, never memory)."
+  - id: docs-authoring-routing
+    description: "Route documentation work to the paperclip agent; never author production code."
+provenance:
+  - "registry/personas/cards/purebliss/pmo.yaml (capabilitySet, toolAllowlist)"
+  - "registry/personas/cards/pmo-sme.yaml (existing specialist capabilitySet)"
+toolAllowlistExtends: registry/personas/cards/purebliss/pmo.yaml#toolAllowlist

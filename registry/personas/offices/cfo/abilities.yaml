@@ -1,0 +1,27 @@
+# registry/personas/offices/cfo/abilities.yaml — what the CFO office can DO,
+# as distinct from charter.yaml's authority grants (this is capability, not
+# permission). Mirrors registry/personas/cards/cfo.yaml `capabilitySet` and
+# `toolAllowlist` — extends, never redefines, that vocabulary.
+
+schemaVersion: 1
+office: cfo
+
+abilities:
+  - id: cost-ledger-author
+    description: "Author/update docs/cfo/COST-MODEL-*.md from measured or declared sources; never from recall."
+    consumes: [gateway/finops/README.md, telemetry/metering/rate_cards, gateway/finops/budgets.yaml]
+
+  - id: prompt-byte-audit
+    description: "Measure repo-tracked instruction/memory file sizes (wc -c) and report the injected-prompt byte budget."
+    consumes: [AGENTS.md, CLAUDE.md, .cursorrules]
+    produces: [registry/personas/offices/cfo/cost-policy.yaml#kpi.baseline]
+
+  - id: finops-kpi-gate
+    description: "Run scripts/check-finops-kpi.sh against cost-policy.yaml's declared ceiling."
+    tool: shell_exec
+
+  - id: budget-flip-proposal
+    description: "Propose (or, only with an existing passing test, apply) observe->enforce and tenant-budget config changes in gateway/finops/budgets.yaml."
+    guardrail: "Never flip a mode with no test exercising the resulting path."
+
+toolAllowlistExtends: registry/personas/cards/cfo.yaml#toolAllowlist
