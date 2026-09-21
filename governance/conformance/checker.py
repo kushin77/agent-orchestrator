@@ -369,14 +369,16 @@ def check_issue(item: Classified, policy: Policy, *, strict: bool = False) -> Li
     subject = "issue-%s" % item.issue
 
     if not item.classes:
+        default_class = policy.filing_defaults.get("class", policy.ladder[0] if policy.ladder else "")
         findings.append(
             Finding(
                 code=CODE_CLASS_MISSING,
                 message="issue #%s declares no class; it cannot be held to any rung "
                 "of the ladder" % item.issue,
                 subject=subject,
-                remediation="add a `class:<rung>` label from: %s"
-                % ", ".join(policy.ladder),
+                remediation="add a `class:<rung>` label from: %s "
+                "(one paste: `gh issue edit %s --add-label class:%s`)"
+                % (", ".join(policy.ladder), item.issue, default_class),
             )
         )
         return findings
@@ -408,19 +410,28 @@ def check_issue(item: Classified, policy: Policy, *, strict: bool = False) -> Li
         if name == "class":
             continue  # already covered above
         if not item.has(name):
+            suggested = policy.filing_defaults.get(name)
+            remediation = "add a `%s:<value>` label" % name
+            if suggested:
+                remediation += " (one paste: `gh issue edit %s --add-label %s:%s`)" % (
+                    item.issue,
+                    name,
+                    suggested,
+                )
             findings.append(
                 Finding(
                     code=CODE_CLASSIFICATION_INCOMPLETE,
                     message="issue #%s declares class '%s' but no `%s:` label"
                     % (item.issue, declared or "(none)", name),
                     subject=subject,
-                    remediation="add a `%s:<value>` label" % name,
+                    remediation=remediation,
                 )
             )
 
     severity = "error" if strict else SEVERITY_WARNING
     for name in policy.expectations_for(declared):
         if not item.has(name):
+            suggested = policy.filing_defaults.get(name, declared)
             findings.append(
                 Finding(
                     code=CODE_CLASS_EXPECTATION_UNMET,
@@ -429,7 +440,9 @@ def check_issue(item: Classified, policy: Policy, *, strict: bool = False) -> Li
                     severity=severity,
                     subject=subject,
                     remediation="add the label, or lower the declared class to match "
-                    "what the work actually meets",
+                    "what the work actually meets (one paste: "
+                    "`gh issue edit %s --add-label %s:%s`)"
+                    % (item.issue, name, suggested),
                 )
             )
 
