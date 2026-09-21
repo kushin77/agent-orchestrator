@@ -141,8 +141,15 @@ def build_engine(
     paths: Iterable[str],
     controls: Optional[ControlRegistry] = None,
     uncovered_decision: Any = "block",
+    audit_log: Any = None,
 ):
-    """Convenience: validate a bundle and construct its gate engine."""
+    """Convenience: validate a bundle and construct its gate engine.
+
+    ``audit_log`` is handed to the engine's sink. When it is None the engine
+    keeps its own default (an in-memory log); a caller that needs the decisions
+    to survive the process passes a durable sink such as
+    :class:`policy.audit.JsonlAuditLog`.
+    """
     from policy.engine import PolicyEngine
 
     bundle = build_bundle(paths, controls=controls)
@@ -150,4 +157,5 @@ def build_engine(
         bundle=bundle,
         controls=controls if controls is not None else ControlRegistry(),
         uncovered_decision=uncovered_decision,
+        audit_log=audit_log,
     )
