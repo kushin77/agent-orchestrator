@@ -1,0 +1,371 @@
+{
+  "schema": "cmr.conformance/exemptions-v1",
+  "note": "The NAMED, shrink-only exemption list for the PRE-MANDATE MILESTONED backlog (issue #1694). The board check enforces the `required` metadata (class, type, priority, area) on every OPEN + MILESTONED issue. The un-milestoned backlog predates that convention and is counted, not failed; so does this one \u2014 it was filed before the mandate reached the board, `class:enterprise` (the policy's `filing.default_class`) was backfilled on all of it, and `priority`/`area` have NO honest bulk default: `area` is a functional classification the policy declares no universal value for, and a guessed value is wrong data every later tool would trust. UNLIKE the un-milestoned seam, this one is EXPLICIT and BY NAME: an issue is excused only while it is listed below, with its own `reason` and `owner`, and only for the UNDECLARED-metadata codes (`class-missing`, `classification-incomplete`). A declared-but-wrong class (`class-unknown`) or an ambiguous one (`class-ambiguous`) is never excused: an exemption covers what the board never recorded, not what it got wrong. There is no broad grandfather and no predicate a new issue could inherit \u2014 an issue that is NOT named here and is missing a required dimension FAILS BY NAME, so a newly filed issue is never absorbed.\n\nFour assertions keep this list honest, and each can genuinely fail (GR-12):\n1. SIZE \u2014 the list carries exactly `expected` entries. An entry added without an outstanding debt, or a debt cleared without its entry removed, fails by name.\n2. APPLIED \u2014 every entry must excuse a debt THIS RUN: an entry whose issue is no longer OPEN + MILESTONED, or which now declares every required dimension, is reported as a STALE exemption naming itself (code `conformance-exemption-stale`).\n3. OWNER \u2014 every entry names an `owner` (the issue that owns this triage) which must be OPEN in the same snapshot; when the owner closes, the entry lapses and the issue's own debt fails by name.\n4. SCOPE \u2014 the exemption grants nothing to a non-exemptable finding, so an exempt issue that declares a class outside the ladder still fails.\n\nThe list can therefore only SHRINK toward the truth: remove an entry (and lower `expected`) as each issue is triaged; the check names exactly the entries to remove. The entries were MEASURED from the committed board snapshot (the artifact the gate reads), not authored.",
+  "tracked_by": "#1254",
+  "tracking": {
+    "state": "open",
+    "measured_at": "2026-09-21T17:21:43Z",
+    "measured_by": "governance/conformance (issue #1694 lane, session 29c87ce7)",
+    "measured_via": "REST: gh api repos/kushin77/agent-orchestrator/issues/1254 --jq .state",
+    "max_age_hours": 720,
+    "renewal": "re-read every entry's `owner` and update tracking.measured_at, or retire the entry; an owner that is no longer OPEN lapses the entry."
+  },
+  "expected": 71,
+  "exemptions": [
+    {
+      "issue": "#1254",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1268",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1276",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1295",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1338",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1465",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1485",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1496",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1501",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1506",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1509",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1510",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1511",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1516",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1518",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1521",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1522",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1523",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1524",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1527",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1528",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1529",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1530",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1531",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1532",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1533",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1535",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1537",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1538",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1539",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1541",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1544",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1545",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1546",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1547",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1548",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1549",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1553",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1557",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1560",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1561",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1562",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1563",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1564",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1566",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1571",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1573",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1574",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1577",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1582",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1593",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1602",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1603",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1618",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1619",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1625",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1627",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1631",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1637",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1642",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1648",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1649",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1650",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1651",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1652",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1653",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1661",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1665",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1666",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1667",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    },
+    {
+      "issue": "#1668",
+      "owner": "#1254",
+      "reason": "Pre-mandate milestoned issue: filed before the `class`/`type`/`priority`/`area` mandate reached the board, so it declares no `class` or `priority` or `area`. Counted under the named pre-mandate exemption (issue #1694) instead of minting a guessed `priority`/`area`; delete this entry (and lower `expected`) once the issue is triaged."
+    }
+  ]
+}

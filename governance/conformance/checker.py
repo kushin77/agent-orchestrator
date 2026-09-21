@@ -15,6 +15,7 @@ produced the snapshot.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import (
@@ -27,6 +28,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Set,
     Tuple,
 )
 
@@ -73,6 +75,145 @@ LABELS_REFRESH_VERB = "python3 governance/conformance/cli.py labels --refresh"
 # resolution half of the same seam and is declared here, beside the inventory it
 # is graded against.
 CODE_FILING_LABEL_UNRESOLVED = "filing-label-unresolved"
+
+# -- the NAMED pre-mandate exemption list (issue #1694) -----------------------
+# The board check enforces the `required` metadata (`class`, `type`, `priority`,
+# `area`) on every OPEN + MILESTONED issue. The un-milestoned backlog predates the
+# convention and is COUNTED, NOT FAILED (see `check_board` below). The PRE-MANDATE
+# MILESTONED backlog predates it too — those issues were filed before the mandate
+# reached the board, `class:enterprise` was later backfilled on all of them, and
+# `priority`/`area` have **no honest bulk default**: `area` is a functional
+# classification the policy declares no universal value for, and a guessed value is
+# wrong data every later tool would trust (issue #1694).
+#
+# That backlog is therefore counted as well — but, unlike the un-milestoned seam,
+# EXPLICITLY and BY NAME: an entry in the document below excuses ONE named issue,
+# for a named reason, under a named owner. There is no broad grandfather and no
+# predicate that a new issue could inherit: an issue that is not named there and is
+# missing a required dimension FAILS BY NAME, so a newly filed issue is never
+# absorbed.
+EXEMPTIONS_RELPATH = Path("governance") / "conformance" / "exemptions.json"
+
+# The classification findings an exemption entry may excuse: **undeclared**
+# metadata only. A `class:` that is *declared and wrong* (`class-unknown`) or
+# ambiguous (`class-ambiguous`) is a false claim, not missing data, and is never
+# excused — an exemption covers what the board never recorded, not what it got
+# wrong.
+EXEMPTABLE_CODES = frozenset({CODE_CLASS_MISSING, CODE_CLASSIFICATION_INCOMPLETE})
+
+# Finding codes for the named-exemption seam. Declared here, beside the document
+# they grade, for the same reason `CODE_FILING_LABEL_UNRESOLVED` is.
+CODE_EXEMPTION_APPLIED = "conformance-exemption-applied"
+CODE_EXEMPTION_STALE = "conformance-exemption-stale"
+CODE_EXEMPTION_SIZE = "conformance-exemption-size"
+CODE_EXEMPTION_MALFORMED = "conformance-exemption-malformed"
+
+
+@dataclass(frozen=True)
+class Exemption:
+    """One named excuse: an issue, why it is excused, and who owns the triage."""
+
+    issue: str  # normalised as "#<number>"
+    reason: str
+    owner: str  # normalised as "#<number>" — must be OPEN in the snapshot
+
+
+@dataclass(frozen=True)
+class Exemptions:
+    """The loaded exemption document.
+
+    ``present`` distinguishes the two ways a document can grant nothing, because
+    they mean different things: ABSENT (no document in this venue — nothing is
+    excused, so every debt fails on its own merit and NO finding is raised: a
+    fixture directory legitimately has none) from PRESENT-BUT-BROKEN (a document
+    that exists and cannot be read — a declaration that cannot be read must never
+    be read as still excused, so it FAILS by name).
+    """
+
+    path: Path
+    entries: Tuple[Exemption, ...] = ()
+    expected: Optional[int] = None
+    problems: Tuple[str, ...] = ()
+    present: bool = False
+
+
+def issue_key(value: Any) -> str:
+    """Normalise an issue reference to ``#<number>``; ``""`` when it refs nothing.
+
+    A missing key must come back empty rather than as the string ``"None"``: an
+    entry with no ``owner`` has to read as *unowned* (a malformed entry), not as an
+    entry owned by an issue literally named ``#None``.
+    """
+    if value is None or isinstance(value, bool):
+        return ""
+    text = str(value).strip().lstrip("#").strip()
+    return "#%s" % text if text else ""
+
+
+def load_exemptions(path: Path = EXEMPTIONS_RELPATH) -> Exemptions:
+    """Read the named exemption document; never raise (absence is not a defect)."""
+    path = Path(path)
+    if not path.is_file():
+        return Exemptions(path=path, present=False)
+
+    def broken(why: str) -> Exemptions:
+        return Exemptions(path=path, problems=(why,), present=True)
+
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        return broken("cannot read the exemption list %s: %s" % (path, exc))
+    except ValueError as exc:
+        return broken("the exemption list %s is not valid JSON: %s" % (path, exc))
+
+    if not isinstance(raw, Mapping):
+        return broken("the exemption list %s must be a JSON object" % path)
+
+    raw_entries = raw.get("exemptions")
+    if not isinstance(raw_entries, list):
+        return broken(
+            "the exemption list %s declares no `exemptions` array" % path
+        )
+
+    problems: List[str] = []
+    expected = raw.get("expected")
+    if not isinstance(expected, int) or isinstance(expected, bool) or expected < 0:
+        problems.append(
+            "the exemption list %s declares no integer `expected` count; the size "
+            "of a shrink-only list must be asserted" % path
+        )
+        expected = None
+
+    entries: List[Exemption] = []
+    for index, item in enumerate(raw_entries):
+        if not isinstance(item, Mapping):
+            problems.append("entry %d of %s is not an object" % (index, path))
+            continue
+        ref = issue_key(item.get("issue"))
+        reason = str(item.get("reason") or "").strip()
+        owner = issue_key(item.get("owner"))
+        missing = [
+            name
+            for name, value in (("issue", ref), ("reason", reason), ("owner", owner))
+            if not value
+        ]
+        if missing:
+            problems.append(
+                "entry %d of %s (%s) declares no %s; an exemption names the issue it "
+                "excuses, why, and the owner of the triage"
+                % (index, path, ref or "no issue", ", ".join(missing))
+            )
+            continue
+        entries.append(Exemption(issue=ref, reason=reason, owner=owner))
+
+    return Exemptions(
+        path=path,
+        entries=tuple(entries),
+        expected=expected,
+        problems=tuple(problems),
+        present=True,
+    )
+
 
 # Paths that must never receive a new file without the IaC mandate satisfied.
 INFRA_PREFIXES = ("infra/",)
@@ -444,22 +585,49 @@ def check_board(
     include_unmilestoned: bool = False,
     strict: bool = False,
     generated_at: Optional[str] = None,
+    exemptions: Optional[Exemptions] = None,
 ) -> ConformanceReport:
     """Conformance of in-scope board items.
 
     Scope is open issues that belong to a milestone. A milestoned issue is a
     commitment to a standard, so classification is enforced there; the un-milestoned
     backlog predates the convention and is counted, not failed, unless asked for.
+
+    ``exemptions`` is the **named** pre-mandate exemption document (issue #1694).
+    When supplied, an in-scope issue NAMED there has its *undeclared-metadata*
+    findings counted rather than failed — and only while the entry is live: the
+    issue must genuinely be OPEN + MILESTONED with an outstanding exemptable debt,
+    and the entry's ``owner`` must be OPEN in the same snapshot. A finding outside
+    ``EXEMPTABLE_CODES`` (a declared-but-wrong class) is never excused, and an issue
+    that is not named is checked exactly as before, so a newly filed issue cannot
+    inherit the exemption. ``None`` grants nothing at all.
     """
     findings: List[Finding] = []
     scanned = 0
     counts: Dict[str, int] = {}
     skipped_unmilestoned = 0
 
-    for issue in issues:
-        if str(issue.get("state", "")).upper() != "OPEN":
+    problems: List[str] = []
+    entries: Dict[str, Exemption] = {}
+    if exemptions is not None:
+        problems.extend(exemptions.problems)
+        for entry in exemptions.entries:
+            entries.setdefault(entry.issue, entry)
+
+    open_issues: Set[str] = {
+        issue_key(entry.get("number"))
+        for entry in issues
+        if str(entry.get("state", "")).upper() == "OPEN"
+    }
+
+    applied: List[Exemption] = []
+    applied_refs: Set[str] = set()
+    seen_refs: Set[str] = set()
+
+    for entry in issues:
+        if str(entry.get("state", "")).upper() != "OPEN":
             continue
-        item = classify(issue)
+        item = classify(entry)
         if milestone and item.milestone != milestone:
             continue
         if not item.milestone and not include_unmilestoned:
@@ -467,9 +635,22 @@ def check_board(
             continue
 
         scanned += 1
-        findings.extend(check_issue(item, policy, strict=strict))
-        key = item.declared or "(none)"
-        counts[key] = counts.get(key, 0) + 1
+        counts[item.declared or "(none)"] = counts.get(item.declared or "(none)", 0) + 1
+
+        found = check_issue(item, policy, strict=strict)
+        ref = issue_key(item.issue)
+        named = entries.get(ref)
+        if named is not None:
+            seen_refs.add(ref)
+            excused = [f for f in found if f.code in EXEMPTABLE_CODES]
+            if excused and named.owner in open_issues:
+                applied.append(named)
+                applied_refs.add(ref)
+                # Everything the entry does NOT excuse is still reported, so a
+                # declared-but-wrong class keeps failing on an exempt issue.
+                findings.extend(f for f in found if f.code not in EXEMPTABLE_CODES)
+                continue
+        findings.extend(found)
 
     if skipped_unmilestoned:
         findings.append(
@@ -480,6 +661,85 @@ def check_board(
                 severity=SEVERITY_WARNING,
                 subject="scope",
                 remediation="run with --include-unmilestoned to bring them into scope",
+            )
+        )
+
+    if applied:
+        findings.append(
+            Finding(
+                code=CODE_EXEMPTION_APPLIED,
+                message="%d pre-mandate milestoned issue(s) are COUNTED, not failed: "
+                "each is named, with a reason and an owner, in the exemption list at "
+                "%s (owner %s). `class` is backfillable from the policy's own "
+                "`filing.default_class`, but `priority` and `area` have no honest bulk "
+                "default, so these issues are counted rather than minted a guessed value"
+                % (
+                    len(applied),
+                    exemptions.path if exemptions is not None else EXEMPTIONS_RELPATH,
+                    ", ".join(sorted({e.owner for e in applied})),
+                ),
+                severity=SEVERITY_WARNING,
+                subject="scope",
+                remediation="triage each named issue, then delete its entry and lower "
+                "`expected` in that file",
+            )
+        )
+
+    for ref, named in entries.items():
+        if ref in applied_refs:
+            continue
+        if named.owner not in open_issues:
+            why = "its owner %s is not an OPEN issue in this snapshot, so it lapses" % (
+                named.owner,
+            )
+        elif ref in seen_refs:
+            why = "the issue now declares every required dimension, so it excuses nothing"
+        else:
+            why = "the issue is not an OPEN + MILESTONED issue in this snapshot, so it cannot bite"
+        findings.append(
+            Finding(
+                code=CODE_EXEMPTION_STALE,
+                message="the exemption list names %s but %s; a stale entry is not an "
+                "exemption, and the issue's own debt is not excused by it" % (ref, why),
+                subject="issue-%s" % ref.lstrip("#"),
+                remediation="delete the entry for %s and lower `expected` accordingly"
+                % ref,
+            )
+        )
+
+    if exemptions is not None and exemptions.present:
+        if (
+            exemptions.expected is not None
+            and len(exemptions.entries) != exemptions.expected
+        ):
+            findings.append(
+                Finding(
+                    code=CODE_EXEMPTION_SIZE,
+                    message="the exemption list %s carries %d entries but declares "
+                    "`expected: %d`; the size of a shrink-only exemption list is "
+                    "asserted, so an entry added without an outstanding debt — or a "
+                    "debt cleared without its entry removed — fails by name"
+                    % (
+                        exemptions.path,
+                        len(exemptions.entries),
+                        exemptions.expected,
+                    ),
+                    subject=str(exemptions.path),
+                    remediation="set `expected` to %d, or delete entries until the "
+                    "sizes agree" % len(exemptions.entries),
+                )
+            )
+
+    for problem in problems:
+        findings.append(
+            Finding(
+                code=CODE_EXEMPTION_MALFORMED,
+                message=problem,
+                subject=str(exemptions.path) if exemptions is not None else str(
+                    EXEMPTIONS_RELPATH
+                ),
+                remediation="fix the exemption list, or delete it — a declaration "
+                "that cannot be read is never read as still excused",
             )
         )
 
