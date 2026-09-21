@@ -1,0 +1,943 @@
+goal: "CRM + Asterisk voice fully operational and functioning, end to end"
+
+paperclip:
+  project_id: "purebliss-crm-voice"
+  project_name: "Purebliss CRM + Voice — enterprise project plan"
+  owner_persona: pmo
+  sync_adapter_status: not-implemented  # tracked in issue #1649
+  milestone_owners:
+    M0: platform-sme
+    M1: cto
+    M2: cto
+    M3: hermes
+    M4: pmo
+
+milestones:
+  - id: M0
+    name: "Infra stabilized"
+    order: 0
+    exit_criteria:
+      - description: ".42 outage closed"
+        command: "gh issue view 4264 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "shared-services apply sequence at steady state"
+        command: "gh issue view 3867 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+
+  - id: M1
+    name: "CRM foundation reachable"
+    order: 1
+    exit_criteria:
+      - description: "purebliss api/app backend deployed (not 404)"
+        command: "gh issue view 120 --repo kushin77/purebliss --json state -q .state"
+        expect: "CLOSED"
+      - description: "no live CRM credentials committed to git"
+        command: "gh issue view 121 --repo kushin77/purebliss --json state -q .state"
+        expect: "CLOSED"
+
+  - id: M2
+    name: "Voice (Asterisk/dial) foundation reachable"
+    order: 2
+    exit_criteria:
+      - description: "dial.purebliss.app landing runbook complete"
+        command: "gh issue view 4094 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "dial-api + WebSocket origin gated behind shared tunnel"
+        command: "gh issue view 4095 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "os-auth integration contract for Go engine + realtime"
+        command: "gh issue view 4096 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+
+  - id: M3
+    name: "CRM + voice hardened (data plane, network, observability)"
+    order: 3
+    exit_criteria:
+      - description: "DIAL-4 data-plane + secrets registration closed"
+        command: "gh issue view 4097 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "DIAL-6 network + carrier egress posture closed"
+        command: "gh issue view 4099 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+      - description: "Dialplane → shared-services e2e integration review closed"
+        command: "gh issue view 4093 --repo kushin77/shared-services --json state -q .state"
+        expect: "CLOSED"
+
+  - id: M4
+    name: "CRM + Asterisk voice operational e2e"
+    order: 4
+    exit_criteria:
+      - description: "shared-services-dial-api container health"
+        command: "curl -s -o /dev/null -w '%{http_code}' https://dial.purebliss.app/healthz"
+        expect: "200"
+      - description: "purebliss app backend health"
+        command: "curl -s -o /dev/null -w '%{http_code}' https://app.purebliss.app/healthz"
+        expect: "200"
+
+  - id: M5
+    name: "Fleet hygiene backlog (clusters.json, issue #1575)"
+    order: 5
+    exit_criteria:
+      - description: "no open docs/friction/lessons/offshore cluster issues remain in shared-services"
+        command: "gh issue list --repo kushin77/shared-services --search 'label:pmo-cluster-docs,pmo-cluster-friction,pmo-cluster-lessons,pmo-cluster-offshore state:open' --json number -q 'length'"
+        expect: "0"
+
+tasks:
+  # M0 — infra stabilization (shared-services outage/apply chain)
+  - id: t-4264
+    repo: shared-services
+    issue: 4264
+    module: infra
+    milestone: M0
+    priority: 1
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+  - id: t-3867
+    repo: shared-services
+    issue: 3867
+    module: infra
+    milestone: M0
+    priority: 1
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+  - id: t-4262
+    repo: shared-services
+    issue: 4262
+    module: infra
+    milestone: M0
+    priority: 1
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+
+  # M1 — CRM foundation (purebliss / GHL)
+  - id: t-purebliss-120
+    repo: purebliss
+    issue: 120
+    module: crm
+    milestone: M1
+    priority: 1
+    depends_on: ["t-4264", "t-3867"]
+    sme: cto-sme
+    tier: L1
+    status_source: github
+  - id: t-purebliss-121
+    repo: purebliss
+    issue: 121
+    module: crm
+    milestone: M1
+    priority: 1
+    depends_on: []
+    sme: security-sme
+    tier: L1
+    status_source: github
+
+  # M2 — voice (Asterisk/dial) foundation
+  - id: t-dial-1
+    repo: shared-services
+    issue: 4094
+    module: voice
+    milestone: M2
+    priority: 1
+    depends_on: ["t-4264"]
+    sme: platform-sme
+    tier: L0
+    status_source: github
+  - id: t-dial-2
+    repo: shared-services
+    issue: 4095
+    module: voice
+    milestone: M2
+    priority: 1
+    depends_on: ["t-dial-1"]
+    sme: platform-sme
+    tier: L0
+    status_source: github
+  - id: t-dial-3
+    repo: shared-services
+    issue: 4096
+    module: voice
+    milestone: M2
+    priority: 2
+    depends_on: ["t-dial-2"]
+    sme: platform-sme
+    tier: L1
+    status_source: github
+  - id: t-dial-5
+    repo: shared-services
+    issue: 4098
+    module: voice
+    milestone: M2
+    priority: 3
+    depends_on: ["t-dial-3"]
+    sme: platform-sme
+    tier: L0
+    status_source: github
+
+  # M3 — hardening (data plane, network, e2e integration review)
+  - id: t-dial-4
+    repo: shared-services
+    issue: 4097
+    module: voice
+    milestone: M3
+    priority: 2
+    depends_on: ["t-dial-3"]
+    sme: security-sme
+    tier: L1
+    status_source: github
+  - id: t-dial-6
+    repo: shared-services
+    issue: 4099
+    module: voice
+    milestone: M3
+    priority: 2
+    depends_on: ["t-dial-4"]
+    sme: iac-sme
+    tier: L1
+    status_source: github
+  - id: t-dialplane-e2e
+    repo: shared-services
+    issue: 4093
+    module: voice
+    milestone: M3
+    priority: 2
+    depends_on: ["t-dial-6"]
+    sme: platform-sme
+    tier: L1
+    status_source: github
+
+  # M4 — final convergence (paperclip sync gap is itself a task on the plan)
+  - id: t-paperclip-sync
+    repo: agent-orchestrator
+    issue: 1649
+    module: paperclip
+    milestone: M4
+    priority: 3
+    depends_on: []
+    sme: pmo
+    tier: L1
+    status_source: github
+
+  # M0/M3/M5 -- fleet hygiene clusters ingested from clusters.json (issue #1575,
+  # branch issue-board-triage-20260920), one task per cluster batching its member issues
+  - id: cluster-c-outage-12
+    repo: shared-services
+    issue: 4247
+    module: fleet-hygiene/outage
+    milestone: M0
+    priority: 5
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-outage-12
+      family: outage
+      members:
+      - repo: shared-services
+        issue: 4247
+      - repo: shared-services
+        issue: 4151
+      - repo: shared-services
+        issue: 4127
+      - repo: shared-services
+        issue: 4066
+      - repo: shared-services
+        issue: 4058
+      - repo: shared-services
+        issue: 4051
+      - repo: shared-services
+        issue: 4014
+      - repo: shared-services
+        issue: 3973
+      - repo: shared-services
+        issue: 3927
+      - repo: shared-services
+        issue: 3867
+      - repo: shared-services
+        issue: 2934
+      - repo: shared-services
+        issue: 2823
+      - repo: shared-services
+        issue: 2819
+      - repo: shared-services
+        issue: 2703
+      - repo: shared-services
+        issue: 2694
+      - repo: shared-services
+        issue: 2650
+      - repo: shared-services
+        issue: 2649
+      - repo: shared-services
+        issue: 2647
+      - repo: shared-services
+        issue: 2399
+      - repo: shared-services
+        issue: 4090
+  - id: cluster-c-outage-14
+    repo: leaderboard
+    issue: 2544
+    module: fleet-hygiene/outage
+    milestone: M0
+    priority: 5
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-outage-14
+      family: outage
+      members:
+      - repo: leaderboard
+        issue: 2544
+      - repo: leaderboard
+        issue: 2511
+      - repo: leaderboard
+        issue: 2395
+      - repo: leaderboard
+        issue: 2378
+      - repo: leaderboard
+        issue: 2360
+      - repo: leaderboard
+        issue: 2251
+      - repo: leaderboard
+        issue: 2124
+      - repo: leaderboard
+        issue: 2115
+      - repo: leaderboard
+        issue: 2050
+      - repo: leaderboard
+        issue: 2044
+      - repo: leaderboard
+        issue: 2043
+      - repo: leaderboard
+        issue: 2008
+      - repo: leaderboard
+        issue: 1945
+      - repo: leaderboard
+        issue: 1698
+      - repo: leaderboard
+        issue: 1662
+  - id: cluster-c-outage-15
+    repo: capital-underwriting
+    issue: 2730
+    module: fleet-hygiene/outage
+    milestone: M0
+    priority: 5
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-outage-15
+      family: outage
+      members:
+      - repo: capital-underwriting
+        issue: 2730
+      - repo: capital-underwriting
+        issue: 2703
+      - repo: capital-underwriting
+        issue: 2605
+      - repo: capital-underwriting
+        issue: 2577
+      - repo: capital-underwriting
+        issue: 2573
+      - repo: capital-underwriting
+        issue: 2564
+      - repo: capital-underwriting
+        issue: 2542
+      - repo: capital-underwriting
+        issue: 2506
+      - repo: capital-underwriting
+        issue: 2439
+      - repo: capital-underwriting
+        issue: 2422
+      - repo: capital-underwriting
+        issue: 2361
+      - repo: capital-underwriting
+        issue: 2335
+      - repo: capital-underwriting
+        issue: 116
+  - id: cluster-c-outage-13
+    repo: CMR
+    issue: 973
+    module: fleet-hygiene/outage
+    milestone: M0
+    priority: 5
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-outage-13
+      family: outage
+      members:
+      - repo: CMR
+        issue: 973
+      - repo: CMR
+        issue: 971
+      - repo: CMR
+        issue: 966
+      - repo: CMR
+        issue: 952
+      - repo: CMR
+        issue: 727
+  - id: cluster-c-rca-07
+    repo: agent-orchestrator
+    issue: 1566
+    module: fleet-hygiene/rca
+    milestone: M0
+    priority: 5
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-rca-07
+      family: rca
+      members:
+      - repo: agent-orchestrator
+        issue: 1566
+      - repo: agent-orchestrator
+        issue: 1565
+      - repo: agent-orchestrator
+        issue: 1564
+      - repo: agent-orchestrator
+        issue: 1563
+      - repo: agent-orchestrator
+        issue: 1562
+      - repo: agent-orchestrator
+        issue: 1561
+      - repo: agent-orchestrator
+        issue: 1560
+      - repo: agent-orchestrator
+        issue: 1559
+      - repo: agent-orchestrator
+        issue: 1553
+      - repo: agent-orchestrator
+        issue: 1549
+      - repo: agent-orchestrator
+        issue: 1548
+      - repo: agent-orchestrator
+        issue: 1547
+      - repo: agent-orchestrator
+        issue: 1546
+      - repo: agent-orchestrator
+        issue: 1545
+      - repo: agent-orchestrator
+        issue: 1544
+      - repo: agent-orchestrator
+        issue: 1543
+      - repo: agent-orchestrator
+        issue: 1542
+      - repo: agent-orchestrator
+        issue: 1541
+      - repo: agent-orchestrator
+        issue: 1540
+      - repo: agent-orchestrator
+        issue: 1539
+      - repo: agent-orchestrator
+        issue: 1538
+      - repo: agent-orchestrator
+        issue: 1537
+      - repo: agent-orchestrator
+        issue: 1536
+      - repo: agent-orchestrator
+        issue: 1535
+      - repo: agent-orchestrator
+        issue: 1534
+      - repo: agent-orchestrator
+        issue: 1533
+      - repo: agent-orchestrator
+        issue: 1497
+  - id: cluster-c-rca-08
+    repo: shared-services
+    issue: 4249
+    module: fleet-hygiene/rca
+    milestone: M0
+    priority: 5
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-rca-08
+      family: rca
+      members:
+      - repo: shared-services
+        issue: 4249
+      - repo: shared-services
+        issue: 4248
+      - repo: shared-services
+        issue: 4163
+      - repo: shared-services
+        issue: 4141
+      - repo: shared-services
+        issue: 4108
+      - repo: shared-services
+        issue: 2699
+  - id: cluster-c-rca-10
+    repo: leaderboard
+    issue: 2572
+    module: fleet-hygiene/rca
+    milestone: M0
+    priority: 5
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-rca-10
+      family: rca
+      members:
+      - repo: leaderboard
+        issue: 2572
+      - repo: leaderboard
+        issue: 2498
+      - repo: leaderboard
+        issue: 2153
+      - repo: leaderboard
+        issue: 2131
+      - repo: leaderboard
+        issue: 1774
+  - id: cluster-c-rca-11
+    repo: capital-underwriting
+    issue: 2800
+    module: fleet-hygiene/rca
+    milestone: M0
+    priority: 5
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-rca-11
+      family: rca
+      members:
+      - repo: capital-underwriting
+        issue: 2800
+      - repo: capital-underwriting
+        issue: 2787
+      - repo: capital-underwriting
+        issue: 2538
+      - repo: capital-underwriting
+        issue: 2518
+      - repo: capital-underwriting
+        issue: 2317
+  - id: cluster-c-rca-09
+    repo: shared-frontend
+    issue: 513
+    module: fleet-hygiene/rca
+    milestone: M0
+    priority: 5
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-rca-09
+      family: rca
+      members:
+      - repo: shared-frontend
+        issue: 513
+      - repo: shared-frontend
+        issue: 512
+      - repo: shared-frontend
+        issue: 511
+  - id: cluster-c-governance-gate-19
+    repo: shared-governance
+    issue: 804
+    module: fleet-hygiene/governance-gate
+    milestone: M3
+    priority: 3
+    depends_on: []
+    sme: iac-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-governance-gate-19
+      family: governance-gate
+      members:
+      - repo: shared-governance
+        issue: 804
+      - repo: shared-governance
+        issue: 802
+      - repo: shared-governance
+        issue: 801
+      - repo: shared-governance
+        issue: 652
+  - id: cluster-c-iac-drift-22
+    repo: capital-underwriting
+    issue: 2795
+    module: fleet-hygiene/iac-drift
+    milestone: M3
+    priority: 3
+    depends_on: []
+    sme: iac-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-iac-drift-22
+      family: iac-drift
+      members:
+      - repo: capital-underwriting
+        issue: 2795
+      - repo: capital-underwriting
+        issue: 2458
+      - repo: capital-underwriting
+        issue: 2030
+      - repo: capital-underwriting
+        issue: 1954
+  - id: cluster-c-iac-drift-21
+    repo: leaderboard
+    issue: 1973
+    module: fleet-hygiene/iac-drift
+    milestone: M3
+    priority: 3
+    depends_on: []
+    sme: iac-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-iac-drift-21
+      family: iac-drift
+      members:
+      - repo: leaderboard
+        issue: 1973
+      - repo: leaderboard
+        issue: 1763
+      - repo: leaderboard
+        issue: 1762
+  - id: cluster-c-docs-05
+    repo: leaderboard
+    issue: 2554
+    module: fleet-hygiene/docs
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: pmo-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-docs-05
+      family: docs
+      members:
+      - repo: leaderboard
+        issue: 2554
+      - repo: leaderboard
+        issue: 2540
+      - repo: leaderboard
+        issue: 2539
+      - repo: leaderboard
+        issue: 2496
+      - repo: leaderboard
+        issue: 2495
+      - repo: leaderboard
+        issue: 2491
+      - repo: leaderboard
+        issue: 2490
+      - repo: leaderboard
+        issue: 2489
+      - repo: leaderboard
+        issue: 2488
+      - repo: leaderboard
+        issue: 2487
+      - repo: leaderboard
+        issue: 2486
+      - repo: leaderboard
+        issue: 2485
+      - repo: leaderboard
+        issue: 2484
+      - repo: leaderboard
+        issue: 2483
+      - repo: leaderboard
+        issue: 2460
+      - repo: leaderboard
+        issue: 2392
+      - repo: leaderboard
+        issue: 2391
+      - repo: leaderboard
+        issue: 2267
+      - repo: leaderboard
+        issue: 2199
+      - repo: leaderboard
+        issue: 2192
+      - repo: leaderboard
+        issue: 2184
+      - repo: leaderboard
+        issue: 2145
+      - repo: leaderboard
+        issue: 2134
+      - repo: leaderboard
+        issue: 2092
+      - repo: leaderboard
+        issue: 2049
+      - repo: leaderboard
+        issue: 1988
+      - repo: leaderboard
+        issue: 1946
+      - repo: leaderboard
+        issue: 1686
+  - id: cluster-c-docs-06
+    repo: capital-underwriting
+    issue: 2766
+    module: fleet-hygiene/docs
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: pmo-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-docs-06
+      family: docs
+      members:
+      - repo: capital-underwriting
+        issue: 2766
+      - repo: capital-underwriting
+        issue: 2739
+      - repo: capital-underwriting
+        issue: 2736
+      - repo: capital-underwriting
+        issue: 2722
+      - repo: capital-underwriting
+        issue: 2715
+      - repo: capital-underwriting
+        issue: 2679
+      - repo: capital-underwriting
+        issue: 2641
+      - repo: capital-underwriting
+        issue: 2634
+      - repo: capital-underwriting
+        issue: 2587
+      - repo: capital-underwriting
+        issue: 2585
+      - repo: capital-underwriting
+        issue: 2502
+      - repo: capital-underwriting
+        issue: 2450
+      - repo: capital-underwriting
+        issue: 2449
+      - repo: capital-underwriting
+        issue: 2448
+      - repo: capital-underwriting
+        issue: 2447
+      - repo: capital-underwriting
+        issue: 2446
+      - repo: capital-underwriting
+        issue: 2445
+      - repo: capital-underwriting
+        issue: 2444
+      - repo: capital-underwriting
+        issue: 2443
+      - repo: capital-underwriting
+        issue: 2442
+      - repo: capital-underwriting
+        issue: 2441
+      - repo: capital-underwriting
+        issue: 2440
+  - id: cluster-c-docs-04
+    repo: CMR
+    issue: 1009
+    module: fleet-hygiene/docs
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: pmo-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-docs-04
+      family: docs
+      members:
+      - repo: CMR
+        issue: 1009
+      - repo: CMR
+        issue: 992
+      - repo: CMR
+        issue: 972
+      - repo: CMR
+        issue: 891
+      - repo: CMR
+        issue: 846
+      - repo: CMR
+        issue: 794
+      - repo: CMR
+        issue: 765
+      - repo: CMR
+        issue: 578
+      - repo: CMR
+        issue: 635
+      - repo: CMR
+        issue: 434
+      - repo: CMR
+        issue: 270
+  - id: cluster-c-docs-02
+    repo: shared-services
+    issue: 4246
+    module: fleet-hygiene/docs
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: pmo-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-docs-02
+      family: docs
+      members:
+      - repo: shared-services
+        issue: 4246
+      - repo: shared-services
+        issue: 4190
+      - repo: shared-services
+        issue: 4153
+      - repo: shared-services
+        issue: 4129
+      - repo: shared-services
+        issue: 4064
+      - repo: shared-services
+        issue: 4062
+      - repo: shared-services
+        issue: 3795
+      - repo: shared-services
+        issue: 3354
+      - repo: shared-services
+        issue: 2429
+      - repo: shared-services
+        issue: 4088
+  - id: cluster-c-docs-01
+    repo: agent-orchestrator
+    issue: 1574
+    module: fleet-hygiene/docs
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: pmo-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-docs-01
+      family: docs
+      members:
+      - repo: agent-orchestrator
+        issue: 1574
+      - repo: agent-orchestrator
+        issue: 1573
+      - repo: agent-orchestrator
+        issue: 1572
+      - repo: agent-orchestrator
+        issue: 1529
+      - repo: agent-orchestrator
+        issue: 1514
+  - id: cluster-c-friction-17
+    repo: shared-services
+    issue: 4241
+    module: fleet-hygiene/friction
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: architecture-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-friction-17
+      family: friction
+      members:
+      - repo: shared-services
+        issue: 4241
+      - repo: shared-services
+        issue: 4240
+      - repo: shared-services
+        issue: 4239
+      - repo: shared-services
+        issue: 4238
+      - repo: shared-services
+        issue: 4236
+  - id: cluster-c-lessons-20
+    repo: CMR
+    issue: 851
+    module: fleet-hygiene/lessons
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-lessons-20
+      family: lessons
+      members:
+      - repo: CMR
+        issue: 851
+      - repo: CMR
+        issue: 837
+      - repo: CMR
+        issue: 788
+      - repo: CMR
+        issue: 724
+  - id: cluster-c-docs-03
+    repo: shared-frontend
+    issue: 493
+    module: fleet-hygiene/docs
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: pmo-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-docs-03
+      family: docs
+      members:
+      - repo: shared-frontend
+        issue: 493
+      - repo: shared-frontend
+        issue: 483
+      - repo: shared-frontend
+        issue: 473
+  - id: cluster-c-friction-16
+    repo: agent-orchestrator
+    issue: 1513
+    module: fleet-hygiene/friction
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: architecture-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-friction-16
+      family: friction
+      members:
+      - repo: agent-orchestrator
+        issue: 1513
+      - repo: agent-orchestrator
+        issue: 1511
+      - repo: agent-orchestrator
+        issue: 1510
+  - id: cluster-c-offshore-18
+    repo: shared-services
+    issue: 4244
+    module: fleet-hygiene/offshore
+    milestone: M5
+    priority: 1
+    depends_on: []
+    sme: platform-sme
+    tier: L0
+    status_source: github
+    cluster:
+      id: c-offshore-18
+      family: offshore
+      members:
+      - repo: shared-services
+        issue: 4244
+      - repo: shared-services
+        issue: 4243
+      - repo: shared-services
+        issue: 4242

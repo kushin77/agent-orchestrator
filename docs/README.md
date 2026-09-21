@@ -11,6 +11,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`ARCHITECTURE-2026-09.md`](ARCHITECTURE-2026-09.md) | **As-built source of truth for the control chain** — Paperclip → PMO → Hermes → agents → lanes/gates/attestation, per-layer implemented/declared-only/missing, corrected against ADR-0033 (issue #1650, `Parent: #1510`). |
 | [`CTO-OFFICE.md`](CTO-OFFICE.md) | agent-orchestrator's job as the fleet's Chief Technology Office for everything in the CMR — authority, what it governs, how a spoke gets work and reports back (issue #1650, `Parent: #1510`). |
 | [`ABILITIES.md`](ABILITIES.md) | Ability inventory — every control verb/cockpit function/paperclip API path/MCP surface/gateway module, owner layer, status, proving gate (issue #1650, `Parent: #1510`). |
+| [`PMO-PROJECT-PLAN.md`](PMO-PROJECT-PLAN.md) | GENERATED enterprise project plan: every module/task by milestone + priority, converging on "CRM + Asterisk voice operational". Regenerate with `python3 governance/pmo/cli.py plan`; freshness gated by `scripts/check-pmo-rollup.sh` (issue #1648). |
 | [`RELEASE-PLAN.md`](RELEASE-PLAN.md) | The v1.0.0 commitment and SemVer contract: surfaces under contract, v1.0.0 exit criteria mapped to issue #803's acceptance boxes, residual risks named (issue #1074). |
 | [`EXECUTION-PLAN.md`](EXECUTION-PLAN.md) | One-issue-one-lane parallel dispatch contract, phase/wave sequencing 0–8. |
 | [`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md) | Sourced fork-map of upstream `paperclip.ing` against the fleet's own primitives (issue #368). |
