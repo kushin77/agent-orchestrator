@@ -186,12 +186,12 @@ led="$work/tf.jsonl"
 python3 "$module" acquire --resource tf-state:onprem --holder '#1545' --ledger "$led" >/dev/null 2>&1
 second_out="$(python3 "$module" acquire --resource tf-state:onprem --holder '#1546' --ledger "$led" 2>&1)"
 second_rc=$?
-if [ "$second_rc" -eq 1 ] && printf '%s' "$second_out" | grep -q '#1545'; then
+if [ "$second_rc" -eq 1 ] && [[ "$second_out" == *"#1545"* ]]; then
   note "a second holder is refused (exit ${second_rc}) quoting the holder: $(printf '%s' "$second_out" | sed 's/^resource-lease: //')"
 else
   problem "the second holder was not refused quoting the holder (rc=${second_rc}): ${second_out}"
 fi
-if printf '%s' "$second_out" | grep -q 'expires 20'; then
+if [[ "$second_out" == *"expires 20"* ]]; then
   note "the refusal quotes the lease's expiry, so the refused caller knows how long to wait"
 else
   problem "the refusal does not quote the expiry: ${second_out}"
@@ -202,7 +202,7 @@ else
   problem "the refused claim still wrote to the ledger: $(grep -c 'acquire' "$led") acquires"
 fi
 renew_out="$(python3 "$module" acquire --resource tf-state:onprem --holder '#1545' --ledger "$led" 2>&1)"
-if [ "$?" -eq 0 ] && printf '%s' "$renew_out" | grep -q 'renewed by its own holder'; then
+if [ "$?" -eq 0 ] && [[ "$renew_out" == *"renewed by its own holder"* ]]; then
   note "the SAME holder re-acquires as a renewal, not a refusal (one owner, not two)"
 else
   problem "the same holder was not allowed to renew: ${renew_out}"
@@ -211,7 +211,7 @@ fi
 echo "== the negative control: an unleased resource proceeds =="
 free_out="$(python3 "$module" acquire --resource tf-state:staging --holder '#1546' --ledger "$led" 2>&1)"
 free_rc=$?
-if [ "$free_rc" -eq 0 ] && printf '%s' "$free_out" | grep -q 'ACQUIRED tf-state:staging'; then
+if [ "$free_rc" -eq 0 ] && [[ "$free_out" == *"ACQUIRED tf-state:staging"* ]]; then
   note "an unleased resource proceeds (exit ${free_rc}), so the refusal above cannot be 'it refuses everything'"
 else
   problem "an unleased resource did not proceed (rc=${free_rc}): ${free_out}"
