@@ -38,16 +38,22 @@ def refresh(
     *,
     runner: Callable[..., subprocess.CompletedProcess] | None = None,
     timeout: float | None = None,
+    command: list[str] | None = None,
 ) -> tuple[bool, str]:
     """Run the ONE refresh verb as a subprocess; return ``(ok, detail)``.
+
+    ``command`` overrides the default dispatch-snapshot verb for a consumer
+    whose committed artifact is refreshed a different way (e.g. the boundary
+    snapshot's ``export-boundary``, issue #1631) — the retry/re-assess/fail-
+    closed-by-name shape stays identical, only the subprocess differs.
 
     A refused network, a failing ``gh`` and a call that outlives ``timeout``
     are all reported as ``(False, reason)`` — a first-class outcome, never a
     crash.
     """
     run = runner or subprocess.run
-    cmd = [sys.executable, str(DISPATCH_CLI), "snapshot", "--from-github"]
-    if repo:
+    cmd = list(command) if command else [sys.executable, str(DISPATCH_CLI), "snapshot", "--from-github"]
+    if repo and not command:
         cmd += ["--repo", repo]
     try:
         result = run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -70,13 +76,16 @@ def self_heal(
     stale_code: str = "board-snapshot-stale",
     runner: Callable[..., subprocess.CompletedProcess] | None = None,
     timeout: float | None = None,
+    command: list[str] | None = None,
 ) -> tuple[Any, bool, str]:
     """Refresh-then-reassess a stale committed snapshot.
 
-    ``assess`` is the caller's own assess() (``queue_freshness.assess`` or
-    ``ticket.freshness.assess``) — same shape (``.ok``, a tuple of findings/
-    violations each with ``.code``), different module; ``subject`` is
-    whatever that assess() takes (a snapshot file, or a project root).
+    ``assess`` is the caller's own assess() (``queue_freshness.assess``,
+    ``ticket.freshness.assess`` or ``board.cli.assess_boundary_freshness``) —
+    same shape (``.ok``, a tuple of findings/violations each with ``.code``),
+    different module; ``subject`` is whatever that assess() takes (a snapshot
+    file, or a project root). ``command`` forwards to :func:`refresh` for a
+    consumer whose artifact needs a different refresh verb.
 
     Returns ``(verdict, healed, detail)``: ``verdict`` is the final assess()
     result (post-refresh when one was attempted), ``healed`` is True only
@@ -93,7 +102,8 @@ def self_heal(
         findings = getattr(verdict, "violations", ())
     if not any(finding.code == stale_code for finding in findings):
         return verdict, False, ""
-    ok, detail = refresh(repo, runner=runner, timeout=timeout)
+    refresh_kwargs = {"command": command} if command else {}
+    ok, detail = refresh(repo, runner=runner, timeout=timeout, **refresh_kwargs)
     if not ok:
         return verdict, False, detail
     healed_verdict = assess(subject, max_age_hours=max_age_hours, now=now)

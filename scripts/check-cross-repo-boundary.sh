@@ -48,8 +48,9 @@ if [ ! -f "$cli" ]; then
 fi
 
 run_check() {
-  # $1 = snapshot path, $2 = baseline path; forwards the gate's own exit code.
-  python3 - "$root" "$1" "$2" <<'PY'
+  # $1 = snapshot path, $2 = baseline path, $3 = "1" to self-heal a stale
+  # snapshot first (issue #1631); forwards the gate's own exit code.
+  python3 - "$root" "$1" "$2" "${3:-}" <<'PY'
 import sys
 from pathlib import Path
 
@@ -58,13 +59,21 @@ sys.path.insert(0, str(root / "governance" / "board"))
 
 from cli import run_boundary_check  # noqa: E402
 
-raise SystemExit(run_boundary_check(sys.argv[2], sys.argv[3]))
+raise SystemExit(run_boundary_check(sys.argv[2], sys.argv[3], refresh=(sys.argv[4] == "1")))
 PY
 }
 
-# --- 1. the real check on the committed snapshot -----------------------------
-run_check "$snapshot" "$baseline"
+# --- 1. the real check, self-healing a stale snapshot on a SCRATCH copy -----
+# A stale committed snapshot self-heals via the ONE export verb before this
+# fails CANNOT-ASSESS (issue #1631) — never a silent OK-with-zero-findings on
+# rotted input. The self-heal runs against a scratch copy, never the tracked
+# file itself: refreshing the committed .board/boundary-snapshot.json is a
+# board-artifact refresh (export-boundary) and must not ride in this gate.
+heal_scratch="$(mktemp -d)"
+cp "$snapshot" "$heal_scratch/boundary-snapshot.json"
+run_check "$heal_scratch/boundary-snapshot.json" "$baseline" 1
 real_rc=$?
+rm -rf "$heal_scratch"
 if [ "$real_rc" -ne 0 ]; then
   echo "check-cross-repo-boundary: FAIL — the committed boundary snapshot is not clean (rc=$real_rc)" >&2
   exit 1
@@ -80,15 +89,21 @@ fi
 trap 'rm -rf "$work"' EXIT
 
 python3 - "$work" "$snapshot" <<'PY'
+import datetime
 import json
 import pathlib
 import sys
 
 work = pathlib.Path(sys.argv[1])
 snapshot = pathlib.Path(sys.argv[2])
+# These controls provoke the BOUNDARY-LOGIC detector, not the freshness gate
+# (issue #1631) — restamp generated_at to now so a real-world stale committed
+# snapshot never masks what these three mutations are meant to prove.
+_now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 # (a) a fresh, non-quarantined cross-repo child must be refused (rc 1).
 fresh = json.loads(snapshot.read_text(encoding="utf-8"))
+fresh["generated_at"] = _now
 fresh_items = fresh.get("items", []) if isinstance(fresh, dict) else []
 fresh_items.append(
     {
@@ -107,6 +122,7 @@ fresh_items.append(
 
 # (b) a snapshot with `body` stripped must be CANNOT-ASSESS, never OK (rc 2).
 stripped = json.loads(snapshot.read_text(encoding="utf-8"))
+stripped["generated_at"] = _now
 stripped_items = stripped.get("items", []) if isinstance(stripped, dict) else []
 for item in stripped_items:
     item.pop("body", None)
@@ -114,6 +130,7 @@ for item in stripped_items:
 
 # (c) a quarantine whose tracker closed must be refused as stale (rc 1).
 stale = json.loads(snapshot.read_text(encoding="utf-8"))
+stale["generated_at"] = _now
 stale_items = stale.get("items", []) if isinstance(stale, dict) else []
 for item in stale_items:
     if item.get("number") == 358:
