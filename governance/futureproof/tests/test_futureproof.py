@@ -5,8 +5,13 @@
 watched to move: a link that passes while doing nothing would otherwise pass
 here too, which is exactly the failure the capstone exists to refuse.
 
-The fixture carries the repository's OWN `scripts/discover-checks.sh`, so
-`gate-wired` is exercised against the real discovery layer rather than a stub.
+The fixture carries the repository's OWN discovery layer, so `gate-wired` is
+exercised against the real layer rather than a stub. That layer is the SET of
+files `scripts/discover-checks.sh` reads at load time (`DISCOVERY_LAYER`), not
+just its entry point: since #1753 the script sources `scripts/lib/common.sh` for
+`find_repo_root`, so a fixture carrying the entry point alone would fail that
+`source`, leave the root empty and discover NOTHING — every mechanism reading
+IMPLEMENTED-UNGATED for a reason that has nothing to do with the tree asserted.
 """
 
 from __future__ import annotations
@@ -23,6 +28,14 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "governance" / "futureproof"))
 
 import e2e as E  # noqa: E402
+
+# The discovery layer as the SET of files it resolves at load time: the entry
+# point `scripts/discover-checks.sh` plus the shared helper it sources for
+# `find_repo_root` (`scripts/lib/common.sh`, since #1753). The fixture must carry
+# the whole set — copying only the entry point makes the `source` fail there, so
+# the layer discovers nothing and every gate reads as unwired for a reason that
+# is an artifact of the harness rather than of the tree under test.
+DISCOVERY_LAYER = ("scripts/discover-checks.sh", "scripts/lib/common.sh")
 
 
 def _write(path: Path, text: str) -> None:
@@ -43,9 +56,10 @@ def _gate_stub(gate: str, rc: int = 0) -> str:
 def build_tree(tmp_path: Path) -> Path:
     """A complete, all-green fixture: every mechanism wired and assessing."""
     tree = tmp_path / "tree"
-    (tree / "scripts").mkdir(parents=True)
-    shutil.copy(ROOT / "scripts" / "discover-checks.sh",
-                tree / "scripts" / "discover-checks.sh")
+    for rel in DISCOVERY_LAYER:
+        target = tree / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / rel, target)
     _write(tree / "scripts" / "check-denylist.txt", "# nothing disabled\n")
     for mech in E.MECHANISMS:
         for rel in mech["authorities"]:
