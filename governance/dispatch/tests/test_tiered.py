@@ -124,6 +124,34 @@ def test_escalation_path_produces_exactly_two_ledger_entries(tmp_path):
     assert outcome["final_tier"] == "L1"
 
 
+def test_negative_control_an_escalate_label_does_not_break_the_in_lane_climb(tmp_path):
+    """#1851 negative control: the frontier's `escalate:*` refusal is frontier-only.
+
+    `tiered.py` climbs tiers INSIDE one lane run and never reads the frontier, so
+    an issue that already carries `escalate:L1` must still be re-dispatched one
+    tier up (L0 -> L1) — the refusal must not read `escalate:*` as "never dispatch
+    again". This is the same two-attempt climb as the escalation test above, with
+    the escalate label already present on the issue at dispatch time.
+    """
+    trail = tmp_path / "dispatch-audit.jsonl"
+    outcome = tiered.run(
+        999,
+        FIXTURE_BODY,
+        ["tier:L0", "escalate:L1"],
+        audit_path=trail,
+        agent="ao-sub-1524",
+        at=_now(),
+        invoke=lambda tier, provider, model: 0,
+        apply_label=lambda issue, label: None,
+        post_comment=lambda issue, text: None,
+    )
+    records = audit.read(trail)
+    assert [record["tier"] for record in records] == ["L0", "L1"]
+    assert [record["status"] for record in records] == ["fail", "pass"]
+    assert outcome["final_status"] == "pass"
+    assert outcome["final_tier"] == "L1"
+
+
 def test_negative_control_no_tier_label_defaults_to_l0_and_logs_warning(tmp_path):
     trail = tmp_path / "dispatch-audit.jsonl"
     outcome = tiered.run(

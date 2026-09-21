@@ -46,6 +46,13 @@ focus-aware one, and it is what a report advertising "do this next" must use —
 and :func:`frontier_agreement` / :func:`unclaimable_frontier` exist so a gate can
 PROVOKE the disagreement rather than assert the happy path.
 
+**An `escalate:*` issue is not a frontier candidate (issue #1851).** The
+same rule, one predicate further: `frontier` advertised an issue the tier climb
+had already exhausted, so no reader could take it. The refusal is named
+(``escalated``) and lives in :func:`_refusal_before_grants`, so `frontier`,
+`claimable_frontier` and `eligible` (hence `claim`) all agree by construction. The
+match is by ``escalate:`` PREFIX — never ``tier:``, which every issue carries.
+
 **An `epic-closed` refusal names the remedy, not only the cause (issue #1259).**
 The refusal is right — the epic that would own the work is gone — but it is
 PERMANENT for the issue until the board is re-pointed, and the `Verify:` command
@@ -74,6 +81,7 @@ from model import (
     REASON_CHILD_OF_CLAIM,
     REASON_EPIC_CLOSED,
     REASON_EPIC_NOT_WORKABLE,
+    REASON_ESCALATED,
     REASON_ISSUE_CLOSED,
     REASON_NEXT_IN_MILESTONE,
     REASON_NO_CHAIN_EDGE,
@@ -86,6 +94,12 @@ from model import (
     Snapshot,
     file_claims_conflict,
 )
+
+#: The label prefix that marks an issue the tier climb has already been tried
+#: on. Matched by PREFIX against ``Issue.labels``; the ``tier:`` prefix is
+#: deliberately NOT matched — every issue in the chain carries ``tier:L0``, so
+#: matching that would refuse the whole board (issue #1851).
+ESCALATE_LABEL_PREFIX = "escalate:"
 
 
 def _refusal_before_grants(
@@ -101,6 +115,12 @@ def _refusal_before_grants(
     defect: ``status`` advertised a #132-shaped issue that ``claim`` refused,
     precisely because the frontier never asked whether the issue's declared epic
     was still open.
+
+    Since #1851 it also refuses an issue carrying an ``escalate:*`` label: the
+    climb has already been attempted in the lane that applied the label, so the
+    issue is dead for every reader and the frontier must advance past it. The
+    match is by ``escalate:`` PREFIX, never ``tier:`` (every issue here carries
+    ``tier:L0``).
     """
     if issue.closed:
         return Eligibility(issue.number, False, REASON_ISSUE_CLOSED, f"#{issue.number} is closed")
@@ -140,6 +160,22 @@ def _refusal_before_grants(
         if queue_note is not None:
             detail = f"{detail} ({queue_note})"
         return Eligibility(issue.number, False, REASON_BLOCKED, detail)
+
+    # Escalated (issue #1851): an `escalate:*` label means the tier climb was
+    # already attempted in the lane that applied it, so this issue is a
+    # terminal-ish state the frontier must not advertise. `tiered.py` climbs
+    # tiers in-process and never reads the frontier, so nothing is lost by
+    # skipping it here. The label itself is named, so the refusal is actionable.
+    escalated = [label for label in issue.labels if label.startswith(ESCALATE_LABEL_PREFIX)]
+    if escalated:
+        return Eligibility(
+            issue.number,
+            False,
+            REASON_ESCALATED,
+            f"#{issue.number} carries {', '.join(sorted(escalated))}: the tier climb has already "
+            "been attempted in the lane that applied it, so no reader can take it and the "
+            "frontier must advance past it",
+        )
     return None
 
 
@@ -190,9 +226,11 @@ def frontier(
     ``frontier`` answers "what is the milestone's next issue", and it is the
     function ``eligible``'s ``next-in-milestone`` grant and the ledger audit both
     resolve against. It therefore applies every refusal that is a property of the
-    ISSUE itself — closed, claimed by another agent, an epic, epic-closed, blocked
-    — so a milestone frontier can never be an issue that no reader could ever take
-    (issue #1168: it named an **epic-closed** issue that ``claim`` refused).
+    ISSUE itself — closed, claimed by another agent, an epic, epic-closed, blocked,
+    escalated — so a milestone frontier can never be an issue that no reader could
+    ever take (issue #1168: it named an **epic-closed** issue that ``claim``
+    refused; issue #1851: it named an ``escalate:*`` issue that the tier climb
+    had already exhausted).
 
     It deliberately does NOT apply the epic-focus refusal: the milestone frontier
     and "the active epic's frontier" are different questions, and
