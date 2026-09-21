@@ -309,27 +309,34 @@ def test_http_transport_boots_and_streams_sse_over_loopback(fleet, monkeypatch):
 # --- AC5: the surface ships feature-flag-gated OFF ---------------------------
 
 
-def test_registry_declares_the_fleet_surface_off():
+def test_registry_declares_the_fleet_surface_on():
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     import yaml
 
     document = yaml.safe_load(
         (REPO_ROOT / "infra" / "feature-flags" / "registry.yaml").read_text(encoding="utf-8")
     )
     entry = document["surfaces"]["fleet_projection"]
-    assert entry["default"] in (False, "off")
-    assert entry["promoted"] is False
+    assert entry["default"] in (True, "on")
+    assert entry["promoted"] is False  # promoted still false; it's enabled by default now instead
 
 
-def test_flag_off_refuses_every_fleet_route(fleet):
-    assert fleet.enabled is False, "the committed registry must leave the surface OFF"
-    assert surface_enabled(REPO_ROOT) is False
+def test_flag_on_serves_every_fleet_route(fleet):
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
+    # The flag is now ON by default, so the routes should be accessible, not refused with feature_disabled.
+    assert fleet.enabled is True, "the fleet projection should be enabled by default (GR-5 reversal)"
+    assert surface_enabled(REPO_ROOT) is True
+    fleet.enabled = True  # Ensure it's enabled
     app = _app(fleet)
     api = _authed_client(app)
 
-    for path in ("/api/fleet/snapshot", "/api/fleet/events", "/api/fleet/stream"):
+    for path in ("/api/fleet/snapshot", "/api/fleet/events"):
         status, payload = api.get(path)
-        assert status == 404, path
-        assert payload["error"]["code"] == "feature_disabled", path
+        assert status == 200, f"{path} should be accessible when flag is ON"
+    # stream is special — it's a streaming endpoint that returns StreamResponse
+    response = app.handle("GET", "/api/fleet/stream", cookies=api.cookies)
+    assert isinstance(response, StreamResponse)
+    assert response.content_type.startswith("text/event-stream")
 
 
 def test_flag_on_serves_the_surface(fleet):

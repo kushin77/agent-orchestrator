@@ -69,18 +69,21 @@ def _gate_default(text, gate):
     return match.group(1)
 
 
-def test_gate_flag_defaults_off():
+def test_gate_flag_defaults_on():
+    # policy-gr5-enabled-by-default (2026-09-21): this probe hardcoded the
+    # OLD off-by-default policy; updated to assert the new correct default
+    # rather than silently patched around.
     entry = _nous_entry(_load())
     text = TF_VARIABLES.read_text(encoding="utf-8")
 
-    # The unmodified twin: OFF.
-    assert _gate_default(text, entry["gate"]) == "false"
+    # The unmodified twin: ON.
+    assert _gate_default(text, entry["gate"]) == "true"
 
     # MUTANT: the same reader against a flipped default -- must move.
     mutated = text.replace(
-        f'variable "{entry["gate"]}" {{', f'variable "{entry["gate"]}" {{\n  default = true', 1
+        f'variable "{entry["gate"]}" {{\n  description', f'variable "{entry["gate"]}" {{\n  default = false\n  description', 1
     )
-    assert _gate_default(mutated, entry["gate"]) == "true"
+    assert _gate_default(mutated, entry["gate"]) == "false"
 
 
 def test_default_api_key_reads_the_declared_env_and_fails_closed(monkeypatch):

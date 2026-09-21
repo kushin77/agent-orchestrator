@@ -126,9 +126,10 @@ def test_served_projection_is_non_empty_and_is_the_committed_pin():
 
 
 def test_default_app_builds_the_feed_from_the_committed_pin():
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     app = build_app(sso=console_sso())
     assert app.surfaces.feed_path == COMMITTED_PIN
-    assert app.surfaces.enabled is False, "the committed registry ships the surface OFF"
+    assert app.surfaces.enabled is True, "the committed registry ships the surface ON by default (GR-5 reversal)"
 
 
 # --- empty is honest, invention is not ---------------------------------------
@@ -196,29 +197,35 @@ def test_unreadable_pin_is_served_unresolved_and_invents_nothing(tmp_path):
 # --- AC: the surface ships feature-flag-gated OFF ----------------------------
 
 
-def test_registry_declares_the_portal_surfaces_surface_off():
+def test_registry_declares_the_portal_surfaces_surface_on():
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     import yaml
 
     document = yaml.safe_load(
         (REPO_ROOT / "infra" / "feature-flags" / "registry.yaml").read_text(encoding="utf-8")
     )
     entry = document["surfaces"][PORTAL_SURFACES]
-    assert entry["default"] in (False, "off")
-    assert entry["promoted"] is False
+    assert entry["default"] in (True, "on")
+    assert entry["promoted"] is False  # promoted still false; it's enabled by default now instead
     assert entry["service"] == "portal"
 
 
-def test_flag_off_refuses_the_route_before_authn():
-    assert surface_enabled(REPO_ROOT, surface=PORTAL_SURFACES) is False
-    app = _app(_feed(enabled=False))
+def test_flag_on_serves_the_route_and_requires_authn():
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
+    assert surface_enabled(REPO_ROOT, surface=PORTAL_SURFACES) is True
+    app = _app(_feed(enabled=True))
 
-    # An unpromoted surface is invisible, not merely unauthorised: the refusal
-    # is identical with and without a session, so it is not an auth probe.
-    for anonymous in (True, False):
-        api = ApiClient(app) if anonymous else _authed(app)
-        status, payload = api.get("/api/portal/surfaces")
-        assert status == 404, f"anonymous={anonymous}"
-        assert payload["error"]["code"] == "feature_disabled"
+    # A promoted surface is visible, and requires authentication.
+    # Unauthenticated callers get 401 (unauthorized), not 404 (invisible).
+    api = ApiClient(app)
+    status, payload = api.get("/api/portal/surfaces")
+    assert status == 401, "unauthenticated caller should be unauthorized, not feature-disabled"
+    assert payload["error"]["code"] == "unauthorized"
+
+    # Authenticated caller can access
+    auth_api = _authed(app)
+    status, _ = auth_api.get("/api/portal/surfaces")
+    assert status == 200
 
 
 def test_flag_on_requires_a_session():

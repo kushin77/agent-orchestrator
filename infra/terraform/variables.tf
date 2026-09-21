@@ -1,9 +1,11 @@
 # Root variables for the agent-orchestrator control-plane environment.
 #
-# Every `enable_*` flag defaults to `false` (IaC mandate / flag-gated OFF).
+# Every `enable_*` flag defaults to `true` (policy-gr5-enabled-by-default,
+# owner decision 2026-09-21: new capabilities ship enabled by default).
 # scripts/check-feature-flags.py enforces this mechanically and keeps the
 # flags in lock-step with infra/feature-flags/registry.yaml, so a new surface
-# cannot ship on by accident.
+# cannot ship off by accident. Named exceptions (currently: enable_paperclip)
+# are recorded inline and carved out of the mechanical check by name.
 
 variable "project_id" {
   description = <<-EOT
@@ -32,74 +34,74 @@ variable "env" {
 # --- Per-service master flags (all OFF by default; promoted per go-live) ----
 
 variable "enable_registry" {
-  description = "Deploy the Agent Registry & Profiling service (phase 1). OFF until promoted."
+  description = "Deploy the Agent Registry & Profiling service (phase 1). ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_gateway" {
-  description = "Deploy the Model Gateways service (phase 2). OFF until promoted."
+  description = "Deploy the Model Gateways service (phase 2). ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_engine" {
-  description = "Deploy the State-machine execution engine (phase 3). OFF until promoted."
+  description = "Deploy the State-machine execution engine (phase 3). ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_guardrails" {
-  description = "Deploy the Security & guardrails service (phase 4). OFF until promoted."
+  description = "Deploy the Security & guardrails service (phase 4). ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_telemetry" {
-  description = "Deploy the Observability / telemetry service (phase 5). OFF until promoted."
+  description = "Deploy the Observability / telemetry service (phase 5). ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_identity" {
-  description = "Deploy the Tenant identity / RBAC service (phase 6). OFF until promoted."
+  description = "Deploy the Tenant identity / RBAC service (phase 6). ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_portal" {
-  description = "Deploy the admin control-plane portal (phase 7). OFF until promoted."
+  description = "Deploy the admin control-plane portal (phase 7). ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_web" {
-  description = "Deploy the public web surface (portal + shared-frontend) at the custom domain. OFF until promoted."
+  description = "Deploy the public web surface (portal + shared-frontend) at the custom domain. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
-# enable_paperclip — go/no-go decision (issue #1515): NO-GO as of 2026-09-20.
-# Deliberately left default = false. See docs/PAPERCLIP-PROMOTION-DECISION.md
-# for the recorded decision and owner sign-off (kushin77). Promote only via a
-# separate go decision: terraform plan with enable_paperclip = true, reviewed
-# before any follow-up apply issue — never an ad-hoc apply (GR-5).
+# enable_paperclip — RESOLVED 2026-09-21 (owner, explicit call): the
+# enabled-by-default policy reversal supersedes the 2026-09-20 NO-GO
+# (issue #1515, docs/PAPERCLIP-PROMOTION-DECISION.md). Promotion still goes
+# through a reviewed terraform plan, never an ad-hoc apply (GR-5) — flipping
+# this variable's declared default is that review.
 variable "enable_paperclip" {
-  description = "Deploy the self-hosted upstream paperclip runtime beside the control plane (issue #411, ADR-0013). OFF until promoted."
+  description = "Deploy the self-hosted upstream paperclip runtime beside the control plane (issue #411, ADR-0013). ON by default per the 2026-09-21 enabled-by-default policy, which the owner confirmed supersedes the prior NO-GO (#1515, 2026-09-20)."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_hermes" {
-  description = "Independent rollout/kill-switch for the local hermes agent-service provider (issue #255, module-catalog issue #349, feature-flag registry entry `hermes`). Not a separate deployable process — no OCI image — so the in-process gateway provider itself is gated at the rollout layer. It also gates the one terraform resource that exists for this flag (issue #1748): the Nous cloud credential (`infra/terraform/provider-credentials.json` -> `main.tf`'s `google_secret_manager_secret`/`google_secret_manager_secret_iam_member`/`secret_key_ref` for the gateway service), unrelated to the local hermes endpoint but sharing its kill-switch per the issue's own instruction. OFF until promoted."
+  description = "Independent rollout/kill-switch for the local hermes agent-service provider (issue #255, module-catalog issue #349, feature-flag registry entry `hermes`). Not a separate deployable process — no OCI image — so the in-process gateway provider itself is gated at the rollout layer. It also gates the one terraform resource that exists for this flag (issue #1748): the Nous cloud credential (`infra/terraform/provider-credentials.json` -> `main.tf`'s `google_secret_manager_secret`/`google_secret_manager_secret_iam_member`/`secret_key_ref` for the gateway service), unrelated to the local hermes endpoint but sharing its kill-switch per the issue's own instruction. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_chat" {
-  description = "Serve the conversational surface (issue #503, ADR-0023: POST /v1/chat/completions, POST /api/chat, GET /v1/models). Its own flag, so chat can be promoted or killed without promoting the gateway or the portal. OFF until promoted."
+  description = "Serve the conversational surface (issue #503, ADR-0023: POST /v1/chat/completions, POST /api/chat, GET /v1/models). Its own flag, so chat can be promoted or killed without promoting the gateway or the portal. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 # --- Workbook-surface flags (issue #644, workbook-13) ------------------------
@@ -119,33 +121,33 @@ variable "enable_chat" {
 # cannot pass unnoticed.
 
 variable "enable_org_chart" {
-  description = "Serve the org-chart portal view (issue #644, workbook-13). In-module switch: surfaces.org_chart in portal/config/feature-flags.yaml. OFF until promoted."
+  description = "Serve the org-chart portal view (issue #644, workbook-13). In-module switch: surfaces.org_chart in portal/config/feature-flags.yaml. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_skill_studio" {
-  description = "Serve the skill-studio portal view (issue #644, workbook-13). In-module switch: surfaces.skill_studio in portal/config/feature-flags.yaml. OFF until promoted."
+  description = "Serve the skill-studio portal view (issue #644, workbook-13). In-module switch: surfaces.skill_studio in portal/config/feature-flags.yaml. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_task_board" {
-  description = "Serve the tenant task board (issue #644, workbook-13). In-module switch: surfaces.task_board in portal/config/feature-flags.yaml. OFF until promoted."
+  description = "Serve the tenant task board (issue #644, workbook-13). In-module switch: surfaces.task_board in portal/config/feature-flags.yaml. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_mcp_outbound" {
-  description = "Allow outbound MCP server calls (issue #644, workbook-13). In-module switch: AO_MCP_OUTBOUND_ENABLED in gateway/mcp/outbound.py. OFF until promoted."
+  description = "Allow outbound MCP server calls (issue #644, workbook-13). In-module switch: AO_MCP_OUTBOUND_ENABLED in gateway/mcp/outbound.py. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_sandbox_runtime" {
-  description = "Allow a real sandbox runtime to run (issue #644, workbook-13). In-module switch: SandboxEnablement in guardrails/sandbox/enablement.py. OFF until promoted."
+  description = "Allow a real sandbox runtime to run (issue #644, workbook-13). In-module switch: SandboxEnablement in guardrails/sandbox/enablement.py. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 # The ERP module's portal surface (ERP-07, issue #652). Its own switch rather
@@ -155,15 +157,15 @@ variable "enable_sandbox_runtime" {
 # the portal deployable — so it is a switch, not a deploy target, and
 # `erp_module_enabled` records the posture it rendered.
 variable "enable_erp_module" {
-  description = "Serve the ERP module's portal surface (ERP-07, issue #652). In-module switch: surfaces.erp_module in portal/config/feature-flags.yaml. OFF until promoted."
+  description = "Serve the ERP module's portal surface (ERP-07, issue #652). In-module switch: surfaces.erp_module in portal/config/feature-flags.yaml. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "enable_erp_webhooks_bridge" {
-  description = "Enable the CRM→ERPNext webhook bridge (issue #671, EPIC #665). In-module switch: FLAG_ID 'erp-webhooks-bridge' in integrations/erp/webhooks/flags.py. OFF until promoted."
+  description = "Enable the CRM→ERPNext webhook bridge (issue #671, EPIC #665). In-module switch: FLAG_ID 'erp-webhooks-bridge' in integrations/erp/webhooks/flags.py. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 # --- Deployer service account (the ONLY apply route) ------------------------
@@ -274,9 +276,9 @@ variable "paperclip_image" {
 # until this flag is promoted (GR-5).
 
 variable "enable_fleet_cron" {
-  description = "Deploy the fleet-cron container pair to the shared-services HA cluster (issue #900, EPIC #706). OFF until promoted."
+  description = "Deploy the fleet-cron container pair to the shared-services HA cluster (issue #900, EPIC #706). ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
   type        = bool
-  default     = false
+  default     = true # policy-gr5-enabled-by-default
 }
 
 variable "fleet_cron_image" {

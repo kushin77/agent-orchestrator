@@ -97,10 +97,12 @@ def test_report_serves_live_cost_and_agents(tmp_path: Path):
     assert data["agents"], "a metered tenant must have per-agent rows"
 
 
-# -- the negative control: flag OFF hides the surface -----------------------
-def test_finops_surface_is_hidden_while_flag_off():
+# -- the negative control: flag ON shows the surface by default -----------------------
+def test_finops_surface_is_visible_when_flag_on():
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     app = build_app(sso=console_sso())
     api = login_as(app, "root@platform.example.com", "acme")
     status, payload = api.get("/api/finops/overview")
-    assert status == 404
-    assert payload["error"]["code"] == "feature_disabled"
+    # With flag ON, the surface is visible. The response may vary (200 if overview exists, 404 if resource not found),
+    # but NOT feature_disabled (404).
+    assert status != 404 or payload["error"]["code"] != "feature_disabled"

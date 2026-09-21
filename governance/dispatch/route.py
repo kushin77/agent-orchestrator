@@ -119,10 +119,12 @@ def dispatch_hermes(hop: dict[str, Any], *, registry_path: Any = None) -> type:
     produced (never invoked directly on a bare capability string), and gated by
     the same ``enable_hermes`` flag (``gateway/providers/flags.py``, issue #1518)
     that gates the hermes provider everywhere else in this repo. The flag's
-    registry-declared default is **off** (IaC mandate: declared, never clicked),
-    so this refuses by name — ``TieredRefusal("hermes-disabled", ...)`` — until a
-    reviewed promotion flips it on. No new flag/config file: this reads the one
-    the provider registry already reads.
+    registry-declared default is **on** (policy-gr5-enabled-by-default,
+    2026-09-21: new capabilities ship enabled by default), so this only
+    refuses by name — ``TieredRefusal("hermes-disabled", ...)`` — if a
+    declared-off registry entry is read (e.g. a reverted/edited registry). No
+    new flag/config file: this reads the one the provider registry already
+    reads.
     """
     if hop.get("runtime") != "hermes":
         raise tiered.TieredRefusal(
@@ -135,8 +137,8 @@ def dispatch_hermes(hop: dict[str, Any], *, registry_path: Any = None) -> type:
     if not hermes_enabled(registry_path):
         raise tiered.TieredRefusal(
             "hermes-disabled",
-            "enable_hermes is off (declared default) — live Nous dispatch refused; "
-            "promote infra/feature-flags/registry.yaml's services.hermes to turn it on",
+            "enable_hermes is off in the registry — live Nous dispatch refused; "
+            "set infra/feature-flags/registry.yaml's services.hermes.default back to on",
         )
     from providers.hermes import HermesProvider  # noqa: E402 (deferred: same reason)
 

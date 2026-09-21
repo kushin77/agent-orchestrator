@@ -21,8 +21,9 @@ locals {
   # provider-credentials.json beside this file and PROJECTED from here --
   # never restated. No value rides in the declaration (GR-6), only the secret
   # id; the entry is only ever passed to a service's module instance when its
-  # `gate` flag is on, so with `enable_hermes` at its committed default
-  # (OFF) nothing here creates or grants anything.
+  # `gate` flag is on. `enable_hermes` now defaults to ON
+  # (policy-gr5-enabled-by-default, variables.tf), so this wiring is live by
+  # default; the secret container itself still carries no value (GR-6).
   provider_credentials = jsondecode(file("${path.module}/provider-credentials.json"))
   provider_credentials_gate = {
     enable_hermes = var.enable_hermes
@@ -203,7 +204,14 @@ module "web_surface" {
 
 # The self-hosted upstream paperclip runtime (issue #411, ADR-0013): a process
 # boundary beside the control plane, not a control-plane service. Count-gated on
-# enable_paperclip, so with the flag OFF (the committed default) it is inert.
+# enable_paperclip, held at OFF (the committed default) per the explicit NO-GO
+# decision (issue #1515, docs/PAPERCLIP-PROMOTION-DECISION.md, 2026-09-20).
+# UNRESOLVED as of the policy-gr5-enabled-by-default PR (2026-09-21, one day
+# later, same owner): that PR's own preamble names "Paperclip live sync" as a
+# capability that must ship enabled by default, which reads as a possible
+# supersession of the NO-GO. This PR does NOT resolve that on its own
+# authority — flagged for an explicit owner call, at the same prominence as
+# the CloudBuild trigger exception.
 module "paperclip_runtime" {
   source = "../paperclip/terraform"
 

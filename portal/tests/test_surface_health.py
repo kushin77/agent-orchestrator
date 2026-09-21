@@ -129,9 +129,11 @@ def test_an_unreadable_overlay_is_never_assumed_disengaged(
 
 
 def test_readiness_is_a_four_state_reading(tmp_path: Path, promoted_registry: Path) -> None:
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     overlay = tmp_path / "surface-state.json"
+    # With GR-5 reversal, unpromoted surfaces now ship ON by default, so they should be READY (and promoted=True because default is on)
     unpromoted = readiness(REPO_ROOT, SURFACE, overlay_path=overlay)
-    assert unpromoted.state == SURFACE_OFF and not unpromoted.promoted
+    assert unpromoted.state == SURFACE_READY and unpromoted.healthy and unpromoted.promoted
 
     ready = readiness(REPO_ROOT, SURFACE, registry_path=promoted_registry, overlay_path=overlay)
     assert ready.state == SURFACE_READY and ready.healthy
@@ -210,13 +212,16 @@ def test_reconcile_rolls_nothing_back_it_cannot_assess(tmp_path: Path) -> None:
 def test_readiness_route_names_only_what_exists(
     tmp_path: Path, promoted_registry: Path, broken_static: Path, monkeypatch
 ) -> None:
-    """The rail is honest and does not enumerate unpromoted surfaces."""
+    """The rail is honest and enumerates enabled surfaces (GR-5 reversal: surfaces now ON by default)."""
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     overlay = tmp_path / "surface-state.json"
     monkeypatch.setenv("AO_SURFACE_STATE", str(overlay))
 
+    # With GR-5 reversal, the committed registry now has surfaces ON by default, so they are enumerated
     monkeypatch.delenv("AO_SURFACE_REGISTRY", raising=False)
     response = build_app(repo_root=REPO_ROOT).handle("GET", "/api/healthz/ready")
-    assert response.status == 200 and response.payload["data"]["surfaces"] == {}
+    assert response.status == 200
+    assert response.payload["data"]["surfaces"][SURFACE]["state"] == SURFACE_READY
 
     monkeypatch.setenv("AO_SURFACE_REGISTRY", str(promoted_registry))
     response = build_app(repo_root=REPO_ROOT).handle("GET", "/api/healthz/ready")

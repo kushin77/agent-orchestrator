@@ -2,20 +2,26 @@
 """Feature-flag registry gate for `make verify` (issue #6 / IaC mandate).
 
 Validates `infra/feature-flags/registry.yaml` and keeps it in lock-step with
-`infra/terraform/variables.tf` so every control-plane surface ships OFF until
-promoted:
+`infra/terraform/variables.tf`. Policy reversed by explicit owner decision
+(2026-09-21, single-developer environment; policy-gr5-enabled-by-default PR):
+new capabilities ship ENABLED by default once merged and tested — a
+capability is either fully built and ON, or not yet merged. There is no more
+"built but off" state, so:
 
-  (1) the registry parses and carries `default_policy: off`,
-  (2) every declared service entry defaults to OFF,
+  (1) the registry parses and carries `default_policy: on`,
+  (2) every declared `services:`/`surfaces:` entry defaults to ON,
   (3) the seven canonical control-plane services are present in the registry,
-  (4) the CI/CD trigger flags (verify_trigger, apply_trigger) default to OFF,
+  (4) the CI/CD trigger flags (verify_trigger, apply_trigger) remain a
+      separate pipeline-mechanics concern and still default to OFF (they are
+      not "new capabilities" in the reversed policy's sense),
   (5) every terraform `enable_*` flag in variables.tf has an explicit
-      `default = false`, and the `enable_<service>` flags match the registry
+      `default = true`, and the `enable_<service>` flags match the registry
       service names 1:1 (a flag without a registry entry — or vice versa — is a
       drift finding),
-  (6) every not-yet-promoted `services:`/`surfaces:` entry carries a promotion
-      owner — a non-empty `promotion_issue:` or `posture: hold` (issue #1618) —
-      so a declared-off surface cannot drift with nobody responsible.
+  (6) every not-yet-promoted `services:`/`surfaces:` entry still carries a
+      promotion owner — a non-empty `promotion_issue:` or `posture: hold`
+      (issue #1618) — so a live-but-not-yet-fully-promoted surface cannot
+      drift with nobody responsible.
 
 Every branch above can genuinely fail; nothing here is a formality.
 """
@@ -35,6 +41,15 @@ except ImportError as exc:  # pragma: no cover
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY = os.path.join(ROOT, "infra", "feature-flags", "registry.yaml")
 TF_VARS = os.path.join(ROOT, "infra", "terraform", "variables.tf")
+
+# Flags this checker accepts at "off" under policy-gr5-enabled-by-default: the
+# owner's default is ON, not a prohibition on off, so an entry here still
+# needs a cited decision (checked by the reader modules, not mechanically
+# here). enable_paperclip's 2026-09-20 NO-GO (issue #1515) was superseded by
+# explicit owner call on 2026-09-21 (see infra/terraform/variables.tf and
+# infra/feature-flags/registry.yaml) — it defaults on like everything else,
+# so this set is currently empty.
+OFF_BY_EXPLICIT_DECISION: set[str] = set()
 
 CANONICAL_SERVICES = [
     "registry",
@@ -86,8 +101,8 @@ def _owner_errors(reg: dict) -> list[str]:
             is_hold = entry.get("posture") == "hold"
             if not has_owner and not is_hold:
                 findings.append(
-                    f"{section}.{name} is declared off with neither promotion_issue "
-                    "nor posture: hold"
+                    f"{section}.{name} is not yet promoted and carries neither "
+                    "promotion_issue nor posture: hold"
                 )
     return findings
 
@@ -114,23 +129,28 @@ def _run_self_test() -> int:
             failed += 1
 
     # (a) a non-promoted entry with neither field must be refused, by name.
+    # NOTE (policy-gr5-enabled-by-default): these probes hardcoded the OLD
+    # "default: off" policy value. The promotion-owner rule (#1618) is about
+    # who owns the go-live, not the flag's on/off value, so the probes are
+    # updated to use "default: on" (the new correct default) rather than
+    # silently keeping the stale "off" fixture.
     probe(
         "missing owner refused",
         True,
-        {"services": {"probe_svc": {"default": "off", "promoted": False}}, "surfaces": {}},
+        {"services": {"probe_svc": {"default": "on", "promoted": False}}, "surfaces": {}},
         needle="services.probe_svc",
     )
     # (b) the same entry with `posture: hold` passes.
     probe(
         "posture: hold accepted",
         False,
-        {"services": {"probe_svc": {"default": "off", "promoted": False, "posture": "hold"}}, "surfaces": {}},
+        {"services": {"probe_svc": {"default": "on", "promoted": False, "posture": "hold"}}, "surfaces": {}},
     )
     # (c) the same entry with a `promotion_issue` passes.
     probe(
         "promotion_issue accepted",
         False,
-        {"services": {"probe_svc": {"default": "off", "promoted": False, "promotion_issue": "#1"}}, "surfaces": {}},
+        {"services": {"probe_svc": {"default": "on", "promoted": False, "promotion_issue": "#1"}}, "surfaces": {}},
     )
     # (d) a promoted entry is exempt (already shipped).
     probe(
@@ -160,8 +180,8 @@ def main(argv=None) -> int:
         finish()
     # PyYAML parses the bare YAML 1.1 scalar `off` as boolean False; both
     # forms mean OFF and are accepted.
-    if reg.get("default_policy") not in (False, "off"):
-        fail("registry default_policy must be 'off' (new flags default OFF)")
+    if reg.get("default_policy") not in (True, "on"):
+        fail("registry default_policy must be 'on' (policy-gr5-enabled-by-default: new flags default ON)")
 
     # apply path must be declared and point at the automated route only.
     apply_path = reg.get("apply_path")
@@ -179,11 +199,12 @@ def main(argv=None) -> int:
             fail(f"services.{svc} is not a mapping")
             continue
         default = entry.get("default")
-        if default not in (False, "off"):
-            fail(f"services.{svc}.default must be off (got {default!r})")
-        promoted = entry.get("promoted", False)
-        if promoted:
-            fail(f"services.{svc}.promoted must be false while default is off")
+        if f"enable_{svc}" in OFF_BY_EXPLICIT_DECISION:
+            if default not in (False, "off"):
+                fail(f"services.{svc} has an explicit NO-GO decision; expected default: off")
+            continue
+        if default not in (True, "on"):
+            fail(f"services.{svc}.default must be on (got {default!r})")
 
     for svc in CANONICAL_SERVICES:
         if svc not in services:
@@ -215,10 +236,14 @@ def main(argv=None) -> int:
         tf_defaults[name] = (match.group(1) == "true") if match else None
 
     for name, default in sorted(tf_defaults.items()):
+        if name in OFF_BY_EXPLICIT_DECISION:
+            if default is not False:
+                fail(f"terraform variable {name} has an explicit NO-GO decision; expected default = false")
+            continue
         if default is None:
-            fail(f"terraform variable {name} has no explicit default (must be false)")
-        elif default:
-            fail(f"terraform variable {name} must default to false (got true)")
+            fail(f"terraform variable {name} has no explicit default (must be true)")
+        elif not default:
+            fail(f"terraform variable {name} must default to true (got false)")
 
     tf_service_flags = {name[len("enable_"):] for name in tf_defaults}
     registry_services = set(services)

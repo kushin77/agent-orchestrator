@@ -75,8 +75,17 @@ superseded. If a doc in this repo contradicts this file, this file wins.
    Single-developer method (owner, 2026-09-21): no required status check and
    no reviewer approval on `master`; see "Landing a PR" below.
 4. **Fully IaC (GR-5, owner IaC mandate).** Infrastructure is declared
-   (Terraform/Cloud Build), never clicked in a console. New infra ships
-   **flag-gated OFF** by default. Never ad-hoc `terraform apply`.
+   (Terraform/Cloud Build), never clicked in a console. Never ad-hoc
+   `terraform apply`. New capabilities — application/UI and live
+   infrastructure/credentialed external calls alike — ship **enabled by
+   default** once merged and tested: a capability is either fully built and
+   ON, or not yet merged, there is no "built but off" state (policy reversed
+   by explicit owner decision, 2026-09-21, single-developer environment,
+   policy-gr5-enabled-by-default; long form: docs/GOLDEN-RULES.md AO-GR-6).
+   Note this repo's numbering diverges from `docs/GOLDEN-RULES.md`: this
+   file's GR-5 carried the flag-default sentence, but the canonical long-form
+   counterpart of that sentence is `AO-GR-6` there (`AO-GR-5` is IaC/no-console
+   only). This PR treats them as the same rule by content, not by number.
 5. **No secrets (GR-6).** Env/secret manager only; never commit a token or key.
    A mechanical secret scan runs in `make verify`.
 6. **SemVer is law (GR-7).** Releases are annotated `vX.Y.Z` tags on `master`
@@ -379,7 +388,8 @@ executing for real.
 - **No direct pushes to `master`** — never force-push or rewrite shared history.
 - **No secrets** in code, files, or git history — never a real token or key.
 - **No ad-hoc `terraform apply` / console clicks** — infra lands as PRs; new
-  infra is flag-gated OFF.
+  capabilities ship **enabled by default** once merged and tested
+  (policy-gr5-enabled-by-default, owner decision 2026-09-21 — see GR-5 below).
 - **No merging failing work** — verification evidence is mandatory first.
 - **No unfinished markers (`TODO`/`FIXME`/`HACK`) or debug prints** in code.
 - **No editing `vendor/`** (pinned CMR submodule) and never commit cloned fleet

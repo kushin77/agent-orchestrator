@@ -5,8 +5,9 @@ Two surfaces are checked, and they answer different questions:
 * **The board** — is every item of in-scope work classified, and does the class it
   declares actually hold? Offline, from the committed board snapshot.
 * **A change set** — does the work itself honour the mandates? Specifically the
-  IaC mandate: infrastructure is declared and ships flag-gated OFF, and no new
-  GitHub Actions workflow is introduced (fleet GR-15).
+  IaC mandate: infrastructure is declared behind a feature flag (default ON,
+  policy-gr5-enabled-by-default, unless a recorded owner exception keeps it
+  off), and no new GitHub Actions workflow is introduced (fleet GR-15).
 
 Everything is deterministic and offline; the network path is confined to whatever
 produced the snapshot.
@@ -550,8 +551,9 @@ def check_change_set(
                     message="the change set adds infrastructure (%s) without a "
                     "flag-gated posture" % path,
                     subject=path,
-                    remediation="declare it OFF by default (a feature flag or an "
-                    "explicit disabled trigger)",
+                    remediation="declare it with a feature flag (policy-gr5-"
+                    "enabled-by-default: on unless a recorded owner exception "
+                    "keeps it off)",
                 )
             )
 

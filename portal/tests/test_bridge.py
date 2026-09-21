@@ -83,27 +83,30 @@ def _frame_payload(frame: str) -> dict:
 # --- the flag gate (before authN) -------------------------------------------
 
 
-def test_bridge_ships_flag_gated_off_and_is_invisible_before_authn():
+def test_bridge_ships_flag_gated_on_and_is_visible_before_authn():
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     default_bridge = LiveBridge(repo_root=REPO_ROOT)  # enabled=None: registry decides
-    assert default_bridge.enabled is False, "the surface must ship OFF"
+    assert default_bridge.enabled is True, "the surface must ship ON by default (GR-5 reversal)"
 
     app = build_app(sso=console_sso(), bridge=default_bridge)
+    # AuthN is still required even though flag is on.
     unauth = ApiClient(app)
     status, payload = unauth.get("/api/v1/bridge")
-    assert status == 404
-    assert payload["error"]["code"] == "feature_disabled"
+    assert status == 401
+    assert payload["error"]["code"] == "unauthorized"
 
-    # A valid session does NOT open a gated surface.
+    # A valid session can now access a gated-on surface.
     status, payload = _super(app).get("/api/v1/bridge/registry")
-    assert status == 404
-    assert payload["error"]["code"] == "feature_disabled"
+    assert status == 200
+    assert "profiles" in payload["data"]
 
 
-def test_the_registry_flag_entry_is_declared_off():
-    """The registry declares the bridge surface, defaulting off (GR-5)."""
+def test_the_registry_flag_entry_is_declared_on():
+    """The registry declares the bridge surface, defaulting on (GR-5 reversal 2026-09-21)."""
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     bridge = LiveBridge(repo_root=REPO_ROOT)
-    # enabled=None resolved OFF, which is only possible from the registry entry.
-    assert bridge.enabled is False
+    # enabled=None resolved ON, which is now the default per registry entry.
+    assert bridge.enabled is True
     text = (REPO_ROOT / "infra" / "feature-flags" / "registry.yaml").read_text(
         encoding="utf-8"
     )
