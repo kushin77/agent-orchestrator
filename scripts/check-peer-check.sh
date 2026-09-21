@@ -105,6 +105,7 @@ python3 - "$ledger" <<'PY' >"$TMPD/fixture.out" 2>&1
 import json
 import pathlib
 import sys
+from datetime import datetime, timedelta, timezone
 
 ledger = pathlib.Path(sys.argv[1])
 dispatch = pathlib.Path("governance/dispatch").resolve()
@@ -115,12 +116,19 @@ import claims as claims_mod  # noqa: E402
 SIBLING_FILE = "scripts/peer-check.sh"
 OTHER_FILE = "registry/personas/README.md"
 
+# The claims are stamped RELATIVE to the live clock, never pinned to a literal
+# day: the engine resolves liveness from CLAIM_TTL_HOURS against the real clock,
+# so a hardcoded date is a bomb that detonates once it is 24h old and this gate
+# collapses to a false green (docs/PYTHON-PATTERNS.md PP-1). `fresh` is "now",
+# `fresh + 1s` preserves the fixture's 1-second ordering between the records.
+fresh = datetime.now(timezone.utc)
+
 records = {
     "0001-07012-ao-sub-7012-claim.json": {
         "event": "claim",
         "issue": 7012,
         "agent": "ao-sub-7012",
-        "at": "2026-09-20T18:00:00Z",
+        "at": fresh.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "lane": "portal",
         "reason": "fixture",
         "files": [{"path": SIBLING_FILE, "regions": None}],
@@ -129,7 +137,7 @@ records = {
         "event": "claim",
         "issue": 7013,
         "agent": "ao-sub-7013",
-        "at": "2026-09-20T18:00:01Z",
+        "at": (fresh + timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "lane": "registry",
         "reason": "fixture",
         "files": [{"path": OTHER_FILE, "regions": None}],

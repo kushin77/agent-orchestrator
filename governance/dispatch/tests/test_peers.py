@@ -325,16 +325,12 @@ def test_a_missing_ledger_is_cannot_assess_never_a_pass(tmp_path, capsys):
 def test_an_overlap_on_the_command_line_exits_one(tmp_path, capsys):
     ledger = tmp_path / "claims"
     ledger.mkdir()
-    # `peers.main()` below reads the ledger against the REAL clock (it takes
-    # no `now` override), unlike the fixed-NOW helper tests in this file that
-    # call `claims_mod.active_claims(..., NOW)` directly. `event()`'s default
-    # `at` is a literal past timestamp, so a claim written with it ages past
-    # the claim TTL as real time moves forward and this arm starts observing
-    # a correctly-expired (dropped) claim instead of the live overlap it is
-    # meant to plant (#1501). Use a claim made "just now" so it is live
-    # regardless of which day the suite runs.
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    held = event(12, "ao-sub-12", at=now_iso, files=[FileClaim("a.sh")])
+    # The evaluation instant is pinned, never the wall clock: `peers.main()`
+    # takes a `now` seam and this arm passes `NOW`. `NOW` (19:00Z) is an hour
+    # AFTER `event()`'s default `at` (18:00Z) and well inside the claim TTL, so
+    # the planted sibling is live against the instant the check resolves
+    # against — on any day the suite runs (docs/PYTHON-PATTERNS.md PP-1).
+    held = event(12, "ao-sub-12", files=[FileClaim("a.sh")])
     (ledger / "0001-00012-ao-sub-12-claim.json").write_text(
         _json(held.to_json()), encoding="utf-8"
     )
@@ -349,7 +345,8 @@ def test_an_overlap_on_the_command_line_exits_one(tmp_path, capsys):
             "--ledger",
             str(ledger),
             "--no-branch-files",
-        ]
+        ],
+        now=NOW,
     )
     captured = capsys.readouterr()
     assert rc == peers.EXIT_NOT_OK
