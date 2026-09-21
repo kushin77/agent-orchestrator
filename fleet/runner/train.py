@@ -714,6 +714,37 @@ def base_moved(git: Command, *, repo: Path, base_tip: str, lock_path: Path) -> s
 
 
 # --- attribution ----------------------------------------------------------------
+#: A check's name reaches this module in ONE OF TWO SHAPES, and both are real:
+#:
+#:   * BARE (`reconcile`, `env-surface`) — `scripts/verify.sh:1032` takes
+#:     `name="${entry%%|*}"`, the part of its `'name|command'` entry before the
+#:     pipe, and `:1180` writes that into `.verify/attestation.json`. This is the
+#:     shape in a TRAIN SEAT, because `verify.py:parse_verify_evidence` PREFERS
+#:     the attestation (`source = "attestation"`).
+#:   * PREFIXED (`check-docs`, `check-reconcile`) — the transcript fallback's own
+#:     spelling, used only when no attestation was written.
+#:
+#: The script is `scripts/check-<name>.sh` in BOTH cases. Resolving a single
+#: shape therefore makes the other one unrunnable — which is not a cosmetic
+#: label: `attribute_red`'s `pre-existing` escape ("the wave does not pay for it")
+#: is reached ONLY through a resolved script, so a whole shape of reds could never
+#: be attributed at all, and the train was retired on every round instead. Measured
+#: 2026-09-21: 21 of 21 attributions `unrunnable`, 4 trains abandoned, master
+#: unmoved and 30 PRs blocked (#1685). Resolve by asking the TREE, never a guess.
+def check_script(tree: Path, name: str) -> str | None:
+    """The repo-relative script for a check, in either naming shape, or None.
+
+    None means the tree genuinely carries no such script — never that this module
+    could not tell. A caller that gets None must say `unrunnable`, which is a
+    refusal, not a green.
+    """
+    shapes = [f"{name}.sh"] if name.startswith("check-") else [f"check-{name}.sh", f"{name}.sh"]
+    for shape in shapes:
+        if (Path(tree) / CHECK_SCRIPT_DIR / shape).is_file():
+            return f"{CHECK_SCRIPT_DIR}/{shape}"
+    return None
+
+
 def check_inputs(name: str, repo: Path) -> tuple[str, ...] | None:
     """The paths a check reads: the declared set, or None when undeclared.
 
@@ -721,11 +752,18 @@ def check_inputs(name: str, repo: Path) -> tuple[str, ...] | None:
     then tests EVERY candidate — an undeclared check is paid for, not skipped.
     A declared check that does not exist in the tree is `unrunnable` where it is
     measured, never silently green.
+
+    `CHECK_INPUTS` is keyed by the PREFIXED shape while a train seat hands over
+    the BARE one, so both keys are tried: missing the declaration would silently
+    widen the candidate set, and a check that reads everything is paid for by
+    every PR in the wave.
     """
     declared = CHECK_INPUTS.get(name)
+    if declared is None:
+        declared = CHECK_INPUTS.get(name if name.startswith("check-") else f"check-{name}")
     if declared is not None:
         return declared
-    if (Path(repo) / CHECK_SCRIPT_DIR / f"{name}.sh").is_file():
+    if check_script(repo, name) is not None:
         return WHOLE_TREE
     return None
 
@@ -751,11 +789,16 @@ def pr_touches(paths: Sequence[str] | None, inputs: Sequence[str] | None) -> boo
 
 
 def run_check(sh: Command, worktree: Path, name: str) -> Result | None:
-    """Run ONE check in a worktree. None when the tree carries no such script."""
-    script = Path(worktree) / CHECK_SCRIPT_DIR / f"{name}.sh"
-    if not script.is_file():
+    """Run ONE check in a worktree. None when the tree carries no such script.
+
+    The name may arrive in either shape the tree spells (see `check_script`); the
+    resolution is by FILE, so a check that exists is run and one that does not is
+    refused by name rather than quietly skipped.
+    """
+    script = check_script(worktree, name)
+    if script is None:
         return None
-    return sh(["bash", f"{CHECK_SCRIPT_DIR}/{name}.sh"], cwd=worktree)
+    return sh(["bash", script], cwd=worktree)
 
 
 def attribute_red(
