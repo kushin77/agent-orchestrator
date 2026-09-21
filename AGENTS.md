@@ -356,7 +356,9 @@ describing what will land there; later issues fill the directories in.
 6. **Report evidence,** never an unverified "done": exact command + output,
    files touched, and the issue closed (GR-12).
 7. **Open a PR** that closes the issue; declare AI-assistance + runtime
-   (e.g. `AI-assistance: Copilot (Relentless, flash/LOW)`).
+   (e.g. `AI-assistance: Copilot (Relentless, flash/LOW)`). Render the body
+   with `scripts/pr-body.sh <issue>` (`--refs` for a non-closing PR) so the
+   trailer paragraph is never hand-typed (issue #1674).
 8. **Merge after green** per the autonomous-merge doctrine, then close the
    issue with the evidence comment.
 
