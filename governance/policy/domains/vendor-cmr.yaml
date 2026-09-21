@@ -1,0 +1,48 @@
+# The vendor-cmr policy domain (issue #1769).
+#
+# The owner's premise — "our CMR already has a GDC policy" — was recorded in
+# docs/rca/2026-09-21-policy-centralization-gap-review.md as *Not found*, on the
+# strength of `grep -rln "gdc" vendor/CMR/` returning zero hits. That grep is
+# VACUOUS: `vendor/CMR` is an unpopulated submodule in every fresh worktree
+# (measured 2026-09-21 — `git submodule status vendor/CMR` prints a leading `-`,
+# meaning "not initialised", and the directory holds 0 files), so it returns
+# zero hits whatever CMR contains. The recorded absence was an artifact of the
+# empty checkout, not a measurement of CMR.
+#
+# Measured instead at the pin this repo actually declares (`.gitmodules` ->
+# https://github.com/kushin77/CMR.git @
+# b6c49aa03992dba9fe4b87b46104b8fc2f69f224, "main tip, 2026-09-08"), read-only
+# over the GitHub API on 2026-09-21, the pinned ref DOES carry the GDC pillar's
+# policy surface:
+#   sync/gdc-policy-bundle.txt                — the GDC *policy bundle* ("the
+#                                               policy-enforcement files CMR
+#                                               ships to governed/vendor repos
+#                                               when GDC policy changes",
+#                                               CMR-904 / EPIC-09)
+#   sync/GDC-FEED.md                          — the GDC change feed
+#   sync/gdc-event.schema.json                — the feed's event schema
+#   sync/gdc-feed.sh                          — the feed handler
+#   catalog/schemas/gdc-manifest.schema.json  — the GDC spoke manifest schema
+#   templates/module/gdc-manifest.yaml        — its module template
+#   board/epics/EPIC-22-gdc-portal.md         — the GDC portal epic
+# (In CMR, GDC is the "Git Domain Controller" pillar — a different sense from
+# this repo's own `gdc` tag-authority dimension in domains/gdc.yaml.)
+#
+# So the premise is CONFIRMED at the declared pin, not a gap: this row
+# CROSS-REFERENCES the found artifact rather than asserting an absence. It stays
+# control_plane_visible: false because the vendored content is not materialised
+# in a worktree (the registry has no local source to stand behind) and GDC is
+# remote hub policy, not a policy this repo enforces.
+#
+# Reconciliation question left for the owner (no async answer is possible here):
+# which CMR ref or module did you mean — the pinned b6c49aa's
+# `sync/gdc-policy-bundle.txt` (the GDC policy bundle), the GDC portal epic
+# (EPIC-22), or the vendored `gdc-manifest` schema — and should this repo mirror
+# that GDC policy surface rather than the one it declares in
+# governance/conformance/policy.yaml?
+#
+# Schema: governance/policy/README.md.
+domain: vendor-cmr
+source_file: vendor/CMR
+enforcement_point: "not reporting: cross-reference, not a gap — vendor/CMR is an unpopulated submodule in this worktree (measured 2026-09-21: git submodule status shows a leading '-' and the directory holds 0 files), so the RCA's grep-based 'Not found' was vacuous; the pinned ref the repo declares (.gitmodules -> kushin77/CMR @ b6c49aa03992dba9fe4b87b46104b8fc2f69f224) carries the GDC policy surface — sync/gdc-policy-bundle.txt (the GDC policy bundle), sync/GDC-FEED.md, sync/gdc-event.schema.json, catalog/schemas/gdc-manifest.schema.json — measured read-only 2026-09-21; owner's premise CONFIRMED at the declared pin; open reconciliation: which CMR ref/module is meant, and whether to mirror its GDC policy surface"
+control_plane_visible: false
