@@ -44,6 +44,7 @@ REQUIRED_VIEWS = [
     # them by the `portal` suite, not only by the lane that added them.
     "taskboard",     # Tenant task board (engine ticket-log replay)
     "board",         # Fleet board (.board snapshot + claims)
+    "sessions",      # Cross-engine Sessions view (issue #1563)
 ]
 
 

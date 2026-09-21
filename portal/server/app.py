@@ -51,6 +51,7 @@ from portal.server.ops_health import OpsHealthReports
 from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
 from portal.server.erp import ErpModuleError, ErpModuleSurface
 from portal.server.livestore import BoardSurface, TelemetryUnavailableError
+from portal.server.sessions import SessionsView
 from portal.server.org_chart import OrgChartView
 from portal.server.skill_studio import (
     ACTION_AUTHOR,
@@ -172,6 +173,7 @@ class ConsoleApplication:
         operator_terminal_enabled: Optional[bool] = None,
         erp_module_surface: Optional[ErpModuleSurface] = None,
         board_surface: Optional[BoardSurface] = None,
+        sessions_view: Optional[SessionsView] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -272,6 +274,13 @@ class ConsoleApplication:
             board_surface
             if board_surface is not None
             else BoardSurface(repo_root=self.repo_root)
+        )
+        # The cross-engine Sessions view (issue #1563) — feature-flag-gated
+        # OFF, declared beside the fleet board for the same reason.
+        self.sessions = (
+            sessions_view
+            if sessions_view is not None
+            else SessionsView(repo_root=self.repo_root)
         )
         # The operator terminal (issue #774) — feature-flag-gated OFF. It
         # composes the fleet projection (read) and the remote control family
@@ -648,6 +657,15 @@ class ConsoleApplication:
                 "(portal/config/feature-flags.yaml surfaces.fleet_board)",
             )
 
+        # The Sessions view (issue #1563) ships the same way, gated before authN.
+        if parts[0] == "sessions" and not self.sessions.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the sessions view is feature-flag-gated OFF "
+                "(portal/config/feature-flags.yaml surfaces.sessions)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
@@ -675,6 +693,8 @@ class ConsoleApplication:
                 return self._route_erp(parts[1:], method, body)
             if parts[0] == "board":
                 return self._route_board(parts, method)
+            if parts[0] == "sessions":
+                return self._route_sessions(parts, method)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -879,6 +899,22 @@ class ConsoleApplication:
             except TelemetryUnavailableError as exc:
                 raise ApiError(503, "board_unavailable", str(exc)) from None
         raise ApiError(404, "not_found", f"no such board read: {'/'.join(surface)}")
+
+    def _route_sessions(self, parts: list[str], method: str) -> Response:
+        """The cross-engine Sessions view (issue #1563).
+
+        Reads: ``GET /api/sessions/rows`` — every session row joined from
+        ``.fleet/claims/*``, ``.board/claims.jsonl`` and
+        ``.deepseek-agent/sessions/*``, plus a ``missing`` list naming any of
+        those three roots absent from this checkout. GET-only; when the
+        view's flag is off the route never reaches here.
+        """
+        if method != "GET":
+            raise ApiError(405, "method_not_allowed", "the sessions view is GET only")
+        surface = parts[1:]
+        if surface == ["rows"]:
+            return self._ok(self.sessions.sessions())
+        raise ApiError(404, "not_found", f"no such sessions read: {'/'.join(surface)}")
 
     def _route_erp(
         self, surface: list[str], method: str, body: dict[str, Any]
