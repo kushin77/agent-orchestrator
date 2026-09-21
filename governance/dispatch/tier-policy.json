@@ -1,0 +1,16 @@
+{
+  "policy_version": "1.0.0",
+  "description": "Tiered try-loop dispatcher model mapping (issue #1524). L0/L1/L2 -> concrete model ids, one per provider, with a default provider. The provider (claude vs deepseek) is a config choice so it can change without code edits. Tier definitions are canonically documented in vendor/CMR/docs/MODEL-PROFILES.md; this file maps those tiers to the concrete invocation model ids the dispatcher runs.",
+  "tiers": {
+    "L0": { "claude": "haiku", "deepseek": "deepseek-v4-flash" },
+    "L1": { "claude": "sonnet", "deepseek": "deepseek-v4-pro" },
+    "L2": { "claude": "opus", "deepseek": "deepseek-v4-pro" }
+  },
+  "default_provider": "deepseek",
+  "max_attempts_per_tier": 3,
+  "escalate_label": {
+    "L0": "escalate:L1",
+    "L1": "escalate:L2",
+    "L2": null
+  }
+}
