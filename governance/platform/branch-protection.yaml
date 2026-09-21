@@ -134,3 +134,16 @@ protection:
 # a context nothing ever writes).
 required_status_contexts:
   - ao/gate-of-record
+
+# CTO root principal — branch-protection bypass (kushin77/agent-orchestrator#1511).
+#
+# The root principal (declared as `cto` in the hub's
+# catalog/topology/principals.yaml) holds the `push-lane-branches` right, which
+# lets it bypass branch protection to push a lane branch directly. Declared here
+# as intent, OUTSIDE `protection`: the branch-protection API object this repo
+# declares has no `bypass_actors` field — that field belongs to the ruleset-based
+# protection API, whose application is a separate deliberate step (exactly like
+# `required_status_contexts` above, which `apply` also does not PUT). The
+# `cto-root` team name matches the root principal's declared `github.team`.
+bypass_actors:
+  - cto-root
