@@ -124,7 +124,10 @@ fi
 # that verb's own `--stale-minutes` is a liveness bound its loop callers opt
 # into, while the age THIS gate tolerates is a property of this consumer.
 echo "== board freshness (the age this consumer tolerates) =="
-python3 governance/dispatch/cli.py freshness --snapshot "$snapshot_file"
+# --refresh: self-heal (issue #1692) — try the one refresh verb before failing,
+# so master never drifts past the tolerance while the fleet can still reach
+# GitHub; a genuinely offline/unauthenticated box still fails, naming why.
+python3 governance/dispatch/cli.py freshness --snapshot "$snapshot_file" --refresh
 fresh_rc=$?
 case "$fresh_rc" in
   0) ;;

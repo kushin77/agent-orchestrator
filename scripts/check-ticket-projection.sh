@@ -72,7 +72,10 @@ store=".verify/ticket/tickets.json"
 # See governance/ticket/freshness.py for the tolerance and the measured cadence
 # behind it.
 echo "== board freshness =="
-if ! python3 governance/ticket/cli.py freshness; then
+# --refresh: self-heal (issue #1692) — try the one refresh verb before failing,
+# so master never drifts past the tolerance while the fleet can still reach
+# GitHub; a genuinely offline/unauthenticated box still fails, naming why.
+if ! python3 governance/ticket/cli.py freshness --refresh; then
   echo "check-ticket-projection: FAIL — the committed board snapshot is outside the age" \
     "this consumer tolerates (see above), so every reference the projection resolves is" \
     "against a stale frontier" >&2

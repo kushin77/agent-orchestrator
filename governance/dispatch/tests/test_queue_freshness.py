@@ -25,7 +25,8 @@ from pathlib import Path
 
 import pytest
 
-import cli
+import cli  # noqa: F401 — imported first: it puts governance/ on sys.path for board_selfheal
+import board_selfheal
 import queue_freshness
 import snapshot as snapshot_mod
 from model import REASON_SNAPSHOT_STALE
@@ -189,3 +190,53 @@ def test_cli_freshness_is_tri_state(tmp_path, capsys):
 
     assert cli.main(["freshness", "--snapshot", str(fresh), "--now", "not-a-time"]) == 2
     assert "CANNOT-ASSESS" in capsys.readouterr().err
+
+
+def test_cli_freshness_without_refresh_never_touches_the_network(tmp_path, capsys, monkeypatch):
+    """The FIX-BEFORE state (issue #1692): a stale snapshot fails outright, and
+    no --refresh means self_heal is never even reachable — the read verb must
+    not touch the network unasked."""
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("refresh must not be called without --refresh")
+
+    monkeypatch.setattr(board_selfheal, "refresh", _boom)
+    aged = _dated(tmp_path, "2026-09-01T00:00:00Z")
+    assert cli.main(["freshness", "--snapshot", str(aged)]) == 1
+    err = capsys.readouterr().err
+    assert queue_freshness.CODE_BOARD_STALE in err
+    assert "no self-heal attempted" in err
+
+
+def test_cli_freshness_self_heals_when_the_refresh_succeeds(tmp_path, capsys, monkeypatch):
+    """The FIX (issue #1692): stale-but-refreshable passes — the gate refreshes
+    the committed record itself through its own declared remedy and re-assesses,
+    instead of failing on an age a self-heal could have cleared."""
+    aged = _dated(tmp_path, "2026-09-01T00:00:00Z")
+
+    def _fake_refresh(repo=None, *, runner=None, timeout=None):
+        aged.write_text(
+            json.dumps({"source": "test", "issues": [], "generated_at": snapshot_mod.now_iso()}),
+            encoding="utf-8",
+        )
+        return True, "refreshed 0 issue(s) from test/repo"
+
+    monkeypatch.setattr(board_selfheal, "refresh", _fake_refresh)
+    assert cli.main(["freshness", "--snapshot", str(aged), "--refresh"]) == 0
+    out = capsys.readouterr().out
+    assert "freshness: OK (self-healed" in out
+
+
+def test_cli_freshness_fails_with_reason_when_the_refresh_is_impossible(tmp_path, capsys, monkeypatch):
+    """The FIX's other half: stale-and-unrefreshable still fails, and the
+    refusal names WHY the self-heal did not clear it (no gh auth / offline)."""
+    aged = _dated(tmp_path, "2026-09-01T00:00:00Z")
+
+    def _offline_refresh(repo=None, *, runner=None, timeout=None):
+        return False, "gh issue list failed (1): gh: not logged into any GitHub hosts"
+
+    monkeypatch.setattr(board_selfheal, "refresh", _offline_refresh)
+    assert cli.main(["freshness", "--snapshot", str(aged), "--refresh"]) == 1
+    err = capsys.readouterr().err
+    assert queue_freshness.CODE_BOARD_STALE in err
+    assert "self-heal refresh failed: gh issue list failed" in err

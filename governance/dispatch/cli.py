@@ -36,7 +36,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import board_selfheal  # noqa: E402
 import claims  # noqa: E402
 import focus as focus_mod  # noqa: E402
 import live as live_mod  # noqa: E402
@@ -818,18 +820,36 @@ def cmd_freshness(args: argparse.Namespace) -> int:
         except ValueError as exc:
             print(f"freshness: CANNOT-ASSESS — --now {args.now!r} is not a timestamp ({exc})", file=sys.stderr)
             return EXIT_CANNOT_ASSESS
+    max_age = queue_freshness.DEFAULT_MAX_AGE_HOURS if args.max_age_hours is None else args.max_age_hours
     try:
-        verdict = queue_freshness.assess(
-            Path(args.snapshot), max_age_hours=args.max_age_hours, now=now
-        )
+        if getattr(args, "refresh", False):
+            verdict, healed, refresh_detail = board_selfheal.self_heal(
+                queue_freshness.assess,
+                Path(args.snapshot),
+                max_age_hours=max_age,
+                now=now,
+                repo=args.repo,
+                timeout=getattr(args, "refresh_window", None),
+                stale_code=queue_freshness.CODE_BOARD_STALE,
+            )
+        else:
+            verdict = queue_freshness.assess(Path(args.snapshot), max_age_hours=max_age, now=now)
+            healed, refresh_detail = False, ""
     except queue_freshness.CannotAssess as exc:
         print(f"freshness: CANNOT-ASSESS — {exc} (refresh it with: {queue_freshness.REFRESH_COMMAND})", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
     if verdict.ok:
-        print(f"freshness: OK — {verdict.render()}")
+        if healed:
+            print(f"freshness: OK (self-healed — {refresh_detail}) — {verdict.render()}")
+        else:
+            print(f"freshness: OK — {verdict.render()}")
         return EXIT_OK
     for finding in verdict.findings:
         print(f"  FAIL  {finding.render()}", file=sys.stderr)
+    if refresh_detail:
+        print(f"  FAIL  self-heal refresh failed: {refresh_detail}", file=sys.stderr)
+    elif not getattr(args, "refresh", False):
+        print("  FAIL  no self-heal attempted — run with --refresh to try it", file=sys.stderr)
     print(
         "freshness: FAIL — the committed board snapshot is outside the age this "
         "consumer tolerates (see above), so every exists/open answer is against a "
@@ -1051,6 +1071,26 @@ def build_parser() -> argparse.ArgumentParser:
             "wall clock, so a gate can provoke the refusal deterministically. The "
             "gate's assertion on the real snapshot never passes it."
         ),
+    )
+    fresh.add_argument(
+        "--refresh",
+        action="store_true",
+        help=(
+            "self-heal (issue #1692): on a stale snapshot, run the ONE bounded board "
+            "refresh before failing — OFF by default, a READ verb must not reach the "
+            "network unasked"
+        ),
+    )
+    fresh.add_argument(
+        "--refresh-window",
+        type=float,
+        default=None,
+        help="seconds the in-band refresh may take (default: the trigger window)",
+    )
+    fresh.add_argument(
+        "--repo",
+        default=snapshot_mod.DEFAULT_REPO,
+        help="the GitHub board a --refresh reads (default: %(default)s)",
     )
     fresh.set_defaults(func=cmd_freshness)
     return parser
