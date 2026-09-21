@@ -46,6 +46,7 @@ import liveness as liveness_mod  # noqa: E402
 import order  # noqa: E402
 import pool as pool_mod  # noqa: E402
 import owner_queue as queue_mod  # noqa: E402
+import peers  # noqa: E402
 import queue_freshness  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
 import tiered  # noqa: E402
@@ -244,6 +245,20 @@ def cmd_claim(args: argparse.Namespace) -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         print(f"claim: CANNOT-ASSESS — --files is not valid: {exc}", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
+    # A2A peer-check standard (#1549/#1625), cadence point 1: before a claim is
+    # RECORDED, refuse by name if the files it wants overlap a live sibling's.
+    # The ONE function (`peers.peer_check`) already used by the standalone CLI
+    # and the tiered dispatcher — never re-implemented here.
+    live = claims.active_claims(claims.read_ledger(args.ledger))
+    peer_report = peers.peer_check(files, live, caller_agent=args.agent, caller_issue=args.issue)
+    if peer_report.verdict == "OVERLAP":
+        # `claim REFUSED: <reason> — <detail>` is the convention every other
+        # refusal in this command uses (ClaimRefused below); the peer-check
+        # reason is printed the same way, alongside the sibling table, so it
+        # augments the existing claim reasons rather than replacing them.
+        print(peer_report.table(), file=sys.stderr)
+        print(f"claim REFUSED: peer-check-overlap — {peer_report.refusal()}", file=sys.stderr)
+        return EXIT_NOT_OK
     try:
         event = claims.claim(
             args.issue,

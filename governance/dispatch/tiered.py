@@ -51,13 +51,15 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Sequence
 
 _PKG_DIR = Path(__file__).resolve().parent
 if str(_PKG_DIR) not in sys.path:
     sys.path.insert(0, str(_PKG_DIR))
 
 import audit  # noqa: E402
+import claims as claims_mod  # noqa: E402
+import peers  # noqa: E402
 
 DEFAULT_POLICY_PATH = _PKG_DIR / "tier-policy.json"
 
@@ -293,6 +295,8 @@ def run(
     apply_label: Callable[[int, str], None] | None = None,
     post_comment: Callable[[int, str], None] | None = None,
     dry_run: bool = False,
+    caller_files: Sequence[str] = (),
+    ledger: Path | str = claims_mod.DEFAULT_CLAIMS_DIR,
 ) -> dict[str, Any]:
     """Run the tiered try-loop for one issue; return a summary dict.
 
@@ -304,7 +308,29 @@ def run(
     All side effects are hooks: ``invoke`` runs the model, ``run_acceptance``
     runs the acceptance commands, ``apply_label``/``post_comment`` touch GitHub.
     Passing ``dry_run=True`` resolves the mapping and records nothing.
+
+    A2A peer-check standard (#1549/#1625), cadence point 3 (pre-dispatch): a
+    dispatch whose ``caller_files`` overlap a live sibling's is aborted before
+    any tier is invoked, via the same ``peers.peer_check`` the claim CLI already
+    calls — escalating per this module's own protocol (``TieredRefusal``).
     """
+    live = claims_mod.active_claims(claims_mod.read_ledger(ledger))
+    named_files = tuple(peers.FileClaim(path=str(p)) for p in caller_files)
+    # The fallback lookup can fall through to a DIFFERENT issue than the one
+    # being dispatched (the agent's live claim is on #42, not #701): the
+    # matched issue is carried as `peer_issue` so that record is excluded as
+    # the caller's own, never judged a sibling of itself.
+    peer_issue = issue_number
+    if named_files:
+        files = named_files
+    else:
+        files = peers._caller_files_from_live(live, agent, issue_number)
+        peer_issue = next((number for number in sorted(live) if live[number].agent == agent), issue_number)
+    if files:
+        report = peers.peer_check(files, live, caller_agent=agent, caller_issue=peer_issue)
+        if report.verdict == "OVERLAP":
+            raise TieredRefusal("peer-check-overlap", report.refusal())
+
     data = policy if policy is not None else load_policy()
     chosen_provider = provider or data["default_provider"]
     tier, warning = read_tier(labels)

@@ -516,6 +516,50 @@ def beat_runtime(runtime_id: str, state: str = "running") -> None:
     beats.best_effort(runtime_id, state, root=beats.ROOT, cwd=ROOT)
 
 
+def peer_check_cadence(agent_id: str, *, ledger: Path | str | None = None) -> str | None:
+    """Run the A2A peer-check standard on the fleet loop's cadence (#1549/#1625).
+
+    Called at loop start and on every poll cycle, the same cadence `beat_runtime`
+    already uses. Records the verdict (a live sibling refused BY NAME on overlap)
+    and never blocks the loop — a monitoring cadence, not a claim gate; `cmd_claim`
+    and the tiered dispatcher are the points that refuse. Returns the refusal text
+    (``None`` when disjoint, or when this runtime holds no live claim of its own
+    to judge) so a caller/test can assert on it directly.
+
+    `governance/dispatch` is imported LAZILY, same reason as `beat_runtime`'s own
+    `import beats`: a gate fixture that copies this file alone into a scratch tree
+    (`scripts/check-orphan-handoff.sh`) must still be able to import the loop.
+    """
+    try:
+        dispatch_dir = ROOT / "governance" / "dispatch"
+        if str(dispatch_dir) not in sys.path:
+            sys.path.insert(0, str(dispatch_dir))
+        import claims as dispatch_claims
+        import peers
+    except ImportError as exc:
+        print(f"[peer-check] {agent_id} cadence check REFUSED — not importable: {exc}", file=sys.stderr, flush=True)
+        return None
+    ledger = ledger if ledger is not None else dispatch_claims.DEFAULT_CLAIMS_DIR
+    try:
+        live = dispatch_claims.active_claims(dispatch_claims.read_ledger(ledger))
+        # The loop's own files come from its own live claim record (the same
+        # fallback `peers.main` uses when no `--files` is named): the fleet loop
+        # never claims files directly, so this is `()` unless the runtime itself
+        # is recorded holding one. The matching issue is carried too so
+        # `peer_check` excludes that record as the caller's OWN claim rather
+        # than judging it a sibling of itself.
+        own_issue = next((number for number in sorted(live) if live[number].agent == agent_id), None)
+        caller_files = peers._caller_files_from_live(live, agent_id, own_issue)
+        report = peers.peer_check(caller_files, live, caller_agent=agent_id, caller_issue=own_issue)
+    except Exception as exc:  # noqa: BLE001 — never fatal, same contract as beat_runtime
+        print(f"[peer-check] {agent_id} cadence check REFUSED — {exc}", file=sys.stderr, flush=True)
+        return None
+    refusal = report.refusal()
+    if refusal:
+        print(f"[peer-check] {refusal}", flush=True)
+    return refusal
+
+
 def start_session_beat(env: dict | None, pid: int) -> object | None:
     """Beat a per-session heartbeat for the lane this dispatch owns (#304).
 
@@ -2458,6 +2502,7 @@ def loop(args: argparse.Namespace) -> int:
     # `runtime-stale:deepseek-sister` means "this loop stopped", not "nobody
     # implemented a producer for it" (which is what it meant before this landed).
     beat_runtime(SISTER_RUNTIME_ID)
+    peer_check_cadence(SISTER_RUNTIME_ID)
 
     def run_worker(
         directive: dict,
@@ -2559,6 +2604,7 @@ def loop(args: argparse.Namespace) -> int:
         # every path through it — including the `continue`s below, which is where
         # a beat written at the END of the cycle would silently stop arriving.
         beat_runtime(SISTER_RUNTIME_ID)
+        peer_check_cadence(SISTER_RUNTIME_ID)
         # Mid-run steering (issue #367): deliver any steer the director queued for a
         # live run before this cycle does anything else.
         delivered_steers = deliver_pending_steers()

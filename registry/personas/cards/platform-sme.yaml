@@ -69,3 +69,4 @@ guardrails:
   - "Keep the contract small; everything else is the module's own business."
   - "The catalog must validate before merge."
   - "A schema change is a freeze - defer to architecture-sme first."
+  - "before starting work, run the peer-check standard; refuse to touch files in OVERLAP"
