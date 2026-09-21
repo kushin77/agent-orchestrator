@@ -63,11 +63,39 @@ gateway's ``ApiKeyVault`` (``AO_VAULT_KEY``-encrypted at rest), sourced from
 Vault ``secret/shared-services/nous`` and mirrored to GSM. An absent key means
 no ``Authorization`` header is sent at all, so the call fails at the provider
 with a 401 rather than silently succeeding.
+
+The GSM mirror needs a declared landing spot for the *default* (non-tenant)
+key (issue #1748): ``NOUS_API_KEY_ENV`` names the environment variable the
+Cloud Run revision is given via Terraform ``secret_key_ref``
+(``infra/terraform/provider-credentials.json`` -> ``infra/terraform/main.tf``,
+gated on the existing ``enable_hermes`` flag, default OFF). Reading it here
+mirrors the repo's one existing convention for secret material delivered as
+an env var: ``gateway/providers/vault.py::load_master_key`` reads
+``AO_VAULT_KEY`` with the same ``os.environ.get(env, "")`` shape. No key set
+means ``default_api_key()`` returns ``None`` and the provider fails closed at
+the API (401), never a literal fallback.
 """
 
 from __future__ import annotations
 
+import os
+
 from providers.base import OpenAICompatProvider
+
+#: Env var the Cloud Run revision is given, via Terraform secret_key_ref,
+#: when `enable_hermes` is on (infra/terraform/provider-credentials.json).
+NOUS_API_KEY_ENV = "NOUS_API_KEY"
+
+
+def default_api_key(env: str | None = None) -> str | None:
+    """The default (non-tenant) Nous API key from the environment, if set.
+
+    Returns ``None`` when unset or empty — fail closed, never a literal
+    fallback (GR-6). The per-tenant path stays ``ApiKeyVault``; this is only
+    the landing spot for the IaC-projected default key (issue #1748).
+    """
+    value = os.environ.get(env or NOUS_API_KEY_ENV, "")
+    return value or None
 
 
 class NousProvider(OpenAICompatProvider):

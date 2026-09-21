@@ -138,9 +138,14 @@ services:
       and is the frozen hermes -> hermes/ollama fallback target (EPIC #253).
       Unlike paperclip it is not a separate deployable process — no OCI image,
       no terraform module (module.json distribution.terraform is null) — so
-      this row declares the independent rollout/kill-switch only; nothing in
-      infra/terraform creates or gates a resource for it, and (like paperclip)
-      it carries no infra/rollout/rollout-state.yaml entry. The declared
+      this row declares the independent rollout/kill-switch only for the local
+      hermes endpoint itself; it carries no infra/rollout/rollout-state.yaml
+      entry, like paperclip. `enable_hermes` DOES now gate one terraform
+      resource, unrelated to this local endpoint: the Nous cloud provider
+      credential (issue #1748, infra/terraform/provider-credentials.json ->
+      main.tf) reuses this flag as its kill-switch per that issue's own
+      instruction, rather than adding a second flag for one Secret Manager
+      declaration. The declared
       `enable_hermes` variable is the switch itself, and it is a LIVE gate:
       the provider registry reads it (gateway/providers/flags.py, issue #1518)
       and, while it is off, drops hermes from the active provider set — hermes

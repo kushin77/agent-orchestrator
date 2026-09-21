@@ -91,7 +91,7 @@ variable "enable_paperclip" {
 }
 
 variable "enable_hermes" {
-  description = "Independent rollout/kill-switch for the local hermes agent-service provider (issue #255, module-catalog issue #349, feature-flag registry entry `hermes`). Not a separate deployable process — no OCI image, no terraform resource — so this variable declares the switch only; the in-process gateway provider is gated at the rollout layer. OFF until promoted."
+  description = "Independent rollout/kill-switch for the local hermes agent-service provider (issue #255, module-catalog issue #349, feature-flag registry entry `hermes`). Not a separate deployable process — no OCI image — so the in-process gateway provider itself is gated at the rollout layer. It also gates the one terraform resource that exists for this flag (issue #1748): the Nous cloud credential (`infra/terraform/provider-credentials.json` -> `main.tf`'s `google_secret_manager_secret`/`google_secret_manager_secret_iam_member`/`secret_key_ref` for the gateway service), unrelated to the local hermes endpoint but sharing its kill-switch per the issue's own instruction. OFF until promoted."
   type        = bool
   default     = false
 }

@@ -17,6 +17,24 @@ locals {
     portal     = { enabled = var.enable_portal, image = var.portal_image }
   }
 
+  # The Nous provider credential (issue #1748): declared ONCE in
+  # provider-credentials.json beside this file and PROJECTED from here --
+  # never restated. No value rides in the declaration (GR-6), only the secret
+  # id; the entry is only ever passed to a service's module instance when its
+  # `gate` flag is on, so with `enable_hermes` at its committed default
+  # (OFF) nothing here creates or grants anything.
+  provider_credentials = jsondecode(file("${path.module}/provider-credentials.json"))
+  provider_credentials_gate = {
+    enable_hermes = var.enable_hermes
+  }
+  gateway_secret_env = {
+    for s in local.provider_credentials.secrets : s.env => {
+      secret_id = s.secret_id
+      version   = s.version
+    }
+    if s.service == "gateway" && lookup(local.provider_credentials_gate, s.gate, false)
+  }
+
   # The web build (issue #606) publishes to Artifact Registry as
   # $_AR_REPO/$_IMAGE:$_TAG — the real reference for the web-surface module:
   # us-central1-docker.pkg.dev/<project_id>/ao-images/portal:<web_image_tag>.
@@ -65,11 +83,65 @@ module "control_plane_service" {
 
   for_each = local.services
 
-  enabled    = each.value.enabled
-  name       = "${var.env}-${each.key}"
-  image      = each.value.image
-  project_id = var.project_id
-  region     = var.region
+  enabled               = each.value.enabled
+  name                  = "${var.env}-${each.key}"
+  image                 = each.value.image
+  project_id            = var.project_id
+  region                = var.region
+  service_account_email = each.key == "gateway" ? one(google_service_account.gateway_runtime[*].email) : null
+  secret_env            = each.key == "gateway" ? local.gateway_secret_env : {}
+}
+
+# Secret Manager must be enabled for the gateway to read the Nous credential
+# (issue #1748) -- created only when there is something to read, never
+# unconditionally.
+resource "google_project_service" "secretmanager_gateway" {
+  count              = length(local.gateway_secret_env) > 0 ? 1 : 0
+  project            = var.project_id
+  service            = "secretmanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+# A dedicated runtime identity for the gateway, created only once there is a
+# secret for it to read (never the project default compute SA -- least
+# privilege). Its sole grant is below: read the declared provider secrets.
+resource "google_service_account" "gateway_runtime" {
+  count        = length(local.gateway_secret_env) > 0 ? 1 : 0
+  project      = var.project_id
+  account_id   = "${var.env}-gateway-runtime"
+  display_name = "Gateway runtime (issue #1748)"
+  description  = "Runtime identity for the gateway service: reads the provider credentials declared in provider-credentials.json from Secret Manager, and nothing else."
+}
+
+# The secret CONTAINER only -- name, no value, no version (GR-6). Terraform
+# declares the id the operator will later push a value into (issue #1748
+# step 5); it never creates a google_secret_manager_secret_version, so this
+# resource alone can never hold a literal.
+resource "google_secret_manager_secret" "gateway_provider_credentials" {
+  for_each = local.gateway_secret_env
+
+  project   = var.project_id
+  secret_id = each.value.secret_id
+
+  replication {
+    auto {}
+  }
+}
+
+# Read access, one grant per declared+gated secret -- part of the wiring
+# (without it the revision fails PERMISSION_DENIED), not an extra.
+resource "google_secret_manager_secret_iam_member" "gateway_provider_credentials" {
+  for_each = local.gateway_secret_env
+
+  project   = var.project_id
+  secret_id = each.value.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.gateway_runtime[0].email}"
+
+  depends_on = [
+    google_project_service.secretmanager_gateway,
+    google_secret_manager_secret.gateway_provider_credentials,
+  ]
 }
 
 # Named IAM role bundles for the deployer SA (issue #411/#1136 go-live), keyed

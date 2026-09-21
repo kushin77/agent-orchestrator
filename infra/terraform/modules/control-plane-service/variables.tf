@@ -62,3 +62,19 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "secret_env" {
+  description = <<-EOT
+    Secret Manager-backed env vars, injected via secret_key_ref, keyed by the
+    env name the container reads. Empty by default -- no secret is projected
+    unless the caller explicitly supplies one (issue #1748). The caller (this
+    module's root) is responsible for deciding WHETHER to pass an entry (the
+    flag gate) and for granting the runtime identity secretAccessor on it; this
+    module only wires the entry it is given.
+  EOT
+  type = map(object({
+    secret_id = string
+    version   = string
+  }))
+  default = {}
+}
