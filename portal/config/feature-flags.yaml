@@ -99,3 +99,12 @@ surfaces:
       set (engine, issue, branch, state, agent, lane, age). Served read-only
       at GET /api/sessions/rows. A root that does not exist on this checkout
       is named in the response's missing[] list rather than silently dropped.
+  settings:
+    default: off
+    phase: 11
+    description: >
+      Settings view (issue #1757): renders portal.server.settings.
+      SettingsAggregator's read-only row join (portal_surfaces, fleet_jobs,
+      dispatch_tier_policy, gate_skip_budget, provider_flags, nous_secret)
+      grouped by domain. Served read-only at GET /api/settings/rows. Every
+      row is editable:false — settings here are IaC-declared, never clicked.

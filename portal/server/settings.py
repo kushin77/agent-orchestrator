@@ -58,7 +58,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from portal.server.config_flags import CONFIG_RELATIVE as PORTAL_FLAGS_RELATIVE
-from portal.server.config_flags import DECLARED_SURFACES
+from portal.server.config_flags import DECLARED_SURFACES, SETTINGS_SURFACE, surface_enabled
 
 SCHEMA = "ao.portal-settings/v1"
 
@@ -138,6 +138,25 @@ class SettingsAggregator:
         rows.extend(self._provider_flags())
         rows.extend(self._nous_secret())
         return rows
+
+    def rows_by_domain(self) -> dict[str, list[dict[str, Any]]]:
+        """``aggregate()``'s rows, grouped by domain, JSON-serializable.
+
+        The view (issue #1757) renders one table per domain — this is the
+        exact shape it needs, so the route does no further reshaping.
+        """
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for row in self.aggregate():
+            grouped.setdefault(row.domain, []).append(
+                {
+                    "domain": row.domain,
+                    "key": row.key,
+                    "value": row.value,
+                    "source_file": row.source_file,
+                    "editable": row.editable,
+                }
+            )
+        return grouped
 
     # -- portal surface flags ------------------------------------------- #
     def _portal_surfaces(self) -> list[SettingsRow]:
@@ -319,3 +338,31 @@ class SettingsAggregator:
                 )
             )
         return rows
+
+
+class SettingsView:
+    """The Settings view's app-facing adapter (issue #1757).
+
+    Feature-flag-gated OFF (GR-5), declared beside the other workbook-11
+    views. Wraps ``SettingsAggregator`` — read fresh each call, no cache,
+    no second store, no click-to-mutate (every row is ``editable: false``).
+    """
+
+    def __init__(
+        self,
+        *,
+        repo_root: Path | str,
+        enabled: Optional[bool] = None,
+        config_path: Optional[Path | str] = None,
+    ) -> None:
+        self.repo_root = Path(repo_root)
+        self.config_path = Path(config_path) if config_path is not None else None
+        if enabled is None:
+            enabled = surface_enabled(
+                self.repo_root, config_path=self.config_path, surface=SETTINGS_SURFACE
+            )
+        self.enabled = bool(enabled)
+        self._aggregator = SettingsAggregator(repo_root=self.repo_root)
+
+    def rows(self) -> dict[str, Any]:
+        return {"schema": SCHEMA, "domains": self._aggregator.rows_by_domain()}
