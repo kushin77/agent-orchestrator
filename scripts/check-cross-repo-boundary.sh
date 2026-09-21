@@ -88,7 +88,7 @@ if ! mkdir -p "$work" 2>/dev/null; then
 fi
 trap 'rm -rf "$work"' EXIT
 
-python3 - "$work" "$snapshot" <<'PY'
+python3 - "$work" "$snapshot" "$baseline" <<'PY'
 import datetime
 import json
 import pathlib
@@ -129,11 +129,20 @@ for item in stripped_items:
 (work / "no-body.json").write_text(json.dumps(stripped, indent=2) + "\n", encoding="utf-8")
 
 # (c) a quarantine whose tracker closed must be refused as stale (rc 1).
+# The tracker to close is read from the live baseline, never hardcoded: a
+# baseline that shrinks (issue #1722) must not silently defang this control
+# by naming a tracker (e.g. #358) the baseline no longer references.
+baseline_doc = json.loads(pathlib.Path(sys.argv[3]).read_text(encoding="utf-8"))
+trackers = {
+    int(e["tracked_by"].lstrip("#"))
+    for e in baseline_doc.get("quarantine", []) or []
+    if str(e.get("tracked_by", "")).lstrip("#").isdigit()
+}
 stale = json.loads(snapshot.read_text(encoding="utf-8"))
 stale["generated_at"] = _now
 stale_items = stale.get("items", []) if isinstance(stale, dict) else []
 for item in stale_items:
-    if item.get("number") == 358:
+    if item.get("number") in trackers:
         item["state"] = "closed"
 (work / "stale-tracker.json").write_text(json.dumps(stale, indent=2) + "\n", encoding="utf-8")
 PY

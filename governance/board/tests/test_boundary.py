@@ -83,21 +83,25 @@ def test_correctly_parented_issue_is_not_reported():
     assert check_issues(POLICY, issues) == []
 
 
-def test_marker_matching_is_a_plain_substring_by_contract():
-    """Pin marker semantics: a plain substring match, deliberately.
+def test_marker_matching_requires_a_whole_issue_number():
+    """Pin marker semantics: whole-number match, not digit-prefix substring.
 
-    The boundary check errs toward *over*-reporting: a body that mentions the
-    marker anywhere (here ``Parent: #1250``) is flagged, and the human
-    quarantines the false positive by name. Widening a marker to a smarter
-    pattern would make the detector silently miss a real child, which is the
-    failure mode this gate exists to prevent.
+    Issue #1722 — a plain substring test flagged ``Parent: #1254`` (and 25
+    siblings) as carrying the ``Parent: #125`` marker purely because ``#125``
+    prefixes ``#1254``; none of those were real out-of-scope declarations. A
+    trailing-digit lookahead loses no real match (``Parent: #125`` on its own
+    still matches) while dropping the digit-prefix false positives.
     """
 
     issues = [_issue(500, "Unrelated", "Parent: #1250")]
     findings = check_issues(POLICY, issues)
-    assert len(findings) == 1
-    assert findings[0].finding == FINDING_SELF_PARENT
-    assert findings[0].issue == 500
+    assert findings == []
+
+    real = [_issue(501, "Real out-of-scope child", "Parent: #125\n")]
+    real_findings = check_issues(POLICY, real)
+    assert len(real_findings) == 1
+    assert real_findings[0].finding == FINDING_SELF_PARENT
+    assert real_findings[0].issue == 501
 
 
 # --- foreign-repo references ------------------------------------------------

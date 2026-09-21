@@ -328,13 +328,17 @@ def check_issues(
     comparison, because the board writes both freely (``## Repo`` vs
     ``## repo``, ``ERP-CRM`` vs ``erp-crm``).
 
-    Marker matching is a deliberate plain-substring test, not a word-boundary
-    regex: the detector errs toward over-reporting and a human quarantines the
-    false positive by name. A cleverer pattern would silently miss a real child
-    issue, which is the failure mode this gate exists to prevent. The
-    declaration check is the one deliberate exception — it must be the *whole*
-    heading or label — because over-reporting every ``## Repository`` heading
-    would drown the finding that matters.
+    Marker matching requires the marker's trailing issue number to be a whole
+    number, not merely a prefix: ``Parent: #125`` must not match
+    ``Parent: #1254`` (issue #1722 — measured 26 of 27 "uncovered child"
+    findings on live data were this exact digit-prefix collision, none a real
+    out-of-scope declaration). A word-boundary check loses nothing a plain
+    substring test would have caught — every real ``Parent: #125`` reference
+    still matches — while a naive substring test drowns real findings in
+    prefix noise the moment any epic number happens to prefix another. The
+    declaration check is a separate, still-deliberate exception — it must be
+    the *whole* heading or label — because over-reporting every
+    ``## Repository`` heading would drown the finding that matters.
     """
 
     own = policy.own_repo.strip()
@@ -347,7 +351,7 @@ def check_issues(
         body = str(issue.get("body") or "")
 
         for marker in policy.out_of_scope_markers:
-            if marker and marker in body:
+            if marker and re.search(re.escape(marker) + r"(?!\d)", body):
                 findings.append(
                     Finding(
                         issue=number,
