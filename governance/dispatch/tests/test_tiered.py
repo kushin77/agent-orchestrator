@@ -15,6 +15,7 @@ import json
 from datetime import datetime, timezone
 
 import audit
+import claims
 import cli
 import schema as dispatch_schema
 import tiered
@@ -212,3 +213,167 @@ def test_cli_try_loop_negative_control_defaults_to_l0(tmp_path, capsys):
     assert len(records) == 1
     assert records[0]["tier"] == "L0"
     assert records[0]["status"] == "pass"
+
+
+# --- the A2A peer gate (issue #1625, cadence point 3 of #1524) ---------------
+#
+# The peer-check standard of issue #1549, wired into the tiered loop: a dispatch
+# whose target files overlap a live sibling is ABORTED before any model runs,
+# escalating per the standard's own protocol. These arms pin that the gate both
+# (a) actually STOPS the dispatch — not merely logs — when a sibling overlaps,
+# (b) lets a disjoint dispatch proceed unchanged, and (c) is FAIL-CLOSED: an
+# unresolvable ledger refuses rather than reporting a false "no siblings".
+
+
+def _fresh_at() -> str:
+    # A claim timestamp inside the 24h TTL, so active_claims keeps the record.
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _write_claim(ledger, name, *, issue, agent, path, lane="portal"):
+    ledger.mkdir(parents=True, exist_ok=True)
+    (ledger / name).write_text(
+        json.dumps(
+            {
+                "event": "claim",
+                "issue": issue,
+                "agent": agent,
+                "at": _fresh_at(),
+                "lane": lane,
+                "reason": "fixture",
+                "files": [{"path": path, "regions": None}],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_a_peer_overlap_aborts_the_dispatch_before_any_model_runs(tmp_path):
+    """An injected refusal must STOPS the loop: no invoke, no pass audit row."""
+    import pytest
+
+    trail = tmp_path / "dispatch-audit.jsonl"
+    invoked: list[tuple[str, str, str]] = []
+    comments: list[tuple[int, str]] = []
+
+    with pytest.raises(tiered.TieredRefusal) as exc:
+        tiered.run(
+            999,
+            FIXTURE_BODY,
+            ["tier:L0"],
+            audit_path=trail,
+            agent="ao-sub-1625",
+            at=_now(),
+            invoke=lambda tier, provider, model: invoked.append((tier, provider, model)) or 0,
+            apply_label=lambda issue, label: None,
+            post_comment=lambda issue, text: comments.append((issue, text)),
+            peer_gate=lambda issue, body, agent: (
+                "peer-check REFUSED: OVERLAP — sibling ao-sub-12 on #12 "
+                "(channel claude-bus) already holds scripts/peer-check.sh, which "
+                "ao-sub-1625 on #999 also claims. Do not start work on those files."
+            ),
+        )
+    assert exc.value.reason == "peer-overlap"
+    assert "ao-sub-12" in exc.value.detail
+    # The load-bearing assertion: the gate STOPPED the dispatch, it did not
+    # merely log a warning. The model was never invoked...
+    assert invoked == []
+    # ...and no audit row — pass OR fail — was written, so there is no
+    # `status:"pass"` for anything downstream to mistake for a completed run.
+    records = audit.read(trail)
+    assert records == []
+    assert not any(record.get("status") == "pass" for record in records)
+    # The abort was announced (escalation protocol) before the refusal was raised.
+    assert len(comments) == 1
+    assert "tiered dispatch aborted before dispatch" in comments[0][1]
+    assert "ao-sub-12" in comments[0][1]
+
+
+def test_a_disjoint_peer_gate_lets_the_dispatch_proceed(tmp_path):
+    """The negative control: a gate returning None changes nothing."""
+    trail = tmp_path / "dispatch-audit.jsonl"
+    invoked: list[tuple[str, str, str]] = []
+
+    outcome = tiered.run(
+        999,
+        NEGATIVE_BODY,
+        ["tier:L0"],
+        audit_path=trail,
+        agent="ao-sub-1625",
+        at=_now(),
+        invoke=lambda tier, provider, model: invoked.append((tier, provider, model)) or 0,
+        apply_label=lambda issue, label: None,
+        post_comment=lambda issue, text: None,
+        peer_gate=lambda issue, body, agent: None,
+    )
+    assert outcome["final_status"] == "pass"
+    assert invoked == [("L0", "deepseek", "deepseek-v4-flash")]
+    assert len(audit.read(trail)) == 1
+
+
+def test_the_default_peer_gate_refuses_a_real_overlap_by_name(tmp_path):
+    """The real gate (not an injected one) refuses against a fixture ledger."""
+    body = "## Ownership\n\nFiles: governance/dispatch/tiered.py\n"
+    ledger = tmp_path / "claims"
+    _write_claim(
+        ledger,
+        "0001-00012-ao-sub-12-claim.json",
+        issue=12,
+        agent="ao-sub-12",
+        path="governance/dispatch/tiered.py",
+    )
+    # Prove the provocation took effect through the engine's OWN reader, so the
+    # refusal below is measured against the ledger the gate actually replays.
+    live = claims.active_claims(claims.read_ledger(ledger))
+    assert [f.path for f in live[12].files] == ["governance/dispatch/tiered.py"]
+
+    refusal = tiered._default_peer_gate(999, body, "ao-sub-1625", ledger=ledger)
+    assert refusal is not None
+    assert refusal.startswith("peer-check REFUSED: OVERLAP")
+    assert "ao-sub-12" in refusal
+    assert "#12" in refusal
+    assert "governance/dispatch/tiered.py" in refusal
+
+
+def test_the_default_peer_gate_is_disjoint_for_different_files(tmp_path):
+    """Same fixture ledger, non-overlapping path: the gate proceeds (returns None)."""
+    body = "## Ownership\n\nFiles: governance/dispatch/tiered.py\n"
+    ledger = tmp_path / "claims"
+    _write_claim(
+        ledger,
+        "0001-00013-ao-sub-13-claim.json",
+        issue=13,
+        agent="ao-sub-13",
+        path="registry/personas/README.md",
+    )
+    assert tiered._default_peer_gate(999, body, "ao-sub-1625", ledger=ledger) is None
+
+
+def test_the_default_peer_gate_fails_closed_when_no_ledger_resolves(tmp_path):
+    """An unresolvable ledger is a refusal, NEVER a silent 'no siblings'."""
+    import pytest
+
+    empty = tmp_path / "no-ledger-here"
+    empty.mkdir()
+    with pytest.raises(tiered.TieredRefusal) as exc:
+        tiered._default_peer_gate(
+            999, "Files: a.py\n", "ao-sub-1625", root=empty, main_worktree=empty
+        )
+    assert exc.value.reason == "peer-ledger-unreadable"
+    # The negative control that makes this arm load-bearing: the gate did NOT
+    # answer None (which would report "disjoint" while ~100 lanes are live).
+    assert "no live claim ledger found" in exc.value.detail
+
+
+def test_the_default_peer_gate_refuses_a_named_but_absent_ledger(tmp_path):
+    """A ledger NAMED but absent is CANNOT-ASSESS, not an empty sibling set."""
+    import pytest
+
+    absent = tmp_path / "claims-that-was-never-written"
+    with pytest.raises(tiered.TieredRefusal) as exc:
+        tiered._default_peer_gate(
+            999, "Files: a.py\n", "ao-sub-1625", ledger=absent
+        )
+    assert exc.value.reason == "peer-ledger-unreadable"
+    assert "does not exist" in exc.value.detail

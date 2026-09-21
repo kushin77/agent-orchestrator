@@ -451,6 +451,16 @@ def _declared_paths(paths: Iterable[str]) -> tuple[FileClaim, ...]:
     return tuple(seen)
 
 
+def files_from_paths(paths: Iterable[str]) -> tuple[FileClaim, ...]:
+    """Whole-file ``FileClaim`` records from bare paths (an issue's ``Files:`` line).
+
+    The one public conversion every cadence point (claim, the fleet loop, the
+    tiered dispatcher) shares, so an issue's declared files become the same
+    ``FileClaim`` set no matter which point judges them — never re-parsed ad hoc.
+    """
+    return _declared_paths(paths)
+
+
 def peer_check(
     caller_files: Sequence[FileClaim],
     live: Mapping[int, ClaimEvent],
@@ -663,7 +673,7 @@ def _caller_files_from_live(
     return ()
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.standard:
         print(__doc__)
@@ -729,7 +739,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         print(f"peer-check: CANNOT-ASSESS — {exc}", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
-    live = claims_mod.active_claims(events)
+    # The evaluation clock is injectable so the liveness verdict is reproducible:
+    # a caller (a test, a replay) may pin the moment it judges against. Production
+    # is unchanged when ``now`` is None — ``active_claims`` then reads the live clock.
+    live = claims_mod.active_claims(events, now)
 
     try:
         caller_files = _parse_files_arg(args.files) if args.files else ()

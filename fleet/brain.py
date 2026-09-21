@@ -82,10 +82,18 @@ import singleton  # noqa: E402
 import claims  # noqa: E402
 import focus as focus_mod  # noqa: E402
 import order  # noqa: E402
+import peers  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
 
 FLEET_DIR = runtime.FLEET_DIR
 HEARTBEAT = FLEET_DIR / "brain.heartbeat.json"
+# Where the cadence A2A peer-check's verdict is published (issue #1625, cadence
+# point 2). It sits BESIDE the heartbeat and is resolved from the heartbeat's
+# CURRENT path (`_peer_check_path`) rather than frozen to `FLEET_DIR`, so the
+# suite's runtime-isolation fixture — which redirects `brain.HEARTBEAT` into
+# `tmp_path` but not `brain.FLEET_DIR` — covers this artifact too: a test that
+# drives the idle path can never write the live fleet's verdict.
+PEER_CHECK_NAME = "peer-check.json"
 # Where this process's stdout is captured. The watchdog owns the spawn and opens
 # exactly this path (`fleet/watchdog.py`); it is named here only so the startup
 # header can tell the principal where the stream they are reading came from.
@@ -1531,6 +1539,218 @@ def watchdog_state() -> str:
     return "unknown"
 
 
+def _peer_check_path() -> Path:
+    """The verdict's path, resolved from the (redirectable) heartbeat location.
+
+    Deriving from ``HEARTBEAT`` rather than ``FLEET_DIR`` is deliberate: the
+    fleet suite redirects ``brain.HEARTBEAT`` into ``tmp_path`` for every test,
+    so the verdict inherits that isolation — a test that drives the idle path
+    (there is one) cannot write the live ``.fleet/peer-check.json``.
+    """
+    return HEARTBEAT.parent / PEER_CHECK_NAME
+
+
+def peer_check_state(path: Path | str | None = None) -> str:
+    """The last cadence peer-check's verdict, read back for `status` (#1625).
+
+    Mirrors `watchdog_state`: one honest token the context line can carry. An
+    absent or unreadable verdict is `unknown` — never `disjoint`, which would
+    advertise a clean check that never ran.
+    """
+    target = Path(path) if path is not None else _peer_check_path()
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "unknown"
+    if str(payload.get("note") or "").startswith("CANNOT-ASSESS"):
+        return "cannot-assess"
+    refused = payload.get("refused") or []
+    if refused:
+        return f"overlap:{len(refused)}"
+    return f"disjoint:{payload.get('checked', 0)}"
+
+
+def _write_peer_check(verdict: dict, target: Path) -> None:
+    """Publish the verdict atomically (tmp + os.replace), like the heartbeat."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(".tmp")
+    tmp.write_text(json.dumps(verdict, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(target)
+
+
+def _publish_peer_check(verdict: dict, target: Path) -> dict:
+    """Write the verdict atomically and return it (one stop for every outcome)."""
+    _write_peer_check(verdict, target)
+    return verdict
+
+
+def _main_worktree(root: Path) -> Path | None:
+    """The shared checkout's path, or None when it cannot be resolved.
+
+    A lane works in its own worktree while `.board/claims/` is untracked and
+    lives only in the main checkout — the hazard `peers.resolve_ledger` names —
+    so the ledger fallback needs the main worktree's path. It is resolved the way
+    `peers.py` resolves it (the first `git worktree list --porcelain` entry); a
+    failure to read the listing is `None`, never a guess.
+    """
+    try:
+        listing = subprocess.run(
+            ["git", "-C", str(root), "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=20.0,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in listing.stdout.splitlines():
+        if line.startswith("worktree "):
+            return Path(line[len("worktree "):].strip())
+    return None
+
+
+def _resolve_live_ledger(root: Path) -> tuple[Path | None, str]:
+    """Resolve the live claim ledger, with the main-worktree fallback.
+
+    The lane's own `.board/claims/` is consulted first and costs nothing; only
+    when it is absent is the main worktree resolved and checked, so the common
+    case runs no `git`. `(None, reason)` when neither holds a record — which the
+    caller records as CANNOT-ASSESS, never as an empty sibling set.
+    """
+    ledger, note = peers.resolve_ledger(root)
+    if ledger is not None:
+        return ledger, note
+    main = _main_worktree(root)
+    if main is not None:
+        return peers.resolve_ledger(root, main)
+    return None, note
+
+
+def _ready_from_board(root: Path, live: dict) -> tuple[list[tuple[int, tuple[str, ...]]], str]:
+    """The fleet's READY set, from the committed board, as issue -> declared files.
+
+    This is the SAME set `advance_ready()` dispatches: the graph-advance
+    candidates over the committed `.board/snapshot.json`
+    (`order.advance_candidates`), minus the live claims. Each issue's declared
+    `Files:` set is the snapshot's own `Issue.files` — the field
+    `snapshot.parse_files(body)` produced when the board was built — so the
+    declaration is the one the claim path (#702) and the wave planner (#740)
+    already share. Returns `(ready, note)`; an unreadable board yields an empty
+    set whose note says CANNOT-ASSESS, never a clean "disjoint".
+    """
+    snapshot_path = root / ".board" / "snapshot.json"
+    try:
+        board = snapshot_mod.load(snapshot_path, apply_queue=False)
+    except (OSError, ValueError) as exc:
+        return [], f"CANNOT-ASSESS — board snapshot {snapshot_path} is unreadable: {exc}"
+    candidates = order.advance_candidates(board, claimed=frozenset(live))
+    ready = [(issue.number, tuple(issue.files)) for issue in candidates]
+    return ready, f"ready set from {snapshot_path} ({len(ready)} issue(s))"
+
+
+def record_peer_check(
+    *,
+    root: Path | str = ROOT,
+    ready: list[tuple[int, tuple[str, ...]]] | None = None,
+    caller_agent: str = "brain",
+    verdict_path: Path | str | None = None,
+    at: str | None = None,
+) -> dict:
+    """Run the A2A peer-check on the cadence and RECORD the verdict (#1625).
+
+    For each ready issue, `peers.peer_check` judges that issue's declared
+    `Files:` set against every live sibling — the replayed claim ledger, with the
+    board's `Files:` declarations folded in for siblings. The verdict is a JSON
+    object `{checked, disjoint, refused:[{issue, sibling, path}], note, at}`,
+    written atomically to `.fleet/peer-check.json` and read back by
+    `peer_check_state`, so the cadence point is publishable, not a constant no
+    one reads.
+
+    An unresolvable ledger — or an unreadable board — is recorded as
+    CANNOT-ASSESS in `note`: an empty sibling set rendered as a clean "disjoint"
+    is the false green `scripts/check-peer-check.sh` exists to prevent.
+    """
+    root = Path(root)
+    target = Path(verdict_path) if verdict_path is not None else _peer_check_path()
+    stamp = at or now_iso()
+
+    ledger, ledger_note = _resolve_live_ledger(root)
+    if ledger is None:
+        return _publish_peer_check(
+            {"checked": 0, "disjoint": 0, "refused": [], "note": f"CANNOT-ASSESS — {ledger_note}", "at": stamp},
+            target,
+        )
+    try:
+        live = claims.active_claims(claims.read_ledger(ledger))
+    except ValueError as exc:
+        return _publish_peer_check(
+            {"checked": 0, "disjoint": 0, "refused": [], "note": f"CANNOT-ASSESS — {exc}", "at": stamp},
+            target,
+        )
+
+    if ready is None:
+        ready, ready_note = _ready_from_board(root, live)
+        if ready_note.startswith("CANNOT-ASSESS"):
+            return _publish_peer_check(
+                {"checked": 0, "disjoint": 0, "refused": [], "note": ready_note, "at": stamp},
+                target,
+            )
+    else:
+        ready_note = f"{len(ready)} ready issue(s) supplied by the caller"
+    ready = list(ready)
+    issue_files = {number: tuple(files) for number, files in ready}
+
+    refused: list[dict] = []
+    checked = 0
+    disjoint = 0
+    for number, files in ready:
+        caller_files = tuple(peers.FileClaim(path=path) for path in files)
+        report = peers.peer_check(
+            caller_files,
+            live,
+            caller_agent=caller_agent,
+            caller_issue=number,
+            issue_files=issue_files,
+        )
+        checked += 1
+        if report.verdict != "OVERLAP":
+            disjoint += 1
+            continue
+        for sibling in report.overlapping:
+            for path in sibling.overlap:
+                refused.append({"issue": number, "sibling": sibling.issue, "path": path})
+
+    if refused:
+        note = (
+            f"peer-check REFUSED {len(refused)} overlap(s) on the ready set — do "
+            "not start the named files until the sibling lands"
+        )
+    else:
+        note = ledger_note
+    return _publish_peer_check(
+        {
+            "checked": checked,
+            "disjoint": disjoint,
+            "refused": refused,
+            "note": f"{note}; {ready_note}",
+            "at": stamp,
+        },
+        target,
+    )
+
+
+def peer_check_line(verdict: dict) -> str:
+    """One log line for the cadence verdict: what was refused, or why not."""
+    refused = verdict.get("refused") or []
+    if refused:
+        named = ", ".join(
+            f"#{item['issue']}→#{item['sibling']} {item['path']}" for item in refused[:3]
+        )
+        more = "" if len(refused) <= 3 else f" (+{len(refused) - 3} more)"
+        return f"[brain] peer-check: REFUSED {len(refused)} overlap(s): {named}{more}"
+    return f"[brain] peer-check: {verdict.get('note', '')}"
+
+
 def fleet_facts() -> dict:
     """The facts every context line reports, gathered once per print."""
     return {
@@ -1540,6 +1760,7 @@ def fleet_facts() -> dict:
         "claims": held_claims(),
         "head": channel.head_commit(),
         "watchdog": watchdog_state(),
+        "peer_check": peer_check_state(),
     }
 
 
@@ -1554,7 +1775,8 @@ def status_line(facts: dict, *, idle_seconds: int | None = None) -> str:
         f"[brain] {position} | orders pending={facts.get('orders_pending', 0)} | "
         f"dispatched={facts.get('dispatched', 0)} | {format_waves(facts.get('waves') or {})} | "
         f"claims={facts.get('claims', 0)} | HEAD={facts.get('head', 'unknown')} | "
-        f"watchdog={facts.get('watchdog', 'unknown')}"
+        f"watchdog={facts.get('watchdog', 'unknown')} | "
+        f"peer-check={facts.get('peer_check', 'unknown')}"
     )
 
 
@@ -1625,6 +1847,19 @@ def loop(args: argparse.Namespace) -> int:
             advanced = advance_waves()
             if advanced:
                 print(wave_line(advanced), flush=True)
+            # Cadence point 2 (issue #1625): the A2A peer-check. The READY set is
+            # judged against the live claim ledger and the verdict RECORDED to
+            # `.fleet/peer-check.json` (then surfaced by `status`), so a collision
+            # a ready lane would hit is named on the cadence — not only when a lane
+            # happens to run `peers.py` by hand. A refusal or a CANNOT-ASSESS is
+            # printed; a clean verdict is left to `status` so the idle log stays
+            # quiet. This is the invocation the issue calls for: a wiring constant
+            # nothing reads is not done.
+            peer_verdict = record_peer_check()
+            if peer_verdict.get("refused") or str(peer_verdict.get("note", "")).startswith(
+                "CANNOT-ASSESS"
+            ):
+                print(peer_check_line(peer_verdict), flush=True)
             # The epic-close advance (epic #707 lane F5/#720). It runs on the idle
             # path, after the wave advance, because that is the only tick that runs
             # without an order: when the fleet is finished, moving to the next epic

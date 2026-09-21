@@ -85,6 +85,87 @@ def _claim(board_file, ledger, *args) -> int:
     )
 
 
+@pytest.fixture
+def peer_board_file(tmp_path):
+    """#701 (the caller) declares no files; sibling #716 declares ``Files: scripts/a.sh``.
+
+    The sibling's files live ONLY on its issue body (``Issue.files``), never on
+    its claim record — the one source the claim path's own file-region check
+    cannot read, which is exactly what makes the peer-check falsifiable here.
+    """
+    snapshot = Snapshot(
+        generated_at=snapshot_mod.now_iso(),
+        source="dispatch-cli-peer-test",
+        issues={
+            701: Issue(701, "dispatchable caller", milestone="CLI"),
+            716: Issue(716, "live sibling", milestone="CLI", files=("scripts/a.sh",)),
+        },
+    )
+    path = tmp_path / "snapshot.json"
+    snapshot_mod.save(snapshot, path)
+    return path
+
+
+@pytest.fixture
+def peer_ledger(tmp_path):
+    """A live sibling #716 whose claim RECORD carries no files.
+
+    ``claims.claim``'s own ``REASON_FILE_REGION_CLAIMED`` check reads the claim
+    record's per-file leases, which are empty here — so wiring the peer-check to
+    ``--files`` alone could never refuse this overlap.
+    """
+    claims_dir = tmp_path / "claims"
+    claims_dir.mkdir()
+    record = {
+        "event": "claim",
+        "issue": 716,
+        "agent": "agent-a",
+        "at": snapshot_mod.now_iso(),
+        "lane": "lane-a",
+        "reason": "next-in-milestone",
+        "ttl_hours": 24,
+    }
+    (claims_dir / "00000000000000000001-00716-agent-a-claim.json").write_text(
+        json.dumps(record), encoding="utf-8"
+    )
+    return claims_dir
+
+
+def test_claim_refuses_a_sibling_by_its_issue_files_line(peer_board_file, peer_ledger, capsys):
+    """The overlap the claim path cannot see: the sibling's issue ``Files:`` line.
+
+    Sibling #716 holds a live claim with NO claim-record files, so the claim
+    path's own file-region check is blind to it; only the peer-check, reading the
+    board's declared ``Files:``, refuses the caller — by name, before any write.
+    """
+    rc = _claim(
+        peer_board_file, peer_ledger,
+        "--issue", "701", "--agent", "agent-b", "--lane", "lane-b",
+        "--files", json.dumps([{"path": "scripts/a.sh"}]),
+    )
+
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert "peer-check REFUSED: OVERLAP" in err
+    assert "#716" in err
+    assert "scripts/a.sh" in err
+    assert not list(peer_ledger.glob("*00701*")), "the refusal must precede the write"
+
+
+def test_claim_accepts_a_path_the_live_sibling_does_not_hold(peer_board_file, peer_ledger, capsys):
+    """Negative control: the same live sibling, a disjoint path — the claim lands."""
+    rc = _claim(
+        peer_board_file, peer_ledger,
+        "--issue", "701", "--agent", "agent-b", "--lane", "lane-b",
+        "--files", json.dumps([{"path": "scripts/b.sh"}]),
+    )
+    capsys.readouterr()
+
+    assert rc == 0
+    records = [json.loads(path.read_text(encoding="utf-8")) for path in peer_ledger.glob("*.json")]
+    assert any(record["issue"] == 701 for record in records)
+
+
 def test_dispatch_refuses_a_closed_issue_and_names_the_board(board_file, ledger, capsys):
     rc = _dispatch(board_file, ledger, "--issue", "702", "--agent", "agent-b", "--lane", "lane-b")
 

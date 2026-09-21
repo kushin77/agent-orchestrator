@@ -58,6 +58,10 @@ if str(_PKG_DIR) not in sys.path:
     sys.path.insert(0, str(_PKG_DIR))
 
 import audit  # noqa: E402
+import claims as claims_mod  # noqa: E402
+import peers  # noqa: E402
+import snapshot as snapshot_mod  # noqa: E402
+from model import FileClaim  # noqa: E402
 
 DEFAULT_POLICY_PATH = _PKG_DIR / "tier-policy.json"
 
@@ -277,6 +281,80 @@ def _gh_comment(issue_number: int, text: str) -> None:
     subprocess.run(["gh", "issue", "comment", str(issue_number), "--body", text], check=False)
 
 
+def _main_worktree(root: Path) -> Path | None:
+    """The main worktree path from ``git worktree list``, or ``None``.
+
+    ``.board/claims/`` is untracked, so a lane worktree does not carry the live
+    ledger while the shared (main) worktree does — the fallback
+    :func:`peers.resolve_ledger` needs. Read-only; no fetch, no network.
+    """
+    try:
+        listing = subprocess.run(
+            ["git", "-C", str(root), "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=20.0,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in listing.stdout.splitlines():
+        if line.startswith("worktree "):
+            return Path(line[len("worktree ") :].strip())
+    return None
+
+
+def _default_peer_gate(
+    issue_number: int,
+    body: str,
+    agent: str,
+    *,
+    root: Path | str | None = None,
+    main_worktree: Path | str | None = None,
+    ledger: Path | str | None = None,
+) -> str | None:
+    """A2A peer gate: refuse a dispatch whose files a live sibling already holds.
+
+    The peer-check standard of issue #1549 (EPIC #1510) wired into the tiered
+    loop: read the live claim ledger (with the main-worktree fallback — a lane
+    worktree has no ``.board/claims/``), build the caller's files from the
+    issue's own ``Files:`` line, and intersect them with every live sibling via
+    ``peers.peer_check``. Returns the refusal string (naming the sibling and the
+    specific overlapping path) or ``None`` when disjoint.
+
+    FAIL-CLOSED: an unresolvable or unreadable ledger raises ``TieredRefusal``,
+    never a silent ``None`` — ``None`` would report "no siblings" while a
+    hundred lanes are live, the exact false green ``peers.peer_check`` warns
+    about. ``report.refusal()`` is used, not ``report.verdict``: a sibling off
+    which no file evidence could be read reads ``unverifiable`` through the
+    verdict, and only the refusal names a real overlap.
+    """
+    repo_root = Path(root) if root is not None else _PKG_DIR.parents[1]
+    resolved = Path(ledger) if ledger is not None else None
+    if resolved is None:
+        fallback = Path(main_worktree) if main_worktree is not None else _main_worktree(repo_root)
+        resolved, note = peers.resolve_ledger(repo_root, fallback)
+        if resolved is None:
+            # No ledger is NOT "no siblings": refuse rather than report disjoint.
+            raise TieredRefusal("peer-ledger-unreadable", note)
+    elif not resolved.exists():
+        # A ledger NAMED but absent is CANNOT-ASSESS, not empty (peers.main's
+        # precedent): read_ledger answers [] for a missing path, and [] renders
+        # as a clean "disjoint".
+        raise TieredRefusal(
+            "peer-ledger-unreadable",
+            f"claim ledger {resolved} does not exist; an absent ledger is not an empty one",
+        )
+    try:
+        events = claims_mod.read_ledger(resolved)
+    except ValueError as exc:
+        raise TieredRefusal("peer-ledger-unreadable", f"{resolved}: {exc}") from exc
+    live = claims_mod.active_claims(events)
+    mine = tuple(FileClaim(path=path) for path in snapshot_mod.parse_files(body))
+    report = peers.peer_check(mine, live, caller_agent=agent, caller_issue=issue_number)
+    return report.refusal()
+
+
 def run(
     issue_number: int,
     body: str,
@@ -292,6 +370,7 @@ def run(
     run_acceptance: Callable[[list[str], str], tuple[bool, str, int]] | None = None,
     apply_label: Callable[[int, str], None] | None = None,
     post_comment: Callable[[int, str], None] | None = None,
+    peer_gate: Callable[[int, str, str], str | None] | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """Run the tiered try-loop for one issue; return a summary dict.
@@ -335,6 +414,19 @@ def run(
         outcome["provider"] = provider_resolved
         outcome["model"] = model
         return outcome
+
+    # The A2A peer gate runs AFTER the dry-run early return (a dry-run resolves
+    # the mapping and touches nothing, so it must not be gated) and BEFORE any
+    # dispatch: an overlap with a live sibling aborts the whole try-loop, so no
+    # model is invoked and no attempt is recorded. It is an injected hook like
+    # the others, and it is deliberately NOT swapped for a no-op by --no-gh /
+    # --no-dispatch — the gate reads its own ledger, not GitHub or a model.
+    if peer_gate is None:
+        peer_gate = _default_peer_gate
+    refusal = peer_gate(issue_number, body, agent)
+    if refusal:
+        post_comment(issue_number, f"tiered dispatch aborted before dispatch: {refusal}")
+        raise TieredRefusal("peer-overlap", refusal)
 
     current = tier
     while current in TIERS:

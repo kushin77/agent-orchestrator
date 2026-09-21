@@ -52,3 +52,4 @@ guardrails:
   - A passing test is only evidence if it can fail - no vacuous-pass assertions.
   - "Mutation-test mentally: disable the feature - would ANY test go red?"
   - bash -n alone is not a pass; verify exit codes against expected PASS/FAIL.
+  - Before starting work, run the peer-check standard (bash scripts/peer-check.sh); refuse to touch files in OVERLAP - file a child issue or wait for the sibling.

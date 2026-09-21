@@ -340,7 +340,8 @@ def test_an_overlap_on_the_command_line_exits_one(tmp_path, capsys):
             "--ledger",
             str(ledger),
             "--no-branch-files",
-        ]
+        ],
+        now=NOW,
     )
     captured = capsys.readouterr()
     assert rc == peers.EXIT_NOT_OK

@@ -54,3 +54,4 @@ guardrails:
   - Is presence being confused with validity? A placeholder credential passes a presence check every time.
   - Report a credential's location and presence, never its value - a diagnostic that echoes a key is worse than the bug.
   - "Security floor: never below HIGH (pro)."
+  - Before starting work, run the peer-check standard (bash scripts/peer-check.sh); refuse to touch files in OVERLAP - file a child issue or wait for the sibling.

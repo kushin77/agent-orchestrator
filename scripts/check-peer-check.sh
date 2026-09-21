@@ -105,6 +105,7 @@ python3 - "$ledger" <<'PY' >"$TMPD/fixture.out" 2>&1
 import json
 import pathlib
 import sys
+from datetime import datetime, timedelta, timezone
 
 ledger = pathlib.Path(sys.argv[1])
 dispatch = pathlib.Path("governance/dispatch").resolve()
@@ -115,12 +116,21 @@ import claims as claims_mod  # noqa: E402
 SIBLING_FILE = "scripts/peer-check.sh"
 OTHER_FILE = "registry/personas/README.md"
 
+# The fixture claims are clock-RELATIVE: `at` is computed from the live clock at
+# run time, so they are always freshly-live against the engine's own
+# `active_claims` TTL. A pinned literal timestamp is a date bomb — the lease
+# expires CLAIM_TTL_HOURS later and every liveness-dependent arm flips red with
+# no code change. The two records keep their one-second ordering.
+fresh = datetime.now(timezone.utc)
+at_sibling = fresh.strftime("%Y-%m-%dT%H:%M:%SZ")
+at_other = (fresh + timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
 records = {
     "0001-07012-ao-sub-7012-claim.json": {
         "event": "claim",
         "issue": 7012,
         "agent": "ao-sub-7012",
-        "at": "2026-09-20T18:00:00Z",
+        "at": at_sibling,
         "lane": "portal",
         "reason": "fixture",
         "files": [{"path": SIBLING_FILE, "regions": None}],
@@ -129,7 +139,7 @@ records = {
         "event": "claim",
         "issue": 7013,
         "agent": "ao-sub-7013",
-        "at": "2026-09-20T18:00:01Z",
+        "at": at_other,
         "lane": "registry",
         "reason": "fixture",
         "files": [{"path": OTHER_FILE, "regions": None}],
@@ -347,6 +357,33 @@ if [ "$nocaller_rc" -eq 2 ] && grep -qF "no caller identity" <<<"$nocaller_out";
 else
   bad "an empty caller identity was not refused (rc=$nocaller_rc):"
   printf '%s\n' "$nocaller_out" | sed 's/^/        /' >&2
+fi
+
+echo "== the standard is written down where a lane reads it, and the assertion can fail =="
+# Cadence #1625 point 4: a card rule that nothing checks is advisory, so the rule
+# text is asserted present here, not merely authored in the card. The predicate is
+# the same grep both times, so this arm proves it discriminates rather than runs.
+rule_text="refuse to touch files in OVERLAP"
+card_hits="$(grep -lF -- "$rule_text" registry/personas/cards/*.yaml 2>/dev/null || true)"
+if [ -n "$card_hits" ]; then
+  ok "at least one SME card carries the peer-check rule text: $(printf '%s' "$card_hits" | tr '\n' ' ')"
+else
+  bad "no file under registry/personas/cards/ carries the peer-check rule text ('$rule_text')"
+fi
+# The provocation: the SAME predicate must be ABSENT from a file that does not
+# carry the text, and present in one that does — a predicate that matched either
+# way, or neither, could not fail and so could not gate anything.
+printf '%s\n' "a card with no peer-check rule in it" > "$TMPD/no-rule.txt"
+if grep -qF -- "$rule_text" "$TMPD/no-rule.txt"; then
+  bad "the rule predicate matched a file that does not carry the text, so it cannot discriminate"
+else
+  ok "the rule predicate does not match a file without the text (rc!=0) — it can fail"
+fi
+printf 'guardrails:\n  - %s\n' "$rule_text" > "$TMPD/with-rule.yaml"
+if grep -qF -- "$rule_text" "$TMPD/with-rule.yaml"; then
+  ok "the rule predicate matches a file that does carry the text (rc=0)"
+else
+  bad "the rule predicate missed a file that does carry the text, so the assertion above is vacuous"
 fi
 
 if [ "$fail" -gt 0 ]; then

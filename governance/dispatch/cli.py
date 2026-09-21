@@ -44,12 +44,13 @@ import focus as focus_mod  # noqa: E402
 import live as live_mod  # noqa: E402
 import liveness as liveness_mod  # noqa: E402
 import order  # noqa: E402
+import peers  # noqa: E402
 import pool as pool_mod  # noqa: E402
 import owner_queue as queue_mod  # noqa: E402
 import queue_freshness  # noqa: E402
 import snapshot as snapshot_mod  # noqa: E402
 import tiered  # noqa: E402
-from model import parse_file_claims  # noqa: E402
+from model import FileClaim, parse_file_claims  # noqa: E402
 
 EXIT_OK = 0
 EXIT_NOT_OK = 1
@@ -244,6 +245,35 @@ def cmd_claim(args: argparse.Namespace) -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         print(f"claim: CANNOT-ASSESS — --files is not valid: {exc}", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
+    # A2A peer-check, cadence point 1 of the standard in peers.py (#1625, #1549).
+    # The claim path already refuses overlapping *claim-record* files
+    # (`REASON_FILE_REGION_CLAIMED`), so judging on `--files` alone would be a
+    # no-op. The value only a peer-check adds is the sibling's ISSUE-declared
+    # `Files:` line (`Issue.files`, parsed from the board body), which the claim
+    # path never reads: enumerate the live ledger the claim itself will write to,
+    # judge the caller's files against every sibling's, and refuse by name
+    # BEFORE anything is written — alongside the existing reasons, not replacing.
+    live = claims.active_claims(claims.read_ledger(args.ledger))
+    caller_files = list(files)
+    own_issue = snapshot.get(args.issue)
+    if own_issue is not None:
+        caller_files.extend(FileClaim(path=path) for path in own_issue.files)
+    sibling_issue_files = {
+        number: holder_issue.files
+        for number in live
+        if (holder_issue := snapshot.get(number)) is not None and holder_issue.files
+    }
+    report = peers.peer_check(
+        caller_files,
+        live,
+        caller_agent=args.agent,
+        caller_issue=args.issue,
+        issue_files=sibling_issue_files,
+    )
+    refusal = report.refusal()
+    if refusal is not None:
+        print(refusal, file=sys.stderr)
+        return EXIT_NOT_OK
     try:
         event = claims.claim(
             args.issue,
