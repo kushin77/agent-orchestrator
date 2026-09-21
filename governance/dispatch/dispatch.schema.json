@@ -115,7 +115,7 @@
       "required": ["schema", "kind", "issue", "agent", "at"],
       "properties": {
         "schema": { "const": "ao.dispatch/audit-v1" },
-        "kind": { "enum": ["refusal", "grant"] },
+        "kind": { "enum": ["refusal", "grant", "tiered_dispatch"] },
         "issue": { "type": "integer" },
         "agent": { "type": "string" },
         "at": { "type": "string" },
@@ -123,7 +123,15 @@
         "detail": { "type": ["string", "null"] },
         "lane": { "type": ["string", "null"] },
         "epic": { "type": ["integer", "null"] },
-        "directive_id": { "type": ["string", "null"] }
+        "directive_id": { "type": ["string", "null"] },
+        "tier": { "type": "string" },
+        "provider": { "type": "string" },
+        "model": { "type": "string" },
+        "status": { "enum": ["pass", "fail"] },
+        "attempt": { "type": "integer" },
+        "duration_ms": { "type": "integer" },
+        "output": { "type": "string" },
+        "escalated_to": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     }
