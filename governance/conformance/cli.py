@@ -48,6 +48,7 @@ if _PKG_DIR not in sys.path:
 
 from checker import (  # noqa: E402
     CODE_FILING_LABEL_UNRESOLVED,
+    EXEMPTIONS_RELPATH,
     LABELS_RELPATH,
     LABELS_REFRESH_VERB,
     POLICY_RELPATH,
@@ -60,6 +61,7 @@ from checker import (  # noqa: E402
     check_board,
     check_change_set,
     default_filing_labels,
+    load_exemptions,
     load_label_inventory,
     load_policy,
     load_snapshot,
@@ -148,6 +150,10 @@ def cmd_check(args: argparse.Namespace) -> int:
         include_unmilestoned=args.include_unmilestoned,
         strict=args.strict,
         generated_at=None,
+        # The NAMED pre-mandate exemption list (issue #1694): the pre-mandate
+        # milestoned backlog is counted, not failed, but only for `priority`/`area`
+        # (and `class`) and only by name. An issue not named there still fails.
+        exemptions=load_exemptions(args.root / EXEMPTIONS_RELPATH),
     )
     write_report(report, args.root / REPORT_RELPATH)
 
