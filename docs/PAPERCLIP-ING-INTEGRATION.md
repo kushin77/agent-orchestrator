@@ -13,6 +13,13 @@ this prose cannot drift from the schemas.
 The mode is **adopt the upstream CLI** (`npx paperclipai`) as an external operator
 surface, integrated over its HTTP API — **not** embed, **not** fork (ADR-0013).
 
+**Status (2026-09-20).** This section states the *mode*; it is not a claim that
+upstream is running. `enable_paperclip` defaults `false`, no runtime resource is
+deployed, and the seam is scoped to the three contracts below — paperclip does
+not execute code and does not dispatch tasks. The plain-language current state is
+in [`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md), section
+*Current status*.
+
 - Upstream runs as its own process; the fleet keeps running beside it.
 - Integration is across a **process boundary**, not a shared runtime.
 - The governing rule is ADR-0012's **map the policy, do not couple the runtime**:
