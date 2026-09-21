@@ -267,6 +267,7 @@ fi
 
 echo "== the document is honest =="
 if python3 - "$work/a.md" <<'PY'
+import re
 import sys
 
 text = open(sys.argv[1], encoding="utf-8").read()
@@ -297,13 +298,21 @@ for row in required_rows:
     if "| {} |".format(row) not in text:
         problems.append("no %r row was rendered" % row)
 
-# Pending is never rendered as shipped.
+# Pending is never rendered as shipped, and the rows must agree with the count the
+# composition itself reports. The old arm demanded that at least one target-pending
+# module render — a claim about incidental TREE state: once every declared target
+# lands in the hub catalog, a correct brief legitimately renders none, and the arm
+# then reds a healthy tree (#1557). Agreement is stricter AND holds at zero.
 pending = [line for line in text.splitlines() if "`target-pending`" in line and line.startswith("| mandatory status |")]
-if not pending:
-    problems.append("no target-pending module was rendered at all")
 for line in pending:
     if "not shipped" not in line or "shipped: false" not in line:
         problems.append("a target-pending module is not rendered as unshipped: %s" % line.strip())
+reported = re.findall(r"(\d+) target-pending", text)
+if len(reported) != 1:
+    problems.append("the composition does not report exactly one target-pending count (found %d)" % len(reported))
+elif int(reported[0]) != len(pending):
+    problems.append("the composition reports %s target-pending name(s) but renders %d row(s)"
+                    % (reported[0], len(pending)))
 if "shipped: true" in text:
     problems.append("the document contains 'shipped: true', which no entry may claim here")
 
@@ -464,16 +473,38 @@ tree="$work/pending-shipped"
 new_tree "$tree" || exit 2
 if python3 - "$tree" "$work/pending.json" <<'PY'
 import json
+import os
 import sys
 
 tree, out = sys.argv[1], sys.argv[2]
 sys.dont_write_bytecode = True
 sys.path.insert(0, tree)
+
+# Plant a target-pending entry in the SCRATCH tree instead of requiring the tree
+# under test to carry one. A provocation that depends on incidental tree state
+# stops biting the moment that state goes away — and once every declared target
+# lands, a correct tree carries none (#1557, same class as #1862). The id is
+# deliberately absent from the hub catalog, so it derives as `target-pending`.
+PLANT = "probe-pending"
+targets = os.path.join(tree, "governance", "modules", "targets.json")
+with open(targets, encoding="utf-8") as handle:
+    declared = json.load(handle)
+declared["targets"] = [t for t in declared["targets"] if t["id"] != PLANT] + [{
+    "id": PLANT,
+    "repo": "kushin77/%s" % PLANT,
+    "blocking": ["kushin77/CMR#1557"],
+    "onboarding": "CMR:ONBOARD-0099",
+    "note": "planted by this gate's own provocation; never a real declaration",
+}]
+with open(targets, "w", encoding="utf-8") as handle:
+    json.dump(declared, handle, indent=2)
+    handle.write("\n")
+
 from governance.modules import registry  # noqa: E402
 
 doc = registry.build(tree, tree + "/vendor/CMR")
 for entry in doc["modules"]:
-    if entry["state"] == "target-pending":
+    if entry["id"] == PLANT:
         entry["shipped"] = True
         break
 else:
@@ -486,7 +517,7 @@ PY
 then
   ok=$((ok + 1))
   expect_refusal "a mandatory module reported as shipped while the registry says pending" \
-    "BRIEF-PENDING-RENDERED-SHIPPED: pmo" \
+    "BRIEF-PENDING-RENDERED-SHIPPED: probe-pending" \
     python3 "$tree/integrations/paperclip/reporting/cli.py" compose --repo "$tree" \
       --registry "$work/pending.json"
 else
@@ -662,16 +693,34 @@ new_tree "$tree" || exit 2
 pending_doc="$work/policy-pending-registry.json"
 if python3 - "$tree" "$pending_doc" <<'PY'
 import json
+import os
 import sys
 
 tree, out = sys.argv[1], sys.argv[2]
 sys.dont_write_bytecode = True
 sys.path.insert(0, tree)
+
+# Plant the pending entry in the scratch tree (same reason as step 3, #1557).
+PLANT = "probe-pending"
+targets = os.path.join(tree, "governance", "modules", "targets.json")
+with open(targets, encoding="utf-8") as handle:
+    declared = json.load(handle)
+declared["targets"] = [t for t in declared["targets"] if t["id"] != PLANT] + [{
+    "id": PLANT,
+    "repo": "kushin77/%s" % PLANT,
+    "blocking": ["kushin77/CMR#1557"],
+    "onboarding": "CMR:ONBOARD-0099",
+    "note": "planted by this gate's own provocation; never a real declaration",
+}]
+with open(targets, "w", encoding="utf-8") as handle:
+    json.dump(declared, handle, indent=2)
+    handle.write("\n")
+
 from governance.modules import registry  # noqa: E402
 
 doc = registry.build(tree, tree + "/vendor/CMR")
 for entry in doc["modules"]:
-    if entry["state"] == "target-pending":
+    if entry["id"] == PLANT:
         entry["shipped"] = True
         break
 else:
@@ -694,7 +743,7 @@ data["pending"]["refusals"]["rendered_shipped"] = "BRIEF-PENDING-RENDERED-SHIPPE
 source = json.dumps(data, indent=2) + "\n"' \
   "the claim policy renames the pending-rendered-as-shipped refusal"; then
   expect_refusal "pending rendered as shipped refuses under the code the POLICY declares" \
-    "BRIEF-PENDING-RENDERED-SHIPPED-MUT: pmo" \
+    "BRIEF-PENDING-RENDERED-SHIPPED-MUT: probe-pending" \
     python3 "$tree/integrations/paperclip/reporting/cli.py" compose \
       --repo "$tree" --registry "$pending_doc"
 fi

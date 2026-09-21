@@ -77,15 +77,16 @@ assets:
   - path: gdc-manifest.yaml
     kind: interpolate
     description: >-
-      The spoke-side declaration: the three mandatory module pins stay intact and
+      The spoke-side declaration: the four mandatory module pins stay intact and
       the tenant/org/domain bind into the `x-onboarding` extension block.
     document: |
       # Spoke-side declaration (EPIC-09 / CMR-901), born from templates/module/ in
       # kushin77/CMR. The mandatory indexer-KB pin (GR-18), the diagrams.blueprint
-      # pin (GR-18, CMR:ONBOARD-0005, second mandatory module) and the
-      # shared-frontend.tokens pin (GR-18, CMR:ONBOARD-0003, third mandatory module)
-      # are pre-declared — none must be removed. Declare the module's own
-      # features/integrations alongside them.
+      # pin (GR-18, CMR:ONBOARD-0005, second mandatory module), the
+      # shared-frontend.tokens pin (GR-18, CMR:ONBOARD-0003, third mandatory
+      # module), and the shared-governance.gates pin (GR-18, CMR:ONBOARD-0008,
+      # fourth mandatory module) are pre-declared — none must be removed. Declare
+      # the module's own features/integrations alongside them.
       #
       # Reproduced in lockstep with the vendored template
       # (vendor/CMR/templates/module/gdc-manifest.yaml); the declaration gate
@@ -114,12 +115,15 @@ assets:
       integrations: []
       modules:
         - module: code-indexing.mcp
-          version: "~0.1"
+          version: 0.1.0
           updates: pr
         - module: diagrams.blueprint
-          version: "~0.1"
+          version: 0.1.0
           updates: pr
         - module: shared-frontend.tokens
+          version: "~0.1"
+          updates: pr
+        - module: shared-governance.gates
           version: "~0.1"
           updates: pr
       updates: pr

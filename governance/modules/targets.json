@@ -16,13 +16,6 @@
       "blocking": ["kushin77/CMR#264", "kushin77/shared-governance#727"],
       "onboarding": "CMR:ONBOARD-0008",
       "note": "Dual-role registration ratified by the hub's ADR-0019; CMR-side tracking issue is BLOCKED."
-    },
-    {
-      "id": "shared-services",
-      "repo": "kushin77/shared-services",
-      "blocking": ["kushin77/CMR#442", "kushin77/shared-services#4040"],
-      "onboarding": "CMR:ONBOARD-0010",
-      "note": "Pending on the vendor module.json; CMR-side tracking issue is BLOCKED."
     }
   ],
   "watch": [
