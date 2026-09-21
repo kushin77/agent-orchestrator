@@ -73,6 +73,34 @@ MT_SCRATCH="$(mktemp -d "$root/.ao1254-mt-guard.XXXXXX")" || {
   exit 2
 }
 
+# pr-queue.sh AND merge-pr.sh both resolve the repo root by sourcing the shared
+# library at LOAD time, relative to their OWN directory (the #1753 migration):
+#
+#   source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+#   root="$(find_repo_root)"
+#   cd "$root" || exit 2
+#
+# A venue that copies the entry point but not the library gives an undefined
+# find_repo_root, a `cd` on an empty string and exit 2 (CANNOT-ASSESS) BEFORE
+# the first control runs — so an arm expecting 1 or 0 reads a venue setup
+# failure as a verdict, which is exactly the vacuity this gate exists to
+# refuse. Same #1753 ripple already fixed for check-squash-message.sh
+# (#1839/#1842) and the governance/futureproof fixture (#1840/#1844); this
+# gate's own venue carried the identical hole (#1859). Stage the shipping
+# library next to every scratch scripts/ dir, exactly as the entry point is.
+require_stageable_lib() {
+  [ -f "$root/scripts/lib/common.sh" ] || {
+    echo "check-pr-queue-squash-guard: CANNOT-ASSESS — $root/scripts/lib/common.sh is missing, so no scratch venue can carry what the entry points source at load time" >&2
+    exit 2
+  }
+}
+stage_lib() { # <scratch-scripts-dir> — pair with the copy of the entry point
+  local d="$1"
+  mkdir -p "$d/lib" || return 2
+  cp "$root/scripts/lib/common.sh" "$d/lib/common.sh" || return 2
+}
+require_stageable_lib
+
 # headRefOid == the CURRENT origin/master tip so merged_tree_evidence_by_ref's
 # merge-base check trivially passes (issue #1254 step 6 made that check
 # unconditional for every PR the apply loop merges, not just this file's
@@ -127,6 +155,7 @@ EOF
   mkdir -p "$scratch_scripts"
   cp "$root/$target" "$scratch_scripts/pr-queue.sh"
   cp "$squash_stub" "$scratch_scripts/check-squash-message.sh"
+  stage_lib "$scratch_scripts" || { echo "check-pr-queue-squash-guard: CANNOT-ASSESS — could not stage lib/common.sh for the $label venue" >&2; exit 2; }
 
   # No gate-status.sh next to the copy -> merged-tree evidence source (a) is
   # skipped by construction; AO_QUEUE_VERIFY_MERGED=1 with a fast fake verify
@@ -202,6 +231,7 @@ else
   mt_scripts="$MT_SCRATCH/scripts-merged-tree"
   mkdir -p "$mt_scripts"
   cp "$root/$target" "$mt_scripts/pr-queue.sh"
+  stage_lib "$mt_scripts" || { echo "check-pr-queue-squash-guard: CANNOT-ASSESS — could not stage lib/common.sh for the merged-tree venue" >&2; exit 2; }
 
   # --- stale evidence: PR head's merge-base is NOT the current tip ---------
   # (an ancestor of the tip, not the tip itself — the base moved since).
@@ -270,6 +300,7 @@ JSON
   mt_apply_scripts="$MT_SCRATCH/scripts-mt-apply"
   mkdir -p "$mt_apply_scripts"
   cp "$root/$target" "$mt_apply_scripts/pr-queue.sh"
+  stage_lib "$mt_apply_scripts" || { echo "check-pr-queue-squash-guard: CANNOT-ASSESS — could not stage lib/common.sh for the merged-tree apply-loop venue" >&2; exit 2; }
   cat > "$mt_apply_scripts/check-squash-message.sh" <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -320,6 +351,7 @@ mkdir -p "$ap_scripts"
 cp "$root/$merge_pr_target" "$ap_scripts/merge-pr.sh"
 cp "$ap_squash_stub" "$ap_scripts/check-squash-message.sh"
 cp "$root/scripts/pr-queue.sh" "$ap_scripts/pr-queue.sh"
+stage_lib "$ap_scripts" || { echo "check-pr-queue-squash-guard: CANNOT-ASSESS — could not stage lib/common.sh for the approval venue" >&2; exit 2; }
 ln -s "$root/integrations" "$AP_SCRATCH/integrations"
 ap_view_calls="$TMPD/ap-view.json"
 printf '{"baseRefName":"master","headRefOid":"%s"}' "$RUN_CASE_TIP" > "$ap_view_calls"
