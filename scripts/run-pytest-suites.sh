@@ -54,8 +54,6 @@ mkdir -p .verify
 # --- the retained transcript, and the bound on what a red one publishes ------
 # (issue #1661 — see "WHAT A RED SUITE PUBLISHES" above.)
 suite_log_dir=".verify/pytest-suites"
-tail_lines="${PYTEST_TAIL_LINES:-25}"
-failed_ids="${PYTEST_FAILED_IDS:-20}"
 if ! mkdir -p "$suite_log_dir" 2>/dev/null; then
   echo "run-pytest-suites: CANNOT-ASSESS — cannot create the transcript directory $suite_log_dir" >&2
   exit 2
@@ -65,33 +63,15 @@ suite_log() { # <suite> -> the transcript this run retains for it
   printf '%s/%s.log\n' "$suite_log_dir" "$(printf '%s' "$1" | tr '/' '_')"
 }
 
-# emit_suite_tail — publish WHY a suite is red, from the transcript this run
-# retained for it (#1661). Before this, the composite printed the transcript
-# PATH and nothing else, and that path was destroyed with the build workspace:
-# the failing test was unnameable from the venue's own evidence, so an
-# unattributable red could not be fixed by any lane. The echo is BOUNDED on both
-# axes — at most $failed_ids id lines, at most $tail_lines transcript lines,
-# every line truncated — so neither a huge transcript nor a hostile one can
-# flood the gate it reports into. A green suite never reaches this function.
-emit_suite_tail() { # <suite> <log>
-  local suite="$1" log="$2"
-  local ids
-  if [ ! -s "$log" ]; then
-    printf '    ---- %s: no transcript retained at %s ----\n' "$suite" "$log" >&2
-    return 0
-  fi
-  ids="$(grep -m "$failed_ids" -E '^(FAILED|ERROR) ' "$log" 2>/dev/null | cut -c1-240 || true)"
-  if [ -n "$ids" ]; then
-    printf '    ---- %s: failing test id(s), first %s ----\n' "$suite" "$failed_ids" >&2
-    printf '%s\n' "$ids" >&2
-  else
-    printf '    ---- %s: pytest printed no FAILED <test> line; the transcript tail follows ----\n' \
-      "$suite" >&2
-  fi
-  printf '    ---- %s: last %s line(s) of %s ----\n' "$suite" "$tail_lines" "$log" >&2
-  tail -n "$tail_lines" "$log" 2>/dev/null | cut -c1-240 >&2
-  printf '    ---- end %s ----\n' "$suite" >&2
-}
+# --- the bounded echo a red suite publishes (issue #1661) --------------------
+# SINGLE-SOURCED in scripts/lib/pytest-tail.sh: the sweep that REACHES a suite
+# and the checker that prints the gate of record's own `FAIL <suite> (…)` line
+# must publish a red suite identically, and one rule with two implementations is
+# how the two drift apart (#1593 was repaired by this same move). The lib reads
+# `PYTEST_TAIL_LINES` (default 25) and `PYTEST_FAILED_IDS` (default 20) — the
+# bounds, and the emitted shape, live in its header.
+# shellcheck source=scripts/lib/pytest-tail.sh
+source "$root/scripts/lib/pytest-tail.sh"
 
 # --- self-test (issue #1661) -------------------------------------------------
 # WHAT IT PROVES, on a scratch tree whose verdict is known rather than guessed:
@@ -130,13 +110,22 @@ run_self_test() {
     return 2
   fi
   local work="$selftest_scratch"
-  if ! mkdir -p "$work/scripts" "$work/demo_red/tests" "$work/demo_loud/tests" \
+  if ! mkdir -p "$work/scripts/lib" "$work/demo_red/tests" "$work/demo_loud/tests" \
       "$work/demo_green/tests" "$work/demo_skipped/tests"; then
     echo "run-pytest-suites --self-test: CANNOT-ASSESS — cannot build the scratch tree" >&2
     return 2
   fi
   if ! cp "$self" "$work/scripts/run-pytest-suites.sh"; then
     echo "run-pytest-suites --self-test: CANNOT-ASSESS — cannot stage the runner" >&2
+    return 2
+  fi
+  # The echo a red suite publishes now lives in scripts/lib/pytest-tail.sh and is
+  # SOURCED, so the staged copy needs the lib beside it or the provocation would
+  # exercise a runner whose echo is missing — i.e. prove nothing about the code
+  # that shipped. Staging it is what keeps this self-test a measurement of the
+  # real path (issue #1661, route (a): one rule, one implementation).
+  if ! cp "$root/scripts/lib/pytest-tail.sh" "$work/scripts/lib/pytest-tail.sh"; then
+    echo "run-pytest-suites --self-test: CANNOT-ASSESS — cannot stage the shared echo lib" >&2
     return 2
   fi
 
@@ -329,7 +318,7 @@ run_one_suite() { # <mod> <label>
       summary="$(tail -n 2 "$log" 2>/dev/null | tr '\n' ' ' | cut -c1-180)"
       echo "  CANNOT-ASSESS  ${prefix}$mod  (no test passed — ${nskip:-0} skipped; a suite that assessed nothing is never a pass — $log)" >&2
       record "$mod" "CANNOT-ASSESS" "$rc" "no test passed: $summary"
-      emit_suite_tail "$mod" "$log"
+      pytest_emit_suite_tail "$mod" "$log"
     else
       passed=$((passed + 1))
       summary="$(grep -oE '[0-9]+ passed.*' "$log" 2>/dev/null | tail -1)"
@@ -342,13 +331,13 @@ run_one_suite() { # <mod> <label>
     unknown=$((unknown + 1))
     echo "  CANNOT-ASSESS  ${prefix}$mod  (exceeded ${suite_timeout}s timeout — no verdict — $log)" >&2
     record "$mod" "CANNOT-ASSESS" "$rc" "timeout after ${suite_timeout}s"
-    emit_suite_tail "$mod" "$log"
+    pytest_emit_suite_tail "$mod" "$log"
   else
     fail=$((fail + 1))
     summary="$(tail -n 2 "$log" 2>/dev/null | tr '\n' ' ' | cut -c1-180)"
     echo "  FAIL  ${prefix}$mod  (pytest exit $rc — $log)" >&2
     record "$mod" "FAIL" "$rc" "$summary"
-    emit_suite_tail "$mod" "$log"
+    pytest_emit_suite_tail "$mod" "$log"
   fi
 }
 
