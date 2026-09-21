@@ -1,5 +1,21 @@
 """``dispatch`` — attach each ready task to an agent, in priority order.
 
+---knowledge---
+module_id: governance.pmo.dispatch
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [derived-view-over-priority, single-source-of-order]
+derives_from: governance/pmo/priority.py
+owner_sme: pmo-sme
+tier: L1
+interfaces: [paperclip_ticket_record, dispatch, validate_plan]
+invariants: "dispatch never re-derives a priority score; it only consumes priority.priority's order"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Built on :func:`priority.priority`: this module never re-derives a score, it
 only *consumes* the priority order and answers "who runs this, on what, at
 what tier, in which lane" for the top of it. Like every PMO view it is a

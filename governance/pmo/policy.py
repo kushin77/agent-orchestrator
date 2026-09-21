@@ -1,5 +1,21 @@
 """Load + validate ``governance/pmo/policy.yaml`` (issue #403 follow-on).
 
+---knowledge---
+module_id: governance.pmo.policy
+system: governance
+app: pmo
+solution_class: pattern
+patterns: [declared-data-not-code, schema-validated-loader]
+derives_from: governance/pmo/policy.yaml
+owner_sme: pmo-sme
+tier: L1
+interfaces: [Lane, Policy, load]
+invariants: "the priority/dispatch policy is declared data, read and validated here, never restated in Python"
+gotchas: ""
+related: ["#403"]
+do_not_duplicate: null
+---knowledge---
+
 The priority/dispatch policy is declared data (docs/SME-ROUTING.md's own
 doctrine: "the policy is declared data, not code"), not restated in Python.
 This module reads it, validates it against ``policy.schema.json`` (structural)

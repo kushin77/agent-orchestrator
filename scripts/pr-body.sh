@@ -13,6 +13,22 @@
 #
 # Usage:
 #   scripts/pr-body.sh <issue-number> [--refs] [--repo <owner/repo>]
+#
+# ---knowledge---
+# module_id: scripts.pr-body
+# system: scripts
+# app: scripts
+# solution_class: class
+# patterns: [trailer-generated-last]
+# derives_from: scripts/check-squash-message.sh
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [stdout: PR body markdown]
+# invariants: "the trailer line is always the final line, exactly what the squash guard looks for"
+# gotchas: "an issue labeled type:epic is refused — an epic is never closed by a single PR"
+# related: ["#1674"]
+# do_not_duplicate: null
+# ---knowledge---
 set -euo pipefail
 
 repo="kushin77/agent-orchestrator"

@@ -1,5 +1,21 @@
 """``priority`` — a single explainable priority order over open work.
 
+---knowledge---
+module_id: governance.pmo.priority
+system: governance
+app: pmo
+solution_class: pattern
+patterns: [derived-query-over-graph, explainable-score]
+derives_from: governance/pmo/policy.py
+owner_sme: pmo-sme
+tier: L1
+interfaces: [priority]
+invariants: "every score term is a derived query over the ticket graph plus declared policy weights — never a fabricated number or a new ledger"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Every term is a **derived query over the ticket graph** (:mod:`graph`) plus the
 declared weights in :mod:`policy` — never a new ledger, never a fabricated
 number. Each item's ``score`` is the sum of:

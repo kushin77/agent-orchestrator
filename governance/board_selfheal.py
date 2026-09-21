@@ -1,5 +1,21 @@
 """Self-heal a stale committed board snapshot before failing (issue #1692).
 
+---knowledge---
+module_id: governance.board_selfheal
+system: governance
+app: governance
+solution_class: pattern
+patterns: [self-heal-before-refuse]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [refresh, self_heal]
+invariants: "self_heal only refreshes; it never suppresses a genuine staleness refusal it cannot fix"
+gotchas: ""
+related: ["#1692", "#1189", "#1077"]
+do_not_duplicate: null
+---knowledge---
+
 Shared by every ``.board/snapshot.json`` freshness consumer —
 ``governance/dispatch/queue_freshness.py`` (#1189) and
 ``governance/ticket/freshness.py`` (#1077): a bare staleness refusal is a

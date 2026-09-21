@@ -1,5 +1,21 @@
 """``governance/pmo/plan.py`` — the enterprise project plan (issue #1648).
 
+---knowledge---
+module_id: governance.pmo.plan
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [data-not-code, derived-view]
+derives_from: governance/pmo/plan.yaml
+owner_sme: pmo-sme
+tier: L1
+interfaces: [CannotAssess, Finding, load_plan, sorted_tasks, check_plan, render_table, paperclip_ticket, render_paperclip]
+invariants: "this module only ever derives views over plan.yaml; it never mutates the plan"
+gotchas: ""
+related: ["#1648"]
+do_not_duplicate: null
+---knowledge---
+
 ``governance/pmo/plan.yaml`` is data: every task the fleet has queued, tagged
 with a milestone and a priority, converging on "CRM + Asterisk voice fully
 operational". This module only ever *derives* views over that data — it never

@@ -12,6 +12,22 @@
 #      helper claims.py itself calls, issue #263)
 #   -> prints the next manual step.
 #
+# ---knowledge---
+# module_id: scripts.run-lane
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [chained-front-half, refusal-recorded-not-fatal]
+# derives_from: governance/pmo/cli.py
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [usage, run_self_test]
+# invariants: "a paperclip-sync refusal (enable_paperclip off) is recorded, not fatal — the chain continues"
+# gotchas: "writing the code itself is deliberately not automated by this script"
+# related: ["#1651"]
+# do_not_duplicate: null
+# ---knowledge---
+#
 # Writing the code is NOT automated (nobody chains that). The back half —
 # verify -> squash-merge-with-trailer-check -> post-merge close-out — already
 # shipped as `make land PR=N` / scripts/land.sh (issue #1675). This script's

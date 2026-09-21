@@ -1,5 +1,21 @@
 """paperclip.adapters.sync.flags — the ``enable_paperclip`` gate reader (issue #1649).
 
+---knowledge---
+module_id: integrations.paperclip.adapters.sync.flags
+system: integrations
+app: paperclip
+solution_class: class
+patterns: [fail-closed-flag-reader]
+derives_from: infra/feature-flags/registry.yaml
+owner_sme: paperclip
+tier: L1
+interfaces: [read_paperclip_default, paperclip_enabled]
+invariants: "fails closed; never imports the hermes/gateway reader — each integration owns its own flag reader"
+gotchas: ""
+related: ["#1649"]
+do_not_duplicate: null
+---knowledge---
+
 Mirrors ``gateway/providers/flags.py`` (the ``enable_hermes`` reader): the
 registry (``infra/feature-flags/registry.yaml``) is the declaration, this is
 the reader, fail-closed. Never imports the hermes/gateway reader — each

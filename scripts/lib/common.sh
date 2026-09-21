@@ -1,6 +1,22 @@
 #!/bin/bash
 # scripts/lib/common.sh — shared helpers for scripts/*.sh (issue #1496).
 #
+# ---knowledge---
+# module_id: scripts.lib.common
+# system: scripts
+# app: lib
+# solution_class: class
+# patterns: [shared-helper-library]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [find_repo_root, contains, log, die]
+# invariants: "find_repo_root must be called from a script's top level, not from inside another function (BASH_SOURCE[1] is the caller)"
+# gotchas: "contains() is bash-native on purpose — grep -qF can SIGPIPE a still-writing producer"
+# related: ["#1496"]
+# do_not_duplicate: null
+# ---knowledge---
+#
 # Source it, then call the functions:
 #   source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/common.sh"
 #   root="$(find_repo_root)"
