@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T16:06:57Z",
+  "generated_at": "2026-09-21T17:52:01Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -11182,7 +11182,11 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:epic"
       ],
       "parent": null,
@@ -11332,7 +11336,11 @@
       "state": "OPEN",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:epic"
       ],
       "parent": null,
@@ -11431,7 +11439,11 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1254,
@@ -11494,7 +11506,11 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:epic"
       ],
       "parent": null,
@@ -11739,9 +11755,12 @@
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:fleet",
+        "class:enterprise",
         "gate",
+        "gdc:enterprise",
         "governance",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1268,
@@ -12514,7 +12533,11 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1295,
@@ -12598,16 +12621,17 @@
     {
       "number": 1485,
       "title": "reconcile: the quarantine is empty and its six rule-17 artifacts are unexcused, so check-reconcile reds every lane again",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "class:enterprise",
         "pmo:triaged",
         "type:bug"
       ],
       "parent": 1254,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T16:22:27Z",
       "files": []
     },
     {
@@ -12674,7 +12698,11 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:bug"
       ],
       "parent": 1510,
@@ -12716,6 +12744,9 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
         "priority:P0",
         "type:bug"
@@ -12741,24 +12772,29 @@
     {
       "number": 1506,
       "title": "gate-status: nothing SCHEDULES the verb that publishes the venue of record concluded verdict",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:12Z",
       "files": []
     },
     {
       "number": 1509,
       "title": "gate: three wired suites are red in the CI venue, so check-pytest-suites.sh reds the gate of record in Cloud Build (#1497)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "pmo:triaged",
         "priority:P0",
         "type:bug"
@@ -12766,7 +12802,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:20Z",
       "files": []
     },
     {
@@ -12775,10 +12811,14 @@
       "state": "OPEN",
       "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-friction-16",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "type:epic"
       ],
       "parent": null,
@@ -12790,20 +12830,23 @@
     {
       "number": 1511,
       "title": "governance: CMR principals.yaml + per-module governance fields (CTO root principal)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-friction-16",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:25Z",
       "files": []
     },
     {
@@ -12877,37 +12920,43 @@
     {
       "number": 1516,
       "title": "paperclip/hermes: real prompt-intake hook in .claude/settings.json (or documented non-routing)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:58Z",
       "files": []
     },
     {
       "number": 1518,
       "title": "hermes: fix or retire dead gateway/providers/hermes.py endpoint + real enable_hermes gate",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:30Z",
       "files": []
     },
     {
@@ -12947,73 +12996,85 @@
     {
       "number": 1521,
       "title": "console: add Org Chart + Skill Studio views",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:04:33Z",
       "files": []
     },
     {
       "number": 1522,
       "title": "console: add Task Board + fleet board views",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:10:38Z",
       "files": []
     },
     {
       "number": 1523,
       "title": "console: resolve /api/v1/bridge consumer + wire full operator verb catalogue",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:04:44Z",
       "files": []
     },
     {
       "number": 1524,
       "title": "dispatch: implement the tiered try-loop dispatcher (L0->L1->L2 escalation)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:bug"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:04:36Z",
       "files": []
     },
     {
@@ -13054,9 +13115,13 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
@@ -13069,19 +13134,22 @@
     {
       "number": 1528,
       "title": "indexer: run and commit a fresh --apply index",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:51Z",
       "files": []
     },
     {
@@ -13090,11 +13158,15 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-docs-01",
         "escalate:L1",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
@@ -13110,9 +13182,13 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
@@ -13128,9 +13204,13 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
@@ -13146,9 +13226,13 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
@@ -13161,20 +13245,23 @@
     {
       "number": 1533,
       "title": "templates: extend agent-orchestrator issue/PR forms with RCA+epic+lifecycle+tier+escalation",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:epic"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:37Z",
       "files": []
     },
     {
@@ -13198,20 +13285,23 @@
     {
       "number": 1535,
       "title": "code-knowledge: define the machine-readable code header standard + linter",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:55Z",
       "files": []
     },
     {
@@ -13238,11 +13328,15 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "escalate:L1",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
@@ -13258,10 +13352,14 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
@@ -13277,10 +13375,14 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
@@ -13312,20 +13414,23 @@
     {
       "number": 1541,
       "title": "isolation: add pre-commit/pre-push file-lease enforcement hook",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:10:00Z",
       "files": []
     },
     {
@@ -13367,115 +13472,133 @@
     {
       "number": 1544,
       "title": "isolation: document shared-checkout git-stash collision risk in AGENTS.md",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:bug"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:34Z",
       "files": []
     },
     {
       "number": 1545,
       "title": "isolation: build live-resource lease registry (terraform state / Cloudflare phase)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:04:30Z",
       "files": []
     },
     {
       "number": 1546,
       "title": "isolation: re-verify issue #4210 against its actual GitHub body",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:12:13Z",
       "files": []
     },
     {
       "number": 1547,
       "title": "isolation: confirm/refute the .42 fetch-refused-into-checked-out-branch claim",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:09:55Z",
       "files": []
     },
     {
       "number": 1548,
       "title": "isolation: add control-plane/control ledger (or confirm dispatch-audit.jsonl is it)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:46Z",
       "files": []
     },
     {
       "number": 1549,
       "title": "isolation: A2A peer-check standard (enumerate siblings, refuse-on-overlap, enhance not clobber)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:06Z",
       "files": []
     },
     {
@@ -13502,19 +13625,22 @@
     {
       "number": 1553,
       "title": "console: CP.el stringifies array children \u2014 Agents capabilities render as [object HTMLSpanElement]",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:bug"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:40Z",
       "files": []
     },
     {
@@ -13541,7 +13667,11 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:bug"
       ],
       "parent": 1510,
@@ -13586,10 +13716,14 @@
       "state": "OPEN",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
@@ -13605,10 +13739,14 @@
       "state": "OPEN",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
@@ -13624,10 +13762,14 @@
       "state": "OPEN",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:task"
       ],
@@ -13643,10 +13785,14 @@
       "state": "OPEN",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
@@ -13662,10 +13808,14 @@
       "state": "OPEN",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L1",
         "type:task"
       ],
@@ -13697,20 +13847,23 @@
     {
       "number": 1566,
       "title": "spog: reconcile the 'Paperclip integrated' claim with ADR-0013's actual scope",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-rca-07",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:governance"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:43Z",
       "files": []
     },
     {
@@ -13758,16 +13911,19 @@
     {
       "number": 1571,
       "title": "[tenant] purebliss single-tenant org: CEO/CTO/CFO/PMO offices with agents, personas, prompts, budgets, fleets",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:04:40Z",
       "files": []
     },
     {
@@ -13797,8 +13953,12 @@
       "state": "OPEN",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-docs-01",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
@@ -13810,17 +13970,20 @@
     {
       "number": 1574,
       "title": "[pmo] board triage 2026-09-20: cluster all open issues across repos for tandem batch dispatch",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "cluster:c-docs-01",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:11:12Z",
       "files": []
     },
     {
@@ -13844,31 +14007,37 @@
     {
       "number": 1577,
       "title": "[pmo] priority + dispatch engine: PMO consumes all PM artifacts and attaches work to agents by priority",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:03Z",
       "files": []
     },
     {
       "number": 1582,
       "title": "[cfo] CFO office: enterprise cost model + 90% prompt-reduction program + finops KPI gate",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:bug"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:01:58Z",
       "files": []
     },
     {
@@ -13886,9 +14055,11 @@
     {
       "number": 1593,
       "title": "commits: 17 commits across 5 open PRs use the bare `Refs #<n>` form the commit predicate refuses \u2014 and the merge gate accepting the bare `Closes #<n>` shape is why lanes write it",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "gate",
         "lifecycle:verify",
         "pillar:autonomous-ops",
@@ -13900,7 +14071,7 @@
       "parent": 1254,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:37:57Z",
       "files": []
     },
     {
@@ -13909,7 +14080,11 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
@@ -13924,7 +14099,11 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
@@ -13936,16 +14115,19 @@
     {
       "number": 1618,
       "title": "flags: the promotion ledger has no owner \u2014 38 declared-off surfaces, zero owner/promotion fields",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:bug"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:02:17Z",
       "files": []
     },
     {
@@ -13954,7 +14136,11 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:governance"
       ],
       "parent": 1510,
@@ -13984,7 +14170,11 @@
       "state": "OPEN",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
@@ -13999,7 +14189,11 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:bug"
       ],
       "parent": 1543,
@@ -14015,8 +14209,11 @@
       "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
         "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
         "pillar:governance",
         "pmo:triaged",
+        "priority:P2",
         "type:governance"
       ],
       "parent": 1510,
@@ -14031,7 +14228,11 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
@@ -14046,9 +14247,13 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "governance-tier",
         "handoff:deepseek",
         "pmo:triaged",
+        "priority:P2",
         "tier:L0",
         "type:bug"
       ],
@@ -14061,46 +14266,55 @@
     {
       "number": 1648,
       "title": "[pmo] enterprise project plan: every module/task by milestone+priority to CRM + Asterisk voice operational",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:epic"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:10:47Z",
       "files": []
     },
     {
       "number": 1649,
       "title": "paperclip: project/ticket sync adapter for PMO plan",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1268,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:46:33Z",
       "files": []
     },
     {
       "number": 1650,
       "title": "[cto] docs: refresh intent/abilities top-down \u2014 Paperclip \u2192 PMO \u2192 Hermes \u2192 agents; CTO office for the CMR",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:03:02Z",
       "files": []
     },
     {
@@ -14109,7 +14323,11 @@
       "state": "OPEN",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:bug"
       ],
       "parent": 1510,
@@ -14124,7 +14342,11 @@
       "state": "OPEN",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
@@ -14139,7 +14361,11 @@
       "state": "OPEN",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1510,
@@ -14169,6 +14395,9 @@
       "state": "OPEN",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
         "priority:P0",
         "type:bug"
@@ -14185,7 +14414,11 @@
       "state": "OPEN",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1648,
@@ -14200,7 +14433,11 @@
       "state": "OPEN",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:epic"
       ],
       "parent": null,
@@ -14215,7 +14452,11 @@
       "state": "OPEN",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:epic"
       ],
       "parent": null,
@@ -14230,7 +14471,11 @@
       "state": "OPEN",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
         "pmo:triaged",
+        "priority:P2",
         "type:epic"
       ],
       "parent": null,
@@ -14245,6 +14490,8 @@
       "state": "OPEN",
       "milestone": "",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "priority:P0",
         "type:epic"
       ],
@@ -14257,7 +14504,7 @@
     {
       "number": 1670,
       "title": "docs: land the PR-lifecycle gap report (docs/rca/2026-09-21-pr-release-lifecycle.md)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "priority:P1",
@@ -14266,7 +14513,7 @@
       "parent": 1669,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:01:54Z",
       "files": []
     },
     {
@@ -14275,6 +14522,8 @@
       "state": "OPEN",
       "milestone": "",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "priority:P1",
         "type:task"
       ],
@@ -14287,22 +14536,24 @@
     {
       "number": 1672,
       "title": "lease: allocate shared index/ADR slots at claim time \u2014 docs/README.md rows, ADR numbers, docs/*.md filenames (6-way collision 2026-09-21)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "priority:P1",
         "type:task"
       ],
       "parent": 1669,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:33:21Z",
       "files": []
     },
     {
       "number": 1673,
       "title": "gate: box-state checks (reaper schedule, reconcile real-tree baseline, orphan census, gate-lock leftovers) never red a lane venue; attestation venue owns them",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "priority:P1",
@@ -14311,37 +14562,41 @@
       "parent": 1669,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:03:09Z",
       "files": []
     },
     {
       "number": 1674,
       "title": "pr-contract: generate the PR body (trailer, Closes, classification) from the lane record \u2014 6 of 33 hand-typed bodies failed the squash guard 2026-09-21",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "priority:P1",
         "type:task"
       ],
       "parent": 1669,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:28:31Z",
       "files": []
     },
     {
       "number": 1675,
       "title": "landing: one command runs claim \u2192 verify \u2192 merge \u2192 attest \u2192 close-out \u2192 reclaim; each step's evidence in the lane record",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "priority:P1",
         "type:task"
       ],
       "parent": 1669,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:34:46Z",
       "files": []
     },
     {
@@ -14350,6 +14605,8 @@
       "state": "OPEN",
       "milestone": "",
       "labels": [
+        "area:standards",
+        "class:enterprise",
         "priority:P1",
         "type:task"
       ],
@@ -14365,6 +14622,9 @@
       "state": "OPEN",
       "milestone": "",
       "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P2",
         "type:task"
       ],
       "parent": 1669,
@@ -14376,13 +14636,13 @@
     {
       "number": 1685,
       "title": "train: every red is unrunnable \u2014 attribute_red resolves scripts/<name>.sh but the attestation names checks bare (4 trains retired today)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:03:06Z",
       "files": []
     },
     {
@@ -14390,7 +14650,12 @@
       "title": "train: a check declared as an inline command is permanently unrunnable, so it can never be attributed (pytest-fleet, pytest-suites, ...)",
       "state": "OPEN",
       "milestone": "",
-      "labels": [],
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
@@ -14400,13 +14665,47 @@
     {
       "number": 1692,
       "title": "gate: the committed board snapshot is 72h-stale with no installed producer, so check-dispatch-queue and check-ticket-projection red every lane",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [],
       "parent": 1254,
       "blocked_by": [],
       "cross_refs": [],
+      "closed_at": "2026-09-21T16:22:27Z",
+      "files": []
+    },
+    {
+      "number": 1694,
+      "title": "conformance: 67 milestoned open issues lack priority/area/gdc \u2014 a cascading label debt the class backfill just exposed",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
       "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1701,
+      "title": "dispatch: tiered.py (claude/deepseek) and routing.py (hermes/paperclip) are two non-composing routers",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "class:enterprise",
+        "priority:P0",
+        "type:bug"
+      ],
+      "parent": 1268,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T17:41:25Z",
       "files": []
     }
   ]

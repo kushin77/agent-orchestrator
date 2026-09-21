@@ -95,6 +95,8 @@ def _print_findings(findings) -> None:
             "  %-7s %-28s %s"
             % (finding.severity.upper(), finding.code, finding.message)
         )
+        if finding.remediation:
+            print("          REMEDY: %s" % finding.remediation)
 
 
 def _git(root: Path, *args: str) -> tuple:

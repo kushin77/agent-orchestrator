@@ -110,6 +110,9 @@ def test_declared_class_expectation_is_a_reported_deviation(policy):
     assert finding.severity == "warning"
     assert "pillar" in finding.message
     assert report.conformant is True  # a deviation, not a wedge
+    # The cascade in #1694 (69 milestoned issues stuck on this exact warning)
+    # showed the fix has to be a one-paste command, not a description of one.
+    assert "gh issue edit 7 --add-label pillar:" in finding.remediation
 
 
 def test_strict_escalates_a_deviation_to_an_error(policy):
