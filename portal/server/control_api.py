@@ -812,7 +812,18 @@ class RemoteControl:
         )
 
     # -- authorisation ------------------------------------------------------
-    def _require_capability(self, principal: Any, row: VerbRow) -> None:
+    def _authz_authorizer(self) -> Any:
+        """The console's own authorizer, or a refusal (fail closed)."""
+        authorizer = getattr(self.app, "fleet_authz", None)
+        if authorizer is None:  # fail closed: an app without a store cannot decide
+            raise ApiError(
+                503,
+                "authorizer_unavailable",
+                "the console carries no rbac store, so no control verb can be authorised",
+            )
+        return authorizer
+
+    def _decision(self, subject: str, capability: str) -> Any:
         """The two rbac gates — scope, then permission — at the platform org.
 
         The console's own authorizer is consumed rather than re-built: it holds
@@ -823,18 +834,34 @@ class RemoteControl:
         fixing the resource: the thing being controlled is the fleet, so control
         is a platform-scope capability and a tenant-scoped role cannot reach it
         by holding a capability string.
+
+        The decision takes an already-prepared *subject* rather than a principal
+        so both callers of it can share one preparation: :meth:`_require_capability`
+        asks it once to refuse by name, and :func:`permitted_verb_ids` asks it
+        once per declared verb to answer the operator terminal's "what may this
+        caller run?". Reading the same function twice is what makes the panel's
+        answer and the dispatch path's answer the same answer — a second
+        evaluation of the rule here is exactly the drift this module exists to
+        prevent.
         """
-        authorizer = getattr(self.app, "fleet_authz", None)
-        if authorizer is None:  # fail closed: an app without a store cannot decide
-            raise ApiError(
-                503,
-                "authorizer_unavailable",
-                "the console carries no rbac store, so no control verb can be authorised",
-            )
-        subject = authorizer._prepare(principal)
-        decision = guard(
-            authorizer.store, subject, ScopeNode(org_id=PLATFORM_ORG), row.capability
+        return guard(
+            self._authz_authorizer().store,
+            subject,
+            ScopeNode(org_id=PLATFORM_ORG),
+            capability,
         )
+
+    def prepared_subject(self, principal: Any) -> str:
+        """The rbac subject a principal's capability decisions are made for."""
+        return self._authz_authorizer()._prepare(principal)
+
+    def _require_capability(
+        self, principal: Any, row: VerbRow, subject: Optional[str] = None
+    ) -> None:
+        """Refuse a verb the caller's platform capabilities do not reach."""
+        if subject is None:
+            subject = self.prepared_subject(principal)
+        decision = self._decision(subject, row.capability)
         if decision.allowed:
             return
         if decision.reason == "permission":
@@ -863,6 +890,53 @@ class RemoteControl:
                     f"the control vocabulary cannot be read: {exc}",
                 ) from exc
         return self._vocabulary
+
+
+# ---------------------------------------------------------------------------
+# the caller's own vocabulary (what the operator terminal may offer)
+# ---------------------------------------------------------------------------
+def permitted_verb_ids(app: Any, principal: Any) -> Optional[list[str]]:
+    """The exposed verbs *this* caller's capabilities reach — or ``None``.
+
+    The operator terminal renders the closed vocabulary (``fleet.verbs``), but
+    the declaration is the same for every caller: it says which verbs exist, not
+    which ones the operator reading it may run. Left at that, the panel offers a
+    steer button for every exposed verb in the registry — including the
+    irreversible ones (``closure.retire``, ``board.reap``) — to a caller whose
+    capabilities reach none of them, so every click is a 403 the panel could
+    have predicted. That is the defect this function exists for (issue #1523).
+
+    It answers with the SAME decision the dispatch path refuses with: one
+    :meth:`RemoteControl._decision` per declared verb, over one prepared
+    subject, against the caller's own org. A verb listed here is therefore a verb
+    the plane would not refuse 403 for *this* caller, and a verb absent from the
+    list is one the plane would refuse — the two can never disagree, because
+    there is one implementation of the rule and this is not a second one.
+
+    ``None`` means "cannot be assessed", and it is deliberately distinct from
+    ``[]``: the surface being flag-gated OFF, or an app with no rbac store, is
+    not the same claim as "this caller may run nothing", and a client that
+    conflated them would either hide a working panel or offer a broken one. The
+    operator terminal treats ``None`` as fail-closed — no steer button is
+    rendered — and says so instead of showing an empty panel that reads as an
+    idle vocabulary.
+    """
+    surface = _surface(app)
+    if not surface.enabled:
+        return None
+    try:
+        vocabulary = surface._vocabulary_for_this_call()
+        subject = surface.prepared_subject(principal)
+        return [
+            row.id
+            for row in vocabulary.verbs.values()
+            if row.exposed and surface._decision(subject, row.capability).allowed
+        ]
+    except ApiError:
+        # No store, no readable registry: no verdict, so no list (never a
+        # partial one that would read as "you may run this" for a verb the
+        # dispatch path would then refuse).
+        return None
 
 
 # ---------------------------------------------------------------------------
