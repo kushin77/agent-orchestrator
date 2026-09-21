@@ -82,6 +82,7 @@ reachable from this index.
 | [`FLEET-CAPABILITY-DRIFT.md`](FLEET-CAPABILITY-DRIFT.md) | Capability drift — restarting a rung that does not implement what the repository declares (issue #319). |
 | [`FLEET-DASHBOARD-GAP-ANALYSIS.md`](FLEET-DASHBOARD-GAP-ANALYSIS.md) | Fleet dashboard gap analysis — terminal TUI vs web single-pane-of-glass (issue #330). |
 | [`LEASE-POLICY.md`](LEASE-POLICY.md) | One declared policy for every fleet lease and TTL (issue #322). |
+| [`LEASE-HOOK.md`](LEASE-HOOK.md) | The opt-in `pre-commit` file-lease hook: what it refuses, the situations it fails open on, the opt-in install, and the two documented opt-out paths (issue #1541). |
 | [`SESSION-FLEET-SYNC.md`](SESSION-FLEET-SYNC.md) | Session fleet sync — the sync contract and gap register (issue #181). |
 | [`CROSS-REPO-LESSONS-SYNC.md`](CROSS-REPO-LESSONS-SYNC.md) | The declared relationship between the two lessons loops either side of the repo boundary. |
 | [`SHARED-SERVICES-FALLBACK.md`](SHARED-SERVICES-FALLBACK.md) | Shared-services fallback rung — frozen contract, owner lane `gateway/health` (issue #375). |
@@ -103,6 +104,7 @@ reachable from this index.
 | [`erp-finops/token-baseline.md`](erp-finops/token-baseline.md) | DeepSeek token-flow baseline (issue #667, EPIC #665). |
 | [`BUILT-NOT-SHIPPED-AO.md`](BUILT-NOT-SHIPPED-AO.md) | Built-not-shipped inventory — every artifact that is built but not shipped, each with the mechanism that proves the claim (issue #1540, EPIC #1510). |
 | [`BOARD-TRIAGE-2026-09-20.md`](BOARD-TRIAGE-2026-09-20.md) | Cross-repo open-issue board triage — clusters for tandem batch dispatch (issue #1574, parent #1510). |
+| [`ISOLATION-42-FETCH-CLAIM.md`](ISOLATION-42-FETCH-CLAIM.md) | Measured verdict on the `.42` "fetch refused into checked-out branch" claim — confirmed as git behaviour on 2.53.0, with the minimal reproduction and its counterfactual (issue #1547). |
 | [`cfo/HARNESS-AUDIT-2026-09-20.md`](cfo/HARNESS-AUDIT-2026-09-20.md) | Read-only audit of the per-turn harness-injected prompt surface (skills, MCP, deferred tools) with a measured change set and MCP-fix diagnosis (refs #1582, CFO office). |
 | [`cfo/proposed-global-CLAUDE.md`](cfo/proposed-global-CLAUDE.md) | Compressed draft of `~/.claude/CLAUDE.md` (~36% smaller, every rule preserved), applied by `cfo/harness-audit-2026-09-20.patch` — see the audit doc above. |
 
