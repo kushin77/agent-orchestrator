@@ -9,6 +9,23 @@ a caller-supplied callback — and every request attaches
 expiry) is the platform's job at the public edge / control plane (issues
 #35/#37/#38); the SDK only parses the claims it needs (tenant scoping + expiry)
 and fails closed when the token is absent or unparseable.
+
+
+---knowledge---
+module_id: control-plane.sdk.python.aosdk.auth
+system: control-plane
+app: sdk
+solution_class: enterprise
+patterns: [short-lived-token, injected-credential, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [SessionToken, TokenSource, token_from_env, bearer_token, verify_not_expired, DEFAULT_TOKEN_ENV]
+invariants: "the SDK consumes short-lived session tokens issued by the platform and never stores, generates or hardcodes keys; the token is absent-or-unparseable fails closed"
+gotchas: "verification (signature, revocation, expiry) belongs to the platform edge and control plane; the SDK only parses the claims it needs"
+related: ["#41", "#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

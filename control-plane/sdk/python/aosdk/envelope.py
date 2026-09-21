@@ -6,6 +6,23 @@ envelope ``{ok, status, requestId, data, error}`` where ``error`` is
 values or raises the matching :class:`~aosdk.errors.ApiError` — fail closed,
 never a silent pass on a non-OK envelope.  The gateway task envelope
 (``{status, result, record}``, issue #16) is handled by the gateway client.
+
+
+---knowledge---
+module_id: control-plane.sdk.python.aosdk.envelope
+system: control-plane
+app: sdk
+solution_class: pattern
+patterns: [contract-first, fail-closed, typed-error-mapping]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [error_from_envelope, require_ok, items]
+invariants: "the control-plane envelope {ok, status, requestId, data, error} is unwrapped into typed values or raises the matching ApiError; fail closed, never a silent pass on a non-OK envelope"
+gotchas: "the gateway task envelope {status, result, record} is handled by the gateway client, not here"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -29,6 +29,23 @@ first — never by editing ``SOURCES``.
 
 Exit contract (this repo's tri-state): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 CANNOT-ASSESS must never read as a pass.
+
+
+---knowledge---
+module_id: control-plane.control.cli
+system: control-plane
+app: control
+solution_class: enterprise
+patterns: [cross-reference-both-directions, anti-vacuity-floor, contract-first, tri-state-exit]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main, cmd_validate, load_registry, verbs_in, validate_schema, cross_reference, SOURCES]
+invariants: "MISSING and ABSENT are both checked, and SOURCES is an anti-vacuity FLOOR rather than a closed set: a producer extends the surface only by landing a registry entry first, never by editing SOURCES"
+gotchas: "when a producer lane adds a lever verb without the matching verbs.yaml entry the registry, not the gate, is what gets extended"
+related: ["#553", "#551"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

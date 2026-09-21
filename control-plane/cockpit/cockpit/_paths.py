@@ -13,6 +13,23 @@ consumes three of them, and the insertion order matters (first wins):
   and the console contract modules).
 
 Nothing here imports a package that requires a network or a TTY.
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit._paths
+system: control-plane
+app: cockpit
+solution_class: class
+patterns: [path-bootstrap, declared-dependency-order]
+derives_from: null
+owner_sme: frontend-sme
+tier: L0
+interfaces: [ensure_paths, ROOT, PACKAGE, FUNCTIONS_DIR, CLI_DIR, FIXTURES]
+invariants: "the sys.path insertion order is the contract (control-plane/cli, then control-plane/functions, then the repository root) because first wins"
+gotchas: "the functions module names are deliberately unique so the repository's top-level registry/ package can never shadow them"
+related: ["#566"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

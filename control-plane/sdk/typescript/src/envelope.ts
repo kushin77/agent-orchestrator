@@ -7,6 +7,22 @@
  * `ApiError` — fail closed, never a silent pass on a non-OK envelope.  The
  * gateway task envelope (`{status, result, record}`, issue #16) is handled by
  * the gateway client.
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.src.envelope
+ * system: control-plane
+ * app: sdk
+ * solution_class: pattern
+ * patterns: [contract-first, fail-closed, typed-error-mapping]
+ * derives_from: control-plane/sdk/python/aosdk/envelope.py
+ * owner_sme: platform-sme
+ * tier: L1
+ * interfaces: [errorFromEnvelope, requireOk, items, ControlPlaneEnvelope, ErrorEnvelope]
+ * invariants: "requireOk unwraps the envelope into data or throws the matching ApiError; fail closed, never a silent pass on a non-OK envelope"
+ * gotchas: "the gateway task envelope {status, result, record} is handled by the gateway client, not here"
+ * related: ["#38"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 import { ApiError, PermissionDeniedError, ScopeDeniedError, UnauthorizedError } from "./errors.js";

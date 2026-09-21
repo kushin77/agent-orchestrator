@@ -24,6 +24,23 @@ The four obligations, each a branch here rather than a virtue:
 Nothing here decides *permission*. Roles are a filter over what to show first
 (``registry.recommended``), never a gate on what may run: the capability in a
 function's ``scope`` is RC-2's, and ``identity/rbac`` enforces it per call.
+
+
+---knowledge---
+module_id: control-plane.functions.cockpit_render
+system: control-plane
+app: functions
+solution_class: enterprise
+patterns: [pure-function-render, no-data-is-never-ok, named-refusal, offline-fixture]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [render, render_all, render_workspace, load_fixtures, Fixture, OUTCOMES]
+invariants: "rendering is a pure function from a declared function plus a fixture to a frame of text, so the gate renders every function with no network, no TTY, no tmux and no bearer token"
+gotchas: "nothing here decides permission: roles are a filter over what to show first, never a gate on what may run, and a disabled fixture renders the flag so an operator can tell off from broken"
+related: ["#565", "#551"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

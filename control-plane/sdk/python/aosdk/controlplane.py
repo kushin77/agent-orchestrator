@@ -15,6 +15,23 @@ Every response rides the standardized control-plane envelope
 the matching :class:`~aosdk.errors.ApiError` on a non-OK envelope.  Requests
 carry a short-lived per-tenant session token (env or callback) — never a
 hardcoded key.
+
+
+---knowledge---
+module_id: control-plane.sdk.python.aosdk.controlplane
+system: control-plane
+app: sdk
+solution_class: enterprise
+patterns: [typed-client, envelope-unwrapping, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ControlPlaneClient]
+invariants: "every response rides the standardized control-plane envelope and a non-OK envelope raises the matching ApiError, never a silent pass"
+gotchas: "requests carry a short-lived per-tenant session token from the env or an injected callback, never a hardcoded key"
+related: ["#41", "#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

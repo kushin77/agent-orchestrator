@@ -36,6 +36,23 @@ Five properties, each of which the module that owns it states in full:
 
 The CLI is not a dashboard (ADR-0022's refusal, consumed by ADR-0025 §6.2):
 text and structured JSON only — no frame, no filter bar, no timeline.
+
+
+---knowledge---
+module_id: control-plane.cli.aoctl
+system: control-plane
+app: cli
+solution_class: class
+patterns: [package-contract, public-surface, client-only]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [aoctl.cli, aoctl.plane, aoctl.receipt, aoctl.refusals, aoctl.vocabulary]
+invariants: "the package is the RC-5 client half only: it owns no vocabulary, re-implements no transport, and speaks only the RC-3 control API"
+gotchas: "the CLI's verbs are a table of declared command ids read from control-plane/control/verbs.yaml at run time, never a hand-copied verb list"
+related: ["#556", "#551"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

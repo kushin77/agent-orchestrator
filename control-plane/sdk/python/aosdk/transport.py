@@ -17,6 +17,23 @@ testable offline against doubles and a deployment swaps in real HTTP:
 implementation of :class:`Transport` used as the production default; the
 streaming adapter is the documented production wiring point (an SSE relay).
 No network call is ever made by the SDK tests.
+
+
+---knowledge---
+module_id: control-plane.sdk.python.aosdk.transport
+system: control-plane
+app: sdk
+solution_class: enterprise
+patterns: [injected-transport, offline-testable, dependency-free-http]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Transport, StreamTransport, HttpTransport]
+invariants: "every client is fully testable offline against doubles and a deployment swaps in real HTTP; no network call is ever made by the SDK tests"
+gotchas: "the streaming adapter is the documented production wiring point (an SSE relay) and is not implemented here"
+related: ["#41"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

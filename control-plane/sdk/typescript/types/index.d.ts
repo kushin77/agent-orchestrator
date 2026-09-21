@@ -5,6 +5,22 @@
  * the package's types without compiling the sources (regenerated from `src`
  * by `npm run build` -> `tsc -d` when the toolchain is available).  The
  * vocabulary matches the Python SDK and the merged platform contracts.
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.types.index
+ * system: control-plane
+ * app: sdk
+ * solution_class: pattern
+ * patterns: [declaration-mirror, consume-never-restate, generated-never-hand-forked]
+ * derives_from: control-plane/sdk/typescript/src/index.ts
+ * owner_sme: platform-sme
+ * tier: L1
+ * interfaces: [SDK_VERSION, TaskOutcome, TaskResult, SessionClaims, Transport, GatewayClient, ControlPlaneClient, McpClient]
+ * invariants: "the vocabulary declared here matches the Python SDK and the merged platform contracts, and it is regenerated from src by the build when the toolchain is available"
+ * gotchas: "this is a hand-maintained mirror for consumers that import the types without compiling the sources"
+ * related: ["#41"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 export declare const SDK_VERSION = "0.1.0";

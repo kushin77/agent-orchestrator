@@ -10,6 +10,23 @@ Two authorities are consumed, none invented:
   the control API — so the audit record lands on RC-4's rails and the cockpit
   writes no local ack state. An alert renders acked only from the receipt the
   plane returned.
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit.ticker
+system: control-plane
+app: cockpit
+solution_class: enterprise
+patterns: [declared-authority, one-receipt-per-action, no-local-state]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [load_alerts, ack_call, render, Alert, SEVERITIES, ACK_FUNCTION]
+invariants: "an alert renders acked only from the receipt the plane returned, so the cockpit writes no local ack state and lands the audit record on RC-4's rails"
+gotchas: "the registry has no ack verb, so an acknowledgement resolves to the DECLARED steering command SEND with the alert id in the message"
+related: ["#566"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

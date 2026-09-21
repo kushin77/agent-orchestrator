@@ -15,6 +15,23 @@ command needs is assembled from the two RC siblings the cockpit consumes:
 :meth:`CockpitPlane.describe` is the ``--dry-run`` document: exactly what would
 go on the wire, with the session value itself never rendered (the terminal may
 be shared).
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit.plane
+system: control-plane
+app: cockpit
+solution_class: enterprise
+patterns: [delegate-never-re-derive, client-only, dry-run-first]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CockpitPlane, mint_command_id, DEFAULT_PLANE, DEFAULT_TIMEOUT]
+invariants: "the cockpit holds no credential of its own: the request is built and delivered by RC-5's client half, so no transport and no wire format is re-implemented here"
+gotchas: "describe() is the --dry-run document, and the session value itself is never rendered because the terminal may be shared"
+related: ["#566"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

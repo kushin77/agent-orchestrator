@@ -17,6 +17,23 @@ Typed value objects exchanged with the platform.  Field vocabulary is
 Wire serialization uses the platform's camelCase JSON keys; the Python
 attributes are snake_case.  All models are immutable dataclasses with
 ``from_dict``/``to_dict`` helpers and fail closed on malformed input.
+
+
+---knowledge---
+module_id: control-plane.sdk.python.aosdk.model
+system: control-plane
+app: sdk
+solution_class: enterprise
+patterns: [consume-never-restate, closed-vocabulary, immutable-models, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TaskRequest, TaskResult, TaskEnvelope, DispatchEvent, UsageReport, AuditRecord, PolicyBinding, ToolDefinition, ToolResult, decode_claims, outcome_is_served]
+invariants: "field vocabulary is CONSUMED from the merged contracts and never redefined, and every model fails closed on malformed input"
+gotchas: "wire serialization uses the platform's camelCase JSON keys while the Python attributes are snake_case"
+related: ["#41"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

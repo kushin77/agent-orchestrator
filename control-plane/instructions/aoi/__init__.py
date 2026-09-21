@@ -11,6 +11,23 @@ Owner lane: ``control-plane/instructions/**`` (issue
 ``kushin77/agent-orchestrator#42``, work item 38, phase 7).  Parent:
 EPIC-00 (issue #4).  Everything here is offline by construction: Python
 standard library + PyYAML only, no network, no third-party templating.
+
+
+---knowledge---
+module_id: control-plane.instructions.aoi
+system: control-plane
+app: instructions
+solution_class: class
+patterns: [package-contract, public-surface, offline-by-construction]
+derives_from: null
+owner_sme: docs-sme
+tier: L0
+interfaces: [aoi.conformance, aoi.model, aoi.override, aoi.render, aoi.versioning]
+invariants: "one canonical instruction source is rendered into per-tool mirrors that are generated and never hand-forked; everything here is offline, Python standard library plus PyYAML only"
+gotchas: "the package carries the model-agnostic proof that the same ordered rules and precedence reach every harness"
+related: ["#42"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

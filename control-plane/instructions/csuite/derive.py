@@ -40,6 +40,23 @@ Derivation (deterministic — same inputs, same bytes):
 
 A produced canonical source must still validate against the ONE canonical
 contract (``aoi.model.validate_canonical``) — this module adds no second scheme.
+
+
+---knowledge---
+module_id: control-plane.instructions.csuite.derive
+system: control-plane
+app: instructions
+solution_class: enterprise
+patterns: [derived-never-authored, deterministic-render, read-only-consumer]
+derives_from: control-plane/instructions/aoi/__init__.py
+owner_sme: docs-sme
+tier: L1
+interfaces: [derive_canonical, write_all, load_card, load_module, load_org_chart, dump_canonical, ROLES]
+invariants: "the canonical sources are a pure function of the workbook artifacts, so a card or module change means regenerate and the mirrors change with it — never a hand-written second copy of the tier ladder or the budget caps"
+gotchas: "the registry and prompt-module lanes stay read-only consumers from this lane's point of view (GR-3, one lane owns a file)"
+related: ["#643"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -16,6 +16,23 @@ copilot-instructions.md) sees identical semantics — same task, same behaviour.
 A machine-readable ledger comment is embedded at the end of every mirror so
 the conformance suite can extract and cross-check the semantics each mirror
 carries.
+
+
+---knowledge---
+module_id: control-plane.instructions.aoi.render
+system: control-plane
+app: instructions
+solution_class: enterprise
+patterns: [pure-function-render, deterministic-render, generated-never-hand-forked]
+derives_from: null
+owner_sme: docs-sme
+tier: L1
+interfaces: [render_all, distribution_manifest, MIRROR_TARGETS, LEDGER_MARKER, LEDGER_SCHEMA]
+invariants: "the renderer is a pure function of its inputs (no timestamps, no randomness, stable ordering) so regenerating over the same inputs reproduces the committed mirrors byte-for-byte"
+gotchas: "every mirror embeds a machine-readable ledger comment at the end so the conformance suite can extract and cross-check the semantics each mirror carries"
+related: ["#42"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

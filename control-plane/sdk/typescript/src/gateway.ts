@@ -7,6 +7,22 @@
  * served outcome and whose `outcome` is one of the closed set otherwise —
  * the SDK never fabricates content for a non-served outcome.  `stream` yields
  * the incremental dispatch events then the terminal `TaskResult`.
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.src.gateway
+ * system: control-plane
+ * app: sdk
+ * solution_class: enterprise
+ * patterns: [typed-client, closed-outcome-set, streaming-then-terminal]
+ * derives_from: control-plane/sdk/python/aosdk/gateway.py
+ * owner_sme: platform-sme
+ * tier: L1
+ * interfaces: [GatewayClient, DispatchOptions, GatewayStreamChunk]
+ * invariants: "the SDK never fabricates content for a non-served outcome: content is the schema-validated typed object on a served outcome and outcome is one of the closed set otherwise"
+ * gotchas: "stream yields the incremental dispatch events then the terminal TaskResult"
+ * related: ["#41", "#16"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 import { TokenSource, verifyNotExpired } from "./auth.js";

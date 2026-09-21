@@ -14,6 +14,22 @@
  * `Transport`.  The streaming adapter (an SSE relay) is the documented
  * production wiring point; offline doubles implement `StreamTransport`
  * directly.  No SDK test touches the network.
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.src.transport
+ * system: control-plane
+ * app: sdk
+ * solution_class: enterprise
+ * patterns: [injected-transport, offline-testable, dependency-free-http]
+ * derives_from: control-plane/sdk/python/aosdk/transport.py
+ * owner_sme: platform-sme
+ * tier: L1
+ * interfaces: [Transport, StreamTransport, HttpTransport, RequestOptions]
+ * invariants: "every client is fully testable offline against doubles and a deployment swaps in real HTTP; no SDK test touches the network"
+ * gotchas: "the streaming adapter (an SSE relay) is the documented production wiring point; offline doubles implement StreamTransport directly"
+ * related: ["#41"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 import { TransportError } from "./errors.js";

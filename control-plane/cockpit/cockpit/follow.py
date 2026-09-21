@@ -14,6 +14,23 @@ restated. The wire is stdlib ``urllib``; a test injects a transport seam and
 exercises the same parser. Every state that is not "frames arrived" renders a
 NAMED condition — ``unreachable``, ``NO_DATA`` — never an empty pane that reads
 as healthy.
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit.follow
+system: control-plane
+app: cockpit
+solution_class: enterprise
+patterns: [reader-only, declared-stream-names, named-refusal, offline-fixture]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [follow, parse_events, SseEvent, SseTransport, HttpSseTransport, FixtureSseTransport, declared_streams]
+invariants: "the follow mode carries no credential of its own, opens no listener and writes nothing: a watcher is by construction a reader"
+gotchas: "every state that is not frames-arrived renders a NAMED condition (unreachable, NO_DATA), never an empty pane that reads as healthy"
+related: ["#566", "#554"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

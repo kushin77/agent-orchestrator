@@ -54,6 +54,23 @@ Usage:
     python3 control-plane/fleet-template/render.py report --params P [--json]
     python3 control-plane/fleet-template/render.py validate-instance F
     python3 control-plane/fleet-template/render.py check
+
+
+---knowledge---
+module_id: control-plane.fleet-template.render
+system: control-plane
+app: fleet-template
+solution_class: enterprise
+patterns: [pure-function-render, deterministic-render, declared-vs-observed, isolation-by-construction, tri-state-exit]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main, render_instance, load_bundle, check, check_drift, check_isolation, check_invariants, Assessment, Finding]
+invariants: "rendering is a pure function of (template bytes, params bytes, observations bytes); composition is DECLARED and run state is OBSERVED, so a declared required member with no observation is unverified and never reported as present"
+gotchas: "every identity, state path, worktree prefix and lane namespace is derived from the repo parameter, so two repositories' fleets share no identity and no state"
+related: ["#146"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

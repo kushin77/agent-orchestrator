@@ -9,6 +9,22 @@
  * Responses ride the standardized control-plane envelope; the client unwraps
  * it and throws the matching `ApiError` on a non-OK envelope.  Requests carry
  * a short-lived per-tenant session token (env or callback) — never a key.
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.src.control-plane
+ * system: control-plane
+ * app: sdk
+ * solution_class: enterprise
+ * patterns: [typed-client, envelope-unwrapping, fail-closed]
+ * derives_from: control-plane/sdk/python/aosdk/controlplane.py
+ * owner_sme: platform-sme
+ * tier: L1
+ * interfaces: [ControlPlaneClient]
+ * invariants: "the client unwraps the standardized control-plane envelope and throws the matching ApiError on a non-OK envelope, never a silent pass"
+ * gotchas: "requests carry a short-lived per-tenant session token from the env or a callback, never a key"
+ * related: ["#41", "#38"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 import { SessionToken, TokenSource, verifyNotExpired } from "./auth.js";

@@ -19,6 +19,23 @@ or a receipt is parsed wrong.
 The import is lazy and cached, so ``--help`` and every local refusal work with no
 console module importable at all; a genuinely unimportable contract is a named
 refusal (``contract_unavailable``), never a traceback.
+
+
+---knowledge---
+module_id: control-plane.cli.aoctl.contract
+system: control-plane
+app: cli
+solution_class: enterprise
+patterns: [consume-never-restate, lazy-import, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [session_cookie_name, receipt_marker, ContractUnavailable]
+invariants: "the console cookie name and the replay marker are read from the modules that declare them; a literal copy here would be a second declaration free to drift"
+gotchas: "the import is lazy and cached, so --help and every local refusal work with no console module importable at all"
+related: ["#556", "#554"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

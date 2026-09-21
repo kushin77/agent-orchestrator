@@ -11,6 +11,22 @@
  * / control plane (issues #35/#37/#38).  The SDK only decodes the claims it
  * needs (tenant scoping + expiry) and fails closed when a token is absent,
  * malformed or expired.
+ *
+ * ---knowledge---
+ * module_id: control-plane.sdk.typescript.src.auth
+ * system: control-plane
+ * app: sdk
+ * solution_class: enterprise
+ * patterns: [short-lived-token, injected-credential, fail-closed]
+ * derives_from: control-plane/sdk/python/aosdk/auth.py
+ * owner_sme: security-sme
+ * tier: L1
+ * interfaces: [SessionToken, TokenSource, tokenFromEnv, bearerToken, verifyNotExpired, DEFAULT_TOKEN_ENV]
+ * invariants: "the SDK consumes SHORT-LIVED per-tenant session tokens and never stores, generates or hardcodes keys; a token that is absent, malformed or expired fails closed"
+ * gotchas: "verification (signature, revocation, expiry) belongs to the platform edge and control plane; the SDK only decodes the claims it needs"
+ * related: ["#41", "#35"]
+ * do_not_duplicate: null
+ * ---knowledge---
  */
 
 import type { SessionClaims } from "./model.js";

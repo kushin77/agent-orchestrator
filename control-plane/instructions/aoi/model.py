@@ -24,6 +24,23 @@ Layers are listed in descending governance order: a rule in a later layer never
 overrides a rule in an earlier layer.  ``managed: true`` layers are governed
 and may not be redefined by a tenant override; only the local (tenant-owned)
 layer may be extended, through the frozen override contract.
+
+
+---knowledge---
+module_id: control-plane.instructions.aoi.model
+system: control-plane
+app: instructions
+solution_class: enterprise
+patterns: [single-source-of-truth, schema-validated-input, frozen-contract]
+derives_from: null
+owner_sme: docs-sme
+tier: L1
+interfaces: [load_canonical, parse_canonical, validate_canonical, layer_ids, governed_rule_ids, rule_ids, canonical_version, CanonicalError]
+invariants: "the canonical instruction source is the single source of truth and is validated before any mirror is rendered; a rule in a later layer never overrides a rule in an earlier layer"
+gotchas: "layers are listed in descending governance order and managed layers may not be redefined by a tenant override"
+related: ["#42"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

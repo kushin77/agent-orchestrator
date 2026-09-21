@@ -12,6 +12,23 @@ manifest and flags: a canonical id mismatch, a consumer that is behind (or
 ahead of) the manifest version, a mirror the consumer is missing, or a mirror
 whose sha256 differs from the manifest (a locally hand-edited mirror).  Any
 finding is a drift -> gate failure (honest, negative-testable).
+
+
+---knowledge---
+module_id: control-plane.instructions.aoi.versioning
+system: control-plane
+app: instructions
+solution_class: enterprise
+patterns: [content-digest, drift-detection, negative-testable]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [build_distribution_manifest, load_consumer_state, check_drift, parse_semver, compare_semver, sha256_file, DistributionError]
+invariants: "any finding is drift and drift is a gate failure: a canonical id mismatch, a consumer behind or ahead, a missing mirror or a sha256 that differs from the manifest"
+gotchas: "a sha256 difference means a locally hand-edited mirror, which is exactly what the generated-never-hand-forked guarantee forbids"
+related: ["#42"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

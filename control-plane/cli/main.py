@@ -16,6 +16,23 @@ arguments.
 Run ``--help`` for the verb table: every verb and the **one declared command id**
 from RC-2's registry it speaks. The CLI's own suite, its README and the module
 docstrings carry the rest.
+
+
+---knowledge---
+module_id: control-plane.cli.main
+system: control-plane
+app: cli
+solution_class: class
+patterns: [entrypoint-only, sys-path-bootstrap]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [python3 control-plane/cli/main.py]
+invariants: "this file is the entry point and nothing else: flags go before the verb and everything after the verb is forwarded verbatim to the lever's own CLI"
+gotchas: "control-plane is not an importable package name because it carries a hyphen, so the CLI's own directory is placed on sys.path here"
+related: ["#556"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

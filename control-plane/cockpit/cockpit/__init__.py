@@ -19,6 +19,23 @@ The stack is the one ADR-0026 D5.1 fixes: Python stdlib only (plus the repo's
 accepted PyYAML), ANSI alternate-screen rendering — no TUI framework. The
 issue's "Python + Textual" parenthetical is superseded by ADR-0026 D5.1
 (Textual would be a new ADR about dependencies, not an import line).
+
+
+---knowledge---
+module_id: control-plane.cockpit.cockpit
+system: control-plane
+app: cockpit
+solution_class: class
+patterns: [package-contract, public-surface, client-only, flag-gated-off]
+derives_from: null
+owner_sme: frontend-sme
+tier: L0
+interfaces: [cockpit.__version__]
+invariants: "the cockpit is a CLIENT of the served API and never an owner of fleet state; it renders only what the RC-10 registry declares and ships flag-gated OFF"
+gotchas: "the issue's Python-plus-Textual parenthetical is superseded by ADR-0026 D5.1: the stack is Python stdlib plus the repo's accepted PyYAML"
+related: ["#566", "#551"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
