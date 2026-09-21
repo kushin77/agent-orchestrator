@@ -1,0 +1,38 @@
+# The GCS (Cloud Storage) policy domain (issue #1767).
+#
+# The bucket policy this repository enforces is declared as IaC in
+# `infra/terraform/main.tf`; this domain makes it control-plane visible through
+# the policy registry (governance/policy/registry.py) without duplicating a line
+# of Terraform logic — the YAML points at the .tf file and nothing more.
+#
+# VERIFIED against the file at registration time (grep, not recall — the brief
+# for this lane said `main.tf` declares a `google_storage_bucket` resource;
+# measure first):
+#
+#   `grep -cE 'resource "google_storage_bucket"' infra/terraform/main.tf` -> 0
+#
+# There is NO `google_storage_bucket` resource in this tree. The GCS policy
+# that `main.tf` actually declares is the bucket-scoped access grant for the
+# deployer SA:
+#
+#   * `resource "google_storage_bucket_iam_member" "deployer_tfstate"`
+#     (`infra/terraform/main.tf:236`) — `bucket = "agent-orchestrator-tfstate"`
+#     (:238), `role = "roles/storage.objectAdmin"` (:239), count-gated on
+#     `var.deployer_enabled` so it is inert at the committed default. Its own
+#     comment states the intent: bucket-scoped state access for the deployer SA,
+#     NOT a project-wide storage role.
+#   * the `standard` deployer role bundle also carries
+#     `"roles/storage.objectAdmin"` (`infra/terraform/main.tf:176`) for when the
+#     deployer SA — rather than a human's credentials — owns writing state.
+#
+# The bucket itself is not provisioned as a resource anywhere in this tree: it
+# is the **GCS state backend** declared in `infra/terraform/backend.tf:2-3`
+# (`backend "gcs" { bucket = "agent-orchestrator-tfstate" }`), i.e. the bucket
+# pre-exists and Terraform is pointed at it. `google_storage_bucket_iam_member`
+# above is therefore the whole of the GCS policy this file declares.
+#
+# Schema: governance/policy/README.md.
+domain: gcs
+source_file: infra/terraform/main.tf
+enforcement_point: "flag-gated Terraform apply as the deployer SA — infra/cloudbuild/apply.yaml (the only apply route, AO-GR-5: never an ad-hoc apply); roles/storage.objectAdmin on the agent-orchestrator-tfstate bucket"
+control_plane_visible: true
