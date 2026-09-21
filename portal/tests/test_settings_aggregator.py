@@ -72,8 +72,8 @@ POISONED_CREDENTIALS = {
             "env": "NOUS_API_KEY",
             "secret_id": "ao-nous-api-key",
             "gate": "enable_hermes",
-            "value": "sk-should-never-leak",
-            "api_key": "sk-also-should-never-leak",
+            "value": "sk-fake-should-never-leak",
+            "api_key": "sk-fake-also-should-never-leak",
         }
     ],
 }
@@ -182,8 +182,8 @@ def test_no_secret_value_ever_reaches_a_row_against_poisoned_fixture(tmp_path):
     nous_rows = [r for r in rows if r.domain == "nous_secret"]
     assert nous_rows
     for row in nous_rows:
-        assert "sk-should-never-leak" not in row.value
-        assert "sk-also-should-never-leak" not in row.value
+        assert "sk-fake-should-never-leak" not in row.value
+        assert "sk-fake-also-should-never-leak" not in row.value
         assert "api_key" not in row.value
         projected = json.loads(row.value)
         assert "value" not in projected

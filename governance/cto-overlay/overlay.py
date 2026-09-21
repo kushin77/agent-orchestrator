@@ -786,7 +786,7 @@ SECRET_SHAPES = (
 )
 
 SECRET_ASSIGNMENT = (
-    r"(api[_-]?key|secret|password|token|access[_-]?key|client[_-]?secret)"
+    r"(?:^|[^\w])(api[_-]?key|secret|password|token|access[_-]?key|client[_-]?secret)"
     r"[\"']?\s*[:=]\s*[\"'][^\"']{8,}[\"']"
 )
 
@@ -844,6 +844,8 @@ def signal_secret_scan(ctx: Context) -> Result:
         scanned += 1
         for lineno, line in enumerate(text.splitlines(), start=1):
             if shape_re.search(line):
+                if marker_re.search(line):
+                    continue
                 findings.append(f"{path}:{lineno}")
                 continue
             if assignment_re.search(line) and not marker_re.search(line):
