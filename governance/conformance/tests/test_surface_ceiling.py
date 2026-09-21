@@ -385,7 +385,7 @@ def test_real_policy_ceilings_are_the_three_non_product_rows():
         for row in raw["surfaces"]
         if "class_ceiling" in row
     }
-    assert set(ceilinged) == {"shell", "github", "commit-contract"}
+    assert set(ceilinged) == {"shell", "github", "commit-contract", "edge-cutover"}
     for row in raw["surfaces"]:
         if "class_ceiling" in row:
             assert row["ceiling_reason"].strip(), row["surface"]

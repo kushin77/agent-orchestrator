@@ -143,10 +143,6 @@
 #                            the MEASURING harness's, not the suite's.
 suite	portal	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	governance/knowledge	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	governance/conformance	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	governance/ticket	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	governance/cto-overlay	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	governance/authority	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	scripts	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	integrations/paperclip/reporting	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
 suite	governance/modules	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b

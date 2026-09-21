@@ -27,6 +27,22 @@ ENGINE_PATH = OVERLAY_DIR / "overlay.py"
 
 
 def _load_engine():
+    # Idempotent: several test files in this directory load their own copy of
+    # this conftest.py by absolute path (see their "whichever conftest is
+    # imported LAST" comment) to dodge the bare-name "conftest" collision
+    # across sibling governance/* suites. Each such reload re-executes this
+    # function, and a non-idempotent version would mint a brand-new engine
+    # module with its own `CHECKS` dict every time — leaving the real
+    # `assess` fixture (bound to the FIRST module) and a test file's own
+    # `engine` reference (bound to whichever reload ran last) pointing at two
+    # different objects. `monkeypatch.setitem(engine.CHECKS, ...)` would then
+    # patch a dict `run_overlay` never reads, and a crashing/indeterminate
+    # check would silently keep reporting its real PASS instead of INDET
+    # (#1501). Returning the cached singleton keeps every caller, in every
+    # file, on the same module.
+    cached = sys.modules.get("cto_overlay_engine")
+    if cached is not None:
+        return cached
     spec = importlib.util.spec_from_file_location("cto_overlay_engine", ENGINE_PATH)
     assert spec and spec.loader, f"cannot load {ENGINE_PATH}"
     module = importlib.util.module_from_spec(spec)

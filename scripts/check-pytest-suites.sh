@@ -60,19 +60,23 @@
 #   elsewhere" without either of them reading the other's state.
 #
 # WHAT IS NOT IN THIS LIST, AND WHY
-#   NINE declared suites are NOT named here, so `scripts/check-gate-coverage.sh`
+#   FIVE declared suites are NOT named here, so `scripts/check-gate-coverage.sh`
 #   still reports them `swept-only` and `scripts/gate-coverage-baseline.txt`
 #   carries one row each, tracked by an OPEN issue.
 #
-#   NINE fail, hang, or cannot run in a lane venue on origin/master — each
-#   measured ALONE in a worktree, its own pytest process, nothing else running:
+#   #1501 measured NINE suites failing, hanging, or unable to run in a lane
+#   venue on origin/master, each ALONE in a worktree, its own pytest process,
+#   nothing else running. FOUR were suite-test defects (module-identity /
+#   stale-clock / stale-expectation bugs, never product bugs) and are now
+#   fixed and named above: governance/conformance (1 failed, now 128 passed),
+#   governance/ticket (1 failed, now 69 passed), governance/cto-overlay
+#   (4 failed, now 70 passed), governance/authority (2 failed, now 137
+#   passed). FIVE remain excluded, each a genuine lane-venue precondition:
 #     portal                            rc 124 after 240s, 3 failures
 #     scripts                           18 failed, 32 passed
-#     governance/knowledge              4 failed, 65 passed
-#     governance/conformance            1 failed, 127 passed
-#     governance/ticket                 1 failed, 68 passed
-#     governance/cto-overlay            4 failed, 66 passed
-#     governance/authority              2 failed, 135 passed
+#     governance/knowledge              4 failed, 65 passed — vendor/CMR not
+#                                        initialised in a `git worktree add`
+#                                        checkout (validator path missing)
 #     integrations/paperclip/reporting  7 failed, 18 passed, 57 errors
 #     governance/modules                3 errors (no vendor/CMR in a worktree)
 #   (tracker #1501, OPEN).
@@ -145,7 +149,7 @@ if [ ! -d "$log_dir" ]; then
   exit 2
 fi
 
-LISTED=42
+LISTED=46
 ran=0
 failed=0
 
@@ -300,6 +304,21 @@ judge governance/lifecycle $?
 
 timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/reconcile/tests > "$(suite_log governance/reconcile)" 2>&1
 judge governance/reconcile $?
+
+# The following four were repaired and wired in by #1501: each failure was a
+# test-suite defect (module-identity / stale-clock / stale-expectation), not
+# a product defect, and each is fixed at its root cause rather than skipped.
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/conformance/tests > "$(suite_log governance/conformance)" 2>&1
+judge governance/conformance $?
+
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/ticket/tests > "$(suite_log governance/ticket)" 2>&1
+judge governance/ticket $?
+
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/cto-overlay/tests > "$(suite_log governance/cto-overlay)" 2>&1
+judge governance/cto-overlay $?
+
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/authority/tests > "$(suite_log governance/authority)" 2>&1
+judge governance/authority $?
 
 if [ "$ran" -ne "$LISTED" ]; then
   printf 'check-pytest-suites: NOT-OK — %d suite(s) ran but %d are named in this check; the list and the run disagree\n' \
