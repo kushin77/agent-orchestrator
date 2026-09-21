@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 from honesty.analyzer import Finding, HonestyAnalyzer, analyze
 
 
@@ -136,6 +138,17 @@ class TestReviewAidSemantics:
     def test_unreadable_file_is_never_clean(self, tmp_path) -> None:
         # An unreadable guard attests nothing: it is surfaced as a finding so
         # it can never read as green.
+        #
+        # The arm's PRE-CONDITION is that a file exists which this process cannot
+        # read. uid 0 reads a mode-000 file regardless, so that pre-condition
+        # cannot be established here and the arm would otherwise report NOT-OK for
+        # a state it never created — the venue is the CI image, which runs `make
+        # verify` as root (#1509). Named, not silent, and never a pass: the same
+        # remedy telemetry/ledger's `test_unreadable_file_is_cannot_assess` already
+        # carries for exactly this pre-condition. Every non-root run (every lane,
+        # every developer) still measures it.
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            pytest.skip("running as root; permissions do not block reads")
         broken = tmp_path / "check_unreadable.sh"
         broken.write_text("#!/usr/bin/env bash\necho hi\n", encoding="utf-8")
         os.chmod(broken, 0o000)
