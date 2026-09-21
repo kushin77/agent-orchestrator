@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "ao.dispatch/dispatch-v1",
   "title": "governance/dispatch record shapes (issue #885)",
-  "$comment": "Freezes the three shapes this package persists to disk: one ClaimEvent (the append-only claims ledger), one Issue row (the committed board snapshot), and the queue.yaml wave document. Validated by governance/dispatch/schema.py (stdlib-only subset validator, reused from governance/modules/schema.py).",
+  "$comment": "Freezes the record shapes this package persists to disk: one ClaimEvent (the append-only claims ledger), one Issue row (the committed board snapshot), the queue.yaml wave document, one auditRecord (the arbitration trail, audit.py) and one resourceClaim (the live-resource lease ledger, resource_lease.py). Validated by governance/dispatch/schema.py (stdlib-only subset validator, reused from governance/modules/schema.py).",
   "$defs": {
     "region": {
       "type": "array",
@@ -19,6 +19,21 @@
           "type": "array",
           "items": { "$ref": "#/$defs/region" }
         }
+      },
+      "additionalProperties": false
+    },
+    "resourceClaim": {
+      "type": "object",
+      "required": ["event", "resource_id", "holder", "at"],
+      "properties": {
+        "event": { "enum": ["acquire", "release"] },
+        "resource_id": { "type": "string" },
+        "holder": { "type": "string" },
+        "at": { "type": "string" },
+        "ttl_seconds": { "type": "integer" },
+        "lane": { "type": "string" },
+        "issue": { "type": "integer" },
+        "reason": { "type": "string" }
       },
       "additionalProperties": false
     },
