@@ -27,7 +27,18 @@ if str(PKG_DIR) not in sys.path:
 # any stale entry immediately before this package's own bare imports so the
 # fresh lookup (against the sys.path entry just inserted above) resolves to
 # THIS package's files.
-for _name in ("model", "cli"):
+#
+# "isolation" must be evicted too, not just "model"/"cli": isolation.py does
+# its own bare `import model`, so if an earlier-collected test file within
+# THIS suite already cached "isolation" (from a stale sys.path/module state)
+# while this eviction only cleared "model", a later `import model` here would
+# hand this file a fresh `model.can_act`/class objects while the cached
+# `isolation` module keeps referencing the OLD ones — two distinct object
+# identities. `monkeypatch.setattr(model, "can_act", ...)` then patches a
+# name `isolation.py`'s own copy never reads, so the negative-control test
+# quietly measures the real (unpatched) behaviour instead of the planted one
+# (#1501).
+for _name in ("model", "cli", "isolation"):
     sys.modules.pop(_name, None)
 
 import model  # noqa: E402  (import after the sys.path bootstrap on purpose)

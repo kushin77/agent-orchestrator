@@ -19,6 +19,9 @@ _conftest_spec = _importlib_util.spec_from_file_location(
 )
 _conftest = _importlib_util.module_from_spec(_conftest_spec)
 _conftest_spec.loader.exec_module(_conftest)
+# `_load_engine()` (in conftest.py) is idempotent and returns the same
+# sys.modules-cached engine object on every call, including this reload's, so
+# `engine` here is identical to the one the `assess` fixture uses (#1501).
 engine = _conftest.engine
 state_of = _conftest.state_of
 summary_of = _conftest.summary_of

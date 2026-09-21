@@ -20,12 +20,21 @@ REPO_ROOT = PACKAGE.parents[1]
 if str(PACKAGE) not in sys.path:
     sys.path.insert(0, str(PACKAGE))
 
-# governance/ticket shares the bare basenames "model", "cli" and "sources"
-# with sibling governance/* suites. Evict any stale sys.modules entry from an
-# earlier-collected suite before this directory's test modules do their own
-# bare imports, so they resolve against THIS package's files (issues #699,
-# #702, #1042).
-for _name in ("model", "cli", "sources"):
+# governance/ticket shares the bare basenames "model", "cli", "sources",
+# "builder" and "freshness" with sibling governance/* suites. Evict any stale
+# sys.modules entry from an earlier-collected suite before this directory's
+# test modules do their own bare imports, so they resolve against THIS
+# package's files (issues #699, #702, #1042).
+#
+# ALL FIVE names must be evicted together, not just the three importED
+# directly by a test file: cli.py imports builder, and builder imports model
+# and sources. If "builder" is left cached from an earlier reimport while
+# "model" is evicted and re-imported fresh, cli.py's fresh `model.CannotAssess`
+# and the cached builder's (stale) `model.CannotAssess` become two distinct
+# class objects — an exception raised via the cached chain then fails
+# `except CannotAssess` in the freshly-imported cli.py, because the two
+# classes are no longer `is`-identical despite matching names (#1501).
+for _name in ("model", "cli", "sources", "builder", "freshness"):
     sys.modules.pop(_name, None)
 
 SCHEMA_RELPATH = Path("docs/contracts/paperclip/ticket.schema.json")
