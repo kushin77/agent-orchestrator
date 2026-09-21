@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """AgentPack registry validator for the agent-orchestrator control plane (#40).
 
+---knowledge---
+module_id: registry.packs.validate
+system: registry
+app: packs
+solution_class: enterprise
+patterns: [self-proving-gate, schema-validation, attestation-verify, no-false-green]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [validate_pack_data, validate_release_file, schema_errors, attestation_errors, self_test_errors, main]
+invariants: "schema, contents integrity, ledger, catalog parity and the attestation signature must ALL hold; an accepted broken fixture is a refusal"
+gotchas: ""
+related: ["#40"]
+do_not_duplicate: null
+---knowledge---
+
 Validates AgentPack documents (registry/packs/agent-pack.schema.json) declared
 as YAML or JSON and the published release archive. Enforces, with REAL exit
 codes and no network:

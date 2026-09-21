@@ -1,5 +1,21 @@
 """The promotion gate for a changed chat prompt module version (issue #509).
 
+---knowledge---
+module_id: registry.chat.regression
+system: registry
+app: chat
+solution_class: enterprise
+patterns: [promotion-gate, baseline-diff, fail-closed]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [PromotionResult, parse_version_ref, evaluate_promotion, main]
+invariants: "a case that passed on the baseline and fails on the candidate refuses the promotion, naming the case"
+gotchas: ""
+related: ["#509"]
+do_not_duplicate: null
+---knowledge---
+
 A prompt-module version is a behaviour change, so it is evaluated against the
 fixture set **before** promotion. The candidate version is run over the same
 fixtures as the baseline, and any case that passed on the baseline and fails on

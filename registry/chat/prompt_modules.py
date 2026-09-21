@@ -1,5 +1,21 @@
 """Chat prompt modules — versioned, frozen and schema-declared (issue #509).
 
+---knowledge---
+module_id: registry.chat.prompt_modules
+system: registry
+app: chat
+solution_class: enterprise
+patterns: [versioned-module, frozen-published-version, content-digest, schema-constrained-output]
+derives_from: registry/prompts/registry.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [ChatPromptRegistry, ResolvedChatModule, module_digest, validate_module, canonical_yaml, main]
+invariants: "a published version is immutable; improving a chat prompt means publishing a NEW version"
+gotchas: ""
+related: ["#509"]
+do_not_duplicate: null
+---knowledge---
+
 Same shape as the control-plane prompt library (``registry/prompts/``): a module
 is a YAML definition naming its task type, version, prompt bodies and the JSON
 Schema its output must satisfy. Publishing freezes a version with a content

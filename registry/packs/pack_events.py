@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Append-only, hash-chained event log for the agent-pack registry (#40).
 
+---knowledge---
+module_id: registry.packs.pack_events
+system: registry
+app: packs
+solution_class: enterprise
+patterns: [append-only, hash-chain, closed-enum]
+derives_from: registry/events/event_log.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [PackEventLog, open_pack_event_log, now_utc, PackEventIntegrityError]
+invariants: "the closed event enum and the hash chain are enforced in code, not only declared by pack-event.schema.json"
+gotchas: ""
+related: ["#40"]
+do_not_duplicate: null
+---knowledge---
+
 Records every pack lifecycle transition and every tenant install/upgrade/
 rollback/drift/consume action as one JSON object per line (JSON Lines,
 optional file backing). The record shape is governed by

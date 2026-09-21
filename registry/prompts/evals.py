@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Regression-eval harness for the prompt library (issue #639).
 
+---knowledge---
+module_id: registry.prompts.evals
+system: registry
+app: prompts
+solution_class: enterprise
+patterns: [publish-precondition, regression-gate, fail-closed]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [EvalCase, EvalReport, load_cases, evaluate, require_ok, format_report, main]
+invariants: "a module whose evals fail cannot be frozen by registry.py, because measurement is a precondition of publication"
+gotchas: ""
+related: ["#639"]
+do_not_duplicate: null
+---knowledge---
+
 A published prompt module is only as good as the last time its behavior was
 measured, so this harness makes the measurement a **precondition of
 publication**: a module whose evals fail cannot be frozen by ``registry.py``.

@@ -1,5 +1,21 @@
 """Per-agent identity issuance with tenant-scoped claims (issue #10).
 
+---knowledge---
+module_id: registry.service.identity
+system: registry
+app: service
+solution_class: enterprise
+patterns: [tenant-scoped-claims, signed-credential, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AgentSession, IdentityService, resolve_actor]
+invariants: "claims are scoped to exactly one tenant and cannot be altered without the signing key; the tenant claim is enforced on every use"
+gotchas: ""
+related: ["#10"]
+do_not_duplicate: null
+---knowledge---
+
 Issues per-agent session credentials whose claims are **scoped** to exactly one
 tenant: ``tenantId``, ``agentId``, ``role`` and the closed ``allowedTools`` set
 (the issuing agent's profile tool allowlist). The credential is an HMAC-SHA256

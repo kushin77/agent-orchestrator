@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Persona -> AgentProfile mapping + SME reviewer assignment doctrine.
 
+---knowledge---
+module_id: registry.personas.mapping
+system: registry
+app: personas
+solution_class: enterprise
+patterns: [contract-first, separation-of-duties, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [materialize_profile, validate_profile, guard_dispatch, assert_reviewer_distinct, assert_auditor_not_executor, assign_reviewer, assign_auditor]
+invariants: "a reviewer is never the author of what it reviews, and an auditor never executes what it audits"
+gotchas: ""
+related: ["#11", "#9"]
+do_not_duplicate: null
+---knowledge---
+
 This module is the bridge between the persona library (issue #11) and the
 AgentProfile contract (issue #9). It
 

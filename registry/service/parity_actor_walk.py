@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Walk the last N actor records of each kind and resolve every actor string.
 
+---knowledge---
+module_id: registry.service.parity_actor_walk
+system: registry
+app: service
+solution_class: pattern
+patterns: [read-only-walk, identity-parity, self-test]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [main, _self_test, _pr_authors, _dir_actor_field]
+invariants: "every source is read only, and the walk proves one identity per actor across GitHub, the mailbox, paperclip and hermes"
+gotchas: "the PR-author source needs gh plus network and auth, so the walk reports what it could not read rather than silently shrinking"
+related: ["#1275"]
+do_not_duplicate: null
+---knowledge---
+
 Issue #1275: one identity per actor across GitHub, the mailbox, paperclip and
 hermes. Sources walked, each read-only:
 

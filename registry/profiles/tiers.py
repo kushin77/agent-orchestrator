@@ -1,5 +1,21 @@
 """registry/profiles/tiers.py — THE model-tier vocabulary reader (issue #1494).
 
+---knowledge---
+module_id: registry.profiles.tiers
+system: registry
+app: profiles
+solution_class: pattern
+patterns: [declared-authority, single-reader, lazy-cached-read]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TierVocabularyRefused, source, carries, authority, rank, clear_cache]
+invariants: "catalog.yaml tiers is the one declared authority; every surface asks HERE rather than carrying a copy of the vocabulary"
+gotchas: ""
+related: ["#1494"]
+do_not_duplicate: null
+---knowledge---
+
 ``registry/profiles/catalog.yaml`` ``tiers:`` is the **declared authority** for
 the platform's model-tier ids — the ladder the gateway routes on, the registry
 profile contract carries, the identity overlay validates, the portal renders and

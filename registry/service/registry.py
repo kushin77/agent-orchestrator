@@ -1,5 +1,21 @@
 """Agent Identity + Registry service facade (issue #10).
 
+---knowledge---
+module_id: registry.service.registry
+system: registry
+app: service
+solution_class: enterprise
+patterns: [facade, tenant-scoped, lifecycle-state-machine, audit-append, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [AgentRegistry]
+invariants: "every mutating operation appends one record to the append-only audit log in registry/events"
+gotchas: ""
+related: ["#10"]
+do_not_duplicate: null
+---knowledge---
+
 The multi-tenant replacement for the fleet's ad-hoc registries: registers
 tenant-scoped agents from frozen AgentProfiles (issue #9), drives their
 lifecycle (register / activate / pause / retire), routes task types to agents

@@ -1,5 +1,21 @@
 """Deterministic stand-ins for the collaborators a chat turn depends on.
 
+---knowledge---
+module_id: registry.chat.eval.standins
+system: registry
+app: eval
+solution_class: pattern
+patterns: [stand-in-collaborators, offline-deterministic]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [Response, respond, retrieve, admitted, supplied_source_ids, case_fragments]
+invariants: "every stand-in is a pure function of the fixture, and restates a sibling lane's contract in miniature"
+gotchas: ""
+related: ["#509"]
+do_not_duplicate: null
+---knowledge---
+
 The eval harness is offline and deterministic: it may not call a model, a
 retrieval service, the guardrails lane or the network. What it needs from each
 collaborator is therefore *declared here as a fixture-driven stand-in*, and the

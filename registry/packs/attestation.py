@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Attestation for the agent-pack registry (issue #40).
 
+---knowledge---
+module_id: registry.packs.attestation
+system: registry
+app: packs
+solution_class: enterprise
+patterns: [publisher-signing, signature-verify, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [sign_pack, verify_pack, generate_keypair, signed_payload, canonical_bytes]
+invariants: "the signature covers every field EXCEPT attestation.signature, so signing is stable over the payload"
+gotchas: "PS256 over canonical JSON: a re-serialisation with a different key order must not verify"
+related: ["#40"]
+do_not_duplicate: null
+---knowledge---
+
 Signs and verifies AgentPack documents with RSASSA-PSS / SHA-256 (PS256).
 A publisher signs the pack's canonical JSON (every field EXCEPT
 ``attestation.signature``); consumers verify it at install time with the

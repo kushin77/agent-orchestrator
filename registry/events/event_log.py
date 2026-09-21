@@ -1,5 +1,21 @@
 """Append-only agent lifecycle event log (registry/events, issue #10).
 
+---knowledge---
+module_id: registry.events.event_log
+system: registry
+app: events
+solution_class: enterprise
+patterns: [append-only, hash-chain, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [EventLog, EventLogError, EventLogIntegrityError, open_event_log, now_utc]
+invariants: "the log is strictly append-only and hash-chained, so an edit, deletion or reorder of a past record is detected by verify"
+gotchas: ""
+related: ["#10"]
+do_not_duplicate: null
+---knowledge---
+
 Audit trail for the Agent Identity + Registry service. Every mutating registry
 operation (register / activate / pause / retire, plus task-route and session
 issuance) appends one event record; the log is strictly append-only and

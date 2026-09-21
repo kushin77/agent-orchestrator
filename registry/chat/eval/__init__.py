@@ -1,5 +1,21 @@
 """Offline, deterministic chat-quality evaluation (issue #509).
 
+---knowledge---
+module_id: registry.chat.eval
+system: registry
+app: eval
+solution_class: class
+patterns: [package-contract, offline-deterministic]
+derives_from: null
+owner_sme: qa-sme
+tier: L0
+interfaces: [the registry.chat.eval package surface, harness, standins]
+invariants: "the eval package may call no model, no retrieval service, no guardrail and no network"
+gotchas: ""
+related: ["#509"]
+do_not_duplicate: null
+---knowledge---
+
 Three things live here and they are deliberately small:
 
 * :mod:`registry.chat.eval.cases` — the committed fixture set, ``cases.yaml``:
