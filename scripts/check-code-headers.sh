@@ -1090,6 +1090,7 @@ def parse_args(args):
     while index < len(args):
         token = args[index]
         if token in ("--tier", "--record", "--tracked-by"):
+            options["flags"].add(token)
             value = args[index + 1] if index + 1 < len(args) else ""
             if token == "--tier":
                 options["tier"] = value
