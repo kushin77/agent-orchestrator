@@ -1,5 +1,22 @@
 """telemetry — per-role heartbeat health + budget burn observability (#637).
 
+---knowledge---
+module_id: telemetry.role_health
+system: telemetry
+app: telemetry
+solution_class: enterprise
+patterns: [outcome-not-liveness, declared-cadence-consumption, per-role-burn, named-alert-codes]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cadence_seconds, ALERT_CODES, CADENCE_STATUSES, BURN_POSITIONS, EVENT_CADENCES, SCOPE_ROLE]
+invariants: "the cadence table is total over the registry's own cadence vocabulary and a missed schedule raises exactly one named alert"
+gotchas: "the thresholds are the declared ones, never a number restated locally"
+related: ["#637", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 WHY this module exists
 ----------------------
 The workbook's Pillar 2 declares, for every role in the agent org chart, three

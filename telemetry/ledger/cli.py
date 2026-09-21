@@ -1,4 +1,21 @@
 """Command-line interface for the tamper-evident audit ledger
+
+---knowledge---
+module_id: telemetry.ledger.cli
+system: telemetry
+app: ledger
+solution_class: enterprise
+patterns: [offline-cli, tri-state-exit]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [main]
+invariants: "exit codes follow the issue #28 wire contract: OK=0, NOT-OK=1, CANNOT-ASSESS=2"
+gotchas: "sensitive payloads enter through --payload-file or --payload-json, never as a bare argv secret"
+related: ["#31", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
 (telemetry/ledger, issue #31).
 
 Run from anywhere with ``telemetry/`` importable, e.g.::

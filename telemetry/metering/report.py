@@ -1,5 +1,22 @@
 """telemetry/metering — usage rollups + cost attribution report (issue #33).
 
+---knowledge---
+module_id: telemetry.metering.report
+system: telemetry
+app: metering
+solution_class: enterprise
+patterns: [durable-rollups, honest-cost-sum, billable-only]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [UsageReporter, UsageAggregate, WINDOWS, GROUP_*]
+invariants: "rollups count only billable records, and a record that could not be priced is surfaced as unmetered rather than assumed zero"
+gotchas: ""
+related: ["#33", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Builds the durable aggregation on top of the store: daily and monthly usage
 rollups per tenant/agent/model/provider, and the cost-attribution report the
 SaaS bills on (per-tenant cost, per-agent cost, provider mix).  Rollups count

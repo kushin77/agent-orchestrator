@@ -1,5 +1,22 @@
 """telemetry/metering — usage_details / cost_details cost model (issue #341).
 
+---knowledge---
+module_id: telemetry.metering.cost_details
+system: telemetry
+app: metering
+solution_class: enterprise
+patterns: [unit-keyed-usage-details, cost-breakdown, pricing-tiers]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [usage_details, usage_details_for, breakdown_for, tier_for, CostDetail, CostBreakdown, TierTotals, PRICING_TIERS]
+invariants: "usage is a unit-keyed map, never one blended number that hides the input/output split"
+gotchas: ""
+related: ["#341", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 WHY this exists: the metering lane already resolves *one* cost figure per call
 (issue #33), but a FinOps single-pane has to answer "those tokens cost what,
 on which price tier?" — and a bare scalar cannot. This module adds the

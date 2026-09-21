@@ -1,5 +1,22 @@
 """telemetry/chat — chat-turn FinOps: attribution, budget caps, cache accounting (issue #506).
 
+---knowledge---
+module_id: telemetry.chat.__init__
+system: telemetry
+app: chat
+solution_class: pattern
+patterns: [package-contract, per-turn-attribution]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: []
+invariants: "every chat turn is attributed once and enforced against the merged budget/quota/kill-switch rails before the model is called"
+gotchas: ""
+related: ["#506", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The per-turn cost layer of the chat surface (EPIC #500): every chat turn is
 attributed **once** — tenant, agent, conversation, promoted provider/model/tier,
 tokens, latency, an estimated cost resolved from the merged rate cards, and the

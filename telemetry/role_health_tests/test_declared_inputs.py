@@ -1,5 +1,22 @@
 """telemetry/role_health — per-role cadence + declaration consumption (#637).
 
+---knowledge---
+module_id: telemetry.role_health_tests.test_declared_inputs
+system: telemetry
+app: role_health_tests
+solution_class: enterprise
+patterns: [total-over-registry-vocabulary, pinned-constants]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: ["pytest suite over the cadence table and the declared role inputs"]
+invariants: "the cadence table must be total over the registry's own cadence vocabulary, not over a local list that could drift"
+gotchas: ""
+related: ["#637", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The staleness rule is only meaningful if the cadence table and the declared
 role inputs are the *declared* ones.  These tests pin both, and prove the table
 is total over the registry's own cadence vocabulary rather than over a local

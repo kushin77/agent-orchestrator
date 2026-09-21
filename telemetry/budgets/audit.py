@@ -1,5 +1,22 @@
 """telemetry/budgets — durable audit of budget/quota/kill-switch decisions (#34).
 
+---knowledge---
+module_id: telemetry.budgets.audit
+system: telemetry
+app: budgets
+solution_class: enterprise
+patterns: [append-only, jsonl-envelope, memory-vs-durable-store]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BudgetAuditEvent, BudgetAuditStore, JsonlAuditStore, MemoryAuditStore, record_decision]
+invariants: "the audit feed is append-only; an operator can always answer what was refused, why, for which tenant and when"
+gotchas: ""
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Every BLOCK / WARN budget decision (and its observe-mode would-* equivalent,
 a kill-switch refuse, or a pause/clear transition) is recorded to an
 append-only audit feed so operators can answer *what was refused, why, for

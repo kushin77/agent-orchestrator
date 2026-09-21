@@ -1,5 +1,22 @@
 """Audit-event schema + canonical serialization (telemetry/ledger, issue #31).
 
+---knowledge---
+module_id: telemetry.ledger.schema
+system: telemetry
+app: ledger
+solution_class: enterprise
+patterns: [canonical-serialization, single-record-contract, validators]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [build_record, validate_record, canonical_bytes, record_hash, encode_actor, parse_actor, GENESIS_HASH, REQUIRED_FIELDS]
+invariants: "one record contract: the canonical JSON byte serialization is the single input to hashing, so on-disk and in-memory records cannot disagree"
+gotchas: "camelCase wire keys (tenantId, prevHash) with snake_case python parameters"
+related: ["#31", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Defines the single record contract of the tamper-evident audit ledger: the
 closed set of fields every stored record carries, the canonical JSON byte
 serialization used for hashing, and the validators that keep on-disk and

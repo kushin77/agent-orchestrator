@@ -1,5 +1,22 @@
 """telemetry/metering — live spend/usage feed for the portal (issue #886).
 
+---knowledge---
+module_id: telemetry.metering.feed
+system: telemetry
+app: metering
+solution_class: enterprise
+patterns: [live-no-cache-read, schema-validated, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LiveUsageFeed, FeedRow, validate_row, FeedValidationError, FEED_SCHEMA_VERSION]
+invariants: "the live surface re-reads the ledger on every call and a malformed row can never reach a consumer silently"
+gotchas: "no caching, so a consumer never reads a stale snapshot by accident"
+related: ["#886", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The metering ledger (``store.py``'s ``JsonlUsageStore``) and the rollup
 report (``report.py``) are both pull-only: a caller must already know which
 store file and which window to ask for.  This module is the one **live**

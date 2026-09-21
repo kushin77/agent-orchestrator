@@ -1,5 +1,22 @@
 """telemetry/role_health — per-role budget burn rollup + alerting (#637).
 
+---knowledge---
+module_id: telemetry.role_health_tests.test_burn_rollup
+system: telemetry
+app: role_health_tests
+solution_class: enterprise
+patterns: [declared-not-restated, boundary-pinned-assertions]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: ["pytest suite over the per-role burn rollup and alerting"]
+invariants: "the burn arithmetic is pinned against the declared cap, so a passing test cannot disagree with what FinOps enforces"
+gotchas: ""
+related: ["#637", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The burn arithmetic is pinned here against the *declared* cap, not against a
 number restated in the test: the cap is read from the declaration the platform
 consumes, so a test that passes cannot disagree with what FinOps enforces.

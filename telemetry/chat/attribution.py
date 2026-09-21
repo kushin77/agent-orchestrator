@@ -1,5 +1,22 @@
 """telemetry/chat — per-turn cost/latency attribution (issue #506).
 
+---knowledge---
+module_id: telemetry.chat.attribution
+system: telemetry
+app: chat
+solution_class: enterprise
+patterns: [join-node-no-recompute, promoted-fields, consumed-rate-cards]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TurnAttributor, record_fields, TASK_TYPE_CHAT_TURN, CODE_IDENTITY_MISMATCH, CODE_DUPLICATE_TURN]
+invariants: "nothing is re-derived: identity, the routing stamp, tokens and latency are promoted from the gateway call record and the price comes from the rate cards"
+gotchas: ""
+related: ["#506", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 One attribution record per chat turn, derived from the turn joined with the
 gateway's call record.  This is the join node of the chat FinOps surface: the
 turn knows the conversation (and the ticket it came from, ADR-0014), the call

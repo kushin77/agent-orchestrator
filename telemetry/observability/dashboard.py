@@ -1,5 +1,22 @@
 """telemetry/observability — offline dashboard generation (issue #32).
 
+---knowledge---
+module_id: telemetry.observability.dashboard
+system: telemetry
+app: observability
+solution_class: enterprise
+patterns: [offline-static-render, json-is-canonical]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Dashboard, render_dashboard, VERDICT_COLOR]
+invariants: "the JSON data file is the canonical artifact and the HTML is a thin render of the same data"
+gotchas: "no external dashboard server and no network or CDN dependency"
+related: ["#32", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Builds a static, self-contained HTML dashboard plus a machine-readable JSON
 data file and a terminal health report — all generated offline from the
 telemetry store, the per-tenant SLO results, the breach alerts and the usage

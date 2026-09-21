@@ -1,5 +1,22 @@
 """telemetry/budgets — spend alerts with warning/alert thresholds (issue #341).
 
+---knowledge---
+module_id: telemetry.budgets.alerts
+system: telemetry
+app: budgets
+solution_class: enterprise
+patterns: [threshold-alerting, soft-hard-cap, machine-readable-severity]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SpendAlert, TenantSpendAlerts, SpendAlertEvaluator, evaluate_all, SEVERITIES, KINDS]
+invariants: "a soft cap is a target and never refuses a call; a hard cap refuses"
+gotchas: "the severity ladder is none -> warning -> alert, ranked by _VERDICT_RANK"
+related: ["#341", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The alerting rail of the budget lane: per tenant and per limit (cost, tokens,
 per-vendor), a **warning** threshold and an **alert** threshold produce a
 machine-readable :class:`SpendAlert` whose severity is ``none``, ``warning`` or

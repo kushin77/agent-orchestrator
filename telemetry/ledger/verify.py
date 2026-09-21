@@ -1,5 +1,22 @@
 """Public verification API for telemetry/ledger (issue #31).
 
+---knowledge---
+module_id: telemetry.ledger.verify
+system: telemetry
+app: ledger
+solution_class: enterprise
+patterns: [tri-state-verification, fail-closed, honest-surface]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [verify_ledger, verify_all, read_payload, verdict_exit_code, all_ok]
+invariants: "a tamper is never a silent pass; a missing key or a failed decrypt is CANNOT-ASSESS, never a partial answer"
+gotchas: ""
+related: ["#31", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Two honest, tri-state surfaces:
 
 * :func:`verify_ledger` / :func:`verify_all` - chain integrity, returning

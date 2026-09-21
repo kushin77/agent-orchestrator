@@ -1,5 +1,22 @@
 """telemetry/chat — tier discipline for chat turns (issue #506).
 
+---knowledge---
+module_id: telemetry.chat.tiering
+system: telemetry
+app: chat
+solution_class: enterprise
+patterns: [promote-never-invent, fail-closed, escalation-on-observed-failure]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [resolve_turn_tier, TierResolution, TierUnresolvedError, TierClaimError, EscalationRefused]
+invariants: "a turn whose record carries no tier is unresolved: the surface may never invent one and a client claim is refused"
+gotchas: ""
+related: ["#506", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The FinOps chooser (``gateway/finops/chooser.py`` over ``tiers.yaml``) is the
 one authority on which model tier serves a turn.  It runs *behind* the chat
 surface, and it stamps the tier it picked onto the gateway call record.  This

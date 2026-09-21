@@ -1,5 +1,22 @@
 """telemetry/chat — the turn cost/latency/budget read model (issue #506).
 
+---knowledge---
+module_id: telemetry.chat.readmodel
+system: telemetry
+app: chat
+solution_class: enterprise
+patterns: [read-model, carried-not-computed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ChatFinOpsReadModel, TurnCostView, CostRollup]
+invariants: "every figure is carried from a TurnAttribution, so the UX never computes a number and the visible arithmetic is the billed arithmetic"
+gotchas: ""
+related: ["#506", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The small projection the chat UX lane renders.  It exists so the UX never
 computes a number: every figure here is *carried* from a ``TurnAttribution``
 (which took it from the rate card, the record, or the enforcer), so the surface

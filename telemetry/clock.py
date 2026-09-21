@@ -1,5 +1,22 @@
 """telemetry.clock — the ONE clock seam for telemetry's money path (#1025).
 
+---knowledge---
+module_id: telemetry.clock
+system: telemetry
+app: telemetry
+solution_class: pattern
+patterns: [the-one-seam, freeze-for-tests]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [now, now_utc_iso, now_epoch, today_utc, this_month_utc, frozen, is_frozen, frozen_instant]
+invariants: "the single clock seam of the telemetry money path: no money-path module reads the wall clock directly"
+gotchas: "tests freeze it through the FROZEN env seam; it replaces nine private per-module timestamp helpers"
+related: ["#1025", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 WHY this module exists
 ----------------------
 The metering/FinOps path used to read the live clock in nine places under

@@ -1,5 +1,22 @@
 """telemetry/chat — per-turn budget enforcement for chat (issue #506).
 
+---knowledge---
+module_id: telemetry.chat.budget_guard
+system: telemetry
+app: chat
+solution_class: enterprise
+patterns: [pre-dispatch-guard, consumed-rails, observe-mode]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TurnBudgetGuard, GuardedTurnRunner, GuardedTurnResult, TurnBudgetOutcome]
+invariants: "the guard composes the merged telemetry.budgets rails in their safe order rather than inventing a second ladder"
+gotchas: ""
+related: ["#506", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The pre-dispatch guard a chat turn passes *before* the model is called.  It
 does not invent a ladder: the enforcement rails are the merged
 ``telemetry.budgets`` ones — the global kill switch

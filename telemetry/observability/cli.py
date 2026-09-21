@@ -1,5 +1,22 @@
 """telemetry/observability — offline operator CLI (issue #32, phase 5).
 
+---knowledge---
+module_id: telemetry.observability.cli
+system: telemetry
+app: observability
+solution_class: enterprise
+patterns: [offline-cli, tri-state-exit, honest-gate]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main]
+invariants: "a tenant that misses its SLO window exits non-zero: silence is never read as healthy"
+gotchas: "exit contract: 0 success, 1 an SLO breached/at-risk/no-data or an alert fired, 2 usage error"
+related: ["#32", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 Deterministic, fully offline observability tooling: seed a demo store through
 the intake hook, inspect traces, evaluate per-tenant SLOs (from the
 ``slo_templates/``), run breach detection (outcome-not-liveness), produce

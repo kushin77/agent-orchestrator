@@ -1,5 +1,22 @@
 """telemetry/metering — usage metering + cost-engine data model (issue #33).
 
+---knowledge---
+module_id: telemetry.metering.model
+system: telemetry
+app: metering
+solution_class: pattern
+patterns: [value-objects, consumed-vocabulary, unmetered-never-zero]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [UsageRecord, parse_ts, day_bucket, month_bucket, NON_BILLABLE_OUTCOMES, CACHE_HIT_OUTCOME]
+invariants: "an unmetered call is never mistaken for a zero-cost one, and an unmetered call is never counted as a billable zero"
+gotchas: ""
+related: ["#33", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The canonical record this lane owns is a ``UsageRecord``: one per model call
 (metered or not), carrying the tenant/agent/provider/model/route stamp, real
 token counts, the resolved cost estimate and *why* that cost is trustworthy

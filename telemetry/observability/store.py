@@ -1,5 +1,22 @@
 """telemetry/observability — offline trace store (issue #32, phase 5).
 
+---knowledge---
+module_id: telemetry.observability.store
+system: telemetry
+app: observability
+solution_class: enterprise
+patterns: [append-only-jsonl, corrupt-line-raises, no-false-green]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TraceStore, JsonlSpanSink, CorruptRecordError, store_span_lines, SCHEMA_VERSION]
+invariants: "the reader never silently drops a corrupt line: a malformed record raises so a truncated store cannot read as clean"
+gotchas: ""
+related: ["#32", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 An append-only JSONL telemetry store plus a query/read surface.  The store is
 the file-backed :class:`TelemetrySink` the recorder writes into (see
 ``intake.py``) and the offline source the SLO/usage/dashboard consumers read

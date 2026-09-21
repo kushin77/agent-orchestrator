@@ -1,4 +1,21 @@
 """Per-tenant append-only, tamper-evident audit ledger (telemetry/ledger,
+
+---knowledge---
+module_id: telemetry.ledger.store
+system: telemetry
+app: ledger
+solution_class: enterprise
+patterns: [append-only, hash-chained, per-tenant-isolation, encrypted-at-rest]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [LedgerStore, open_ledger, LedgerVerdict]
+invariants: "a record is never rewritten, deleted or reordered; each new record chains to the previous one with prevHash"
+gotchas: "one record per action; the evidence layer of the control plane"
+related: ["#31", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
 issue #31).
 
 This is the evidence layer of the control plane (AO-GR-17): every agent action

@@ -1,5 +1,22 @@
 """telemetry/budgets — composed pre-dispatch call check (issue #34).
 
+---knowledge---
+module_id: telemetry.budgets.preflight
+system: telemetry
+app: budgets
+solution_class: enterprise
+patterns: [composed-rail-order, single-verdict, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [preflight, PreflightResult, first_blocking_rail]
+invariants: "the three rails run in the safe order: kill switch first, then quota, then budget"
+gotchas: "order is load-bearing: a platform-wide pause must refuse before headroom is even considered"
+related: ["#34", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The enforcement contract the gateway/engine lanes call before a model call:
 one ``preflight()`` that runs the three rails in the safe order and returns
 a single verdict the caller either lets through or refuses.

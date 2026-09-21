@@ -1,5 +1,22 @@
 """telemetry/role_health — heartbeat staleness per declared schedule (#637).
 
+---knowledge---
+module_id: telemetry.role_health_tests.test_heartbeat_staleness
+system: telemetry
+app: role_health_tests
+solution_class: enterprise
+patterns: [exactly-one-named-alert, boundary-pinned]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: ["pytest suite over heartbeat staleness against the declared schedule"]
+invariants: "a role that misses its schedule raises exactly one named alert, asserted as a count and as the alert code"
+gotchas: ""
+related: ["#637", "#1510"]
+do_not_duplicate: null
+---knowledge---
+
+
 The acceptance criterion this file exists for: *a role that misses its schedule
 raises exactly ONE named alert*.  "Exactly one" is asserted as a count of the
 alerts naming that role, and "named" is asserted as the alert's code — so a
