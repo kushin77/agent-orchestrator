@@ -1,5 +1,21 @@
 """portal.server.task_board — the tenant task-board adapter (issue #642, workbook-11).
 
+---knowledge---
+module_id: portal.server.task_board
+system: portal
+app: server
+solution_class: pattern
+patterns: [cross-domain-aggregator, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [TaskBoardError, TaskBoardSurface]
+invariants: ""
+gotchas: ""
+related: ["#642"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: the workbook-3 lane ships the tenant ticket lifecycle as a
 durable library (``engine.core.tickets.TicketRuntime``) — a ticket is *created →
 decomposed → dispatched → executed → reviewed → closed*, and its state is a

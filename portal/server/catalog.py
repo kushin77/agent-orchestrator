@@ -1,5 +1,21 @@
 """portal.server.catalog — read-model projections over :class:`ConsoleState`.
 
+---knowledge---
+module_id: portal.server.catalog
+system: portal
+app: server
+solution_class: enterprise
+patterns: [read-model-projection]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [tenants_overview, tenant_overview, agents_tree, personas, prompts, budgets, usage, audit_records]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Each view's data is a pure projection (never a second source of truth) over the
 console state, which is itself hydrated from the **live** registry +
 telemetry stores (issue #348): the agent roster resolves its identity from

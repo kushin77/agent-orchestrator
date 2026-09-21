@@ -1,5 +1,21 @@
 """portal.server.bridge — the **versioned** live-data bridge (issue #339).
 
+---knowledge---
+module_id: portal.server.bridge
+system: portal
+app: server
+solution_class: pattern
+patterns: [versioned-bridge, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [LiveBridge]
+invariants: ""
+gotchas: ""
+related: ["#339"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: the platform already gathers and serves its own state, but it
 does so under four *independent, unversioned* endpoint families
 (``/api/fleet/*``, ``/api/telemetry/*``, ``/api/finops/*``, ``/api/ops/*``,

@@ -1,6 +1,22 @@
 """portal.server.fleet_authz — access control + tenant scoping for the streamed
 fleet dashboard (issue #333).
 
+---knowledge---
+module_id: portal.server.fleet_authz
+system: portal
+app: server
+solution_class: enterprise
+patterns: [rbac, tenant-scoping]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [team_node_id, RowOwner, FleetRow, RowSpec, OrgIndex, FleetAuthorizer, FleetDenied]
+invariants: ""
+gotchas: ""
+related: ["#333"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: ``portal/server/fleet.py`` (issue #331) exposes the fleet's
 live projection over HTTP. The terminal dashboard it mirrors needs no access
 control because it is a local tmux pane; a **browser** surface changes the

@@ -1,3 +1,20 @@
+/*
+ * ---knowledge---
+ * module_id: portal.static.erp.module
+ * system: portal
+ * app: static
+ * solution_class: pattern
+ * patterns: [client-adapter, no-own-authority]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L1
+ * interfaces: []
+ * invariants: ""
+ * gotchas: ""
+ * related: ["#652"]
+ * do_not_duplicate: null
+ * ---knowledge---
+ */
 /* ERP module — the portal frame's client (ERP-07, issue #652).
  *
  * WHAT THIS FILE IS ALLOWED TO KNOW. Nothing about the ERP module's domain. The

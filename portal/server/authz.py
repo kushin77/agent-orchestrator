@@ -1,5 +1,21 @@
 """portal.server.authz — console RBAC (super-admin vs tenant-admin).
 
+---knowledge---
+module_id: portal.server.authz
+system: portal
+app: server
+solution_class: enterprise
+patterns: [rbac, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Principal, Authorizer]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The permission vocabulary is *consumed* from the merged identity/rbac
 platform role pack (issue #12, ``identity/rbac/presets/platform.yaml``):
 roles ``owner`` (``*:*``), ``admin``, ``team-admin``, ``agent-operator``,

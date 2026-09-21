@@ -1,5 +1,21 @@
 """portal.server.finops — the FinOps single-pane report adapter (issue #341).
 
+---knowledge---
+module_id: portal.server.finops
+system: portal
+app: server
+solution_class: pattern
+patterns: [cross-domain-aggregator, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [FinOpsReports]
+invariants: ""
+gotchas: ""
+related: ["#341"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: the metering lane (``telemetry/metering``) knows what was
 spent and on what tiers, and the budgets lane (``telemetry/budgets``) knows the
 limits, the quotas, the chargeback lines and the alert thresholds — but both

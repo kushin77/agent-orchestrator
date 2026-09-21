@@ -1,3 +1,20 @@
+/*
+ * ---knowledge---
+ * module_id: portal.static.js.console
+ * system: portal
+ * app: static
+ * solution_class: enterprise
+ * patterns: [shell-chrome]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L1
+ * interfaces: []
+ * invariants: ""
+ * gotchas: ""
+ * related: ["#39"]
+ * do_not_duplicate: null
+ * ---knowledge---
+ */
 /* agent-orchestrator console — shell chrome (issue #39)
  * The shell is the super-admin/tenant frame host: rail navigation, tenant
  * switcher, dark-mode toggle. Each nav target loads a view *frame* that links

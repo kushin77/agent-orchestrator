@@ -1,5 +1,21 @@
 """portal.server.live_feed — the live telemetry event feed adapter (issue #345).
 
+---knowledge---
+module_id: portal.server.live_feed
+system: portal
+app: server
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [StoreTail, LiveFeed]
+invariants: ""
+gotchas: ""
+related: ["#345"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: every model call the platform routes already leaves a durable
 record — the gateway proxy appends one full call record per dispatch (the
 phase-5 telemetry seam) and the DLP pipeline appends one security event per

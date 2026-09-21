@@ -1,5 +1,21 @@
 """portal.server.skill_studio — the skill-studio serving surface (issue #642, workbook-11).
 
+---knowledge---
+module_id: portal.server.skill_studio
+system: portal
+app: server
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [SkillStudioError, SkillStudioSurface]
+invariants: ""
+gotchas: ""
+related: ["#642"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: the workbook-9 lane already ships the whole author → test →
 publish workflow as a library (``registry/packs/skills.SkillStudio``), including
 the gate that matters — *publish is refused without green eval evidence derived

@@ -1,5 +1,21 @@
 """portal.server.sso — console session verification against the OS auth gate.
 
+---knowledge---
+module_id: portal.server.sso
+system: portal
+app: server
+solution_class: enterprise
+patterns: [session-verification, no-own-login]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ConsoleAuthError, ConsoleIdentity, trusted_keys_from_jwks, load_auth_gate_jwks, configured_root_admin_emails, ConsoleSso]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The console has **no login of its own**. The shared-frontend ``auth/`` gate
 ("one front door") runs Google OAuth and mints the RS256 ``os-session-token``
 (``purpose: os-session-token``, ``kid`` = RFC 7638 thumbprint, published at

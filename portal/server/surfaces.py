@@ -1,5 +1,21 @@
 """portal.server.surfaces — the portal-surfaces feed adapter (issue #350).
 
+---knowledge---
+module_id: portal.server.surfaces
+system: portal
+app: server
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [load_pinned_feed, PortalSurfacesFeed]
+invariants: ""
+gotchas: ""
+related: ["#350"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: the OS shell's Settings→Modules page needs the *fleet-wide*
 surface catalog — which modules exist, what they are, which features each
 declares — and today it has to pin a revision of the CMR feed inside its own

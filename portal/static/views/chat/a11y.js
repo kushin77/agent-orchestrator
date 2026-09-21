@@ -1,4 +1,21 @@
 /*
+ * ---knowledge---
+ * module_id: portal.static.views.chat.a11y
+ * system: portal
+ * app: static
+ * solution_class: pattern
+ * patterns: [accessibility-enhancement]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L1
+ * interfaces: []
+ * invariants: ""
+ * gotchas: ""
+ * related: ["#500", "#514"]
+ * do_not_duplicate: null
+ * ---knowledge---
+ */
+/*
  * Chat surface — accessibility enhancements (EPIC #500, issue #514)
  * =====================================================================
  * Progressive enhancement layered ON TOP of js/chat.js, which this file does

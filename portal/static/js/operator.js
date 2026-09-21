@@ -1,3 +1,20 @@
+/*
+ * ---knowledge---
+ * module_id: portal.static.js.operator
+ * system: portal
+ * app: static
+ * solution_class: pattern
+ * patterns: [client-adapter, no-own-authority]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L1
+ * interfaces: []
+ * invariants: ""
+ * gotchas: ""
+ * related: ["#774"]
+ * do_not_duplicate: null
+ * ---knowledge---
+ */
 /* agent-orchestrator console — operator terminal (issue #774)
  *
  * The browser IT-terminal behind the SSO session. It invents nothing: the read

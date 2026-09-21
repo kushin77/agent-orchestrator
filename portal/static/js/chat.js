@@ -1,3 +1,20 @@
+/*
+ * ---knowledge---
+ * module_id: portal.static.js.chat
+ * system: portal
+ * app: static
+ * solution_class: pattern
+ * patterns: [client-adapter, no-own-authority]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L1
+ * interfaces: []
+ * invariants: ""
+ * gotchas: ""
+ * related: ["#508"]
+ * do_not_duplicate: null
+ * ---knowledge---
+ */
 /* agent-orchestrator console — conversation view (issue #508, ADR-0023)
  *
  * The client half of the conversational surface. It owns no authority: it

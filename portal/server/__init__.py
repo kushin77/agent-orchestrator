@@ -1,5 +1,21 @@
 """portal.server — offline control-plane console backend (issue #39).
 
+---knowledge---
+module_id: portal.server.__init__
+system: portal
+app: server
+solution_class: enterprise
+patterns: [package-root]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#39"]
+do_not_duplicate: null
+---knowledge---
+
 The portal is a self-contained static console (design-token CSS/JSON twins +
 vanilla JS views) served by this stdlib-only Python HTTP layer. The server
 implements the console routes (session SSO, RBAC, entity projections) and is

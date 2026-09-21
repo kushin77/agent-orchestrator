@@ -1,5 +1,21 @@
 """portal.server.org_chart — the org-chart view adapter (issue #642, workbook-11).
 
+---knowledge---
+module_id: portal.server.org_chart
+system: portal
+app: server
+solution_class: pattern
+patterns: [declared-authority, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [OrgChartView]
+invariants: ""
+gotchas: ""
+related: ["#642"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: the workbook-1 declaration (``registry/personas/org-chart.yaml``
 plus the bound ``cards/*.yaml``) says *who exists, who reports to whom, and what
 each seat may spend and when it must beat*, and the workbook-6 role-health feed

@@ -1,5 +1,21 @@
 """portal.server.surface_state — the runtime surface rollback overlay (#802).
 
+---knowledge---
+module_id: portal.server.surface_state
+system: portal
+app: server
+solution_class: pattern
+patterns: [rollback-overlay, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [overlay_path, read_rollbacks, is_rolled_back, rollback_record, record_rollback, clear_rollback]
+invariants: ""
+gotchas: ""
+related: ["#802"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists. Every console surface is gated by its declaration in
 ``infra/feature-flags/registry.yaml`` (``surfaces.<name>.default``), read
 fail-closed by :func:`portal.server.fleet.read_surface_default`. A declaration is

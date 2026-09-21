@@ -1,5 +1,21 @@
 """portal.server.erp — the ERP module's portal surface (ERP-07, issue #652).
 
+---knowledge---
+module_id: portal.server.erp
+system: portal
+app: server
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [ErpModuleError, ErpApi, build_erp_api, ErpModuleSurface]
+invariants: ""
+gotchas: ""
+related: ["#652"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists. EPIC #645's module is indexer-fed by construction: ERP-01
 declares it, ERP-02 owns the document model, ERP-06 serves it as a REST
 contract. A tenant operator still cannot *use* a library or read a JSON

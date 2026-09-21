@@ -1,5 +1,21 @@
 """portal.server.config_flags — the portal's own surface-flag reader (issue #642).
 
+---knowledge---
+module_id: portal.server.config_flags
+system: portal
+app: server
+solution_class: pattern
+patterns: [declared-authority]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [read_config_default, surface_enabled]
+invariants: ""
+gotchas: ""
+related: ["#642"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this module exists rather than reusing ``portal.server.fleet``: that module
 reads ``infra/feature-flags/registry.yaml``, whose ``surfaces:`` map is the
 *control-plane service* registry. ``scripts/check-feature-flags.py`` keeps that

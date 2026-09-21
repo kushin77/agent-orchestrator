@@ -1,5 +1,21 @@
 """portal.server.app — console route table + request pipeline (offline).
 
+---knowledge---
+module_id: portal.server.app
+system: portal
+app: server
+solution_class: enterprise
+patterns: [route-table, transport-free]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ApiError, Response, StreamResponse, ConsoleApplication, build_app]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Transport-free: :meth:`ConsoleApplication.handle` takes a method/path/query/
 body/cookie-map and returns a :class:`Response`. ``httpd.py`` binds it to
 ``http.server``; tests drive it directly (no sockets). Every API response

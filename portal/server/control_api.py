@@ -1,5 +1,21 @@
 """portal.server.control_api — the remote control API (issue #554, RC-3 of #551).
 
+---knowledge---
+module_id: portal.server.control_api
+system: portal
+app: server
+solution_class: enterprise
+patterns: [remote-control, exactly-once]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [VocabularyUnavailable, LeverUnreachable, VerbRow, Vocabulary, Command, EffectRecord, CommandLedger, InFlightCommands]
+invariants: ""
+gotchas: ""
+related: ["#554", "#551"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists. EPIC #551 exists because the fleet can be commanded only from
 its own keyboard: ``docs/REMOTE-CONTROL-GAP-ANALYSIS.md`` §2.6 measures eighteen
 verbs in ``fleet/control.py``, thirteen in ``fleet/channel.py`` and twenty-two

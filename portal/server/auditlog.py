@@ -1,5 +1,21 @@
 """portal.server.auditlog — per-tenant tamper-evident audit chain.
 
+---knowledge---
+module_id: portal.server.auditlog
+system: portal
+app: server
+solution_class: enterprise
+patterns: [hash-chained-ledger, append-only]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AuditRecord, AuditLedger]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The Audit view and every mutation use this append-only, hash-chained ledger.
 The record shape and the verify semantics consume the frozen telemetry/ledger
 (issue #31) vocabulary — ``schemaVersion``/``seq``/``ts``/``tenantId``/

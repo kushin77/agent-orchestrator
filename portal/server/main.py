@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """portal.server.main — run the offline console server.
 
+---knowledge---
+module_id: portal.server.main
+system: portal
+app: server
+solution_class: class
+patterns: [entrypoint]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The console is a self-contained static app (design-token CSS/JSON twins +
 vanilla JS views) served by this stdlib-only Python HTTP layer with the console
 routes + the auth-gate session check. No build step and no node_modules.

@@ -1,5 +1,21 @@
 """portal.server.control_audit — exactly-once control: one effect, one record.
 
+---knowledge---
+module_id: portal.server.control_audit
+system: portal
+app: server
+solution_class: enterprise
+patterns: [exactly-once, audit-record]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AuditUnavailable, CommandLike, EffectRecordLike, utc_now, mint_command_id, mint_record_id, canonical, command_binding]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists (issue #555, RC-4 of EPIC #551). RC-3 shipped the control
 channel and its refusals; it records nothing. Its ledger, ``InFlightCommands``,
 answers "this id is *still running*" and forgets the id the moment the command

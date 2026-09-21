@@ -1,3 +1,20 @@
+/*
+ * ---knowledge---
+ * module_id: portal.static.js.api
+ * system: portal
+ * app: static
+ * solution_class: enterprise
+ * patterns: [shared-frame-api]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L1
+ * interfaces: []
+ * invariants: ""
+ * gotchas: ""
+ * related: ["#39"]
+ * do_not_duplicate: null
+ * ---knowledge---
+ */
 /* agent-orchestrator console — shared frame API (issue #39)
  * Every view frame is an isolated document: it links tokens.css + console.css
  * itself and applies its own theme (no cross-frame cascade reliance). This

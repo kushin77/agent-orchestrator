@@ -1,5 +1,21 @@
 """portal.server.fleet — the fleet-state projection adapter (issue #331).
 
+---knowledge---
+module_id: portal.server.fleet
+system: portal
+app: server
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [read_registry_surfaces, declares_on, read_live_state_doc, read_surface_default, surface_enabled, load_fleet_console, FleetProjection]
+invariants: ""
+gotchas: ""
+related: ["#331"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: the terminal dashboard (``fleet/console.py``) renders the
 fleet's live state into one tmux pane. A remote operator cannot open that pane,
 filter it, or feed it into another system. This module is the *server half* of

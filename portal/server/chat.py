@@ -1,5 +1,21 @@
 """portal.server.chat — the conversational surface (issue #508, ADR-0023).
 
+---knowledge---
+module_id: portal.server.chat
+system: portal
+app: server
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [tiers, ChatError, parse_turn_request, CancelToken, BudgetState, sse_frame, render_source, unsupported_label]
+invariants: ""
+gotchas: ""
+related: ["#508"]
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists: the console could *show* the control plane but not *talk* to
 it. This module is the experience half of EPIC #500 — the conversational
 surface a user actually judges — and it is deliberately the **client** half of

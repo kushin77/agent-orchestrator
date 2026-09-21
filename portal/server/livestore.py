@@ -1,5 +1,21 @@
 """portal.server.livestore — read-only adapters over the LIVE registry + telemetry.
 
+---knowledge---
+module_id: portal.server.livestore
+system: portal
+app: server
+solution_class: pattern
+patterns: [read-only-adapter, join-not-own]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [RegistryDriftError, TelemetryUnavailableError, seed_version, revision_key, seed_selection_key, seed_paths, resolve_seed_path, RegistryProfile]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The console is a *projection* over the control-plane entities, never a second
 source of truth (CMR portal doctrine). This module is the single seam that
 reads the control plane's **real** stores on this checkout, so the console's

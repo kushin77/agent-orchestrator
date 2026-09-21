@@ -1,3 +1,20 @@
+/*
+ * ---knowledge---
+ * module_id: portal.static.js.fleet
+ * system: portal
+ * app: static
+ * solution_class: pattern
+ * patterns: [client-adapter, no-own-authority]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L1
+ * interfaces: []
+ * invariants: ""
+ * gotchas: ""
+ * related: ["#332"]
+ * do_not_duplicate: null
+ * ---knowledge---
+ */
 /* agent-orchestrator console — fleet single-pane-of-glass (issue #332)
  *
  * The browser half of the web single-pane-of-glass. The server half (issue
