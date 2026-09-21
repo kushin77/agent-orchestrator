@@ -88,7 +88,8 @@
 # Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 self_test_only=0
 
 usage() {
