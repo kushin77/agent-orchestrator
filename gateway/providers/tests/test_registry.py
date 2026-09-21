@@ -366,6 +366,7 @@ def test_hermes_degrades_to_ollama(sentiment_schema) -> None:
     registry = _registry(
         credentials_factory=lambda tenant, provider: Credentials(api_key=FAKE_KEY),
         transport_factory=transport_factory,
+        hermes_enabled=True,
     )
     registry.set_tenant_mapping("acme", {"MED": "hermes"})
     result = registry.chat(
@@ -432,10 +433,54 @@ def test_metering_and_audit_hooks_fire_per_call(sentiment_schema) -> None:
 def test_provider_configs_are_exposed() -> None:
     registry = _registry()
     names = set(registry.provider_configs())
+    # hermes is retired by default (enable_hermes off): it is absent from the
+    # ACTIVE configs, though its adapter + config remain in the catalog so a
+    # reviewed go-live can re-enable it.
     assert names == {"anthropic", "deepseek", "openai", "copilot", "gemini",
-                     "ollama", "paperclip", "hermes", "nous"}
+                     "ollama", "paperclip", "nous"}
+    assert "hermes" not in names
     assert registry.config_for("ollama").requires_key is False
+    assert "hermes" in default_provider_configs()
+
+
+def test_hermes_retired_by_default() -> None:
+    """``enable_hermes`` off (default): the registry does not activate hermes.
+
+    The gate is fail-closed at routing time: hermes is absent from the active
+    config set, so it cannot be resolved, even though its adapter and config
+    remain in the catalog for a reviewed go-live to re-enable.
+    """
+    registry = _registry()
+    assert registry.hermes_enabled is False
+    assert "hermes" not in registry.provider_configs()
+    with pytest.raises(ProviderConfigurationError):
+        registry.config_for("hermes")
+
+
+def test_hermes_registers_when_enabled() -> None:
+    """``enable_hermes`` on: the registry registers (and activates) hermes."""
+    registry = _registry(hermes_enabled=True)
+    assert registry.hermes_enabled is True
+    assert "hermes" in registry.provider_configs()
     assert registry.config_for("hermes").requires_key is False
+    # Re-registering a hermes config is accepted when the flag is on.
+    registry.register_provider_config(default_provider_configs()["hermes"])
+
+
+def test_hermes_flag_is_read_fail_closed(tmp_path) -> None:
+    """The flag reader reads ``services.hermes`` and fails closed (issue #1518)."""
+    from providers.flags import hermes_enabled as flag_enabled
+
+    # A missing/unreadable registry never enables the provider.
+    assert flag_enabled(tmp_path / "does-not-exist.yaml") is False
+    # An explicit off stays off.
+    off = tmp_path / "off.yaml"
+    off.write_text("services:\n  hermes:\n    default: off\n", encoding="utf-8")
+    assert flag_enabled(off) is False
+    # Only an explicit on enables it.
+    on = tmp_path / "on.yaml"
+    on.write_text("services:\n  hermes:\n    default: on\n", encoding="utf-8")
+    assert flag_enabled(on) is True
 
 
 def test_nous_is_a_keyed_cloud_provider_not_the_local_hermes_hop() -> None:
@@ -447,8 +492,10 @@ def test_nous_is_a_keyed_cloud_provider_not_the_local_hermes_hop() -> None:
     assert nous.requires_key is True
     assert nous.fallback == ("ollama",)
     assert nous.tier_model_for("MAX") == "openai/gpt-6-astra-fast"
-    # the local hop is untouched: this provider is additive, not a re-point
-    assert registry.config_for("hermes").requires_key is False
+    # the local hop is untouched: this provider is additive, not a re-point.
+    # hermes is retired-by-default (issue #1518), so check its catalog config
+    # rather than the default (flag-off) registry's active set.
+    assert default_provider_configs()["hermes"].requires_key is False
 
 
 def test_the_finops_credit_declaration_prices_exactly_what_nous_routes() -> None:
