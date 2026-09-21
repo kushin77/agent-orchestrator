@@ -108,6 +108,7 @@ def iter_persona_cards(root: Path) -> List[Persona]:
                 tier=str(data.get("defaultModelTier") or ""),
                 owned_lanes=tuple(data.get("ownedLanes") or ()),
                 expertise=tuple(data.get("expertise") or ()),
+                reports_to=str(data.get("reportsTo") or ""),
             )
         )
     return sorted(personas, key=lambda p: p.id)
@@ -160,6 +161,14 @@ def map_agents(root: Path) -> List[Dict[str, Any]]:
         )
         if agent_id == DEFAULT_OWNER:
             reports_to = PLATFORM_ROOT
+        elif persona and persona.reports_to and persona.reports_to in personas:
+            # Project the card's real org-chart edge (issue #1573: CEO -> CTO
+            # -> SMEs) instead of flattening every agent under the default
+            # owner. `reports_to` names another platform persona id (e.g.
+            # cto -> ceo); the reserved principal "board" never resolves to a
+            # persona, so a root role (reportsTo: board) falls through to the
+            # existing default-owner behaviour below, same as before.
+            reports_to = persona.reports_to
         else:
             reports_to = DEFAULT_OWNER
         agents.append(

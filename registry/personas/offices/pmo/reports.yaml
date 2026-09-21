@@ -1,0 +1,16 @@
+# PMO Office members (purebliss single-tenant org).
+#
+# Every id below must resolve to a real persona card in
+# registry/personas/cards/*.yaml.
+office: pmo
+schema: pmo-office-reports/v1
+version: 1.0.0
+members:
+  - id: pmo-sme
+    card: registry/personas/cards/pmo-sme.yaml
+    lane: program-management
+    defaultTierAtWriting: HIGH
+  - id: docs-sme
+    card: registry/personas/cards/docs-sme.yaml
+    lane: dx
+    defaultTierAtWriting: LOW

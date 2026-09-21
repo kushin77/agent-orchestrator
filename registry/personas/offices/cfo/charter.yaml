@@ -1,0 +1,53 @@
+# registry/personas/offices/cfo/charter.yaml — CFO office charter.
+#
+# No `registry/personas/offices/` tree exists on origin/master as of this
+# authoring (verified: `git ls-tree -r origin/master registry/personas/`
+# returned no `offices` match). This charter therefore INVENTS the office
+# shape rather than mirroring a prior example — flagged here rather than
+# silently presented as an established convention. It mirrors the existing
+# `registry/personas/cards/cfo.yaml` PersonaCard (id, tenant, guardrails)
+# where the concepts overlap, and adds only what a PersonaCard does not
+# carry: office-level authority and escalation.
+
+schemaVersion: 1
+office: cfo
+tenant: platform
+reportsTo: ceo
+personaCardRef: registry/personas/cards/cfo.yaml
+
+authority:
+  # What the CFO office may change unilaterally.
+  grants:
+    - budget-caps            # gateway/finops/budgets.yaml tenant/role caps
+    - tier-ladder             # gateway/finops/tiers.yaml ordering (not prices)
+    - enforce-mode-flips      # observe->enforce per gateway/finops/budget-authority.yaml,
+                               # ONLY when an existing test exercises the enforce path
+    - cost-gates               # scripts/check-finops-kpi.sh and its ceiling
+
+  # What the CFO office explicitly cannot do, and where authority sits instead.
+  denies:
+    - bypass-pmo-priority:
+        reason: "PMO owns dispatch priority/sequencing (registry/personas/cards/pmo-sme.yaml, governance/pmo/*). CFO may flag a cost concern but cannot reorder or block a PMO-prioritized lane."
+    - edit-other-office-cards:
+        reason: "registry/personas/offices/cto/* and registry/personas/cards/purebliss/* are other lanes' owned files per this office's originating task constraints."
+    - adhoc-terraform-apply:
+        reason: "GR-5 (AGENTS.md/CLAUDE.md golden rule) — no ad-hoc terraform apply from any office."
+    - invent-model-prices:
+        reason: "Prices are sourced only from telemetry/metering/rate_cards/*.yaml; an office cannot declare its own price for a model already priced there."
+
+escalation:
+  # A budget or KPI breach the CFO office cannot resolve within its own
+  # authority escalates to the CEO persona card, which reports to the board
+  # per registry/personas/org-chart.yaml ("cto/coo/cfo/cmo -> ceo; ceo -> board").
+  path:
+    - cfo
+    - ceo
+    - board
+  trigger:
+    - "finops KPI gate (scripts/check-finops-kpi.sh) fails and the ceiling cannot be met without a scope cut PMO must approve"
+    - "a tenant budget hardCapPct (gateway/finops/budgets.yaml) is projected to be breached and no fallback tier exists"
+
+provenance:
+  - "kushin77/agent-orchestrator: CFO office IaC, issue TBD, parent #1510"
+  - "registry/personas/cards/cfo.yaml (existing PersonaCard, mirrored where overlapping)"
+  - "registry/personas/org-chart.yaml (reporting edge cfo -> ceo, verified line 9/37)"
