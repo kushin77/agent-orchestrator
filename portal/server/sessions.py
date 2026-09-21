@@ -43,6 +43,25 @@ OPTIONAL_ROOTS: dict[str, str] = {
     "paperclip": ".paperclip-agent",
 }
 
+#: Sessions-view operator control buttons (issue #1564) onto EXISTING verbs
+#: from control-plane/control/verbs.yaml — no new verb is declared, so
+#: functions.yaml/fixtures/bodies.json/test_functions.py are untouched.
+#: "assign" reuses fleet.start (brings the loop up to take work); "reassign"/
+#: "resume" reuses fleet.resume; "escalate" reuses fleet.override (files an
+#: operator override ticket); "kill" reuses fleet.kill (irreversible).
+SESSION_CONTROL_VERBS: dict[str, str] = {
+    "assign": "fleet.start",
+    "pause": "fleet.pause",
+    "resume": "fleet.resume",
+    "escalate": "fleet.override",
+    "kill": "fleet.kill",
+}
+
+#: The only engine a fleet.* verb can act on (it commands the single
+#: claude-fleet loop, not the other two engines' own session stores). A row
+#: from another engine is refused by name, never silently no-opped.
+CONTROLLABLE_ENGINE = "claude-fleet"
+
 
 def _age(at: Any, *, now: Optional[datetime] = None) -> Optional[str]:
     """A human age (``"3m"``, ``"2h"``, ``"5d"``) from an ISO-8601 timestamp.
