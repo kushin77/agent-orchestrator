@@ -30,7 +30,7 @@ from providers.transport import RecordingTransport
 from conftest import CONTENT_OBJ, FAKE_KEY, VALID_CONTENT, make_messages
 from support import auth_header_name, config_for, expected_endpoint, ok_response
 
-PROVIDERS = ["anthropic", "deepseek", "openai", "copilot", "gemini", "ollama", "paperclip", "hermes"]
+PROVIDERS = ["anthropic", "deepseek", "openai", "copilot", "gemini", "ollama", "paperclip", "hermes", "nous"]
 
 
 def _credentials(name: str) -> Credentials | None:

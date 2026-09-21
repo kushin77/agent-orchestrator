@@ -164,8 +164,10 @@ controls:
     since: "issue #26"
 ```
 
-The registry ships **eight** controls: the three platform examples above plus
-the five workbook mechanical-rule controls of issue #636 (all default OFF).
+The registry ships **ten** controls: the three platform examples above, the
+five workbook mechanical-rule controls of issue #636, and the two head-of-org
+guardrails of issue #951 (`hermes-head-guardrails`,
+`paperclip-operator-guardrails`) — all default OFF.
 
 * A control is **active** only when it is registered **and** `enabled: true`.
 * A policy is enforced only when `policy.enabled` is true **and** every control
@@ -175,6 +177,31 @@ the five workbook mechanical-rule controls of issue #636 (all default OFF).
 * A control that ships `enabled: true` must document `on_since_rationale`;
   `mode: off` requires `enabled: false`.  The registry validator rejects both
   violations.
+
+### Canary scope (issue #1519)
+
+A control being toggleable is not the same as its policy having ever fired.
+[`canary/controls.canary.yaml`](canary/controls.canary.yaml) is a **committed,
+non-production** registry in which exactly one control —
+`hermes-head-guardrails` — is ON, scoped to the single policy file
+[`bundles/platform/hermes-head.yaml`](bundles/platform/hermes-head.yaml). It is
+the scope in which that policy's first BLOCK is produced by an artifact rather
+than by a test fixture:
+
+```bash
+python3 guardrails/policy/cli.py evaluate agent.dispatch \
+  --subject hermes --tenant acme --context '{"channel":"sideband"}' \
+  --bundle guardrails/policy/bundles/platform/hermes-head.yaml \
+  --controls guardrails/policy/canary/controls.canary.yaml \
+  --audit /tmp/hermes-canary-audit.jsonl      # exit 2 = BLOCK, rule named in the evidence
+```
+
+The commands, their real output, the negative control and the canary result are
+recorded in [`canary/README.md`](canary/README.md); the assertions are enforced
+by [`tests/test_hermes_guardrail_canary.py`](tests/test_hermes_guardrail_canary.py)
+inside the declared `guardrails/policy` suite. This is a PROOF, not a
+promotion: `controls.yaml` still ships the control `enabled: false`, and
+`default_controls_file()` never resolves to the canary path.
 
 ## Startup validation gate
 
@@ -202,6 +229,20 @@ full structured evidence.  [`audit.py`](audit.py) ships `InMemoryAuditLog`
 update/delete surface).  The durable, hash-chained, per-tenant tamper-evident
 ledger is owned by the observability lane (issue #31); this lane provides the
 structured record that ledger consumes.
+
+The CLI can sink to that durable file rather than to memory, which is what makes
+a decision readable back from disk by a second process (the shape the #1519
+canary proof uses):
+
+```bash
+# stdout stays pure JSON; the confirmation goes to stderr
+python3 guardrails/policy/cli.py evaluate model.call --tenant acme \
+  --context '{"budget": {"utilization_ratio": 1.5}}' \
+  --audit /tmp/audit.jsonl
+```
+
+`sequence` is the *engine's* counter, so two separate CLI runs each start at 1;
+a global sequence across processes belongs to the observability ledger above.
 
 ## OPA integration option
 
@@ -280,6 +321,7 @@ guardrails/policy/
 ├── README.md / PROVENANCE.md     landing doc + provenance (AO-GR-10)
 ├── schema/*.schema.json          policy + controls JSON Schemas
 ├── controls.yaml                 controls registry (default OFF)
+├── canary/                       non-prod canary scope + proof (issue #1519)
 ├── bundles/platform/*.yaml       shipped example policies
 ├── decision.py model.py          tri-state + policy/rule model
 ├── conditions.py                 condition tree evaluation (fail-closed)

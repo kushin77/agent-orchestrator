@@ -1,0 +1,31 @@
+# Importable Cloud Build push trigger for the overlay-lift sync check (issue
+# #1513, parent #1510). Fires on a push to contrib/shared-services/** in
+# agent-orchestrator — the path whose overlay changes the 3-day hand-lift gap
+# (09-17 -> 09-20) exposed — and runs the drift check within the designed
+# latency (under 1 hour), not a polling timer.
+#
+# Ships DISABLED (GR-5 / flag-gated OFF): nothing fires until a reviewed
+# go-live imports this trigger with `disabled: false` and flips
+# ci_cd.overlay_sync on in infra/feature-flags/registry.yaml. The build is
+# fail-closed (refuses to run while _ENABLE_OVERLAY_SYNC != "true").
+#
+# The live diff (scripts/sync-agentconsole-overlay.sh --check) reaches
+# kushin77/shared-services + kushin77/shared-frontend over the GitHub API, so
+# the runner needs a GitHub token (the fleet's controller/app-token.sh mints a
+# GitHub App installation token; wire it as a build secret at promotion time —
+# the same out-of-band step as every other trigger). The offline half
+# (self-test + manifest validation) runs with no network.
+name: control-plane-overlay-sync
+disabled: true
+description: Push-triggered overlay-lift drift check for contrib/shared-services/**.
+repositoryEventConfig:
+  push:
+    branch: ^master$
+    includedFiles:
+      - "contrib/shared-services/**"
+  repository: projects/purebliss-ghl/locations/us-central1/connections/capital-gh/repositories/agent-orchestrator
+  repositoryType: GITHUB
+serviceAccount: projects/purebliss-ghl/serviceAccounts/1056038104733-compute@developer.gserviceaccount.com
+filename: infra/cloudbuild/overlay-sync.yaml
+substitutions:
+  _ENABLE_OVERLAY_SYNC: "false"

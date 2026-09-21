@@ -16,6 +16,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`GOVERNANCE.md`](GOVERNANCE.md) | Branch, provenance, session-label, review/merge conventions. |
 | [`PAPERCLIP-ING-INTEGRATION.md`](PAPERCLIP-ING-INTEGRATION.md) | Frozen fleet ↔ upstream Paperclip integration seam — heartbeat/ticket/budget contracts (ADR-0013, issue #370). |
 | [`PAPERCLIP-ING-DEPLOY.md`](PAPERCLIP-ING-DEPLOY.md) | The self-hosted paperclip runtime runbook — declaration-only, flag-gated OFF, pinned upstream release, offline `/api/health` probe (issue #411). |
+| [`PAPERCLIP-PROMOTION-DECISION.md`](PAPERCLIP-PROMOTION-DECISION.md) | Recorded go/no-go decision on promoting `enable_paperclip`: NO-GO (flag stays `default = false`, documented-inert), with owner sign-off (issue #1515). |
 | [`ENTERPRISE-WORKBOOK-GAP-ANALYSIS.md`](ENTERPRISE-WORKBOOK-GAP-ANALYSIS.md) | Paperclip enterprise-workbook four-pillar gap analysis — measured master mapping, C-suite org-chart → persona mapping, and the delta epic (EPIC #631, children #632–#644) (issue #614). |
 | [`CROSS-REFERENCE-SPINE.md`](CROSS-REFERENCE-SPINE.md) | Typed relationship edges (`cmr-refs:` markers, closed vocabulary, RCA nodes) — EPIC #138, issue #384. |
 | [`CROSS-REPO-EXECUTION-BOUNDARY.md`](CROSS-REPO-EXECUTION-BOUNDARY.md) | The cross-repo boundary contract — a repo remediates findings for itself only; foreign work is handed over by direction issue (NG4, issue #125). |
@@ -86,10 +87,12 @@ reachable from this index.
 | [`CODEIDX-CAPABILITY-REGISTER.md`](CODEIDX-CAPABILITY-REGISTER.md) | What the fleet needs from `kushin77/code-indexing`, per capability, and how we know we have it. |
 | [`CODE-HEADER-STANDARD.md`](CODE-HEADER-STANDARD.md) | The machine-parseable knowledge block every source file carries, and the fields the indexer reads (issue #1535, EPIC #1510). |
 | [`DIAGRAMS-CAPABILITY-REGISTER.md`](DIAGRAMS-CAPABILITY-REGISTER.md) | What "fully capable" means for the fleet's diagrams surface (issue #467). |
+| [`VENDOR-COMPLIANCE-GAP-133.md`](VENDOR-COMPLIANCE-GAP-133.md) | Vendor-compliance gap #133 (`kushin77/googleworkspace`) — the measured declaration, its owners, and why it must not be closed on its own gate (issue #133). |
 | [`erp-finops/compliance-audit.md`](erp-finops/compliance-audit.md) | ERP/FinOps compliance audit — phase-4 validation & governance (issue #676, EPIC #665). |
 | [`erp-finops/current-state.md`](erp-finops/current-state.md) | Current-state money map — subscription flows and the manual reconciliation points (PF-1, issue #666, EPIC #665). |
 | [`erp-finops/saas-metrics-current-state.md`](erp-finops/saas-metrics-current-state.md) | SaaS metrics current state — MRR/ARR, cloud compute burn, invoicing bottlenecks and the silo map (issue #668). |
 | [`erp-finops/token-baseline.md`](erp-finops/token-baseline.md) | DeepSeek token-flow baseline (issue #667, EPIC #665). |
+| [`BUILT-NOT-SHIPPED-AO.md`](BUILT-NOT-SHIPPED-AO.md) | Built-not-shipped inventory — every artifact that is built but not shipped, each with the mechanism that proves the claim (issue #1540, EPIC #1510). |
 
 ## Planned (later issues)
 

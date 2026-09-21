@@ -237,6 +237,78 @@ def test_planted_row_newer_than_its_own_provenance_is_refused(tmp_path: Path) ->
     assert PROBE in result.stderr, result.stderr
 
 
+# The suite the scratch gate surface never names: declared in the manifest, so
+# the detector examines it, and reached by no gate, so a row for it is LIVE. A
+# ROW for `SUITE` would be stale instead — `_gate_surface` names it.
+UNWIRED_SUITE = "scratch-unwired"
+
+
+def _unwired_suite_universe(tmp_path: Path, *, tracker_state: str) -> Path:
+    """A scratch tree whose baseline carries a LIVE suite row (#1497).
+
+    The row is well-provenanced in every other respect — the suite exists at the
+    commit the row itself declares, the reason is in the closed vocabulary, the
+    tracker is a real `#<n>` — so the only thing left to vary is the tracker's
+    STATE. Two tests then differ by exactly that one input, which is what makes
+    the refusal attributable to it rather than to the fixture.
+    """
+    root = build_universe(tmp_path, wire_probe=False, probe=False)
+    _write(root, "scripts/pytest-suites.txt", "%s\n%s\n" % (SUITE, UNWIRED_SUITE))
+    _write(
+        root,
+        "%s/tests/test_probe.py" % UNWIRED_SUITE,
+        "def test_the_declared_suite_exists():\n    assert True\n",
+    )
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "scratch: declare the unwired suite")
+    at = _git(root, "rev-parse", "HEAD").stdout.strip()
+    assert len(at) == 40, at
+
+    _write(
+        root,
+        ".board/snapshot.json",
+        json.dumps({"issues": [{"number": ROW_TRACKER, "state": tracker_state}]}),
+    )
+    _write(
+        root,
+        "scripts/gate-coverage-baseline.txt",
+        "suite\t%s\tswept-only\t#%d\t%s\n" % (UNWIRED_SUITE, ROW_TRACKER, at),
+    )
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "scratch: baseline row for the unwired suite")
+    return root
+
+
+def test_closed_tracker_on_a_suite_row_is_refused(tmp_path: Path) -> None:
+    """A suite row deferred to a CLOSED issue is a permanent excuse (#1497).
+
+    Before #1497 the rule covered only `script` rows, so this row was ACCEPTED:
+    51 rows sat on `suite ... swept-only #524` while #524 was closed, and the
+    detector reported OK. The declaration rotted while the detector stayed
+    green — the whole finding.
+    """
+    root = _unwired_suite_universe(tmp_path, tracker_state="closed")
+    result = run_detector(root)
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert "baseline suite %s" % UNWIRED_SUITE in result.stderr, result.stderr
+    assert "CLOSED" in result.stderr, result.stderr
+    assert "permanent excuse" in result.stderr, result.stderr
+
+
+def test_open_tracker_on_a_suite_row_is_accepted(tmp_path: Path) -> None:
+    """The same tree with the tracker OPEN is accepted, and the row is REPORTED.
+
+    This is the other half of the control: the ONLY difference from the refused
+    tree is the tracker's state, so the refusal above is attributable to the
+    rule and not to the fixture. It also pins that an accepted live row is named
+    in the output — a deferral may never be silent.
+    """
+    root = _unwired_suite_universe(tmp_path, tracker_state="open")
+    result = run_detector(root)
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert "deferral suite %s -> #%d" % (UNWIRED_SUITE, ROW_TRACKER) in result.stdout, result.stdout
+
+
 def _demonstrate() -> int:
     """Print the provoked refusal verbatim — the re-derivation this control automates."""
     with tempfile.TemporaryDirectory(prefix="gate-coverage-control.") as scratch:

@@ -39,6 +39,21 @@
 #      RUNS: the record may not invent a probe nothing else measures, and a
 #      planted phantom probe is refused by name so that rule cannot match
 #      nothing.
+#
+#      AND EVERY ENTRY IS LEASED TO AN OPEN TRACKER (#1499). Each entry carries
+#      `tracked_by` plus the quarantine's `tracking` block, and the committed
+#      record is asserted by census over it -- each entry spelling its tracker
+#      once (tracked_by == '#' + issue) and leased to an OPEN issue. Both halves
+#      of the rule are PROVED to have a failing path through the run's OWN code,
+#      never a second copy: its loader refuses a planted entry carrying no lease,
+#      and its `evaluate()` refuses a planted CLOSED tracker BY NAME -- with the
+#      SAME entry at state `open` as the positive control, because a rule that
+#      refuses the record wholesale is not the rule under test. The census's own
+#      failing path is proved by running it over the record with every tracker
+#      flipped to `closed`. The per-entry re-point DECISION (#1499 ask 1) is
+#      asserted the same way: a row for every committed entry, the row's `now`
+#      being that entry's `tracked_by` and differing from `was`, with a row
+#      REMOVED as the failing path.
 #   3. THE RATCHET IS WIRED, NOT INERT (#1164's class: a detector nothing calls
 #      is advisory). The gate asserts that `scripts/verify.sh` INVOKES the
 #      ratchet, consumes its exit code as a failure, carries its record into
@@ -395,6 +410,213 @@ if not any(CENSUS_NEEDLE in finding for finding in planted_census):
         % (CENSUS_NEEDLE, planted_census or "no finding")
     )
 
+# --- the LEASE (#1499), and the decision record it carries --------------------
+# An exemption is honoured only while its tracker is OPEN. Two halves, and each is
+# PROVED to have a failing path -- through the RUN's OWN code, never a second copy
+# of the rule:
+#   * the SHAPE half lives in `load_budget` (a missing or malformed lease is
+#     CANNOT-ASSESS), so a planted entry with no `tracking` block is loaded to
+#     show the rule can fail;
+#   * the STATE half lives in `evaluate` (a state that is not `open` is REFUSED by
+#     name), so a planted CLOSED tracker goes through `evaluate` and must come
+#     back rc 1 naming it -- with the SAME entry at state `open` as the positive
+#     control, because a rule that refuses everything proves nothing.
+# The committed record is then asserted by census (every entry spells its tracker
+# once and is leased to an OPEN one), and the census's own failing path is proved
+# by running that same function over the record with one entry's state flipped.
+doc = {}
+try:
+    doc = json.loads(budget_path.read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError):
+    doc = {}
+
+
+def lease_census(candidate_entries):
+    """Every entry spells its tracker once and is leased to an OPEN one."""
+    out = []
+    for entry in candidate_entries:
+        name = entry.get("check")
+        tracked_by = entry.get("tracked_by")
+        issue = entry.get("issue")
+        if not isinstance(tracked_by, str) or tracked_by != "#%s" % issue:
+            out.append(
+                "entry '%s' does not spell its tracker once: tracked_by=%r, issue=%r"
+                % (name, tracked_by, issue)
+            )
+        tracking = entry.get("tracking")
+        if not isinstance(tracking, dict) or tracking.get("state") != "open":
+            out.append(
+                "entry '%s' is not leased to an OPEN tracker: tracking.state=%r "
+                "(a closed tracker may not be honoured -- re-point it or retire it)"
+                % (
+                    name,
+                    tracking.get("state") if isinstance(tracking, dict) else tracking,
+                )
+            )
+    return out
+
+
+findings.extend(lease_census(entries))
+LEASE_NEEDLE = "is not leased to an OPEN tracker"
+planted_lease_census = lease_census(
+    [
+        dict(e, tracking=dict(e["tracking"], state="closed"))
+        if isinstance(e.get("tracking"), dict)
+        else e
+        for e in entries
+    ]
+)
+if not any(LEASE_NEEDLE in finding for finding in planted_lease_census):
+    findings.append(
+        "the planted record with EVERY tracker CLOSED was ACCEPTED by the lease "
+        "census -- it matches nothing, so a record leased to a closed issue would "
+        "pass it (expected a finding naming %r, got %r)"
+        % (LEASE_NEEDLE, planted_lease_census or "no finding")
+    )
+
+# The SHAPE half, through the run's own loader: a planted entry with no lease.
+LEASE_SHAPE_NEEDLE = "carries no 'tracking' block"
+if not any(
+    LEASE_SHAPE_NEEDLE in finding
+    for finding in planted_loader_findings(
+        [
+            {
+                "check": "ao-lease-fixture-1499",
+                "kind": "standing-gap",
+                "issue": 1499,
+                "reason": "planted",
+            }
+        ],
+        "no-lease",
+    )
+):
+    findings.append(
+        "the planted entry carrying NO lease was ACCEPTED by the run's own loader -- "
+        "this rule matches nothing, so an unleased exemption would be honoured "
+        "(expected a finding naming %r)" % LEASE_SHAPE_NEEDLE
+    )
+
+
+def _planted_lease(state):
+    return {
+        "check": "ao-lease-fixture-1499",
+        "kind": "standing-gap",
+        "issue": 1361,
+        "tracked_by": "#1361",
+        "tracking": {
+            "state": state,
+            # A state that is not `open` is refused BEFORE the age is consulted, so
+            # a literal instant is safe here and cannot go stale (the
+            # clock/date-bomb class, #1025); the clock is passed in explicitly.
+            "measured_at": "2026-09-20T13:14:34Z",
+            "measured_by": "scripts/check-skip-ratchet.sh planted fixture",
+            "measured_via": "fixture: the state half of the rule, at a pinned instant",
+            "max_age_hours": 720,
+        },
+        "reason": "planted",
+    }
+
+
+_CLOSED_NEEDLE = "is closed, not open"
+_PINNED = module.parse_utc("2026-09-20T13:14:34Z")
+_closed_record, _closed_rc, _ = module.evaluate(
+    root,
+    [("ao-lease-fixture-1499", 2)],
+    ["ao-lease-fixture-1499"],
+    [_planted_lease("closed")],
+    "planted",
+    at=_PINNED,
+)
+if _closed_rc != 1 or not any(
+    _CLOSED_NEEDLE in finding for finding in _closed_record["findings"]
+):
+    findings.append(
+        "the planted entry whose tracker is CLOSED was not REFUSED by the run's own "
+        "evaluate() (rc %r, findings %r) -- expected rc 1 naming %r"
+        % (_closed_rc, _closed_record["findings"], _CLOSED_NEEDLE)
+    )
+_open_record, _open_rc, _ = module.evaluate(
+    root,
+    [("ao-lease-fixture-1499", 2)],
+    ["ao-lease-fixture-1499"],
+    [_planted_lease("open")],
+    "planted",
+    at=_PINNED,
+)
+if _open_rc != 0:
+    findings.append(
+        "the SAME planted entry with its tracker OPEN was REFUSED (rc %r: %r) -- a "
+        "rule that refuses the record wholesale is not the rule under test"
+        % (_open_rc, _open_record["findings"])
+    )
+
+
+# The re-point decision (issue #1499 ask 1) is LOAD-BEARING, not decorative: every
+# committed entry must have a row, the row's `now` must BE that entry's
+# `tracked_by`, and `now` must differ from `was` -- a row that re-points to itself
+# records no decision at all.
+def decision_findings(candidate_doc, candidate_entries):
+    rows = (candidate_doc.get("tracking-repoint-2026-09-20") or {}).get("rows")
+    if not isinstance(rows, list):
+        return [
+            "the record carries no tracking-repoint-2026-09-20.rows -- the per-entry "
+            "decision issue #1499 asks for is not recorded anywhere"
+        ]
+    by = {e.get("check"): e for e in candidate_entries}
+    named = set()
+    out = []
+    for row in rows:
+        check = row.get("check")
+        named.add(check)
+        entry = by.get(check)
+        if entry is None:
+            out.append(
+                "the re-point record names '%s', which is not an entry of this record"
+                % check
+            )
+            continue
+        if row.get("now") != entry.get("tracked_by"):
+            out.append(
+                "the re-point record says '%s' now names %r while the entry is leased "
+                "to %r -- the decision and the entry must agree"
+                % (check, row.get("now"), entry.get("tracked_by"))
+            )
+        if row.get("now") == row.get("was"):
+            out.append(
+                "the re-point record's row for '%s' is a no-op (%r): a row must record "
+                "a change or be absent" % (check, row.get("now"))
+            )
+    for check in by:
+        if check not in named:
+            out.append(
+                "entry '%s' has no row in the re-point record -- an unrecorded "
+                "decision is the silent edit issue #1499 forbids" % check
+            )
+    return out
+
+
+findings.extend(decision_findings(doc, entries))
+DECISION_NEEDLE = "has no row in the re-point record"
+planted_decision = decision_findings(
+    {
+        "tracking-repoint-2026-09-20": {
+            "rows": [
+                row
+                for row in (doc.get("tracking-repoint-2026-09-20") or {}).get("rows", [])
+                if row.get("check") != "cmr-pin"
+            ]
+        }
+    },
+    entries,
+)
+if not any(DECISION_NEEDLE in finding for finding in planted_decision):
+    findings.append(
+        "the planted re-point record with one row REMOVED was ACCEPTED -- the rule "
+        "matches nothing, so an entry whose decision was never recorded would pass "
+        "(expected a finding naming %r, got %r)"
+        % (DECISION_NEEDLE, planted_decision or "no finding")
+    )
+
 for finding in findings:
     print("  FAIL  %s" % finding)
 if findings:
@@ -421,6 +643,19 @@ print(
     "run's own loader, while a record with the kind STRIPPED is refused by the census "
     "itself (so a census of zero has a failing path, not only a passing one)"
     % len(live_entries)
+)
+print(
+    "  OK    %d entry(ies) leased to an OPEN tracker, each spelling its tracker once "
+    "(tracked_by == '#' + issue), and the planted record with one tracker CLOSED is "
+    "refused by the lease census while the run's OWN loader refuses an entry carrying "
+    "no lease and the run's OWN evaluate() refuses a CLOSED one by name -- with the "
+    "same entry OPEN as the positive control" % len(entries)
+)
+print(
+    "  OK    %d re-point decision(s) recorded for %d committed entry(ies) (issue "
+    "#1499 ask 1), each row's `now` being its entry's tracked_by and differing from "
+    "`was`; and a record with one row REMOVED is refused by that same rule"
+    % (len(doc.get("tracking-repoint-2026-09-20", {}).get("rows", [])), len(entries))
 )
 for entry in entries:
     declared = entry.get("precondition")
@@ -745,17 +980,25 @@ check "the attestation record cannot under-report a skip" \
 #                          failing check is a finding, not a skip;
 #   * a LIVE-DEPENDENT entry with no live mechanism -> rc 1, the record cannot be
 #                          evaluated and the malformed entry is named.
+#   * an entry whose tracking issue is CLOSED (#1499) -> rc 1, refused BY NAME
+#                          with the two remedies, which is the defect the rule
+#                          exists for measured end to end: all 13 entries of the
+#                          committed record were in exactly this state when the
+#                          issue was filed, and the venue read green.
+#   * a MALFORMED lease -> rc 1 with the ratchet CANNOT-ASSESS, so a skip whose
+#                          exemption could not be READ is never silently excused.
 # The gate permit store is a private fixture dir: this is a control, not a
 # competing gate (the box-wide cap is proved by scripts/check-gate-lock.sh).
 echo "== the composite, end to end (fixture checks, the real scripts/verify.sh) =="
 shim_rc=0
 python3 - "$root" "$work" > "$work/shim.txt" 2>&1 <<'PY' || shim_rc=$?
-"""Run the REAL scripts/verify.sh ten times on a shim with a fixture check set."""
+"""Run the REAL scripts/verify.sh twelve times on a shim with a fixture check set."""
 import json
 import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 root = Path(sys.argv[1])
@@ -806,13 +1049,49 @@ def mount(fixture_rcs, ratchet_source=None):
         )
 
 
+LEASE_STAMP = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def lease(entry):
+    """Fill in the lease (#1499) for a fixture entry that does not declare one.
+
+    Derived from the fixture's own clock and the entry's own issue: a fixture that
+    pinned a date would be green the day it was written and refused every day
+    after (the clock/date-bomb class, #1025). A scenario that WANTS a closed
+    tracker -- or no lease at all -- declares it itself and is left untouched.
+    """
+    if "tracking" in entry or "tracked_by" in entry:
+        return entry
+    issue = entry.get("issue")
+    if issue is None:
+        return entry
+    return dict(
+        entry,
+        tracked_by="#%s" % issue,
+        tracking={
+            "state": "open",
+            "measured_at": LEASE_STAMP,
+            "measured_by": "scripts/check-skip-ratchet.sh shim fixture",
+            "measured_via": "fixture: the entry's own issue number, at the fixture's clock",
+            "max_age_hours": 720,
+        },
+    )
+
+
 def budget(entries):
     path = shim / "scripts" / "skip-budget.json"
     if entries is None:
         path.unlink(missing_ok=True)
         return
     path.write_text(
-        json.dumps({"schema": "ao.verify.skip-budget/v1", "entries": entries}, indent=2) + "\n",
+        json.dumps(
+            {
+                "schema": "ao.verify.skip-budget/v1",
+                "entries": [lease(e) for e in entries],
+            },
+            indent=2,
+        )
+        + "\n",
         encoding="utf-8",
     )
 
@@ -892,7 +1171,7 @@ if not verdict or "skipped" in verdict[0]:
 # 2. a NAMED venue skip: PASS, but the standing skip is named in the line and
 #    recorded. The precondition is the committed record's own -- absent here.
 mount(((FIXTURE_A, 0), (FIXTURE_B, 2)))
-budget([{"check": FIXTURE_B, "kind": "venue", "precondition": "vendor/CMR/sync", "reason": "fixture"}])
+budget([{"check": FIXTURE_B, "kind": "venue", "issue": 1199, "precondition": "vendor/CMR/sync", "reason": "fixture"}])
 rc, text, att, verdict = run("named venue skip")
 expect(
     "a NAMED venue skip is a PASS that names the standing skip",
@@ -1091,19 +1370,72 @@ expect(
     [(("skip_ratchet", "verdict"), "CANNOT-ASSESS")],
 )
 
+# 11. the LEASE (#1499): the same record with one entry pointing at a CLOSED
+#     tracker. The composite must FAIL by name -- this is the defect the rule
+#     exists for, measured END TO END rather than only in the unit fixtures, and
+#     it is the state the committed record was actually in when #1499 was filed
+#     (all 13 entries named a tracker that had closed, and the venue read green).
+mount(((FIXTURE_A, 0), (FIXTURE_B, 2)))
+budget([{"check": FIXTURE_B, "kind": "venue", "issue": 1295,
+         "precondition": "vendor/CMR/sync", "reason": "fixture",
+         "tracked_by": "#1295",
+         "tracking": {"state": "closed", "measured_at": LEASE_STAMP,
+                      "measured_by": "gate fixture",
+                      "measured_via": "fixture: a CLOSED tracker",
+                      "max_age_hours": 720}}])
+rc, text, att, verdict = run("closed tracker")
+expect(
+    "an entry whose tracking issue is CLOSED FAILS the composite, by name",
+    rc, 1, text,
+    [
+        "is not leased to an open tracker",
+        "the tracking issue #1295 is closed, not open",
+        "re-point it at the live issue that now tracks the gap, or retire the entry",
+        "verify: FAIL (0 of 2 checks failed, 1 skipped: %s" % FIXTURE_B,
+    ],
+    att,
+    [
+        (("skip_ratchet", "verdict"), "VIOLATION"),
+        (("skip_ratchet", "standing_skips", 0, "tracked_by"), "#1295"),
+        (("skip_ratchet", "standing_skips", 0, "tracking_state"), "closed"),
+        (("result",), "FAIL"),
+    ],
+)
+
+# 12. a MALFORMED lease: fail-closed, so the composite cannot attest a skip set
+#     whose exemption it could not read. A missing or unreadable declaration is
+#     never a silent "still excused" -- the direction the quarantine takes too.
+mount(((FIXTURE_A, 0), (FIXTURE_B, 2)))
+budget([{"check": FIXTURE_B, "kind": "venue", "issue": 1295,
+         "precondition": "vendor/CMR/sync", "reason": "fixture",
+         "tracked_by": "#1295", "tracking": {}}])
+rc, text, att, verdict = run("lease with no state")
+expect(
+    "an entry with a malformed lease is CANNOT-ASSESS by name",
+    rc, 1, text,
+    [
+        "malformed budget entry",
+        "tracking.state must be a non-empty string",
+        "skip ratchet CANNOT-ASSESS",
+    ],
+    att,
+    [(("skip_ratchet", "verdict"), "CANNOT-ASSESS")],
+)
+
 if failures:
-    print("  %d of 10 scenario(s) failed" % len(failures))
+    print("  %d of 12 scenario(s) failed" % len(failures))
     raise SystemExit(1)
 print(
-    "  OK    ten scenarios on the real composite: clean, named, unnamed, stale, a "
+    "  OK    twelve scenarios on the real composite: clean, named, unnamed, stale, a "
     "venue command the venue lacks, the same entry with it supplied, a "
     "live-dependent skip honoured by name, the same entry NOT stale when its check "
-    "assesses, REFUSED when its check fails, and CANNOT-ASSESS when it names no "
-    "mechanism"
+    "assesses, REFUSED when its check fails, CANNOT-ASSESS when it names no "
+    "mechanism, an entry whose tracking issue is CLOSED FAILING by name (#1499) and "
+    "a malformed lease CANNOT-ASSESS rather than silently excused"
 )
 PY
 cat "$work/shim.txt"
-check "the composite itself names a skip and fails on an unnamed one, and the third kind is honoured, not stale and refused on failure" \
+check "the composite itself names a skip and fails on an unnamed one, the third kind is honoured, not stale and refused on failure, and an exemption whose tracker is CLOSED is refused" \
   "$([ "$shim_rc" -eq 0 ] && echo 0 || echo 1)" \
   "the end-to-end shim exited $shim_rc"
 
@@ -1125,6 +1457,7 @@ this fixture to stop meeting its expectation, naming what changed."""
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 root = Path(sys.argv[1])
@@ -1159,6 +1492,14 @@ fixture = work / "falsify-root"
                     "check": "gate-status",
                     "kind": "live-dependent",
                     "issue": 1382,
+                    "tracked_by": "#1382",
+                    "tracking": {
+                        "state": "open",
+                        "measured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "measured_by": "scripts/check-skip-ratchet.sh falsification fixture",
+                        "measured_via": "fixture: clock-derived, so the arm cannot go stale",
+                        "max_age_hours": 720,
+                    },
                     "mechanism": "the GitHub commit statuses API, read with gh",
                     "reason": "the live source did not answer",
                 }
@@ -1232,5 +1573,5 @@ if [ "$fails" -gt 0 ]; then
   echo "check-skip-ratchet: NOT-OK -- $fails of $checks assertion(s) failed" >&2
   exit 1
 fi
-echo "check-skip-ratchet: OK -- $checks assertion(s) held: the ratchet's rules are all provoked ($selftest_cases fixtures, each rc AND each refusal line), the committed record loads through the run's own loader, names discovered checks, declares only venue command preconditions this tree actually runs (a planted phantom probe is refused by name) and carries the THIRD kind (#1410) with its own census -- a census of zero reds by name, and a record with the kind STRIPPED is refused by that same census, so it has a failing path rather than only a passing one, while the planted live-dependent records that omit the issue, omit the mechanism or carry a precondition are each refused by the same loader; scripts/verify.sh invokes the ratchet and fails the run on its verdict (proved by mutation); the attestation validator refuses a skip that nothing accounts for and a venue skip that declares no precondition; the REAL composite run on a shim fixture proves all TEN end states (clean PASS unchanged, a named standing skip, an unnamed skip FAILING by name, a stale exemption FAILING, a venue COMMAND precondition honoured, the same entry REFUSED once supplied, a live-dependent skip honoured BY NAME while its LIVE mechanism cannot answer and NOT stale when its check assesses, the same entry REFUSED the moment the check FAILS because a failing check is a finding, and a live-dependent entry naming no mechanism CANNOT-ASSESS by name); and the FALSIFICATION control deletes the honouring from a copy of the ratchet and requires the fixture that passed to red by name -- measured, the mutant stays green and narrates the LIVE skip as a standing gap, so the naming is the load-bearing property rather than the exit code"
+echo "check-skip-ratchet: OK -- $checks assertion(s) held: the ratchet's rules are all provoked ($selftest_cases fixtures, each rc AND each refusal line), the committed record loads through the run's own loader, names discovered checks, leases every entry to an OPEN tracker (#1499) with both halves of that rule proved to have a failing path through the run's own code (its loader refuses an entry carrying no lease; its evaluate() refuses a CLOSED one by name, with the same entry OPEN as the positive control), records a per-entry re-point decision whose rows are asserted against the entries they describe, declares only venue command preconditions this tree actually runs (a planted phantom probe is refused by name) and carries the THIRD kind (#1410) with its own census -- a census of zero reds by name, and a record with the kind STRIPPED is refused by that same census, so it has a failing path rather than only a passing one, while the planted live-dependent records that omit the issue, omit the mechanism or carry a precondition are each refused by the same loader; scripts/verify.sh invokes the ratchet and fails the run on its verdict (proved by mutation); the attestation validator refuses a skip that nothing accounts for and a venue skip that declares no precondition; the REAL composite run on a shim fixture proves all TWELVE end states (clean PASS unchanged, a named standing skip, an unnamed skip FAILING by name, a stale exemption FAILING, a venue COMMAND precondition honoured, the same entry REFUSED once supplied, a live-dependent skip honoured BY NAME while its LIVE mechanism cannot answer and NOT stale when its check assesses, the same entry REFUSED the moment the check FAILS because a failing check is a finding, a live-dependent entry naming no mechanism CANNOT-ASSESS by name, an entry whose tracking issue is CLOSED FAILING by name with the two remedies, and a malformed lease CANNOT-ASSESS rather than silently excused); and the FALSIFICATION control deletes the honouring from a copy of the ratchet and requires the fixture that passed to red by name -- measured, the mutant stays green and narrates the LIVE skip as a standing gap, so the naming is the load-bearing property rather than the exit code"
 exit 0

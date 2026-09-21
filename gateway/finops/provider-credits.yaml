@@ -1,0 +1,110 @@
+# gateway/finops/provider-credits.yaml - prepaid provider credit budgets.
+#
+# The FinOps pillar's two budget axes over USD spend live in `budgets.yaml`
+# (per-tenant, issue #17; per-role, issue #633). A provider that bills against
+# PREPAID ACCOUNT CREDITS rather than post-paid metered USD needs a third
+# declaration: the credits an account holds, what those credits cost, and how
+# much rolls over. This file is that declaration, consumed by
+# `provider_credits.py` (the loader + the credit arithmetic).
+#
+# The #1 rule is inherited from the rate-card estimator (issue #33) and stated
+# again here because it is the reason this file exists rather than a hardcoded
+# table: **unknown -> null, never 0**. A model whose price the provider's
+# published contract does not state is declared `pricePublished: false` with
+# null rates, and `debit_usd()` answers null for it. It never estimates, and it
+# never reports an unmetered call as free.
+#
+# Numbers here are declared from the provider's own published contract, and the
+# source is named per provider. They are list prices for budget purposes; the
+# authoritative balance lives with the provider.
+
+schemaVersion: 1
+
+providers:
+  # Nous Research (issue #1559). The inference API is OpenAI-compatible:
+  # POST {baseUrl}/chat/completions with the API key as a bearer token, billed
+  # against account credits.
+  nous:
+    displayName: Nous Research
+    billing: credits
+    baseUrl: https://inference-api.nousresearch.com/v1
+    docs: https://portal.nousresearch.com/api-docs
+
+    # The published contract documents `POST /chat/completions` and
+    # `POST /completions` only - there is NO balance/credits readback endpoint.
+    # So the balance cannot be polled and is TRACKED AGAINST KNOWN TOP-UPS
+    # (the `plans` ceilings plus every recorded `topUpsUsd` purchase) rather
+    # than read back. If the provider ever publishes a balance endpoint, this
+    # is the field to point at it.
+    balanceEndpoint: null
+    balanceTracking: manual-top-ups
+    balanceTrackingNote: >-
+      No credits/balance endpoint is declared by the provider's API contract, so
+      the remaining balance is derived from the declared plan ceiling plus
+      recorded top-ups, minus debits. It is a budget meter, not a live ledger
+      readback, and must be reconciled against the provider's own statement.
+
+    # Subscription ceilings (published): monthly price -> monthly credits, with
+    # a rollover cap on unused credits.
+    plans:
+      free:
+        priceUsdPerMonth: 0.0
+        grantedCreditsUsd: 0.0
+        rolloverCapUsd: 0.0
+      plus:
+        priceUsdPerMonth: 20.0
+        grantedCreditsUsd: 22.0
+        rolloverCapUsd: 10.0
+      super:
+        priceUsdPerMonth: 100.0
+        grantedCreditsUsd: 110.0
+        rolloverCapUsd: 50.0
+      ultra:
+        priceUsdPerMonth: 200.0
+        grantedCreditsUsd: 220.0
+        rolloverCapUsd: 100.0
+
+    # Published one-off top-up amounts (USD), purchasable independently of a
+    # plan. Declared lowest-first; every `topUpUsd` passed to the arithmetic is
+    # validated against this set so a typo cannot silently invent a balance.
+    topUpsUsd: [10.0, 20.0, 50.0, 100.0, 200.0]
+
+    # The chat models this provider's tier map routes to, with prices taken from
+    # the endpoint's OWN live catalog (``GET {baseUrl}/models``, HTTP 200
+    # unauthenticated, 402 models, each carrying ``pricing.prompt`` /
+    # ``pricing.completion`` per-token rates - measured 2026-09-20).
+    #
+    # These four ids are the ones ``gateway/providers/config.py`` maps the
+    # LOW/MED/HIGH/MAX ladder onto, and each one was VERIFIED SERVABLE against
+    # the endpoint's chat path: an id it accepts answers HTTP 402 (the x402
+    # payment-required flow), an id it does not answers 400 "Unknown model".
+    # Rates are USD per 1,000,000 tokens, converted from the catalog's
+    # per-token strings.
+    #
+    # NOT declared here, and deliberately so:
+    # - the ``Hermes-4.x`` ids the API docs advertise (two retired, one not
+    #   found - no id containing "hermes" is servable at all);
+    # - the rest of the 402-model catalog listing, which the chat path mostly
+    #   refuses ("Unknown model"), so pricing it would only meter calls that
+    #   cannot be made.
+    models:
+      inclusionai/ling-3.0-flash:
+        contextWindow: 262144
+        pricePublished: true
+        inputUsdPerMTok: 0.021
+        outputUsdPerMTok: 0.063
+      qwen/qwen3.7-flash:
+        contextWindow: 1000000
+        pricePublished: true
+        inputUsdPerMTok: 0.03
+        outputUsdPerMTok: 0.13
+      anthropic/claude-haiku-4.5:
+        contextWindow: 200000
+        pricePublished: true
+        inputUsdPerMTok: 1.00
+        outputUsdPerMTok: 5.00
+      openai/gpt-6-astra-fast:
+        contextWindow: 1050000
+        pricePublished: true
+        inputUsdPerMTok: 20.00
+        outputUsdPerMTok: 100.00

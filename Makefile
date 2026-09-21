@@ -153,6 +153,21 @@ help:
 verify:
 	@bash scripts/verify.sh verify
 
+## verify-attestation — the same gate of record, but with AO_GATE_VENUE=attestation
+## (#1620): check-worktree-cap / check-reconcile-orphans stop treating
+## orphan-branch / orphan-issue-lane / worktree-cap-exceeded as advisory (a
+## bare `make verify` reports them as NOTE, since they measure box-wide state
+## shared with every OTHER concurrent session on the machine, not this
+## checkout's own diff) and enforce them for real. Use this — never plain
+## `make verify` — right before `make master-attestation`, since that
+## attestation is meant to speak for the WHOLE box's hygiene, not just one
+## lane's diff.
+##   make verify-attestation && make master-attestation
+verify-attestation:
+	@AO_GATE_VENUE=attestation bash scripts/verify.sh verify
+
+.PHONY: verify-attestation
+
 ## worktrees — reclaim stale lane worktrees (dry run by default)
 worktrees:
 	@bash scripts/prune-worktrees.sh
@@ -386,6 +401,27 @@ reconcile:
 ## named mutation (a session TTL below the rung heartbeat is refused)
 lease-policy:
 	@bash scripts/check-lease-policy.sh
+
+
+# isolation-landed — the ticket-trailer rule over LANDED history (issue #287), and the
+# wire that issue #1542 CONFIRMED rather than added. The check is wired into `make verify`
+# by the DISCOVERY layer (`scripts/discover-checks.sh`, #698), which appends every
+# `scripts/check-*.sh` that is not disabled by name in `scripts/check-denylist.txt`; it is
+# therefore absent from this file and from `scripts/verify.sh`'s explicit `checks=()`
+# array BY DESIGN, and `grep -n check-isolation-landed Makefile` returning nothing is the
+# EXPECTED result — not evidence of dead code. A hand-added `verify.sh` entry would be a
+# DUPLICATE registration of the same check name, which the gate of record refuses by name.
+# The sibling targets above (session-isolation, reconcile, lease-policy) are hand-run
+# conveniences, not the wire; every one of them would be discovered with or without them.
+# Measured at b895e396 (2026-09-20, issue #1542): `discover_check_scripts` yields
+# `isolation-landed|bash scripts/check-isolation-landed.sh` (position 95 of 189); it is
+# absent from the denylist; `scripts/check-gate-coverage.sh`'s #698 marker rule reports it
+# `check scripts WIRED=194 UNWIRED=0` (rc 0); and the check itself exits 0 —
+# `isolation-enforce: OK — 39 recorded legacy, 0 unrecorded, 0 stale in HEAD`. Its
+# negative control is real and was reproduced outside the check's own harness: a synthetic
+# landed commit carrying no ticket trailer is refused rc 1 naming
+# `commit-missing-ticket-trailer`, while its compliant twin in the same repo shape is
+# accepted rc 0.
 
 ## paperclip-gap-analysis — sourced paperclip.ing gap analysis (issue #368): the
 ## GR-10 provenance, the four-way namesake disambiguation, the six capability
@@ -844,7 +880,7 @@ land:
 ## `make verify`/scripts/verify.sh itself — that file is held by an open PR
 ## (#1127) at the time this target was added; this is the seam a follow-up
 ## hooks scripts/verify.sh into once #1127 lands.
-##   make verify && make master-attestation
+##   make verify-attestation && make master-attestation
 master-attestation:
 	@python3 governance/landing/cli.py write-master-attestation --attestation "$(ATTESTATION)"
 

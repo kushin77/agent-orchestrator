@@ -341,6 +341,60 @@ def test_unmeasurable_age_is_treated_as_old_fail_closed(scratch_repo: Path, tmp_
     assert age_worktree is None
 
 
+def test_a_transient_git_failure_is_retried_and_recovers(scratch_repo: Path, monkeypatch):
+    """#1620: on a busy box, a single `git log` call for a branch can race a
+    concurrent ref-write from another session and come back empty/nonzero even
+    though the branch is perfectly measurable. `_branch_age_seconds` must
+    retry before fail-closing to OLD — a real, present branch must still be
+    classified as recently-touched (young), not lost to one bad race."""
+    from governance.reconcile import real_tree_baseline as rtb
+
+    real_run = subprocess.run
+    calls = {"n": 0}
+
+    def flaky_run(cmd, **kwargs):
+        if cmd[:2] == ["git", "-C"] and "log" in cmd:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                # simulate the race: git ran, but returned nothing usable
+                return subprocess.CompletedProcess(cmd, returncode=0, stdout="", stderr="")
+        return real_run(cmd, **kwargs)
+
+    monkeypatch.setattr(rtb, "subprocess", subprocess)
+    monkeypatch.setattr(subprocess, "run", flaky_run)
+    monkeypatch.setattr(rtb, "_BRANCH_AGE_RETRY_BACKOFF", (0.0, 0.0, 0.0))
+    try:
+        age = rtb._branch_age_seconds(scratch_repo, "issue-orphan-1", at=time.time())
+    finally:
+        monkeypatch.setattr(subprocess, "run", real_run)
+
+    assert calls["n"] >= 2, "the retry never re-tried the git call"
+    assert age is not None
+    assert age < 3600, f"a just-created branch measured as {age}s old — the retry recovered a stale value"
+
+
+def test_exhausted_retries_still_fail_closed_to_old(scratch_repo: Path, monkeypatch):
+    """The retry absorbs a transient loss; it must never turn into a longer
+    license to call a genuinely unmeasurable branch 'young'."""
+    from governance.reconcile import real_tree_baseline as rtb
+
+    real_run = subprocess.run
+
+    def always_empty(cmd, **kwargs):
+        if cmd[:2] == ["git", "-C"] and "log" in cmd:
+            return subprocess.CompletedProcess(cmd, returncode=0, stdout="", stderr="")
+        return real_run(cmd, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", always_empty)
+    monkeypatch.setattr(rtb, "_BRANCH_AGE_RETRY_BACKOFF", (0.0, 0.0, 0.0))
+    try:
+        age = rtb._branch_age_seconds(scratch_repo, "issue-orphan-1", at=time.time())
+    finally:
+        monkeypatch.setattr(subprocess, "run", real_run)
+
+    assert age is None
+
+
 # --- vanished-between-list-and-measure (#885 follow-up) ---------------------
 #
 # Concurrent lane churn during `make verify` can delete a worktree/branch

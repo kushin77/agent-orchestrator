@@ -27,6 +27,14 @@ set -uo pipefail
 
 self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# #1620: AO_GATE_VENUE distinguishes a per-lane `make verify` (default —
+# box-wide, concurrency-sensitive counts are advisory) from the serial
+# post-merge master-attestation run (AO_GATE_VENUE=attestation — the same
+# counts are enforced for real). Read per-call (inside check_cap), not once
+# here, so a self-test can exercise both venues in the same process. See
+# governance/reconcile/real_tree_baseline.py and check-reconcile-orphans.sh
+# for the same distinction.
+
 self_test=0
 for arg in "$@"; do
   case "$arg" in
@@ -190,9 +198,21 @@ check_cap() { # check_cap <repo> — prints findings, returns 0/1/2 per the cont
   fi
 
   local rc=0
+  local venue="${AO_GATE_VENUE:-lane}"
   if [ "$wt_count" -gt "$cap" ]; then
     excess=$((wt_count - cap))
-    echo "check-worktree-cap: NOT-OK — worktree-cap-exceeded:$wt_count/$cap" >&2
+    # #1620: the count is box-wide state — every concurrent session's
+    # worktrees, not just this one's — so it is non-deterministic under
+    # concurrent load. Blocking on it in a LANE venue (a PR's own `make
+    # verify`) means an unrelated diff can fail purely on fleet timing;
+    # the MASTER-ATTESTATION venue (AO_GATE_VENUE=attestation, run serially
+    # post-merge) still enforces it for real.
+    if [ "$venue" = "attestation" ]; then
+      echo "check-worktree-cap: NOT-OK — worktree-cap-exceeded:$wt_count/$cap" >&2
+      rc=1
+    else
+      echo "check-worktree-cap: NOTE — worktree-cap-exceeded:$wt_count/$cap (advisory in lane venue, #1620; blocking in AO_GATE_VENUE=attestation)" >&2
+    fi
     echo "check-worktree-cap: oldest unexplained worktree(s) (excess $excess):" >&2
     # Oldest-first by mtime of the worktree's own .git file/dir, naming ones
     # that are NOT claimed by an open lane record — those are "explained".
@@ -205,7 +225,6 @@ check_cap() { # check_cap <repo> — prints findings, returns 0/1/2 per the cont
       grep -qxF -- "$wtpath" "$claimed_file" 2>/dev/null && continue
       printf '  %s\n' "$wtpath" >&2
     done
-    rc=1
   fi
   rm -f "$claimed_file"
 
@@ -243,11 +262,22 @@ self_test() {
   for i in 1 2 3 4; do
     git -C "$over" worktree add -q --detach "$over/.wt-$i" master >/dev/null 2>&1 || true
   done
-  out="$(check_cap "$over" 2>&1)"; rc=$?
-  if [ "$rc" -eq 1 ] && [[ "$out" == *"worktree-cap-exceeded:"* ]]; then
-    ok "worktree-cap-exceeded fires by name when worktrees exceed lanes+slack"
+  # Text, not rc, is what proves the downgrade: on a box whose own crontab
+  # has no prune-worktrees.sh line, `reaper-unscheduled` legitimately sets
+  # rc=1 regardless of venue (it is a static finding, never advisory, #1620)
+  # — that must not be conflated with whether worktree-cap-exceeded itself
+  # was downgraded to a NOTE.
+  out="$(check_cap "$over" 2>&1)"
+  if [[ "$out" == *"NOTE — worktree-cap-exceeded:"* ]] && [[ "$out" != *"NOT-OK — worktree-cap-exceeded:"* ]]; then
+    ok "worktree-cap-exceeded is advisory (NOTE, not NOT-OK) in the default lane venue (#1620)"
   else
-    bad "worktree-cap-exceeded did not fire (rc=$rc): $out"
+    bad "worktree-cap-exceeded was not advisory in the lane venue: $out"
+  fi
+  outa="$(AO_GATE_VENUE=attestation check_cap "$over" 2>&1)"; rca=$?
+  if [ "$rca" -eq 1 ] && [[ "$outa" == *"NOT-OK — worktree-cap-exceeded:"* ]]; then
+    ok "worktree-cap-exceeded still fires by name (rc=1) in AO_GATE_VENUE=attestation (#1620)"
+  else
+    bad "worktree-cap-exceeded did not fire in the attestation venue (rc=$rca): $outa"
   fi
 
   # --- CANNOT-ASSESS: .fleet/lanes unreadable --------------------------------
@@ -328,9 +358,9 @@ YAML
   for i in 1 2 3 4; do
     git -C "$expired_ratchet" worktree add -q --detach "$expired_ratchet/.wt-$i" master >/dev/null 2>&1 || true
   done
-  out5="$(check_cap "$expired_ratchet" 2>&1)"; rc5=$?
+  out5="$(AO_GATE_VENUE=attestation check_cap "$expired_ratchet" 2>&1)"; rc5=$?
   if [ "$rc5" -eq 1 ] && [[ "$out5" == *"worktree-cap-exceeded:"* ]] && [[ "$out5" != *"worktree-cap-ratchet:"* ]]; then
-    ok "an expired ratchet is ignored — the declared slack is the only cap, and it reds"
+    ok "an expired ratchet is ignored — the declared slack is the only cap, and it reds (attestation venue)"
   else
     bad "an expired ratchet still excused the pile (rc=$rc5): $out5"
   fi
