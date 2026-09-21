@@ -28,7 +28,7 @@ ATTESTATION ?= .verify/attestation.json
 .PHONY: help verify lint gate merge-gate qa-loop tests e2e fleet-parity \
         shell-syntax python-syntax yaml-lint json-lint docs-lint gate-coverage codeowners squash-message chronological-dispatch \
 issue-claims issue-template fleet-channel finops-chooser fleet-contract fleet-runbook fleet-vocabulary session-isolation github-lifecycle reconcile lease-policy fleet-state knowledge-index knowledge-index-build erp-module paperclip-gap-analysis paperclip-integration cross-reference cross-repo-boundary audit-read-model gateway-catalog-parity guardrail-controls paperclip-adapter agent-identity-parity paperclip-canonical-module paperclip-auth paperclip diagrams codeidx monitoring-declaration capability-registers chat \
-        brain-profile conformance lessons ticket pmo secrets feature-flags cloudbuild terraform tf-fmt surface-class \
+        brain-profile conformance lessons ticket pmo pmo-dispatch secrets feature-flags cloudbuild terraform tf-fmt surface-class \
         tf-validate shellcheck gitleaks pre-commit install-hooks worktrees scratch-safety web-image-dryrun \
         remediation remediation-scan remediation-dispatch \
         capacity-gate tagging epic-focus capability-drift conformance-change-set board-gate ao-ssh-access \
@@ -156,9 +156,31 @@ help:
 verify:
 	@bash scripts/verify.sh verify
 
+## verify-attestation — the same gate of record, but with AO_GATE_VENUE=attestation
+## (#1620): check-worktree-cap / check-reconcile-orphans stop treating
+## orphan-branch / orphan-issue-lane / worktree-cap-exceeded as advisory (a
+## bare `make verify` reports them as NOTE, since they measure box-wide state
+## shared with every OTHER concurrent session on the machine, not this
+## checkout's own diff) and enforce them for real. Use this — never plain
+## `make verify` — right before `make master-attestation`, since that
+## attestation is meant to speak for the WHOLE box's hygiene, not just one
+## lane's diff.
+##   make verify-attestation && make master-attestation
+verify-attestation:
+	@AO_GATE_VENUE=attestation bash scripts/verify.sh verify
+
+.PHONY: verify-attestation
+
 ## worktrees — reclaim stale lane worktrees (dry run by default)
 worktrees:
 	@bash scripts/prune-worktrees.sh
+
+## finops — CFO office KPI gate: injected-prompt byte ceiling
+## (registry/personas/offices/cfo/cost-policy.yaml). Auto-discovered into
+## `make verify` as scripts/check-finops-kpi.sh; this target lets it run
+## standalone (docs/cfo/PROMPT-REDUCTION-PLAN.md).
+finops:
+	@bash scripts/check-finops-kpi.sh
 
 ## repo-settings — read back the live repo merge-message policy against the
 ## declaration (governance/platform/repo-settings.yaml, issue #1138); pass
@@ -519,6 +541,19 @@ ticket:
 ## that disagrees with the graph, a rollup from a stale cache) for real
 pmo:
 	@bash scripts/check-pmo-rollup.sh
+
+## pmo-dispatch — the priority/dispatch engine over the same ticket graph
+## (issue #403 follow-on): `priority` derives one explainable score per open
+## task (P-level + aging tier + blocking fan-out + unblocked-readiness + owner
+## capacity, every term cited to its ledger source in governance/pmo/policy.yaml,
+## an SLA term with no committed ledger carried as `unsourced` rather than
+## fabricated); `dispatch` turns the top of that order into a lane-collision-free
+## wave, each task attached to an SME profile, model tier and Agent brief
+## skeleton. Read-only by default — `--apply` (never run here) is the only path
+## that writes anything, and it writes one idempotent PMO comment + label.
+pmo-dispatch:
+	@python3 governance/pmo/cli.py priority
+	@python3 governance/pmo/cli.py dispatch --wave 1
 
 ## conformance — CMR class/pattern/template enforcement (issue #140): every
 ## milestoned issue must be classified, and the class it declares must hold
@@ -917,7 +952,7 @@ land:
 ## `make verify`/scripts/verify.sh itself — that file is held by an open PR
 ## (#1127) at the time this target was added; this is the seam a follow-up
 ## hooks scripts/verify.sh into once #1127 lands.
-##   make verify && make master-attestation
+##   make verify-attestation && make master-attestation
 master-attestation:
 	@python3 governance/landing/cli.py write-master-attestation --attestation "$(ATTESTATION)"
 

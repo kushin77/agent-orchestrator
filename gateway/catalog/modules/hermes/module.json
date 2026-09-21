@@ -6,9 +6,11 @@
   "source": {
     "repo": "kushin77/hermes-agents",
     "default_branch": "master",
-    "path": "models/model_tiering.py"
+    "path": "models/model_tiering.py",
+    "note": "Naming (ADR-0033): the real repository is `kushin77/hermes-agents` (plural). `hermes-agent` (singular) is only the docker-compose service/container name inside that repo (docker-compose.yml services.hermes-agent, port 9501), not a repository — `kushin77/hermes-agent` returns HTTP 404. This `source.repo` intentionally points at the plural repo from which the adapter harvests its routing vocabulary."
   },
   "type": "service",
+  "status": "retired",
   "class": ["model-gateway", "provider", "hermes", "local"],
   "versions": {
     "latest": "v1.0.0"

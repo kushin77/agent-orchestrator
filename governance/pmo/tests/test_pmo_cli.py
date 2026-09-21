@@ -97,3 +97,26 @@ def test_now_overrides_the_clock(root, capsys):
 def test_against_a_missing_view_is_cannot_assess(root, tmp_path):
     write_board(root, [issue(10)])
     assert run(["raid", "--root", str(root), "--check", "--against", str(tmp_path / "nope.json")]) == 2
+
+
+def test_priority_and_dispatch_run_offline_and_tri_state(root):
+    write_board(root, [issue(10, labels=["priority:P0"])])
+    assert run(["priority", "--root", str(root), "--json"]) == 0
+    assert run(["dispatch", "--root", str(root), "--json", "--wave", "1"]) == 0
+
+
+def test_by_cluster_falls_back_with_no_clusters_json(root, capsys):
+    write_board(root, [issue(10, labels=["priority:P0"])])
+    assert run(["dispatch", "--root", str(root), "--json", "--by-cluster"]) == 0
+    document = json.loads(capsys.readouterr().out)
+    assert document["by_cluster"] is False
+
+
+def test_by_cluster_with_a_schema_invalid_clusters_json_is_cannot_assess(root, capsys):
+    write_board(root, [issue(10)])
+    target = root / "governance" / "pmo"
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "clusters.json").write_text('{"generated_at": "x"}', encoding="utf-8")  # missing required keys
+    rc = run(["dispatch", "--root", str(root), "--json", "--by-cluster"])
+    assert rc == 2
+    assert "CANNOT-ASSESS" in capsys.readouterr().err

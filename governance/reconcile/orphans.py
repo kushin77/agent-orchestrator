@@ -116,6 +116,44 @@ BUDGET_EXCEEDED = "orphan-budget-exceeded"
 #: Where the budget is declared, relative to the repository root.
 BUDGET_PATH = "governance/reconcile/orphan-budget.yaml"
 
+#: Kinds whose budget-exceeded finding is advisory in the default "lane"
+#: venue (#1620, #1655): each is counted against the WHOLE box's state
+#: (every concurrent session's worktrees/branches/lane records/open PRs),
+#: not this checkout's own diff, so it is non-deterministic under concurrent
+#: load — measured swinging orphan-branch 107->97, orphan-issue-lane 44->45
+#: and orphan-worktree 46->54 between two runs with no action taken in
+#: between, and orphan-pr climbing 20->29->30 across ~20 minutes of ordinary
+#: fleet churn (opening/closing PRs, including the merge trains themselves —
+#: see #1655) with none of it stale or closeable. orphan-pr joined this set
+#: 2026-09-20 by explicit owner decision: it is the same box-wide census as
+#: its three siblings, not a per-artifact fact — a PR without a `lane:` line
+#: is common for perfectly live work (#1655 is the fix for THAT gap).
+#: orphan-directive is the one kind that stays blocking in every venue: one
+#: directive names one closed issue, a fact this checkout can settle on its
+#: own without racing any other session.
+ADVISORY_IN_LANE_VENUE = (ORPHAN_WORKTREE, ORPHAN_BRANCH, ORPHAN_ISSUE_LANE, ORPHAN_PR)
+
+
+def venue_classify(exceeded: Iterable[str], venue: str) -> tuple[list[str], list[str]]:
+    """Split ``exceeded`` (``orphan-budget-exceeded:<kind>:<n>/<budget>`` strings)
+    into ``(blocking, advisory)`` for the given ``AO_GATE_VENUE`` (#1620).
+
+    ``venue == "attestation"`` blocks on everything (the serial, post-merge
+    run this repo's box-wide hygiene is actually enforced by); any other
+    venue (the default, "lane") downgrades :data:`ADVISORY_IN_LANE_VENUE`
+    kinds to advisory, since a single PR's `make verify` measures the whole
+    box, not its own diff.
+    """
+    blocking: list[str] = []
+    advisory: list[str] = []
+    for name in exceeded:
+        kind = name.split(":")[1] if name.count(":") >= 1 else ""
+        if venue != "attestation" and kind in ADVISORY_IN_LANE_VENUE:
+            advisory.append(name)
+        else:
+            blocking.append(name)
+    return blocking, advisory
+
 #: The line a PR body carries to bind itself to a lane (#1254 step 5).
 LANE_LINE = re.compile(r"^\s*lane:\s*([0-9a-z][0-9a-z_-]{5,63})\s*$", re.IGNORECASE | re.MULTILINE)
 

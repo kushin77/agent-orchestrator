@@ -14,6 +14,47 @@ the decision to adopt, adapt, or ignore is sourced rather than assumed. It is th
 same discipline as the sibling terminal-vs-web inventory in
 [`FLEET-DASHBOARD-GAP-ANALYSIS.md`](FLEET-DASHBOARD-GAP-ANALYSIS.md).
 
+## Current status — what exists today, and what does not (measured 2026-09-20)
+
+**Read this before the verdicts below.** This document is a **fork-map** of
+upstream capability *families* against the fleet's own primitives. It is **not**
+a statement that upstream paperclip.ing is integrated, running, or doing anything
+on our behalf. The integration *mode* is decided in
+[ADR-0013](decision-records/ADR-0013-paperclip-ing-integration.md), and that record
+is explicit about how narrow it is: it **"edits no code, stands up no process, and
+changes no runtime behaviour"**, and it says of the seam lane that
+**"#370 freezes the seam, it does not run the process"**.
+
+In plain language, measured on 2026-09-20:
+
+- **The flag is OFF.** `enable_paperclip` is declared with `default = false` in
+  [`../infra/terraform/variables.tf`](../infra/terraform/variables.tf) and recorded
+  as `services.paperclip` (`default: off`) in
+  [`../infra/feature-flags/registry.yaml`](../infra/feature-flags/registry.yaml).
+- **No runtime resource is deployed.** The runtime is a **count-gated** service
+  ([`../infra/paperclip/terraform/main.tf`](../infra/paperclip/terraform/main.tf)),
+  so while the flag is closed a plan shows **zero resources** and the deploy
+  trigger stays disabled — **no container is running**. The runbook says the same
+  from the operations side: [`PAPERCLIP-ING-DEPLOY.md`](PAPERCLIP-ING-DEPLOY.md) §1.
+- **What does exist in this repository is declaration and offline-verified code,
+  not a live service** — the persona and seed artifacts, the gateway provider, the
+  guardrail bundle and the boundary adapter under `integrations/paperclip/`, each
+  exercised by its own gate offline. None of it is reached from a live path today.
+- **The scope is three contracts, and nothing more.** Per ADR-0013 the seam is
+  exactly the heartbeat, ticket and budget contracts frozen in
+  [`PAPERCLIP-ING-INTEGRATION.md`](PAPERCLIP-ING-INTEGRATION.md). Paperclip does
+  **not** execute code and does **not** dispatch tasks; dispatch, claims, budgets
+  and audit stay authoritative in `fleet/` and `governance/`.
+
+Whether to promote the flag at all is a separate, still-open decision (issue
+[#1515](https://github.com/kushin77/agent-orchestrator/issues/1515)); nothing here
+pre-empts it.
+
+> **Verdict legend, read carefully.** In the capability map below,
+> **ALREADY-SHIPPED** describes the *fleet's* capability for that family — a
+> primitive this repository already owns — and never upstream paperclip.ing being
+> integrated here. The map measures a *capability* gap, not a deployment status.
+
 ## Upstream facts (as retrieved)
 
 | Fact | Value |
@@ -53,6 +94,9 @@ single most likely source of a wrong adoption call, so they are named here:
 
 The boundary between (1) and (2) is recorded in
 [`decision-records/ADR-0012-hermes-paperclip-boundary.md`](decision-records/ADR-0012-hermes-paperclip-boundary.md).
+The authoritative-artifact resolution for all four names — and the paired
+three-way "Hermes" disambiguation — is
+[`decision-records/ADR-0033-paperclip-hermes-naming-resolution.md`](decision-records/ADR-0033-paperclip-hermes-naming-resolution.md).
 
 ## Capability family map
 

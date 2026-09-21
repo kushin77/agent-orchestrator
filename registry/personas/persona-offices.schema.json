@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:agent-orchestrator:registry:persona-offices.schema:v1",
+  "title": "PersonaOffices",
+  "description": "Declarative office layer over the org chart (purebliss single-tenant org: CEO/CTO/CFO/PMO). Each office binds a head persona (a role node in the tenant's org-chart.yaml), its member SME personas, its agent profiles (from an AgentPack team), its prompt module refs, a monthly budget (summed by reference from the org chart, never a bare literal) and its fleet/routing group. registry/personas/registry.py validate_offices() cross-checks every reference against the live persona library, the org chart and the routing config.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["officesSchema", "id", "tenant", "version", "orgChartRef", "offices"],
+  "properties": {
+    "officesSchema": { "type": "string", "const": "persona-offices/v1" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "tenant": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "orgChartRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path (repo-relative) to the org-chart.yaml this office layer sits on top of."
+    },
+    "offices": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/office" }
+    }
+  },
+  "definitions": {
+    "office": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "headPersona", "memberPersonas", "agentProfiles", "promptRefs", "monthlyBudgetUsd", "budgetSource", "fleetPack", "routingGroup", "moduleDir"],
+      "properties": {
+        "id": { "type": "string", "enum": ["ceo", "cto", "cfo", "pmo"] },
+        "title": { "type": "string", "minLength": 1 },
+        "headPersona": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Persona id of the office head; must equal a role node id in orgChartRef."
+        },
+        "memberPersonas": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "SME/specialist persona ids that report into this office (per persona-card.schema.json's reportsTo enum)."
+        },
+        "agentProfiles": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "AgentProfile ids (from the fleetPack) this office dispatches work through."
+        },
+        "moduleDir": {
+          "type": "string",
+          "pattern": "^registry/personas/offices/(ceo|cto|cfo|pmo)$",
+          "description": "The office's directory module (charter.yaml, abilities.yaml, reports.yaml and, where declared, delivery-lifecycle.yaml/cost-policy.yaml), validated against registry/personas/offices/schema/office.schema.json (CFO's charter.yaml is the one documented exception; see that schema's description)."
+        },
+        "promptRefs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9_-]+/[a-z0-9_-]+@v[0-9]+$" }
+        },
+        "monthlyBudgetUsd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Must equal the sum of monthlyBudgetCapUsd of headPersona + every memberPersona role declared in the org chart / registry (source of truth stays the org chart; this is a computed, verified restatement, not a second literal)."
+        },
+        "budgetSource": {
+          "type": "string",
+          "const": "registry/personas/org-charts/purebliss.yaml + gateway/finops/budgets.yaml roles.capSource",
+          "description": "Fixed pointer documenting where monthlyBudgetUsd is derived from, so no office can silently redefine a cap the org chart owns."
+        },
+        "fleetPack": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+@[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "routingGroup": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

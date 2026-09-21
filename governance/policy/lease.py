@@ -100,6 +100,25 @@ DIRECTIVE_LIFETIME_SECONDS = DIRECTIVE_LIFETIME_HOURS * 3600
 #: is explicitly baselined.
 REAL_TREE_GRACE_HOURS = 24
 
+#: How long a claim on a LIVE RESOURCE — a thing that is not a file — is held
+#: (issue #1545), declared PER RESOURCE TYPE. An issue claim could use one
+#: number because a lane's shape does not change with what it edits; a
+#: resource's does, and the resource types differ in how long a legitimate
+#: holder mutates them. A `terraform apply` against shared state can outlive
+#: ten minutes, and a lease that expires mid-apply is a SECOND writer on that
+#: state — the exact failure a resource lease exists to prevent. So this is a
+#: mapping read by `governance/dispatch/resource_lease.py`, never one global
+#: number: shortening it for a one-shot phase must not shorten the state lease.
+RESOURCE_CLAIM_TTL_SECONDS: dict[str, int] = {
+    "tf-state": 4 * 3600,
+    "cloudflare-phase": 3600,
+}
+
+#: The TTL for a resource type with NO declared entry above. It is bounded
+#: rather than "forever": an unknown resource type still releases, and it is
+#: declared here so the number a consumer reads is this one and not its own.
+RESOURCE_CLAIM_TTL_DEFAULT_SECONDS = 3600
+
 
 @dataclass(frozen=True)
 class Lease:
@@ -168,6 +187,27 @@ LEASES: tuple[Lease, ...] = (
         unit="hours",
         owner="fleet/channel.py",
         why="a directive the sister never consumes is abandoned after this long",
+    ),
+    Lease(
+        key="resource_claim_default",
+        value=RESOURCE_CLAIM_TTL_DEFAULT_SECONDS,
+        unit="seconds",
+        owner="governance/dispatch/resource_lease.py",
+        why="how long a claim on a resource type with no declared TTL is held",
+    ),
+    Lease(
+        key="resource_claim_cloudflare_phase",
+        value=RESOURCE_CLAIM_TTL_SECONDS["cloudflare-phase"],
+        unit="seconds",
+        owner="governance/dispatch/resource_lease.py",
+        why="how long a live-resource claim on one Cloudflare phase is held",
+    ),
+    Lease(
+        key="resource_claim_tf_state",
+        value=RESOURCE_CLAIM_TTL_SECONDS["tf-state"],
+        unit="seconds",
+        owner="governance/dispatch/resource_lease.py",
+        why="how long a live-resource claim on terraform state is held (an apply outlives a phase)",
     ),
 )
 
@@ -242,6 +282,20 @@ INVARIANTS: tuple[Invariant, ...] = (
         right="claim_ttl",
         why="the authorisation must outlive the lease it authorises",
     ),
+    Invariant(
+        name="resource-claim-outlives-the-session-ttl",
+        left="resource_claim_default",
+        relation=">",
+        right="session_ttl",
+        why="a resource lease must not look stale while the lane holding it is still beating",
+    ),
+    Invariant(
+        name="resource-claim-tf-state-outlives-a-phase",
+        left="resource_claim_tf_state",
+        relation=">",
+        right="resource_claim_cloudflare_phase",
+        why="a terraform apply on shared state outlives a one-shot phase; a state lease shorter than a phase lease is the mid-apply lease loss (#1545)",
+    ),
 )
 
 
@@ -282,6 +336,16 @@ MUTATIONS: tuple[Mutation, ...] = (
         override={"directive_lifetime": 3600.0},
         invariant="directive-lifetime-covers-claim-ttl",
     ),
+    Mutation(
+        name="resource-claim-default-below-session-ttl",
+        override={"resource_claim_default": 60.0},
+        invariant="resource-claim-outlives-the-session-ttl",
+    ),
+    Mutation(
+        name="resource-claim-tf-state-below-a-phase",
+        override={"resource_claim_tf_state": 600.0},
+        invariant="resource-claim-tf-state-outlives-a-phase",
+    ),
 )
 
 
@@ -320,6 +384,8 @@ CONSUMERS: tuple[tuple[str, str | None, str], ...] = (
     ("governance/dispatch/model.py", None, "CLAIM_TTL_HOURS"),
     ("governance/dispatch/snapshot.py", "DEFAULT_STALENESS_MINUTES", "SNAPSHOT_STALENESS_MINUTES"),
     ("governance/reconcile/real_tree_baseline.py", "DEFAULT_GRACE_HOURS", "REAL_TREE_GRACE_HOURS"),
+    ("governance/dispatch/resource_lease.py", "RESOURCE_CLAIM_TTL_SECONDS", "RESOURCE_CLAIM_TTL_SECONDS"),
+    ("governance/dispatch/resource_lease.py", "RESOURCE_CLAIM_TTL_DEFAULT_SECONDS", "RESOURCE_CLAIM_TTL_DEFAULT_SECONDS"),
 )
 
 #: Modules that must read the policy *through* another module's constant.

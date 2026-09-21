@@ -91,9 +91,23 @@ Gate-changing: <no | yes — paths>
 
 ## Evidence
 
+Two outputs, each by its real command: the acceptance criteria the issue named,
+and a negative control proving the same check can FAIL. A check whose pass and
+fail paths collapse into one exit code is a formality (AGENTS.md golden rule 8),
+so the negative control is the half that makes the acceptance half mean anything.
+
+### Acceptance output
+
 ```
-$ <the exact commands you ran, in order>
-<their real output, pasted — including any failure>
+$ <the exact acceptance command the issue named>
+<its real output, pasted — a summary or a claimed count is not evidence>
+```
+
+### Negative-control output
+
+```
+$ <the same check against a deliberately broken input>
+<its real output, pasted, showing the refusal and naming what it refused>
 ```
 
 ## AI-assistance
@@ -141,12 +155,21 @@ issue #1001, declared as platform policy by issue #1138
 `bash scripts/repo-settings.sh verify`): the squash commit message on `master`
 IS this PR's body ("<title> (#N)\n\n<body>"), never the branch's own commit
 trailers. That means THIS is the only place the trailer paragraph can
-still be lost before it lands. Leave the line below as the body's FINAL
+still be lost before it lands. Leave BOTH lines below as the body's FINAL
 paragraph (replace `<n>` with this PR's own issue number; do not add anything
-after it) so the composed squash message keeps the ticket reference inside a
-trailing trailer block. Verify before merging with:
+after them) so the composed squash message keeps the ticket reference inside a
+trailing trailer block AND the auto-close keyword that actually closes the
+issue.
+
+Both lines are required, and issue #1266 is why: `Refs` alone satisfies the
+ticket-trailer rule, but `scripts/check-squash-message.sh` answers
+`closes-missing:<n>` when the trailing block carries no bare `Closes #<n>` (or
+another GitHub auto-close keyword naming the same number) -- measured on the
+first pull request opened from this template after issue #1533 updated it.
+Verify before merging with:
 
     bash scripts/check-squash-message.sh --pr <this PR's number>
 -->
 
+Closes #<n>
 Refs kushin77/agent-orchestrator#<n>
