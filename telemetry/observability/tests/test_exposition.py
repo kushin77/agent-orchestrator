@@ -467,17 +467,25 @@ class TestTenantScoping:
 
 
 # --------------------------------------------------------------------------- #
-# GR-5 — the flag gate
+# AO-GR-6 — the flag gate. The "flag-gated OFF by default" rule was REVERSED
+# by the owner decision of 2026-09-21 (issue #1789): new capabilities ship
+# ENABLED by default. Authority: docs/rca/2026-09-21-gr5-enabled-by-default.md.
+# The shipped registry now declares this surface `default: on`, so the gate
+# asserts the shipped default is ON — and test_the_reader_fails_closed below
+# still proves a missing/broken declaration is refused rather than treated as on.
 # --------------------------------------------------------------------------- #
 class TestFlagGate:
-    def test_the_registry_declares_the_surface_off(self):
-        assert read_surface_default(REPO_ROOT) == "off"
-        assert surface_enabled(REPO_ROOT) is False
+    def test_the_registry_declares_the_surface_on(self):
+        # Owner decision 2026-09-21 (#1789,
+        # docs/rca/2026-09-21-gr5-enabled-by-default.md): new capabilities ship
+        # ENABLED by default, so the shipped registry says on.
+        assert read_surface_default(REPO_ROOT) == "on"
+        assert surface_enabled(REPO_ROOT) is True
         import yaml
 
         document = yaml.safe_load((Path(REPO_ROOT) / REGISTRY_RELATIVE).read_text())
         entry = document["surfaces"][EXPOSITION_SURFACE]
-        assert entry["default"] in (False, "off")
+        assert entry["default"] in (True, "on")
         assert entry["promoted"] is False
         assert entry["service"] == "telemetry"
         assert entry["tf_flag"] == "enable_telemetry"
@@ -508,7 +516,7 @@ class TestFlagGate:
         built = TelemetryExposition(
             repo_root=REPO_ROOT, environ={ENV_ENDPOINT: "https://plane.example/otlp"}
         )
-        assert built.enabled is False  # the shipped registry says off
+        assert built.enabled is True  # the shipped registry says on (2026-09-21 policy, #1789)
 
     def test_promoting_the_flag_enables_the_push(self, tmp_path: Path):
         registry = tmp_path / "registry.yaml"
