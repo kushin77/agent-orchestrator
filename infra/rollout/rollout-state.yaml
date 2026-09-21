@@ -9,6 +9,14 @@
 # a real promotion flips a flag here through the automated pipeline and the
 # apply path deploys the now-enabled surface. Every transition is appended to
 # an audit log.
+#
+# Each flag that mirrors a not-yet-promoted registry entry carries the SAME
+# `promotion_issue:` / `posture: hold` field as its registry counterpart, so
+# the two declarations cannot drift apart (issue #1618). Flags that mirror a
+# registry entry already `promoted: true` (ci_cd.*, surfaces.fleet_projection,
+# surfaces.remote_control, surfaces.operator_terminal) and rollout-native flags
+# (rollout.pipeline, rollout.governance) carry no owner field: their promotion
+# is recorded in the registry, or they are owned by the rollout lane itself.
 
 schema_version: 1
 default_policy: "off"
@@ -24,34 +32,42 @@ flags:
     targeted: []
   services.registry:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   services.gateway:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   services.engine:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   services.guardrails:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   services.telemetry:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   services.identity:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   services.portal:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   services.web:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   # Workbook surfaces (issue #644, workbook-13): one promotable flag per new
@@ -64,22 +80,27 @@ flags:
   # registry row.
   services.org_chart:
     stage: "off"
+    promotion_issue: "#1521"
     rollout_pct: 0
     targeted: []
   services.skill_studio:
     stage: "off"
+    promotion_issue: "#1521"
     rollout_pct: 0
     targeted: []
   services.task_board:
     stage: "off"
+    promotion_issue: "#1522"
     rollout_pct: 0
     targeted: []
   services.mcp_outbound:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   services.sandbox_runtime:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   # The ERP module's portal surface (ERP-07, issue #652). The registry row is
@@ -89,10 +110,12 @@ flags:
   # promoted module could be taken dark only by hand.
   services.erp_module:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   services.erp_webhooks_bridge:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   # The AgentConsole (issue #802, child of EPIC #800). The registry row declares
@@ -132,6 +155,7 @@ flags:
   # keeping the two declarations from drifting apart.
   surfaces.erp_module:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   # Edge fronting for ai.purebliss.app (issue #935, child of #731). The
@@ -141,6 +165,7 @@ flags:
   # (`unknown flag 'surfaces.edge_cutover' (not declared in rollout state)`).
   surfaces.edge_cutover:
     stage: "off"
+    posture: hold
     rollout_pct: 0
     targeted: []
   rollout.pipeline:
