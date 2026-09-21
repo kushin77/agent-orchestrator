@@ -4,13 +4,19 @@
 #
 # ADR-0013 adopts the upstream Paperclip CLI as an external operator surface
 # across a process boundary. Issue #411 stands that process up **beside** the
-# control plane as a declaration-only, flag-gated-OFF deployment. A deployment
-# that nothing validates is a hope, not a check (no-false-green doctrine,
-# GR-12), so this gate fails, BY NAME, when any load-bearing part is missing:
+# control plane. The flag-default rule was REVERSED by the owner decision of
+# 2026-09-21 (issue #1789): new capabilities ship ENABLED by default
+# (docs/rca/2026-09-21-gr5-enabled-by-default.md). A deployment that nothing
+# validates is a hope, not a check (no-false-green doctrine, GR-12), so this
+# gate fails, BY NAME, when any load-bearing part is missing:
 #
 #   * the flag   — infra/terraform/variables.tf declares `enable_paperclip`
-#                  defaulting to false, and infra/feature-flags/registry.yaml
-#                  records services.paperclip defaulting OFF (GR-5);
+#                  defaulting to true, and infra/feature-flags/registry.yaml
+#                  records services.paperclip defaulting ON, the two in
+#                  agreement (owner decision 2026-09-21; #1789). A
+#                  registry/terraform disagreement — one ON, one OFF — is the
+#                  "ambiguous half-on" state the decision prohibits and is
+#                  refused BY NAME;
 #   * the pin    — infra/paperclip/release.yaml pins an exact upstream release
 #                  (never a floating `latest`) with its release and retrieval
 #                  dates and the MIT license (GR-10 provenance);
@@ -23,8 +29,12 @@
 # The gate never touches the network. It proves the health probe is REAL by
 # exercising it offline both ways — a live healthy server passes, an HTTP error
 # fails, and an absent process fails — and it runs its own negative control:
-# three scratch copies drop the flag, the pin and the health probe in turn, and
-# each must be refused BY NAME. A check that cannot fail is a formality.
+# four scratch copies drop the flag, the pin, the health probe and the
+# registry/terraform agreement in turn, and each must be refused BY NAME. The
+# agreement arm is load-bearing under the 2026-09-21 decision: it plants the
+# "ambiguous half-on" state (registry ON, Terraform OFF) the decision prohibits
+# and proves the gate refuses it by name. A check that cannot fail is a
+# formality.
 #
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 # CANNOT-ASSESS must never be reported as a pass.
@@ -70,7 +80,12 @@ def read(rel):
     return path.read_text(encoding="utf-8")
 
 
-# --- (1) the flag: enable_paperclip defaults OFF ----------------------------
+# --- (1) the flag: enable_paperclip defaults ON (owner decision 2026-09-21) --
+# Issue #1789 reversed the "flag-gated OFF by default" rule: new capabilities
+# ship ENABLED by default (docs/rca/2026-09-21-gr5-enabled-by-default.md). The
+# owner then confirmed the call for this capability explicitly, superseding the
+# 2026-09-20 NO-GO (#1515) — see docs/PAPERCLIP-PROMOTION-DECISION.md.
+tf_default = None
 tf_vars = read("infra/terraform/variables.tf")
 if tf_vars is not None:
     block = re.search(r'variable\s+"enable_paperclip"\s*\{(.*?)\n\}', tf_vars, re.S)
@@ -79,11 +94,17 @@ if tf_vars is not None:
     else:
         default = re.search(r"default\s*=\s*(true|false)", block.group(1))
         if not default:
-            findings.append("flag: enable_paperclip has no explicit default (must be false)")
-        elif default.group(1) != "false":
-            findings.append("flag: enable_paperclip must default to false (flag-gated OFF)")
+            findings.append("flag: enable_paperclip has no explicit default (must be true, owner decision 2026-09-21)")
+        else:
+            tf_default = default.group(1) == "true"
+            if tf_default is not True:
+                findings.append(
+                    "flag: enable_paperclip must default to true "
+                    "(owner decision 2026-09-21, #1789; the flag-gated-OFF rule is reversed)"
+                )
 
-# --- (1b) the registry row --------------------------------------------------
+# --- (1b) the registry row: ON, promoted, and in agreement with Terraform ---
+registry_on = None
 registry_text = read("infra/feature-flags/registry.yaml")
 if registry_text is not None:
     try:
@@ -96,12 +117,28 @@ if registry_text is not None:
         if not isinstance(entry, dict):
             findings.append("registry: services.paperclip is not declared (the flag has no registry row)")
         else:
-            if entry.get("default") not in (False, "off"):
-                findings.append(f"registry: services.paperclip.default must be off (got {entry.get('default')!r})")
-            if entry.get("promoted"):
-                findings.append("registry: services.paperclip.promoted must be false while it ships OFF")
+            declared = entry.get("default")
+            if declared in (False, "off"):
+                findings.append(f"registry: services.paperclip.default must be on (owner decision 2026-09-21, #1789; got {declared!r})")
+            elif declared not in (True, "on"):
+                findings.append(f"registry: services.paperclip.default is not a declared flag value (got {declared!r})")
+            else:
+                registry_on = True
+            if not entry.get("promoted"):
+                findings.append("registry: services.paperclip.promoted must be true now that it ships ON (owner promoted it, #1789)")
             if entry.get("tf_flag") != "enable_paperclip":
                 findings.append(f"registry: services.paperclip.tf_flag must be enable_paperclip (got {entry.get('tf_flag')!r})")
+
+# --- (1c) registry and Terraform must agree — no "ambiguous half-on" --------
+# Owner decision 2026-09-21: "a capability is either fully built and ON, or not
+# yet merged." A registry row and a Terraform default that disagree (one ON, one
+# OFF) is exactly that prohibited half-on state and is refused BY NAME.
+if registry_on is not None and tf_default is not None and registry_on != tf_default:
+    findings.append(
+        "flag: registry and terraform disagree — services.paperclip.default is "
+        f"{'on' if registry_on else 'off'} but enable_paperclip defaults "
+        f"{'true' if tf_default else 'false'} (ambiguous half-on; owner decision 2026-09-21, #1789)"
+    )
 
 # --- (2) the pin: exact tag, provenance, no vendoring declaration -----------
 release_text = read("infra/paperclip/release.yaml")
@@ -154,10 +191,14 @@ if trigger_text is not None:
         trigger = None
     if isinstance(trigger, dict):
         if trigger.get("disabled") is not True:
-            findings.append("enable: deploy-trigger.yaml must ship disabled: true (flag-gated OFF, GR-5)")
+            findings.append("enable: deploy-trigger.yaml must ship disabled: true (CloudBuild-trigger rule, GR-5)")
         substitutions = trigger.get("substitutions") or {}
         if substitutions.get("_ENABLE_PAPERCLIP") != "false":
-            findings.append('enable: deploy-trigger.yaml substitution _ENABLE_PAPERCLIP must be "false"')
+            findings.append(
+                'enable: deploy-trigger.yaml substitution _ENABLE_PAPERCLIP must be "false" '
+                "(the importable trigger stays OFF pending the owner-gated CloudBuild-trigger call; "
+                "docs/rca/2026-09-21-gr5-enabled-by-default.md names CloudBuild triggers as an exception)"
+            )
 
 tf_main = read("infra/paperclip/terraform/main.tf")
 if tf_main is not None:
@@ -190,7 +231,7 @@ if findings:
     for finding in findings:
         print(f"  FAIL  {finding}", file=sys.stderr)
     raise SystemExit(1)
-print("  OK    flag (enable_paperclip=false), pin (exact tag), health probe and no-vendoring assertions all hold")
+print("  OK    flag (enable_paperclip=true, registry/terraform agree), pin (exact tag), health probe and no-vendoring assertions all hold")
 raise SystemExit(0)
 PY
 }
@@ -345,6 +386,22 @@ elif tag == "pin":
         print("mutation 'pin' changed nothing", file=sys.stderr)
         raise SystemExit(2)
     path.write_text(mutated, encoding="utf-8")
+elif tag == "halfon":
+    # Plant the prohibited "ambiguous half-on" state: registry stays ON while the
+    # Terraform default drops to false, so the two disagree.
+    path = root / "infra/terraform/variables.tf"
+    text = path.read_text(encoding="utf-8")
+    mutated = re.sub(
+        r'(variable\s+"enable_paperclip"\s*\{(?:.*?))\bdefault\s*=\s*true',
+        r"\1default = false",
+        text,
+        count=1,
+        flags=re.S,
+    )
+    if mutated == text:
+        print("mutation 'halfon' changed nothing", file=sys.stderr)
+        raise SystemExit(2)
+    path.write_text(mutated, encoding="utf-8")
 elif tag == "health":
     for rel in ("infra/paperclip/cloudbuild/deploy.yaml", "infra/paperclip/terraform/main.tf"):
         path = root / rel
@@ -395,6 +452,7 @@ control_ok=0
 control "flag" "enable_paperclip" || control_ok=1
 control "pin" "latest" || control_ok=1
 control "health" "api/health" || control_ok=1
+control "halfon" "ambiguous half-on" || control_ok=1
 if [ "$control_ok" -ne 0 ]; then
   exit 1
 fi
