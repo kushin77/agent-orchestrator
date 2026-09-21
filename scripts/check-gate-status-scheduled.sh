@@ -68,6 +68,22 @@
 # REAP_BRANCHES_MANIFEST pattern the sibling gates use).
 #
 # Usage: bash scripts/check-gate-status-scheduled.sh
+#
+# ---knowledge---
+# module_id: scripts.check-gate-status-scheduled
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [self-proving-gate, no-false-green]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: "the schedule is proved against config/fleet-jobs.json, never declared"
+# gotchas: "GATE_STATUS_SCHEDULED_MANIFEST overrides the manifest path for tests"
+# related: ["#1506"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
