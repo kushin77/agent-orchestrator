@@ -276,6 +276,11 @@ json-lint:
 docs-lint:
 	@bash scripts/check-docs.sh
 
+## docs-index — regenerate docs/README.md's index table (issue #1672); never
+## hand-edit the index, run this instead so two lanes' additions merge cleanly
+docs-index:
+	@bash scripts/check-docs.sh --fix
+
 ## codeowners — declared ownership map (issue #1073): default + one rule per
 ## pillar/cross-cutting dir, every rule naming a real path, PROVOKED
 codeowners:

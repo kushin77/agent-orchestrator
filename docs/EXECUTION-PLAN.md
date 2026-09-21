@@ -97,6 +97,14 @@ two cron rung additions, two independently-created parity docs):
   `docs/*-PARITY.md`-shaped file) is claimed the same way as a core code
   file: declare the filename on the issue before creating it, so a second
   lane finds the claim instead of writing a byte-different duplicate.
+- **Never hand-edit `docs/README.md`'s index table.** Every lane that adds a
+  `docs/*.md` file runs `make docs-index` (`scripts/check-docs.sh --fix`)
+  instead — it regenerates the table sorted by filename from the docs on
+  disk, so two lanes' additions land as independent append-only rows and a
+  merge conflict resolves by re-running the same command (issue #1672).
+  Minting a new ADR the same way: run `scripts/adr-next.sh` for the next
+  free number rather than reading the highest file your branch happens to
+  see.
 
 This is lighter than a lock registry on purpose: the existing dispatch claim
 (`governance/dispatch/cli.py claim`) already names the issue and lane; core
