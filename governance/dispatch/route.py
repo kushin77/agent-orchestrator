@@ -18,7 +18,7 @@ patterns: [adapter, pure-function-core]
 derives_from: null
 owner_sme: platform-sme
 tier: L1
-interfaces: [resolve, tier_for_runtime]
+interfaces: [resolve, tier_for_runtime, dispatch_hermes]
 invariants: "translates routing decisions only; transport (mailbox/dead-letter) is untouched, both routers already share it"
 gotchas: ""
 related: ["#1701", "#1268"]
@@ -34,6 +34,7 @@ from typing import Any
 
 _PKG_DIR = Path(__file__).resolve().parent
 _FLEET_DIR = _PKG_DIR.parent.parent / "fleet"
+_GATEWAY_DIR = _PKG_DIR.parent.parent / "gateway"
 for _p in (_PKG_DIR, _FLEET_DIR):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
@@ -109,3 +110,38 @@ def tier_for_runtime(runtime: str, routing_policy: "routing.RoutingPolicy | None
     persona_tier = str(rp.personas[runtime]["tier"])
     finops_tier = str(rp.finops["tier_map"][persona_tier])
     return FINOPS_TO_TIER.get(finops_tier)
+
+
+def dispatch_hermes(hop: dict[str, Any], *, registry_path: Any = None) -> type:
+    """Live Nous dispatch for a resolved hermes hop — the final leg of issue #1562.
+
+    Reachable only from a hermes hop that ``resolve``/``tier_for_runtime`` already
+    produced (never invoked directly on a bare capability string), and gated by
+    the same ``enable_hermes`` flag (``gateway/providers/flags.py``, issue #1518)
+    that gates the hermes provider everywhere else in this repo. The flag's
+    registry-declared default is **off** (IaC mandate: declared, never clicked),
+    so this refuses by name — ``TieredRefusal("hermes-disabled", ...)`` — until a
+    reviewed promotion flips it on. No new flag/config file: this reads the one
+    the provider registry already reads.
+    """
+    if hop.get("runtime") != "hermes":
+        raise tiered.TieredRefusal(
+            "dispatch-hermes-wrong-runtime", f"hop runtime is {hop.get('runtime')!r}, not 'hermes'"
+        )
+    if str(_GATEWAY_DIR) not in sys.path:
+        sys.path.insert(0, str(_GATEWAY_DIR))
+    from providers.flags import hermes_enabled  # noqa: E402 (deferred: only needed on this call path)
+
+    if not hermes_enabled(registry_path):
+        raise tiered.TieredRefusal(
+            "hermes-disabled",
+            "enable_hermes is off (declared default) — live Nous dispatch refused; "
+            "promote infra/feature-flags/registry.yaml's services.hermes to turn it on",
+        )
+    from providers.hermes import HermesProvider  # noqa: E402 (deferred: same reason)
+
+    # Returns the provider class, not an instance: constructing a live one needs
+    # real config/transport/credentials (``registry.py`` already owns that
+    # wiring for every other call site) — this function's job is only the
+    # flag-gated reachability check, not another construction path.
+    return HermesProvider
