@@ -35,6 +35,12 @@ Filename: `docs/rca/<yyyy-mm-dd>-<slug>.md`.
   capabilities ship enabled by default instead of flag-gated off. Full flip
   list, the CloudBuild and paperclip exceptions, and hardcoded-old-default
   test fixes.
+- [`2026-09-21-reconcile-orphan-triage.md`](2026-09-21-reconcile-orphan-triage.md) —
+  #1602's 40 `closeout-blocked` lanes, re-measured: none is reclaimable (0
+  return `"ok": true`), the `pr-merged` group carries **closed-unmerged** PRs
+  rather than a trailer gap, and 20 lanes hold unlanded work that rule 17
+  forbids trading away. Budget stays red (`orphan-issue-lane` 53/25, up from
+  42).
 
 The real-tree quarantine (governance/reconcile/real-tree-quarantine.json) held
 7 residual exemptions tracked while open; the earlier landing chain retired
