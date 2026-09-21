@@ -31,6 +31,23 @@ The layering (mirrors the cannibalized saas-rbac ``billing`` modules)
   what its RBAC roles grant and what its entitled capabilities unlock (plus
   the org self-administration core a plan can never strip):
   ``effective = f(plan entitlements ∩ org roles)``.
+
+
+---knowledge---
+module_id: identity.entitlements.model
+system: identity
+app: entitlements
+solution_class: class
+patterns: [closed-vocabulary, contract-first, consume-never-restate]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [PlanCatalog, EntitlementProfile, Override, FeatureState, AccessDecision, EntitlementAuditEvent]
+invariants: "an Org is the tenant; this model consumes the RBAC resource:action permission language and never redefines it"
+gotchas: ""
+related: ["#36", "#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

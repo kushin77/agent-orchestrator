@@ -18,6 +18,23 @@ Both operations are idempotent: re-granting a role the subject already holds
 returns the existing binding, and revoking one it does not hold is a no-op, so
 a caller retrying an uncertain request never has to tell "already done" from
 "conflict".
+
+
+---knowledge---
+module_id: identity.rbac.bindings
+system: identity
+app: rbac
+solution_class: enterprise
+patterns: [no-lockout, invariant-held, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [grant_role, revoke_role, LastAdministratorError, UnknownRoleError]
+invariants: "revocation refuses to leave an Org with nobody holding the Org's declared role-admin permission"
+gotchas: "the check is keyed to the Org's own declared role_admin_permission, not a hardcoded string"
+related: ["#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

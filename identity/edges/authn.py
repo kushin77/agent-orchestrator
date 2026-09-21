@@ -17,6 +17,23 @@ here.
 Fail closed: a missing, malformed, expired, revoked, tenant-mismatched or
 otherwise invalid token is an ``unauthenticated`` rejection - the edge never
 continues unauthenticated and never guesses.
+
+
+---knowledge---
+module_id: identity.edges.authn
+system: identity
+app: edges
+solution_class: enterprise
+patterns: [authn-never-authz, fail-closed, consume-never-restate]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [verify_caller, AuthnResult, sso_verifier, bearer_token]
+invariants: "the edge authenticates and performs no authorization; it extracts a role snapshot as audit context, never as a grant"
+gotchas: "the verifier seam is duck-typed to the issue #35 verify_session semantics and the edge never reimplements token verification"
+related: ["#37", "#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

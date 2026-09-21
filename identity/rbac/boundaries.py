@@ -34,6 +34,23 @@ The distinction matters for attribution, exactly as it does for the two gates:
 Every refusal names the offender (lane id / tool id / amount) so a gate can
 quote the reason instead of a bare boolean - the same discipline the skills
 adapter uses for its refusals and the guard uses for its ``Decision``.
+
+
+---knowledge---
+module_id: identity.rbac.boundaries
+system: identity
+app: rbac
+solution_class: enterprise
+patterns: [derived-never-restated, fail-closed, read-only-consumption]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [load_csuite_boundaries, RoleBoundary, BoundaryViolation, BOUNDARY_LANES, CSUITE_ROLE_IDS]
+invariants: "a boundary is a narrowing declaration, not a grant, and it is derived from the landed persona cards rather than restated"
+gotchas: "the C-suite cards are read-only consumption per the contract-freeze doctrine"
+related: ["#638", "#632"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

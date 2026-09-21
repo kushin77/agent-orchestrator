@@ -24,6 +24,23 @@ Public surface
 Consumed, never redefined: the RBAC contract (``identity/rbac``, issue #12) -
 ``resource:action`` permissions, ``ScopeNode``, the scope/permission gates,
 preset packs per tenant type, Org == tenant.
+
+
+---knowledge---
+module_id: identity.entitlements
+system: identity
+app: entitlements
+solution_class: class
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [model, catalog, store, engine, overrides, errors]
+invariants: ""
+gotchas: ""
+related: ["#36"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from entitlements.model import (

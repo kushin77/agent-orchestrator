@@ -12,6 +12,23 @@ The adapters import their backing module lazily (guarded) so this file stays
 importable even when a pillar root is not yet on ``sys.path``; a missing
 module raises a descriptive :class:`RuntimeError` at construction time, never
 a silent partial wiring.
+
+
+---knowledge---
+module_id: identity.cpapi.wiring
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [dependency-inversion, thin-adapter, consume-never-restate]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RbacAuthorizer, SsoSessionVerifier, RegistryAgentOps, build_rbac_authorizer, add_pillar_roots]
+invariants: "it builds the ports from the real merged pillar modules and edits none of them; no vocabulary is redefined"
+gotchas: "adapters import their backing module lazily and raise a descriptive RuntimeError rather than wiring partially"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -19,6 +19,23 @@ issue (#36) keeps deliberately separate, plus the intersection that ties them:
 gate, then the RBAC permission gate, then the entitlement gate - in that
 order, never raising for a deny, always returning an ``AccessDecision`` with
 the reason and machine code of the gate that refused.
+
+
+---knowledge---
+module_id: identity.entitlements.engine
+system: identity
+app: entitlements
+solution_class: enterprise
+patterns: [two-gate, fail-closed, tenant-scoped]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [evaluate_permission, feature_state, entitled_permissions, assign_plan, limit_for]
+invariants: "the active-subscription gate is separate from the entitlement gate: a permission a role grants is only effective when the org's entitled capabilities unlock it"
+gotchas: "a tenant with no plan, an unknown plan, or an inactive subscription grants nothing"
+related: ["#36"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

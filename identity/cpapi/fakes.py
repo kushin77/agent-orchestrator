@@ -11,6 +11,23 @@ do not change.
 
 ``build_test_app`` wires a full :class:`ControlPlane` from fakes in one call
 so tests stay short.
+
+
+---knowledge---
+module_id: identity.cpapi.fakes
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [test-double, fail-closed, offline-deterministic, consume-never-restate]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [build_test_app, FakeAgentOps, FakeAuthorizer, FakeSessionVerifier, FakeClock]
+invariants: "the fakes mirror the merged pillar vocabularies and their fail-closed behaviours, so handler tests exercise real semantics"
+gotchas: "production wiring replaces each fake with a thin adapter over the real merged modules; the handlers do not change"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

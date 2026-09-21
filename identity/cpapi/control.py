@@ -24,6 +24,23 @@ outbox in the same request (the outbox pattern — no dual write).
 GET query parameters travel in the ``query`` dict; POST bodies travel in
 ``body``; both are passed to handlers as the single ``data`` mapping so
 endpoints never care which transport carried the parameters.
+
+
+---knowledge---
+module_id: identity.cpapi.control
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [authn-then-authz, two-gate, fail-closed, contract-first]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ControlPlane, ControlPlane.handle]
+invariants: "a path tenantId must be the session tenant: there is no cross-tenant fallback"
+gotchas: "transport-free by design — nothing in this module opens a socket"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -24,6 +24,23 @@ Where the client's role vocabulary and ours disagree, **ours wins**: the role
 always comes from the declared binding, and
 :class:`Resolution.role_ignored` records that a differing client claim was
 seen and discarded (the credential is minted with our role regardless).
+
+
+---knowledge---
+module_id: identity.chat.binding
+system: identity
+app: chat
+solution_class: enterprise
+patterns: [fail-closed, declared-authority, named-refusal, tenant-scoped]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [IdentityMap, ClientBinding, Resolution, forwarded_identity, load_default_map]
+invariants: "a client's own user table is advisory, never authoritative: an identity maps to exactly one tenant, and an unmapped identity resolves to no tenant"
+gotchas: "the X-Forwarded-Email header is trusted only because the reverse proxy injects it; the mapping itself is declared in identity-map.json"
+related: ["#505", "ADR-0023"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

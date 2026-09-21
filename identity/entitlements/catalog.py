@@ -27,6 +27,23 @@ Validation is strict and fail-closed: an unknown feature reference, a
 duplicate feature key, a duplicate plan key, a malformed permission grant, a
 limit on a non-limit feature, or a duplicate plan entry for one feature all
 refuse to parse - a catalog that cannot be reasoned about must not load.
+
+
+---knowledge---
+module_id: identity.entitlements.catalog
+system: identity
+app: entitlements
+solution_class: pattern
+patterns: [schema-validated-loader, declared-authority, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [parse_catalog, load_catalog, load_default_catalog]
+invariants: "entitlements live in code beside the module that enforces them, so adding a feature flag needs no migration and no data backfill"
+gotchas: "the catalog is product configuration declared in plans/catalog.yaml"
+related: ["#36"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

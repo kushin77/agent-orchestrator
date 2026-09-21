@@ -17,6 +17,23 @@ The envelope carries version + correlation metadata only.  It never rewrites
 a downstream status or body: a backend 403 (authorization denial) stays a
 403 and its body passes through untouched - the edge must not turn a denial
 into a success, and it has nothing to add to a downstream decision.
+
+
+---knowledge---
+module_id: identity.edges.envelope
+system: identity
+app: edges
+solution_class: pattern
+patterns: [envelope, versioned-envelope, passthrough]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [passthrough, edge_rejection, EDGE_STATUS, EDGE_MESSAGE]
+invariants: "the envelope never rewrites a downstream status or body; it carries version and correlation metadata only"
+gotchas: "a downstream authorization denial passes through unchanged"
+related: ["#37"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

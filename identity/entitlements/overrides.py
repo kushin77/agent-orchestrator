@@ -22,6 +22,23 @@ doctrine). It is an exception, and an exception is what governance is for:
   so a plan change underneath it cannot silently shift a negotiated agreement
   (downgrade-safe). Only one active override may exist per (org, feature); a
   re-grant supersedes the previous one.
+
+
+---knowledge---
+module_id: identity.entitlements.overrides
+system: identity
+app: entitlements
+solution_class: enterprise
+patterns: [declared-authority, audited-override, time-boxed, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [grant_override, revoke_override]
+invariants: "an override is time-boxed and requires the override-authority permission, evaluated through the RBAC contract"
+gotchas: "wildcards count, so the built-in preset packs confer the authority on owner via *:*"
+related: ["#36"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

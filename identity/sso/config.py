@@ -12,6 +12,23 @@ Validation mirrors the harvested writers:
 - saas-rbac ``assertValidIdpConfigName``: an IdP config resource name must
   start ``saml.`` / ``oidc.`` for its protocol;
 - saas-rbac ``TenantSsoConfig``/``IdpOnboardingConfig`` field requirements.
+
+
+---knowledge---
+module_id: identity.sso.config
+system: identity
+app: sso
+solution_class: pattern
+patterns: [schema-validation, fail-closed, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [validate_sso_config, register_tenant_sso, require_sso_config, sso_config_for_host]
+invariants: "one platform tenant maps to exactly one identity provider"
+gotchas: "an IdP config resource name must start saml. or oidc. for its protocol"
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

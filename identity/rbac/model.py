@@ -33,6 +33,23 @@ Only the *granted* side of a comparison may carry a wildcard; a request is
 always a concrete ``resource:action`` pair. A permission is only ever
 evaluated inside a single Org - no role, permission or binding crosses an Org
 boundary (see `resolve.py`).
+
+
+---knowledge---
+module_id: identity.rbac.model
+system: identity
+app: rbac
+solution_class: class
+patterns: [closed-vocabulary, contract-first, permission-language]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Org, Team, Agent, ScopeNode, PERMISSIONS, WILDCARD]
+invariants: "an Org is the tenant, every Agent belongs to exactly one Team, and every Team to exactly one Org"
+gotchas: "later phases and every guardrail middleware consume this contract"
+related: ["#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

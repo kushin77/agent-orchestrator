@@ -20,6 +20,23 @@ resource, requested by exactly this principal, on a resource inside the
 principal's own tenant; it then runs the caller-supplied operation and consumes
 the approval (one-shot). Every other combination is a
 :class:`DirectWriteRefused`.
+
+
+---knowledge---
+module_id: identity.chat.approvals
+system: identity
+app: chat
+solution_class: enterprise
+patterns: [fail-closed, approval-gated, public-surface]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Proposal, ChatApprovalRouter, ROUTER_PUBLIC_SURFACE]
+invariants: "the chat surface has no approver: approval authority lives on the control-plane surface, so a router that could approve its own request would make the gate a formality"
+gotchas: "a proposed action is handed to the merged control-plane approval gate and never performed by the chat surface"
+related: ["#505"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

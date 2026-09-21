@@ -14,6 +14,23 @@ Usage (from the repo root):
     python3 identity/edges/cli.py routes
     python3 identity/edges/cli.py probe --method POST --path /v1/agents/a1/tasks
     python3 identity/edges/cli.py demo
+
+
+---knowledge---
+module_id: identity.edges.cli
+system: identity
+app: edges
+solution_class: pattern
+patterns: [offline-demo, entrypoint-only, throwaway-verifier]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [main, demo_verifier, echo_backend, _cmd_probe]
+invariants: "the demo verifier is a harness-only stub; the real verifier is identity.sso.SsoService.verify_session"
+gotchas: "it runs on the standard library alone, using a fixed demo token for tenant acme"
+related: ["#37"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

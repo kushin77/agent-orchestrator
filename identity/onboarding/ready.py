@@ -10,6 +10,23 @@ as a health/readiness endpoint; this lane ships the pure completeness check.
 
 A negative test removes one expected element (a seed, a role, the org, the
 owner binding) and asserts the report flips to not-ready.
+
+
+---knowledge---
+module_id: identity.onboarding.ready
+system: identity
+app: onboarding
+solution_class: pattern
+patterns: [completeness-check, named-refusal, pure-function-core]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ready_check, ReadyCheck, ReadyReport]
+invariants: "a negative test removes one expected element (a seed, a role, the org, the owner binding) and asserts the report flips to not-ready"
+gotchas: "this lane ships the pure completeness check; a later phase may surface it as a health endpoint"
+related: ["#14"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

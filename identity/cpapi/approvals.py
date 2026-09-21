@@ -25,6 +25,23 @@ Gate semantics (``ApprovalGate.guard``) used by destructive endpoints:
 
 All ids are injectable-``rng``-derived and timestamps come from the clock seam
 so the whole gate is deterministic under test.
+
+
+---knowledge---
+module_id: identity.cpapi.approvals
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [approval-gated, lifecycle-state-machine, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ApprovalStore, ApprovalGate, ApprovalGate.guard]
+invariants: "no destructive control-plane action runs until an approver with the right authority has approved a request naming exactly that action and resource"
+gotchas: "the lifecycle is pending -> approved -> consumed (or denied), and a consumed approval cannot be replayed"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -37,6 +37,23 @@ The JWKS mirror is the composition root's job. ``portal.server.sso`` translates
 the published JWKS payload into a ``kid -> public key`` map with its own
 ``trusted_keys_from_jwks`` helper; this module accepts that translated map so
 no second translation exists to drift.
+
+
+---knowledge---
+module_id: identity.chat.frontdoor
+system: identity
+app: chat
+solution_class: enterprise
+patterns: [consume-never-restate, fail-closed, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ChatRequest, AuthGateIdentity, session_token_from_request, cookie_value]
+invariants: "the chat surface verifies the auth-gate token and mints nothing of its own at the door"
+gotchas: "it re-implements no JOSE and no allowlist: it calls identity.sso.tokens exactly as portal/server/sso.py does"
+related: ["#505"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

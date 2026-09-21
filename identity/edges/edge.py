@@ -22,6 +22,23 @@ scope resolution - the front door is not trusted for authorization by design
 The backend is an injected, duck-typed passthrough seam (offline-testable):
 ``backend.call(ForwardedRequest) -> (status, body)``.  The real downstream
 REST server arrives in issue #38; this lane models the boundary only.
+
+
+---knowledge---
+module_id: identity.edges.edge
+system: identity
+app: edges
+solution_class: enterprise
+patterns: [authn-never-authz, fail-closed, allowlist-not-denylist, envelope]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [PublicEdge, PublicEdge.handle, default_edge, Backend]
+invariants: "the edge does exactly three things in order — allowlist, authenticate, forward — and never authorizes"
+gotchas: "the backend's status and body pass back untouched, so a backend 403 stays a 403"
+related: ["#37"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

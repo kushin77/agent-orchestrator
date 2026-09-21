@@ -12,6 +12,23 @@ a thin append.
 AuditRecordView is returned on append so a handler can echo the stamp; query
 filters by tenant (mandatory for tenant-scoped callers), action and actor and
 returns newest-first.
+
+
+---knowledge---
+module_id: identity.cpapi.audit
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [append-only, audit-ledger, delegate-never-re-derive]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AuditStore, AuditStore.append, AuditRecordView]
+invariants: "every control-plane mutation appends exactly one audit record before it returns"
+gotchas: "production wiring maps this seam onto telemetry/ledger and the record vocabulary mirrors that contract"
+related: ["#38", "#31"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

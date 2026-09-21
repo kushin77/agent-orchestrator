@@ -26,6 +26,23 @@ Usage (from the repo root):
 State persists to ``--store PATH`` (or ``$AO_ONBOARDING_STORE``); without it
 the run is in-memory only. Exit codes: 0 ok, 1 runtime/provision failure,
 2 usage error.
+
+
+---knowledge---
+module_id: identity.onboarding.cli
+system: identity
+app: onboarding
+solution_class: pattern
+patterns: [operator-only, dry-run, entrypoint-only]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main, _cmd_provision, _cmd_tenant, _cmd_render, _cmd_jobs]
+invariants: "provisioning is operator-only and deliberately not an HTTP endpoint"
+gotchas: "exposing it anonymously would be an unauthenticated write, and an authenticated route would need a permission inside a tenant that does not exist yet"
+related: ["#14"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -16,6 +16,23 @@ Validation invariants
   registry catalog membership; here we only shape-check);
 - ``task_type`` is a kebab ``^[a-z][a-z0-9-]*$`` (registry/prompts #13 shape);
 - pagination/count limits are clamped, never silently negative.
+
+
+---knowledge---
+module_id: identity.cpapi.model
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [contract-first, schema-validation, closed-vocabulary]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RegisterAgentRequest, LifecycleRequest, check_id, clamp_limit, new_request_id]
+invariants: "ids match ^[A-Za-z0-9][A-Za-z0-9._-]*$ and a profile_ref must resolve to a frozen profile id"
+gotchas: "stdlib only by fleet doctrine; field names mirror the frozen upstream vocabulary (profileRef, taskType, tenantId)"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

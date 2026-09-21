@@ -10,6 +10,23 @@ cannibalized saas-rbac module uses (mirror of its ``RbacDataAccess`` /
 The in-memory implementation here is the offline default used by tests and by
 single-tenant embedded use. It keeps entities in dicts keyed by id and hands
 out small monotonically increasing ids.
+
+
+---knowledge---
+module_id: identity.rbac.store
+system: identity
+app: rbac
+solution_class: pattern
+patterns: [persistence-seam, in-memory-default]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [InMemoryStore]
+invariants: "the enforcement modules are written against this seam, so a real database adapter can replace it without touching the enforcement logic"
+gotchas: ""
+related: ["#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

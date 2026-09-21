@@ -14,6 +14,23 @@ the tenant. Provisioning therefore creates BOTH an onboarding ``Tenant`` row
 store with ``Org.id == Tenant.id`` (the authorization record). The RBAC Org is
 seeded from the tenant-type preset pack; later identity phases (#35-#38) wire
 this to HTTP - this lane ships the operator-only controller core.
+
+
+---knowledge---
+module_id: identity.onboarding.model
+system: identity
+app: onboarding
+solution_class: class
+patterns: [closed-vocabulary, contract-first, pure-function-core]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Tenant, IdpTenantMapping, SeedPack, ProvisioningJob, TenantStatus]
+invariants: "the platform treats an Org as the tenant: provisioning creates both the onboarding Tenant row and an RBAC Org with Org.id == Tenant.id"
+gotchas: "no I/O and nothing outside the standard library"
+related: ["#14", "#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

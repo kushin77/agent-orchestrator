@@ -10,6 +10,23 @@ thin (see each adapter in ``wiring.py``).
 
 Views returned by ports are the typed ``model.View`` dataclasses so a handler
 can render a response without knowing the backing store's own shape.
+
+
+---knowledge---
+module_id: identity.cpapi.ports
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [dependency-inversion, contract-first, consume-never-restate]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Clock, SessionVerifier, Authorizer, AgentOps, VerifiedPrincipal, DecisionView]
+invariants: "handlers depend only on these seams and never touch a merged pillar module directly"
+gotchas: "field and method names mirror the frozen upstream vocabularies so the real adapters are thin"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

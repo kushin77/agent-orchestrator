@@ -23,6 +23,23 @@ gate denies first and there is no cross-tenant (or cross-team) fallback.
 Resolution never throws for a deny: a principal with no bindings, an
 unrecognized scope, or a malformed permission resolves to a denial so callers
 deny by default.
+
+
+---knowledge---
+module_id: identity.rbac.resolve
+system: identity
+app: rbac
+solution_class: enterprise
+patterns: [two-gate, scope-before-permission, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [resolve_scope, authorize, effective_permissions, ScopeResolution]
+invariants: "the scope gate is separate from the permission gate: a principal with no binding in the requested Org is out of scope no matter what its role strings would grant"
+gotchas: "bindings resolve down the Org -> Team -> Agent tree"
+related: ["#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -9,6 +9,23 @@ offline with no network. Because the spec is the contract, a richer client can
 also be *generated* from ``openapi.yaml`` by standard code generators at build
 time (see ``clients/README.md``) — this module is the hand-written, dependency
 free core that exercises the same wire contract.
+
+
+---knowledge---
+module_id: identity.cpapi.clients.control_plane_client
+system: identity
+app: cpapi
+solution_class: pattern
+patterns: [typed-client, contract-first, offline-deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ControlPlaneClient, Transport]
+invariants: "the client speaks the wire contract in ../openapi.yaml over an injected transport"
+gotchas: "offline in tests via the in-process transport; a richer client can be generated from the spec at build time"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

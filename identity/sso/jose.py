@@ -9,6 +9,23 @@ with kid-indexed JWKS verification (shared-frontend ``os-session-token``).
 
 Everything is deterministic and offline: no network, no JWKS fetch - keys are
 injected (fixtures / keystore) and ``now`` is passed in for testability.
+
+
+---knowledge---
+module_id: identity.sso.jose
+system: identity
+app: sso
+solution_class: enterprise
+patterns: [offline-by-construction, deterministic, consume-never-restate]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [hs256_sign, hs256_verify, rsa_sha256_sign, b64url_encode, load_private_key, serialize_public_key_spki]
+invariants: "no network and no JWKS fetch: keys are injected and now is passed in for testability"
+gotchas: "the RSA/RS256 paths use cryptography when importable and degrade to a typed error when it is absent; HS256 needs only the stdlib hmac"
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

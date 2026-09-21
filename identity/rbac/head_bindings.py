@@ -45,6 +45,23 @@ of the four built-in packs, or from `csuite`, carries no head-of-org binding
 until a tenant explicitly enables one persona at a time - the same
 declared-default-off discipline as GR-28 elsewhere in this repo (rollout flags
 default OFF; nothing here defaults ON either).
+
+
+---knowledge---
+module_id: identity.rbac.head_bindings
+system: identity
+app: rbac
+solution_class: enterprise
+patterns: [real-binding, declared-authority, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [bind_persona_to_tenant, unbind_persona_from_tenant, is_persona_bound, persona_subject]
+invariants: "both head-of-org personas get a real Role and Binding, not the skills carve-out which grants no permission and creates no binding"
+gotchas: "the paperclip carve-out in skills.py is not a role binding"
+related: ["#952", "#878"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

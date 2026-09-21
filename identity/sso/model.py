@@ -15,6 +15,23 @@ by an earlier lane and this subtree imports the names, never the files (see
 - Per-tenant SSO config mirrors capital-underwriting ``StoredSsoConfig``
   (protocol-discriminated single column) + saas-rbac ``TenantSsoConfig`` /
   ``IdpOnboardingConfig`` (``idpConfigName`` ``saml.``/``oidc.`` prefix rule).
+
+
+---knowledge---
+module_id: identity.sso.model
+system: identity
+app: sso
+solution_class: class
+patterns: [closed-vocabulary, contract-first, consume-never-restate]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [TenantSsoConfig, Principal, Session, SSO_ISSUER, CONSOLE_TOKEN_PURPOSE, SUBJECT_TYPES]
+invariants: "every vocabulary is frozen by an earlier lane; this subtree imports the names, never the files"
+gotchas: ""
+related: ["#35", "#10", "#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

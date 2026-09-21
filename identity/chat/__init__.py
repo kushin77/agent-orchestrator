@@ -32,6 +32,23 @@ Five modules, each consuming a merged pillar contract rather than forking one:
 Fail-closed defaults, stated once: no anonymous mode, no tenant from the
 request body, no cross-tenant fallback, no impersonation shortcut, and no
 credential without a signing key and a revocation store.
+
+
+---knowledge---
+module_id: identity.chat
+system: identity
+app: chat
+solution_class: class
+patterns: [package-contract, public-surface, delegate-never-re-derive]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [credential, binding, frontdoor, isolation, approvals, errors]
+invariants: ""
+gotchas: ""
+related: ["#505", "#500"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

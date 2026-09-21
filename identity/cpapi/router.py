@@ -24,6 +24,23 @@ Handlers return ``(status, data_dict)`` or raise :class:`ApiError`; the facade
 builds the envelope. A path template ``/v1/agents/{agentId}`` matches literal
 segments and captures ``{name}`` placeholders into the params dict passed to
 the handler.
+
+
+---knowledge---
+module_id: identity.cpapi.router
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [contract-first, transport-free, envelope, declarative-routing]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Router, Route, MatchedRoute, ok_envelope, error_envelope]
+invariants: "every response is one envelope with a fixed shape, and no route opens a socket"
+gotchas: "a real deployment mounts a thin transport adapter in front of the same handle method"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

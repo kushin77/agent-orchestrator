@@ -43,6 +43,23 @@ trusts the snapshot: ``guard_session`` re-resolves live bindings from the store
 on every call, so a revocation takes effect immediately (the dangerous failure
 mode of a cache - a revoked subject keeping access - produces fewer denials
 and is invisible to monitoring, so there is deliberately no caching here).
+
+
+---knowledge---
+module_id: identity.rbac.guard
+system: identity
+app: rbac
+solution_class: enterprise
+patterns: [two-gate, scope-before-permission, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [guard, guard_required, start_agent_session, Decision, authorization_denied_payload]
+invariants: "scope is checked before permission: when scope fails the permission gate is never reached, so there is no cross-tenant or cross-team fallback"
+gotchas: "a Decision records which gate denied"
+related: ["#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

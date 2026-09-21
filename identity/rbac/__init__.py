@@ -38,6 +38,23 @@ Public surface
   #952): the ``head-agents`` preset pack (``hermes-head`` / ``paperclip-head``)
   plus ``bind_persona_to_tenant`` / ``unbind_persona_from_tenant`` /
   ``is_persona_bound``, opt-in only per tenant (GR-28: no default binding).
+
+
+---knowledge---
+module_id: identity.rbac
+system: identity
+app: rbac
+solution_class: class
+patterns: [package-contract, public-surface, relative-imports]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [model, resolve, bindings, guard, store, presets, skills, boundaries, head_bindings]
+invariants: "intra-package imports are relative, so the package imports under either its bare or its qualified name without a sys.path mutation"
+gotchas: "an absolute from-rbac import made the package importable only when identity/ happened to be on sys.path"
+related: ["#12", "#1078"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from .model import (

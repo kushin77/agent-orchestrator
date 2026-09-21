@@ -24,6 +24,23 @@ Public surface:
 - ``forward`` - build-don't-copy outbound request builder.
 - ``envelope`` - versioned, envelope-standardized responses.
 - ``edge`` - ``PublicEdge`` orchestrator (authN + allowlist + forward).
+
+
+---knowledge---
+module_id: identity.edges
+system: identity
+app: edges
+solution_class: class
+patterns: [package-contract, public-surface, authn-never-authz]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [model, paths, allowlist, authn, forward, envelope, edge]
+invariants: ""
+gotchas: ""
+related: ["#37"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from identity.edges import (

@@ -12,6 +12,23 @@ A pack may name role administration in its own vocabulary via
 ``role_admin_permission`` (the saas-rbac #125 lesson). Seeding refuses a pack
 whose roles do not grant the Org's role-admin permission, so an Org can never
 be born with no way to administer itself.
+
+
+---knowledge---
+module_id: identity.rbac.presets
+system: identity
+app: rbac
+solution_class: pattern
+patterns: [preset-packs, custom-pack-seam, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [seed_org, RolePack, RolePreset, parse_pack, register_pack, load_pack]
+invariants: "seeding refuses a pack whose roles do not grant the Org's role-admin permission, so an Org can never be born with no way to administer itself"
+gotchas: "a tenant that brings its own RBAC model supplies a custom pack through the same path as the platform pack"
+related: ["#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -16,6 +16,23 @@ Two token kinds, matching the consumed models:
 
 Revocation: every session id (``jti``) can be revoked (logout /
 impersonation revoke); a revoked token is refused even while unexpired.
+
+
+---knowledge---
+module_id: identity.sso.tokens
+system: identity
+app: sso
+solution_class: enterprise
+patterns: [two-token-kinds, tenant-scoped, fail-closed, kid-indexed-jwks]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [issue_session_token, verify_session_token, issue_console_session_token, verify_console_session_token, console_jwks]
+invariants: "a caller can use a token only inside the one tenant it claims — there is no cross-tenant fallback"
+gotchas: "the console token is RS256 with purpose os-session-token, verified kid-indexed against the published JWKS (kid = RFC 7638 thumbprint)"
+related: ["#35", "#10"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

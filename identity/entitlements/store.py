@@ -9,6 +9,23 @@ The in-memory implementation is the offline default used by tests and by
 single-tenant embedded use. It keeps profiles and overrides in dicts keyed by
 id and the audit log as an append-only list (order preserved - the audit trail
 is the record of record; see ``events_for_org``).
+
+
+---knowledge---
+module_id: identity.entitlements.store
+system: identity
+app: entitlements
+solution_class: pattern
+patterns: [persistence-seam, in-memory-default, append-only]
+derives_from: identity/rbac/store.py
+owner_sme: security-sme
+tier: L1
+interfaces: [InMemoryStore, events_for_org]
+invariants: "the audit log is order-preserved and append-only: it is the record of record"
+gotchas: "enforcement logic never touches storage directly, so a later phase swaps in a database adapter behind this seam"
+related: ["#36"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
