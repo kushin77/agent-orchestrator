@@ -920,6 +920,30 @@ check_semantic_merge_review() { # <body-file> <range>
   fi
 }
 
+# check_code_review_sme — issue #1537: the `## Code review (code-review-sme)`
+# section (from the template) must carry either the persona's report or the
+# explicit `N/A — doc-only change` opt-out. Warn-only, same enforcement switch
+# as the rest of the classification block — there is no poster yet that could
+# make this a hard gate.
+check_code_review_sme() { # <body-file>
+  local body="$1" section
+  if [ ! -f "$body" ] || ! grep -qiE '^##+[ \t]*Code review \(code-review-sme\)[ \t]*$' "$body"; then
+    class_findings+=("code-review-sme-section-missing")
+    return 0
+  fi
+  section="$(awk '
+    BEGIN{insec=0}
+    /^##+[ \t]*Code review \(code-review-sme\)[ \t]*$/{insec=1; next}
+    /^##+[ \t]/{if(insec) exit; next}
+    insec{print}
+  ' "$body")"
+  if ! printf '%s\n' "$section" | grep -qE '[^[:space:]]'; then
+    class_findings+=("code-review-sme-section-empty")
+  elif printf '%s\n' "$section" | grep -qE '^<the code-review-sme report'; then
+    class_findings+=("code-review-sme-section-unfilled-placeholder")
+  fi
+}
+
 report() { # [label]
   local label="${1:-check-pr-contract}"
   local f
@@ -940,6 +964,7 @@ run_checks() { # <body-file> <range> [<head-branch>] [<surfaces-yaml>]
   check_classification "$1" "$dr" "${3:-}" "${4:-}"
   check_duplicate_pr "$1" "${3:-}" "${PR_NUMBER:-}"
   check_semantic_merge_review "$1" "$2"
+  check_code_review_sme "$1"
 
   local enforce="${AO_PR_CONTRACT_ENFORCE:-0}" cf level
   if [ "${#class_findings[@]}" -gt 0 ]; then
