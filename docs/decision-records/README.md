@@ -84,6 +84,7 @@ writes the real ADR.
 | [ADR-0031](ADR-0031-solution-class-ladder-pin-and-class-ceilings.md) | Solution-class ladder by pin, trio canon reaffirmed per doc, and class ceilings for non-product surfaces | accepted | issue #883 (lane L4 of EPIC #878) |
 | [ADR-0032](ADR-0032-fleet-loop-ownership.md) | The `.fleet` loop family stays agent-orchestrator-owned, with a declared (not in-container-hardcoded) crontab | accepted | issue #1512 (EPIC #1510) |
 | [ADR-0033](ADR-0033-paperclip-hermes-naming-resolution.md) | Paperclip/Hermes naming resolution — one name, one authoritative artifact | accepted | issue #1514 (EPIC #1510) |
+| [ADR-0034](ADR-0034-bridge-consumer-contract.md) | The live-data bridge (`ao.bridge/v1`) is an external-API contract, not a console pane | accepted | issue #1523 (EPIC #1510) |
 
 > **Numbering gap `ADR-0019`–`ADR-0021`.** Those numbers are **CMR-hub** records
 > cited from this repo with an explicit `CMR (fleet)` prefix
