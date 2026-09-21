@@ -51,6 +51,22 @@
 #                      skip cannot sit here hiding a broken hook.
 #
 # Usage: bash scripts/check-lease-hook.sh
+#
+# ---knowledge---
+# module_id: scripts.check-lease-hook
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [self-proving-gate, no-false-green]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: "a normal run never returns 2 -- an arm that fails is a definite finding"
+# gotchas: ""
+# related: ["#1541"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
