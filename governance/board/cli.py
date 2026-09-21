@@ -22,13 +22,16 @@ import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import boundary  # noqa: E402
+import board_selfheal  # noqa: E402
 from gate import EXCEPTIONS_RELPATH, REPORT_RELPATH, load_exceptions, run_gate, write_report  # noqa: E402
 from model import STATUS_CANNOT_ASSESS, STATUS_EXCEPTED, STATUS_NOT_OK, STATUS_OK, ExceptionInvalid  # noqa: E402
 
@@ -36,6 +39,89 @@ from model import STATUS_CANNOT_ASSESS, STATUS_EXCEPTED, STATUS_NOT_OK, STATUS_O
 DEFAULT_REPO = "kushin77/agent-orchestrator"
 BOUNDARY_SNAPSHOT_RELPATH = ".board/boundary-snapshot.json"
 BOUNDARY_BASELINE_RELPATH = "governance/board/boundary-baseline.json"
+
+# --- boundary snapshot freshness (issue #1631) -------------------------------
+# The boundary gate never checked the committed snapshot's own age: a rotted
+# ``.board/boundary-snapshot.json`` (tracker liveness resolved against a
+# point-in-time export) reads as a clean OK even after its live truth flipped
+# (measured: #358 closed 14h before the committed export, and the gate kept
+# reporting OK). Mirrors governance/dispatch/queue_freshness.py's shape
+# (Finding/assess/self-heal) — duplicated in miniature rather than imported:
+# importing a sibling package's flat "cli"/"model" modules from here collides
+# their bare basenames (see governance/board_selfheal.py's docstring).
+BOUNDARY_MAX_AGE_HOURS = 72
+CODE_BOUNDARY_STALE = "boundary-snapshot-stale"
+BOUNDARY_REFRESH_COMMAND = "python3 governance/board/cli.py export-boundary"
+
+
+@dataclass(frozen=True)
+class _BoundaryFinding:
+    code: str
+    subject: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class _BoundaryFreshness:
+    ok: bool
+    findings: tuple = ()
+
+
+def _parse_boundary_iso(value: str) -> datetime:
+    text = str(value).strip()
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    moment = datetime.fromisoformat(text)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
+
+
+def assess_boundary_freshness(
+    path: Any, *, max_age_hours: float | None = None, now: datetime | None = None
+) -> _BoundaryFreshness:
+    """Assert the committed boundary snapshot's ``generated_at`` is inside the
+    tolerance. Never raises: an unreadable/missing/unaged snapshot is a named
+    finding, same as a too-old one — the caller (``run_boundary_check``)
+    already owns the missing/unreadable CANNOT-ASSESS wording for the case
+    where no freshness check is even reachable.
+    """
+    tolerance = BOUNDARY_MAX_AGE_HOURS if max_age_hours is None else float(max_age_hours)
+    moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    subject = str(path)
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return _BoundaryFreshness(
+            False, (_BoundaryFinding(CODE_BOUNDARY_STALE, subject, f"unreadable: {exc}"),)
+        )
+    raw = payload.get("generated_at") if isinstance(payload, dict) else None
+    if not isinstance(raw, str) or not raw.strip():
+        return _BoundaryFreshness(
+            False,
+            (_BoundaryFinding(CODE_BOUNDARY_STALE, subject, "the snapshot carries no generated_at"),),
+        )
+    try:
+        generated = _parse_boundary_iso(raw)
+    except ValueError as exc:
+        return _BoundaryFreshness(
+            False,
+            (_BoundaryFinding(CODE_BOUNDARY_STALE, subject, f"generated_at {raw!r} is not a timestamp ({exc})"),),
+        )
+    age_hours = max(0.0, (moment - generated).total_seconds() / 3600.0)
+    if age_hours <= tolerance:
+        return _BoundaryFreshness(True)
+    return _BoundaryFreshness(
+        False,
+        (
+            _BoundaryFinding(
+                CODE_BOUNDARY_STALE,
+                subject,
+                f"generated_at {raw} is {age_hours:.1f}h old, beyond the {tolerance:g}h tolerance "
+                f"(refresh with: {BOUNDARY_REFRESH_COMMAND})",
+            ),
+        ),
+    )
 
 # A quarantine entry may excuse exactly one of the detector's three finding
 # kinds; a code outside this vocabulary is reported as a stale quarantine.
@@ -318,16 +404,60 @@ def run_boundary_check(
     snapshot_path: Any,
     baseline_path: Any,
     own_repo: str = DEFAULT_REPO,
+    *,
+    refresh: bool = False,
+    now: datetime | None = None,
+    max_age_hours: float | None = None,
 ) -> int:
     """The offline tri-state boundary gate. 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 
     CANNOT-ASSESS covers every reason the check could not actually run — a
     missing snapshot, an unreadable snapshot, an empty snapshot, a snapshot
-    whose records lack ``body`` (a missing body must never read as OK), or a
-    missing baseline. NOT-OK covers any non-quarantined cross-repo child and
-    any quarantine entry whose tracking issue is no longer open.
+    whose records lack ``body`` (a missing body must never read as OK), a
+    missing baseline, or (issue #1631) a snapshot older than the tolerance
+    this gate honours whose ONE refresh verb (``export-boundary``) either was
+    not attempted (no ``--refresh``) or failed. A rotted snapshot never
+    silently reads as OK-with-zero-findings. NOT-OK covers any non-quarantined
+    cross-repo child and any quarantine entry whose tracking issue is no
+    longer open.
     """
     snapshot = Path(snapshot_path)
+
+    if snapshot.is_file():
+        if refresh:
+            verdict, _healed, detail = board_selfheal.self_heal(
+                assess_boundary_freshness,
+                snapshot,
+                max_age_hours=max_age_hours,
+                now=now,
+                stale_code=CODE_BOUNDARY_STALE,
+                # --out targets the SAME path being assessed — a self-heal on a
+                # scratch copy (the verify-time gate) never rewrites the
+                # committed snapshot out from under git (issue #1631's own
+                # scope note: a refresh "must not ride in a feature lane").
+                command=[
+                    sys.executable,
+                    str(Path(__file__).resolve()),
+                    "export-boundary",
+                    "--out",
+                    str(snapshot),
+                ],
+            )
+        else:
+            verdict = assess_boundary_freshness(snapshot, max_age_hours=max_age_hours, now=now)
+            detail = ""
+        if not verdict.ok:
+            why = "; ".join(f.detail for f in verdict.findings)
+            if refresh:
+                why = f"{why} (refresh attempted: {detail or 'no effect'})"
+            else:
+                why = f"{why} (no --refresh attempted)"
+            print(
+                "boundary: CANNOT-ASSESS — snapshot stale and refresh impossible: %s" % why,
+                file=sys.stderr,
+            )
+            return boundary.EXIT_CANNOT_ASSESS
+
     try:
         issues = boundary.load_issues(snapshot)
     except FileNotFoundError:
@@ -413,6 +543,7 @@ def cmd_boundary_check(args: argparse.Namespace) -> int:
         _resolve_from_root(args.snapshot),
         _resolve_from_root(args.baseline),
         own_repo=args.policy_own_repo,
+        refresh=args.refresh,
     )
 
 
@@ -442,6 +573,11 @@ def main(argv=None) -> int:
     check_p.add_argument("--baseline", default=BOUNDARY_BASELINE_RELPATH)
     check_p.add_argument(
         "--policy-own-repo", default=DEFAULT_REPO, dest="policy_own_repo"
+    )
+    check_p.add_argument(
+        "--refresh",
+        action="store_true",
+        help="self-heal a stale committed snapshot via export-boundary before failing (issue #1631)",
     )
     check_p.set_defaults(func=cmd_boundary_check)
 
