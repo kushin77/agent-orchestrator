@@ -42,7 +42,8 @@ SCHEMA = "ao.dispatch/audit-v1"
 
 KIND_REFUSAL = "refusal"
 KIND_GRANT = "grant"
-KINDS = (KIND_REFUSAL, KIND_GRANT)
+KIND_TIERED = "tiered_dispatch"
+KINDS = (KIND_REFUSAL, KIND_GRANT, KIND_TIERED)
 
 DEFAULT_AUDIT_PATH = Path(".board/dispatch-audit.jsonl")
 
@@ -85,6 +86,48 @@ def record_grant(arbitration: Arbitration, at: str) -> Dict[str, Any]:
         lane=arbitration.lane or None,
         epic=arbitration.epic,
         directive_id=arbitration.directive_id or None,
+    )
+
+
+def record_tiered_attempt(
+    *,
+    issue: int,
+    agent: str,
+    at: str,
+    tier: str,
+    provider: str,
+    model: str,
+    status: str,
+    attempt: int,
+    duration_ms: int,
+    output: str = "",
+    escalated_to: str | None = None,
+    reason: str = "",
+    detail: str = "",
+) -> Dict[str, Any]:
+    """One record for a tiered try-loop dispatch attempt (issue #1524).
+
+    ``status`` is ``pass`` or ``fail`` — the outcome of the issue's own
+    acceptance commands at this tier. ``escalated_to`` names the next tier when
+    this attempt was the last failure before an escalation (else ``None``).
+    """
+    if status not in ("pass", "fail"):
+        raise AuditUnavailable(f"status {status!r} is not one of pass/fail")
+    return _record(
+        kind=KIND_TIERED,
+        issue=issue,
+        agent=agent,
+        at=at,
+        reason=reason or None,
+        detail=detail or None,
+        tier=tier,
+        provider=provider,
+        model=model,
+        status=status,
+        attempt=attempt,
+        duration_ms=duration_ms,
+        output=output,
+        escalated_to=escalated_to,
     )
 
 
