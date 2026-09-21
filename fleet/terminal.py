@@ -137,7 +137,17 @@ TIER_RUNNERS: dict[str, dict[str, str]] = {
 #: (documented in ``fleet/README.md`` and, until #733, read by nothing) sets the same
 #: default, so a principal can point the fleet at an absolute runner path from the
 #: environment cron gives it.
-DEFAULT_RUNNER = "claude -p"
+#:
+#: The default IS the native DeepSeek CLI (issue #1787), because the vocabulary this
+#: module dispatches is DeepSeek's (``TIER_RUNNERS`` above) and the runner has to be
+#: the one that can honour it. The previous default — ``"claude -p"``, the Anthropic
+#: CLI — resolved to the `claude-byok` profile, which cannot honour that vocabulary
+#: without the BYOK environment (``fleet/runners.py``'s own docstring diagnoses
+#: exactly this), so on a box with no Anthropic credential the loop held its queue
+#: over a vocabulary it had declared correctly. `deepseek` keeps binary, argv shape
+#: and vocabulary moving together: ``build_command`` reads the switch from the
+#: profile, and the native CLI spells it ``-m``.
+DEFAULT_RUNNER = "deepseek"
 
 #: The exit code a refused dispatch reports (EX_CONFIG: the order cannot be
 #: executed as declared). Distinct from 127 (could not start) and 124 (timeout).
@@ -249,10 +259,15 @@ def resolve_dispatch(
         "AO_MODEL": model,
         "AO_RISK": risk,
         "AO_RUNNER": runner,
-        # deepseek #88's own BYOK variable, so a wrapper honours the tier's model
-        # with no fleet-specific glue.
-        "ANTHROPIC_MODEL": model,
     }
+    # The BYOK model variable is for a runner that READS its model from the
+    # environment, and the profile declares whether it does (`reads_model_env`).
+    # Until #1787 that field was declared but never consulted, so a native DeepSeek
+    # CLI was handed an Anthropic-named variable it never looks at — the same
+    # "declared but not enforced" shape this repository keeps finding. An unknown
+    # profile keeps the old behaviour: the preflight refuses one by name first.
+    if chosen is None or chosen.reads_model_env:
+        env["ANTHROPIC_MODEL"] = model
     return (
         {
             "tier": str(tier),

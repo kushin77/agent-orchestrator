@@ -173,21 +173,56 @@ def test_describe_names_all_four_parts_of_the_quadruple():
 
 
 def test_the_argv_uses_the_profiles_model_switch():
-    """`deepseek` takes `-m`; asking it for `--model` is a different runner's argv."""
+    """`deepseek` takes `-m`; asking it for `--model` is a different runner's argv.
+
+    The DEFAULT is the native DeepSeek CLI since #1787, so the default block is the
+    `-m` one. The BYOK profile is then exercised by NAMING it, rather than by relying
+    on it being the default — so both halves of the property stay pinned, and a future
+    change to the default moves one assertion instead of quietly retiring the other.
+    """
     directive = {"task": {"lane": "erp-tx", "title": "ERP-03"}, "model": {"tier": "flash", "thinking": "none"}}
 
     default, refusal = terminal.resolve_dispatch(dict(directive))
     assert refusal is None, f"the default block must resolve: {refusal}"
-    assert " --model deepseek-v4-flash" in default["runner"], (
-        f"the BYOK profile's switch is --model: {default['runner']}"
+    assert " -m deepseek-v4-flash" in default["runner"], (
+        f"the native CLI's switch is -m, and the default profile is what says so: {default['runner']}"
+    )
+    assert "--model" not in default["runner"], "the wrong switch must not survive alongside"
+
+    byok, refusal = terminal.resolve_dispatch(dict(directive), base_runner="claude -p")
+    assert refusal is None, f"the BYOK profile's block must resolve too: {refusal}"
+    assert " --model deepseek-v4-flash" in byok["runner"], (
+        f"the BYOK profile's switch is --model: {byok['runner']}"
     )
 
-    native, refusal = terminal.resolve_dispatch(dict(directive), base_runner="deepseek")
-    assert refusal is None, f"the native profile's block must resolve too: {refusal}"
-    assert " -m deepseek-v4-flash" in native["runner"], (
-        f"the native CLI's switch is -m, and the profile is what says so: {native['runner']}"
+
+def test_the_model_variable_is_exported_only_to_a_profile_that_reads_it():
+    """#1787: `reads_model_env` decides, instead of being declared and ignored.
+
+    The field exists to say "this runner does NOT read its model from the
+    environment", and nothing consulted it — so the native DeepSeek CLI was handed
+    an Anthropic-named variable it never looks at (the same declared-but-unenforced
+    shape this repository keeps finding). Both sides are pinned: the native profile
+    must not receive one, and the BYOK profile, which declares it reads it, must.
+    """
+    directive = {"task": {"lane": "erp-tx", "title": "ERP-03"}, "model": {"tier": "flash", "thinking": "none"}}
+
+    native, refusal = terminal.resolve_dispatch(dict(directive))
+    assert refusal is None, f"the default block must resolve: {refusal}"
+    assert "ANTHROPIC_MODEL" not in native["env"], (
+        "a profile declaring reads_model_env=False must not be handed a model "
+        f"variable it never reads: {native['env']}"
     )
-    assert "--model" not in native["runner"], "the wrong switch must not survive alongside"
+    assert native["env"]["AO_MODEL"] == "deepseek-v4-flash", (
+        "the tier's model must still reach the child by the fleet's own variable"
+    )
+
+    byok, refusal = terminal.resolve_dispatch(dict(directive), base_runner="claude -p")
+    assert refusal is None, f"the BYOK profile's block must resolve too: {refusal}"
+    assert byok["env"].get("ANTHROPIC_MODEL") == "deepseek-v4-flash", (
+        "the BYOK profile declares it reads the model from the environment, so it "
+        f"must receive one: {byok['env']}"
+    )
 
 
 # ---------------------------------------------------------------------------
