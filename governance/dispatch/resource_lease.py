@@ -47,6 +47,7 @@ FAIL-CLOSED CONTRACT (the repo's honesty tri-state)
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import subprocess
@@ -225,23 +226,8 @@ def render(record: dict) -> str:
     return json.dumps(record, sort_keys=True, separators=(",", ":"))
 
 
-def read(path: Path | str | None = None) -> list[dict]:
-    """Every record in the ledger, in file order.
-
-    An ABSENT ledger is empty (nothing has ever been claimed — the common case
-    on a fresh checkout). A ledger that exists but cannot be read, or that
-    carries a line which is not a record of the frozen shape, is
-    :class:`ResourceLeaseUnavailable`: "I could not read the leases" and
-    "nothing is leased" are not the same answer, and only one of them is safe to
-    act on.
-    """
-    target = ledger_path(path)
-    if not target.exists():
-        return []
-    try:
-        text = target.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise ResourceLeaseUnavailable(f"the resource-claim ledger {target} is unreadable: {exc}") from exc
+def _parse_records(text: str, target: Path) -> list[dict]:
+    """Parse ledger ``text`` into records, or raise naming the bad line."""
     records: list[dict] = []
     for number, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
@@ -264,19 +250,41 @@ def read(path: Path | str | None = None) -> list[dict]:
     return records
 
 
-def append(record: dict, path: Path | str | None = None) -> None:
-    """Append one record, proving the ledger only ever grew.
+def read(path: Path | str | None = None) -> list[dict]:
+    """Every record in the ledger, in file order.
 
-    The bytes present before the write must be an exact prefix of the bytes
-    after it, so a concurrent truncation or rewrite is refused rather than
-    mistaken for this writer's doing; concurrent APPENDS are serialised with an
-    advisory lock, because two holders recording two different resources at once
-    is legitimate.
+    An ABSENT ledger is empty (nothing has ever been claimed — the common case
+    on a fresh checkout). A ledger that exists but cannot be read, or that
+    carries a line which is not a record of the frozen shape, is
+    :class:`ResourceLeaseUnavailable`: "I could not read the leases" and
+    "nothing is leased" are not the same answer, and only one of them is safe to
+    act on.
+    """
+    target = ledger_path(path)
+    if not target.exists():
+        return []
+    try:
+        text = target.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ResourceLeaseUnavailable(f"the resource-claim ledger {target} is unreadable: {exc}") from exc
+    return _parse_records(text, target)
+
+
+@contextlib.contextmanager
+def _locked(path: Path | str | None = None):
+    """Hold ONE exclusive lock on the ledger for a whole read-decide-append.
+
+    ``acquire``/``release`` are check-then-act: reading the live leases, then
+    deciding, then appending are three separate moments, and without a lock
+    held across all three, two callers can both read "free" and both append an
+    ``acquire`` — a double lease on the exact single-writer resource this
+    registry exists to prevent. Yielding the open file lets the caller read the
+    CURRENT bytes and append inside the same critical section a plain
+    ``append()`` only locks for the write.
     """
     target = ledger_path(path)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        line = render(record) + "\n"
         target.touch(exist_ok=True)
     except OSError as exc:
         raise ResourceLeaseUnavailable(f"the resource-claim ledger {target} is not writable: {exc}") from exc
@@ -284,19 +292,44 @@ def append(record: dict, path: Path | str | None = None) -> None:
         if fcntl is not None:
             fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
         try:
-            before = fh.read()
-            fh.seek(0, 2)
-            fh.write(line)
-            fh.flush()
-            fh.seek(0)
-            after = fh.read()
+            yield fh, target
         finally:
             if fcntl is not None:
                 fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+
+
+def _append_locked(fh, target: Path, record: dict) -> None:
+    """Append ``record`` to the already-locked, already-positioned-at-0 ``fh``.
+
+    Proves the same prefix property ``append()`` does: the bytes present
+    before this write must be an exact prefix of the bytes after it.
+    """
+    line = render(record) + "\n"
+    before = fh.read()
+    fh.seek(0, 2)
+    fh.write(line)
+    fh.flush()
+    fh.seek(0)
+    after = fh.read()
     if not after.startswith(before) or after != before + line:
         raise ResourceLeaseUnavailable(
             f"the resource-claim ledger {target} was rewritten concurrently — refusing to trust the append"
         )
+
+
+def append(record: dict, path: Path | str | None = None) -> None:
+    """Append one record, proving the ledger only ever grew.
+
+    The bytes present before the write must be an exact prefix of the bytes
+    after it, so a concurrent truncation or rewrite is refused rather than
+    mistaken for this writer's doing; concurrent APPENDS are serialised with an
+    advisory lock, because two holders recording two different resources at once
+    is legitimate. Callers that must decide something (is this resource free?)
+    BEFORE writing use :func:`_locked` instead, so the decision and the write
+    share one lock — see ``acquire``/``release``.
+    """
+    with _locked(path) as (fh, target):
+        _append_locked(fh, target, record)
 
 
 def live_leases(records: list[dict], now: datetime | None = None) -> dict[str, dict]:
@@ -345,33 +378,35 @@ def acquire(
     holder doing one job, not two owners contending.
     """
     moment = now or _now()
-    records = read(path)
-    current = live_leases(records, moment).get(resource_id)
-    if current is not None and current.get("holder") != holder:
-        raise ResourceClaimRefused(
-            REASON_CLAIMED,
-            f"{resource_id} is held by {current.get('holder')} since {current.get('at')} "
-            f"(expires {expires_at(current) or 'unknown'}); this holder is {holder}",
+    with _locked(path) as (fh, target):
+        records = _parse_records(fh.read(), target)
+        fh.seek(0)
+        current = live_leases(records, moment).get(resource_id)
+        if current is not None and current.get("holder") != holder:
+            raise ResourceClaimRefused(
+                REASON_CLAIMED,
+                f"{resource_id} is held by {current.get('holder')} since {current.get('at')} "
+                f"(expires {expires_at(current) or 'unknown'}); this holder is {holder}",
+            )
+        expired_holder = ""
+        if current is None:
+            previous = next(
+                (
+                    record
+                    for record in reversed(records)
+                    if record.get("resource_id") == resource_id and record.get("event") == KIND_ACQUIRE
+                ),
+                None,
+            )
+            if previous is not None and previous.get("holder") != holder:
+                expired_holder = str(previous.get("holder"))
+        reason = "renewed by its own holder" if current is not None else ""
+        if expired_holder:
+            reason = f"taken over from {expired_holder}, whose lease lapsed"
+        record = _record(
+            KIND_ACQUIRE, resource_id, holder, moment, ttl=ttl, lane=lane, issue=issue, reason=reason
         )
-    expired_holder = ""
-    if current is None:
-        previous = next(
-            (
-                record
-                for record in reversed(records)
-                if record.get("resource_id") == resource_id and record.get("event") == KIND_ACQUIRE
-            ),
-            None,
-        )
-        if previous is not None and previous.get("holder") != holder:
-            expired_holder = str(previous.get("holder"))
-    reason = "renewed by its own holder" if current is not None else ""
-    if expired_holder:
-        reason = f"taken over from {expired_holder}, whose lease lapsed"
-    record = _record(
-        KIND_ACQUIRE, resource_id, holder, moment, ttl=ttl, lane=lane, issue=issue, reason=reason
-    )
-    append(record, path)
+        _append_locked(fh, target, record)
     return record
 
 
@@ -392,18 +427,23 @@ def release(
     always refused: nobody releases somebody else's lease.
     """
     moment = now or _now()
-    current = live_leases(read(path), moment).get(resource_id)
-    if current is None:
-        if strict:
-            raise ResourceClaimRefused(REASON_NOT_HELD, f"{resource_id} is not leased, so {holder} cannot release it")
-        return None
-    if current.get("holder") != holder:
-        raise ResourceClaimRefused(
-            REASON_NOT_THE_HOLDER,
-            f"{resource_id} is held by {current.get('holder')}, not {holder} — only the holder releases its lease",
-        )
-    record = _record(KIND_RELEASE, resource_id, holder, moment)
-    append(record, path)
+    with _locked(path) as (fh, target):
+        records = _parse_records(fh.read(), target)
+        fh.seek(0)
+        current = live_leases(records, moment).get(resource_id)
+        if current is None:
+            if strict:
+                raise ResourceClaimRefused(
+                    REASON_NOT_HELD, f"{resource_id} is not leased, so {holder} cannot release it"
+                )
+            return None
+        if current.get("holder") != holder:
+            raise ResourceClaimRefused(
+                REASON_NOT_THE_HOLDER,
+                f"{resource_id} is held by {current.get('holder')}, not {holder} — only the holder releases its lease",
+            )
+        record = _record(KIND_RELEASE, resource_id, holder, moment)
+        _append_locked(fh, target, record)
     return record
 
 

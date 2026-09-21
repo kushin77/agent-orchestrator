@@ -87,6 +87,45 @@ def test_a_second_holder_is_refused_by_name(tmp_path):
     assert resource_lease.holder_of("tf-state:onprem", path=ledger, now=OTHER)["holder"] == "#1545"
 
 
+def test_concurrent_acquires_do_not_both_win(tmp_path):
+    """TOCTOU: two threads racing acquire() on the same resource never both win.
+
+    Without a lock held across read -> decide -> append, both threads can read
+    "free" before either appends, and both then append an `acquire` record --
+    a double lease on a single-writer resource. With the critical section
+    locked, exactly one thread wins and the other is refused by name.
+    """
+    import threading
+
+    ledger = _ledger(tmp_path)
+    barrier = threading.Barrier(2)
+    results: list[object] = [None, None]
+
+    def take(index, holder):
+        barrier.wait()
+        try:
+            results[index] = resource_lease.acquire("tf-state:onprem", holder, path=ledger, now=BASE)
+        except resource_lease.ResourceClaimRefused as refused:
+            results[index] = refused
+
+    threads = [
+        threading.Thread(target=take, args=(0, "#1")),
+        threading.Thread(target=take, args=(1, "#2")),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    wins = [r for r in results if isinstance(r, dict)]
+    refusals = [r for r in results if isinstance(r, resource_lease.ResourceClaimRefused)]
+    assert len(wins) == 1, f"expected exactly one winner, got {results!r}"
+    assert len(refusals) == 1
+    assert refusals[0].reason == resource_lease.REASON_CLAIMED
+    # The ledger itself carries exactly one acquire, not two.
+    assert sum(1 for row in _rows(ledger) if row["event"] == "acquire") == 1
+
+
 def test_the_same_holder_renews_rather_than_being_refused(tmp_path):
     """One holder running its own phases twice is not two owners contending."""
     ledger = _ledger(tmp_path)
