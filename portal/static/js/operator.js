@@ -248,8 +248,20 @@
     if (known) {
       permitted.forEach(function (id) { allowed[String(id)] = true; });
     }
+    /* A family this caller cannot reach at all must not appear on screen just
+     * because one of its verbs happens to be unexposed — that would leak the
+     * family's existence to a caller with no capability in it. An unexposed
+     * ("withheld") row is shown only inside a family where the caller already
+     * has at least one runnable verb; same fail-closed rule as everything
+     * else here (an unknown `permitted` shows nothing). */
+    var reachableFamilies = {};
+    if (known) {
+      rows.forEach(function (row) {
+        if (row.exposed && allowed[row.id] === true) reachableFamilies[row.family] = true;
+      });
+    }
     return rows.filter(function (row) {
-      if (!row.exposed) return true;
+      if (!row.exposed) return known && reachableFamilies[row.family] === true;
       return known && allowed[row.id] === true;
     });
   }

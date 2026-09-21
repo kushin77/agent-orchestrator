@@ -187,7 +187,11 @@ def console(browser, tmp_path, monkeypatch):
     fleet = FleetProjection(
         repo_root=REPO_ROOT, console=fleet_console, enabled=True, poll_interval=0.05
     )
-    app = build_app(sso=console_sso(), fleet_projection=fleet)
+    # operator_terminal ships flag-gated OFF (GR-5); this real-browser fixture
+    # exercises the promoted surface, so it injects the promotion the same way
+    # `build_app`'s own constructor seam is meant to be used — never by relying
+    # on the committed registry's default.
+    app = build_app(sso=console_sso(), fleet_projection=fleet, operator_terminal_enabled=True)
     lever = RecordingLever()
     install(app, RemoteControl(app=app, enabled=True, lever=lever, commands=SpyLedger()))
     _bind(app, PARTIAL_EMAIL, PARTIAL_ROLE)
