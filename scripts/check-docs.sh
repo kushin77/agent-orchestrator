@@ -49,6 +49,10 @@
 #   bash scripts/check-docs.sh --self-test         prove the marker rule AND the
 #                                                  docs-index rule (issue #629)
 #                                                  each fire both ways
+#   bash scripts/check-docs.sh --fix               regenerate the docs index
+#                                                  table (issue #1672); never
+#                                                  hand-edit docs/README.md's
+#                                                  index — run `make docs-index`
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -414,6 +418,9 @@ case "${1:-}" in
     marker_self_test || self_test_rc=1
     docs_index_self_test || self_test_rc=1
     exit "$self_test_rc"
+    ;;
+  --fix)
+    exec python3 "$root/scripts/docs-index-fix.py"
     ;;
   -h|--help)
     usage
