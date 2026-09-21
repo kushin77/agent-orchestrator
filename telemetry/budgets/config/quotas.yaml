@@ -35,6 +35,15 @@ planDefaults:
 tenantQuotas:
   # enterprise tenant: inherits enterprise plan defaults, overrides requests
   # upward (per-tenant override wins).
+  # purebliss (single-tenant org: CEO/CTO/CFO/PMO offices): enterprise plan,
+  # daily token ceiling matches telemetry/metering/config/budgets.yaml's
+  # dailyTokenLimit for tenantId purebliss (3,000,000/day).
+  - tenantId: purebliss
+    plan: enterprise
+    quotas:
+      requests: { window: day, softLimit: 4000, hardLimit: 20000 }
+      tokens: { window: day, softLimit: 2500000, hardLimit: 3000000 }
+      concurrency: { softLimit: 24, hardLimit: 60 }
   - tenantId: acme
     plan: enterprise
     quotas:

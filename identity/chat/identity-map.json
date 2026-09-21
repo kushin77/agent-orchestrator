@@ -4,6 +4,13 @@
   "bindings": [
     {
       "client": "openwebui",
+      "externalId": "kushin77@gmail.com",
+      "tenantId": "purebliss",
+      "agentId": "claude",
+      "role": "chat-operator"
+    },
+    {
+      "client": "openwebui",
       "externalId": "ada@acme.example",
       "tenantId": "tenant-acme",
       "agentId": "coder",

@@ -71,6 +71,10 @@ reachable from this index.
 | [`OBSERVABILITY.md`](OBSERVABILITY.md) | Observability — the monitoring boundary for agent-orchestrator; declared and gated (issue #496, EPIC #494). |
 | [`QA-GATE.md`](QA-GATE.md) | QA gate stack — `make gate`, qa-loop and merge gate (issue #29). |
 | [`SURFACE-CLASS.md`](SURFACE-CLASS.md) | Per-surface target solution-classes — the CMR quality rung each product surface declares. |
+| [`cfo/COST-MODEL-2026-09-20.md`](cfo/COST-MODEL-2026-09-20.md) | CFO office enterprise cost model — every figure tagged MEASURED / DECLARED / UNKNOWN-with-source, each price traced to `telemetry/metering/rate_cards/*.yaml` and no billing number fabricated (CFO office, parent #1510). |
+| [`cfo/PROMPT-REDUCTION-PLAN.md`](cfo/PROMPT-REDUCTION-PLAN.md) | CFO office prompt-reduction program, target 90%+ — every baseline cell cites a row of the cost model's §6, plus the harness-injected surface measured from the transcript (parent #1510). |
+| [`cto/HARVEST.md`](cto/HARVEST.md) | CTO office harvest provenance (GR-10) — read-only mining of `/home/akushnir/leaderboard` and `capital-underwriting`, declarative doctrine only, no application code copied (issue #1573, parent #1510). |
+| [`tenancy/PUREBLISS-ORG.md`](tenancy/PUREBLISS-ORG.md) | The `purebliss` single-tenant org — CEO/CTO/CFO/PMO offices as declarative IaC seeds, with the file-by-file source-of-truth table (issue #1571). |
 | [`MECHANICAL-EXECUTION-LAYER.md`](MECHANICAL-EXECUTION-LAYER.md) | Mechanical execution layer — concept & intent (intent-only spec, issue #239). |
 | [`BOARD-ATTACK-PLAN.md`](BOARD-ATTACK-PLAN.md) | Board attack plan (milestone → epic → class) — the PMO coordination artifact; no product code. |
 | [`FLEET-STATE.md`](FLEET-STATE.md) | Unified fleet-state projection across the five stores one work item touches (issue #323). |
