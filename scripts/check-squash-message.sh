@@ -67,9 +67,29 @@
 # ---knowledge---
 set -u
 
-source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
-root="$(find_repo_root)"
-cd "$root" || exit 2
+# The shared helper resolves the repo root from THIS script's own location. In a
+# checkout that carries the script but not `scripts/lib/common.sh` the `source`
+# fails, `find_repo_root` is never defined, and the `cd` below then ran on an
+# empty string — a raw `cd: null directory` shell error instead of a refusal
+# (measured against a scratch tree holding only this script, issue #1839). An
+# unresolvable root is CANNOT-ASSESS naming the shared predicate, never a shell
+# error. The same unguarded shape exists at the other call sites of the #1753
+# migration; those are outside this lane and are reported, not changed.
+lib="$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+if [ ! -f "$lib" ]; then
+  echo "check-squash-message: CANNOT-ASSESS — $lib is missing, so the repo root cannot be resolved and the shared predicate (governance/isolation/trailer.py) cannot be located" >&2
+  exit 2
+fi
+source "$lib"
+root=""
+if ! root="$(find_repo_root)" || [ -z "$root" ] || [ ! -d "$root" ]; then
+  echo "check-squash-message: CANNOT-ASSESS — the repo root could not be resolved (find_repo_root returned '${root}'), so the shared predicate (governance/isolation/trailer.py) cannot be located" >&2
+  exit 2
+fi
+cd "$root" || {
+  echo "check-squash-message: CANNOT-ASSESS — cannot enter the resolved repo root '$root', so the shared predicate (governance/isolation/trailer.py) cannot be located" >&2
+  exit 2
+}
 
 usage() {
   printf 'usage: %s --pr <number> | --self-test\n' "$0" >&2
