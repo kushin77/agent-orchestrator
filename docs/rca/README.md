@@ -14,3 +14,7 @@ Filename: `docs/rca/<yyyy-mm-dd>-<slug>.md`.
 - [`2026-09-16-pr-queue-clearing.md`](2026-09-16-pr-queue-clearing.md) — the
   zero-byte gate-lock wedge (RCA-0007) and the shared-core-file collision
   class (RCA-0008) from a 17-PR queue-clearing session.
+- [`2026-09-21-pr-release-lifecycle.md`](2026-09-21-pr-release-lifecycle.md) —
+  the PR lifecycle gap report (epic #1669): stale merge trains, shared-index
+  collisions, box-state gates redding every lane, hand-typed PR bodies, and
+  the templated issue → merge → close-out state machine that replaces them.
