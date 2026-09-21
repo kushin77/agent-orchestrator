@@ -168,7 +168,11 @@ def master_health_is_green_by_default(isolate_fleet_runtime, monkeypatch):
 
 
 #: The executable the fleet's default runner names (`terminal.DEFAULT_RUNNER`).
-DEFAULT_RUNNER_BINARY = "claude"
+#: Issue #1787 moved that default to the native DeepSeek CLI, so the stand-in below
+#: is named after whatever the default actually is. A suite that drives the run path
+#: must resolve the real default; naming it here is how the two stay in step, and a
+#: mismatch fails loudly rather than silently resolving some other binary.
+DEFAULT_RUNNER_BINARY = "deepseek"
 
 
 @pytest.fixture(autouse=True)
