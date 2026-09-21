@@ -1,0 +1,11 @@
+{
+  "_orchestrator_prompt_intake": {
+    "decision": "non-routing",
+    "scope": "interactive-claude-code-sessions",
+    "authority": "docs/decision-records/ADR-0034-interactive-prompt-intake-non-routing.md",
+    "rationale": ".claude/README.md",
+    "project_hooks": "none-by-design",
+    "statement": "No orchestrator routing by design for interactive sessions. An interactive prompt reaches the model directly; autonomous work reaches fleet/ and governance/dispatch/ as an order or a claim, never as a prompt. See the ADR above and .claude/README.md."
+  },
+  "hooks": {}
+}
