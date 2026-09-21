@@ -256,6 +256,7 @@ def test_a_peer_overlap_aborts_the_dispatch_before_any_model_runs(tmp_path):
     trail = tmp_path / "dispatch-audit.jsonl"
     invoked: list[tuple[str, str, str]] = []
     comments: list[tuple[int, str]] = []
+    applied_labels: list[tuple[int, str]] = []
 
     with pytest.raises(tiered.TieredRefusal) as exc:
         tiered.run(
@@ -266,7 +267,7 @@ def test_a_peer_overlap_aborts_the_dispatch_before_any_model_runs(tmp_path):
             agent="ao-sub-1625",
             at=_now(),
             invoke=lambda tier, provider, model: invoked.append((tier, provider, model)) or 0,
-            apply_label=lambda issue, label: None,
+            apply_label=lambda issue, label: applied_labels.append((issue, label)),
             post_comment=lambda issue, text: comments.append((issue, text)),
             peer_gate=lambda issue, body, agent: (
                 "peer-check REFUSED: OVERLAP — sibling ao-sub-12 on #12 "
@@ -284,7 +285,9 @@ def test_a_peer_overlap_aborts_the_dispatch_before_any_model_runs(tmp_path):
     records = audit.read(trail)
     assert records == []
     assert not any(record.get("status") == "pass" for record in records)
-    # The abort was announced (escalation protocol) before the refusal was raised.
+    # The abort was announced (escalation protocol) before the refusal was raised,
+    # and escalated per #1524's own protocol: the `escalate:*` label is applied.
+    assert applied_labels == [(999, "escalate:L1")]
     assert len(comments) == 1
     assert "tiered dispatch aborted before dispatch" in comments[0][1]
     assert "ao-sub-12" in comments[0][1]

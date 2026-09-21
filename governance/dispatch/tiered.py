@@ -425,6 +425,14 @@ def run(
         peer_gate = _default_peer_gate
     refusal = peer_gate(issue_number, body, agent)
     if refusal:
+        # Escalate per #1524's own protocol: surface the abort (comment) and
+        # climb the issue to the next tier so a senior tier / human resolves the
+        # file conflict — the SAME `escalate:*` label the failed-attempt path
+        # applies. The refusal is raised only after both side effects, so the
+        # abort is announced before the loop stops, never silently.
+        next_label = escalate_label_for(tier, data)
+        if next_label is not None:
+            apply_label(issue_number, next_label)
         post_comment(issue_number, f"tiered dispatch aborted before dispatch: {refusal}")
         raise TieredRefusal("peer-overlap", refusal)
 

@@ -363,7 +363,7 @@ echo "== the standard is written down where a lane reads it, and the assertion c
 # Cadence #1625 point 4: a card rule that nothing checks is advisory, so the rule
 # text is asserted present here, not merely authored in the card. The predicate is
 # the same grep both times, so this arm proves it discriminates rather than runs.
-rule_text="refuse to touch files in OVERLAP"
+rule_text="before starting work, run the peer-check standard; refuse to touch files in OVERLAP"
 card_hits="$(grep -lF -- "$rule_text" registry/personas/cards/*.yaml 2>/dev/null || true)"
 if [ -n "$card_hits" ]; then
   ok "at least one SME card carries the peer-check rule text: $(printf '%s' "$card_hits" | tr '\n' ' ')"
