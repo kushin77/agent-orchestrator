@@ -788,6 +788,7 @@ PY
 cat "$work/mutate.txt"
 mutant_wiring_rc=0
 python3 "$work/assert-wiring.py" "$work/mutant/scripts/verify.sh" > "$work/mutant-wiring.txt" 2>&1 || mutant_wiring_rc=$?
+echo "      (the mutated COPY is EXPECTED to be refused: the findings below are the negative control's evidence, not a failure of this run -- the mutation is what makes the assertion's failing path visible)"
 sed 's/^/      /' "$work/mutant-wiring.txt"
 if [ "$mutate_rc" -ne 0 ]; then
   check "a verify.sh without the invocation is refused by the wiring assertion" 1 \
@@ -1024,10 +1025,20 @@ shim = work / "shim"
 
 # Byte-identical copies of the orchestrator surface verify.sh needs, exactly as
 # scripts/check-gate-lock.sh mounts its own scratch worktree.
+#
+# `scripts/lib/common.sh` is LOAD-TIME, not call-time: since #1753 both
+# `scripts/gate-lock.sh` and `scripts/discover-checks.sh` `source` it at the top
+# of the file for `find_repo_root`. A shim that omits it leaves `find_repo_root`
+# undefined, so gate-lock.sh resolves an EMPTY root and verify.sh exits 2
+# (CANNOT-ASSESS, "the gate permit store is unusable") instead of admitting the
+# gate -- every scenario below would then read rc 2 regardless of its budget, and
+# the whole composite section would prove nothing. Carrying it is the same remedy
+# #1840 applied to the futureproof fixture tree.
 ORCHESTRATOR = (
     "scripts/verify.sh",
     "scripts/gate-lock.sh",
     "scripts/discover-checks.sh",
+    "scripts/lib/common.sh",
     "scripts/lib/skip-ratchet.py",
     "scripts/lib/validate-attestation.py",
     "governance/isolation/attestation.schema.json",
