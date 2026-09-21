@@ -27,6 +27,23 @@ declared in ``infra/feature-flags/registry.yaml`` under ``surfaces`` and read
 here through the same fail-closed reader the fleet projection uses
 (``portal.server.fleet.read_surface_default``), and while it is off every
 ``/api/portal/*`` route is refused by the app.
+
+
+---knowledge---
+module_id: portal.server.surfaces
+system: portal
+app: server
+solution_class: pattern
+patterns: [pinned-feed-serving, empty-and-honest, feature-flag-gated-off]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PortalSurfacesFeed, load_pinned_feed]
+invariants: "a missing, unreadable or non-conforming pin is served as an explicitly unresolved document with an empty surfaces list, never fabricated"
+gotchas: "the served document is registry/portal-surfaces.pinned.json - this adapter never invents a surface"
+related: ["#350"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

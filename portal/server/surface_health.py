@@ -43,6 +43,23 @@ names only the surfaces it actually serves, for the same reason ``/console``
 answers ``404 feature_disabled`` while the flag is off — an unpromoted surface is
 *absent*, not merely unauthorised, so a probe must not be able to enumerate what
 does not exist yet.
+
+
+---knowledge---
+module_id: portal.server.surface_health
+system: portal
+app: server
+solution_class: pattern
+patterns: [four-state-vocabulary, not-a-boolean, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [readiness, console_readiness, SurfaceSpec, Readiness, spec]
+invariants: "a surface that cannot be measured is never ready; the readiness vocabulary is four states, never a boolean"
+gotchas: "an unpromoted surface stays anonymous on the HTTP rail"
+related: ["#802"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

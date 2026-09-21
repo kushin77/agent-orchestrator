@@ -20,6 +20,23 @@ Consumed read-only from the merged ``identity/sso`` lane (issue #35):
 RBAC is never taken from the token: the local allowlist decides super-admin,
 and a scoped user's tenant roles come from the org directory (``authz``), so a
 token can never promote itself.
+
+
+---knowledge---
+module_id: portal.server.sso
+system: portal
+app: server
+solution_class: enterprise
+patterns: [verify-not-mint, fail-closed, consumed-contract, rbac-not-from-token]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ConsoleSso, ConsoleIdentity, load_auth_gate_jwks, trusted_keys_from_jwks, configured_root_admin_emails]
+invariants: "the portal verifies the OS auth-gate RS256 token offline and fails closed on every error; it mints nothing and re-implements no JOSE"
+gotchas: "RBAC is never taken from the token - the local allowlist decides super-admin and a token can never promote itself"
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

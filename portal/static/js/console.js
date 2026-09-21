@@ -1,4 +1,19 @@
 /* agent-orchestrator console — shell chrome (issue #39)
+ * ---knowledge---
+ * module_id: portal.static.js.console
+ * system: portal
+ * app: static
+ * solution_class: pattern
+ * patterns: [frame-host, per-frame-no-cascade]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L0
+ * interfaces: [portal/static/views/shell.html]
+ * invariants: "each nav target loads an isolated view frame that links its own tokens.css + console.css"
+ * gotchas: "an unauthenticated /api/console/me redirects the shell to /auth/login"
+ * related: ["#39"]
+ * do_not_duplicate: null
+ * ---knowledge---
  * The shell is the super-admin/tenant frame host: rail navigation, tenant
  * switcher, dark-mode toggle. Each nav target loads a view *frame* that links
  * tokens.css + console.css independently (per-frame no-cascade). */

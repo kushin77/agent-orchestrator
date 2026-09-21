@@ -16,6 +16,23 @@ whose enforcement lives in :class:`PolicyEnforcer`; each entry's
 State lives in :class:`PolicyStateStore` (per-tenant, server-side), never in
 the browser. :class:`PolicyEnforcer.evaluate` turns that state into an
 enforcement decision, so a toggled control demonstrably changes policy state.
+
+
+---knowledge---
+module_id: portal.server.controls
+system: portal
+app: server
+solution_class: pattern
+patterns: [flag-gated-off, single-source-vocabulary, server-side-state]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ControlCatalog, PolicyControl, build_control_policy_map, PolicyStateStore, PolicyEnforcer]
+invariants: "control state lives server-side, never in the browser; every control ships enabled:false until deliberately flipped"
+gotchas: "consumes the guardrails controls registry vocabulary, never redefines it"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

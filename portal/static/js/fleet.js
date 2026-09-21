@@ -1,4 +1,19 @@
 /* agent-orchestrator console — fleet single-pane-of-glass (issue #332)
+ * ---knowledge---
+ * module_id: portal.static.js.fleet
+ * system: portal
+ * app: static
+ * solution_class: pattern
+ * patterns: [render-only, sse-in-place-mutation, shared-source-fidelity]
+ * derives_from: null
+ * owner_sme: frontend-sme
+ * tier: L1
+ * interfaces: [portal/static/views/fleet.html]
+ * invariants: "the module re-implements none of the projection - it renders what the server half sends; each SSE frame mutates the DOM in place, never re-navigating"
+ * gotchas: ""
+ * related: ["#332", "#331"]
+ * do_not_duplicate: null
+ * ---knowledge---
  *
  * The browser half of the web single-pane-of-glass. The server half (issue
  * #331) already projects `fleet/console.py snapshot()` over HTTP:

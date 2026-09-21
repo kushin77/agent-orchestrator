@@ -18,6 +18,23 @@ hydrates it from the control plane's real stores on this checkout (issue #348):
   org directory + per-tenant agent *bindings* are console configuration.
 * persona cards + prompt modules (versions) — ``registry/personas|prompts``
 * approval-gated destructive ops — ``identity/cpapi`` approvals shape
+
+
+---knowledge---
+module_id: portal.server.state
+system: portal
+app: server
+solution_class: pattern
+patterns: [projection, live-hydration, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ConsoleState, Tenant, OrgAgent, PersonaCard, PromptModule, Approval, OrgBinding, seed_state]
+invariants: "a roster referencing a profile the registry does not publish fails closed; a tenant with no declared telemetry policy reads as nothing declared, never an invented number"
+gotchas: ""
+related: ["#348"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

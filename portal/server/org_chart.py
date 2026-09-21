@@ -40,6 +40,23 @@ The surface ships **feature-flag-gated OFF** (GR-5): the flag is declared in the
 portal's own ``portal/config/feature-flags.yaml`` and read here through
 ``portal.server.config_flags``; while it is off the app refuses every
 ``/api/orgchart/*`` route before authentication.
+
+
+---knowledge---
+module_id: portal.server.org_chart
+system: portal
+app: server
+solution_class: pattern
+patterns: [read-model, join-not-own, honest-absence]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [OrgChartView]
+invariants: "an undeclared budget is null, never 0; the chart is served whole or refused, never invented"
+gotchas: "if the declaration cannot be read or fails its own validator the answer is an explicitly unresolved document with an empty nodes list"
+related: ["#642"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

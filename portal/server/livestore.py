@@ -29,6 +29,23 @@ telemetry — never hardcoded demo rows (issue #348):
   never an invented number.
 
 Everything here is read-only and pure; nothing writes to the consumed stores.
+
+
+---knowledge---
+module_id: portal.server.livestore
+system: portal
+app: server
+solution_class: pattern
+patterns: [read-only-adapter, fail-closed, single-seam, content-addressed-selection]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RegistrySnapshot, TelemetrySnapshot, resolve_seed_path, BoardSnapshot, load_board_rows]
+invariants: "the console can never project an agent the registry does not know; nothing here writes to the consumed stores"
+gotchas: "Path.glob yields filesystem order, so live-revision selection lives in exactly one place (resolve_seed_path), never restated"
+related: ["#348", "#794"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

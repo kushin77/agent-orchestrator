@@ -51,6 +51,23 @@ principal, exactly like the portal-surfaces feed (``/api/portal/surfaces``).
 The ``telemetry`` family is tenant-scoped: the app passes the caller's visible
 tenants through the same rule the live feed uses, and a caller with no visible
 tenant is refused rather than shown an empty feed.
+
+
+---knowledge---
+module_id: portal.server.bridge
+system: portal
+app: server
+solution_class: enterprise
+patterns: [versioned-facade, delegate-never-re-derive, re-read-every-call, feature-flag-gated-off]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LiveBridge, CONTRACT]
+invariants: "every read re-reads its source on every call; the push channel carries revisions, never tenant data"
+gotchas: "the contract is ao.bridge/v1 and the surface ships feature-flag-gated OFF"
+related: ["#339"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
