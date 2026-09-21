@@ -663,7 +663,14 @@ def _caller_files_from_live(
     return ()
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None, *, now: datetime | None = None) -> int:
+    """Run the check for the command line.
+
+    ``now`` is the evaluation instant the claim TTL is resolved against. It
+    defaults to ``None`` — the live clock — so production behaviour is unchanged;
+    a gate passes a pinned instant so whether a fixture claim is live does not
+    depend on the day the suite runs (docs/PYTHON-PATTERNS.md PP-1).
+    """
     args = build_parser().parse_args(argv)
     if args.standard:
         print(__doc__)
@@ -729,7 +736,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         print(f"peer-check: CANNOT-ASSESS — {exc}", file=sys.stderr)
         return EXIT_CANNOT_ASSESS
-    live = claims_mod.active_claims(events)
+    live = claims_mod.active_claims(events, now)
 
     try:
         caller_files = _parse_files_arg(args.files) if args.files else ()
