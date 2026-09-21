@@ -77,6 +77,12 @@ indirect_reads:
   - path: fleet/watchdog.py
     sites: 2
     reason: the watchdog resolves its rung tunables from caller-supplied names.
+  - path: gateway/providers/nous.py
+    sites: 1
+    reason: >-
+      the API-key read resolves its variable from a caller-supplied name
+      (`os.environ.get(env or NOUS_API_KEY_ENV, "")`), so the scanner cannot
+      resolve it statically.
   - path: telemetry/clock.py
     sites: 2
     reason: >-
@@ -170,6 +176,14 @@ variables:
     secret: false
     required_by: [deploy, local-run]
     readers: [portal/server/chat.py]
+  - name: AO_PORTAL_DEMO
+    purpose: >-
+      local-runtime-only override (issue #1771, `make portal-demo`): every
+      declared feature-flag surface reads "on" regardless of
+      portal/config/feature-flags.yaml. Never read in production boots.
+    secret: false
+    required_by: [local-run]
+    readers: [portal/server/config_flags.py]
   - name: AO_CONTROL_SLOG
     purpose: the signed control-audit log the console appends control-plane events to.
     secret: false

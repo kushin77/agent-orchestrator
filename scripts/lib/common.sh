@@ -32,7 +32,13 @@
 # Call this directly from a script's top level (not from inside another
 # function), matching how the 188 duplicate call sites used it.
 find_repo_root() {
-  cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd
+  # Bash-builtin dirname (no external `dirname`): operator.sh's honesty check
+  # (#763) strips PATH down to nothing to prove the operator path fails on a
+  # missing `tmux` by name rather than dying on a missing coreutil first.
+  local src="${BASH_SOURCE[1]}"
+  local dir="${src%/*}"
+  [ "$dir" = "$src" ] && dir="."
+  cd "$dir/.." && pwd
 }
 
 # contains <haystack> <needle> — bash-native substring test; used instead of
