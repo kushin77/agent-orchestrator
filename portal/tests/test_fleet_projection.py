@@ -333,9 +333,10 @@ def test_flag_on_serves_every_fleet_route(fleet):
     for path in ("/api/fleet/snapshot", "/api/fleet/events"):
         status, payload = api.get(path)
         assert status == 200, f"{path} should be accessible when flag is ON"
-    # stream is special — it's a streaming endpoint
-    status, response = api.get("/api/fleet/stream")
-    assert status == 200, "/api/fleet/stream should be accessible when flag is ON"
+    # stream is special — it's a streaming endpoint that returns StreamResponse
+    response = app.handle("GET", "/api/fleet/stream", cookies=api.cookies)
+    assert isinstance(response, StreamResponse)
+    assert response.content_type.startswith("text/event-stream")
 
 
 def test_flag_on_serves_the_surface(fleet):
