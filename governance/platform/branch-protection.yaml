@@ -147,3 +147,119 @@ required_status_contexts:
 # `cto-root` team name matches the root principal's declared `github.team`.
 bypass_actors:
   - cto-root
+# ---- merge identity — the ONE principal that may put a commit on `master` ----
+# (kushin77/agent-orchestrator#1276)
+#
+# THE DEFECT THIS DECLARES AWAY. Everything above is about what may happen to
+# `master`'s HISTORY (no force-push, no deletion, a required status check). None
+# of it says WHO may merge into it, and the measured answer on 2026-09-20 was:
+# anybody with a token. Eleven DIRECT merges landed in 36 hours from Claude and
+# DeepSeek sessions alike, each carrying the owner's own token, while the
+# doctrine said "use the queue" and `scripts/merge-pr.sh`'s own header admitted
+# it could not stop a deliberate bypass. A rule whose enforcement is who was
+# told what is advice (GR-29).
+#
+# WHAT IS DECLARED. One principal — a GitHub App / machine user, `ao-merge-queue`
+# — holds `merge-to-master`. Every other principal is refused: an agent runtime's
+# token carries `contents: write` on BRANCHES and `pull_requests: write`, and
+# never merge authority on `master`. The single exception is the named
+# break-glass actor, and its use is time-boxed, logged and paged.
+#
+# WHAT IS NOT DECLARED HERE, AND WHY. `protection` above is what
+# `scripts/branch-protection.sh apply` PUTs to GitHub's branch-protection API,
+# and that API object has no field naming a merge principal — the restriction
+# lives in the RULESET API (org-level `bypass_actors` + repo ruleset), whose
+# application needs org admin and is a deliberate operator step, exactly like
+# `required_status_contexts` and `bypass_actors` above. So this block is the
+# DECLARATION (what the platform state must be), and the half that can be
+# MEASURED offline — which code paths can invoke a merge, and whether every
+# break-glass use left a record — is enforced by
+# `scripts/check-merge-identity.sh` (auto-discovered by `scripts/verify.sh`).
+# The platform half of that gate is CANNOT-ASSESS until a reading of the live
+# ruleset is supplied; the operator step is printed by the gate and recorded in
+# the landing PR's body. Never a pass for a read that did not happen (#739).
+merge_identity:
+  schema: ao.merge-identity/v1
+  principal: ao-merge-queue
+  principal_kind: github-app
+  rights:
+    - merge-to-master
+    - push-to-master
+  # The queue identity's CODE SURFACE: the paths that invoke a merge, and
+  # therefore the only paths that may run as that principal. This list is not
+  # documentation — `scripts/check-merge-identity.sh` asserts it EQUALS the set
+  # of files its scanner detects invoking a merge, in BOTH directions:
+  #   * an invocation in a file that is not listed => refused by name
+  #     (`merge-invocation-outside-queue-identity:<file>:<line>`);
+  #   * a listed path the scanner cannot find an invocation in => refused by
+  #     name (`merge-path-declared-without-invocation:<file>`).
+  # So the surface cannot quietly grow (a new merge path is red until it is
+  # declared) and cannot quietly rot (a stale entry is red too).
+  merge_paths:
+    - scripts/pr-queue.sh
+    - scripts/merge-pr.sh
+    - governance/landing/ports.py
+    - governance/lifecycle/cli.py
+  # Files that CARRY a merge verb without being a merge path: the guards that
+  # test the transports, the prose in code, the declarations that name the verb.
+  # Listing them is the reviewed answer to "is this file a merge path?"; the
+  # point of the list is that a NEW file carrying the verb is refused by name
+  # (`merge-surface-undeclared:<file>`) until somebody answers that question in
+  # a review, rather than landing invisibly.
+  verb_only_paths:
+    - Makefile
+    - fleet/runner/model.py
+    - fleet/runner/tests/test_plan.py
+    - fleet/runner/tests/test_transports.py
+    - fleet/tests/test_terminal.py
+    - governance/isolation/landed-baseline.json
+    - governance/isolation/tests/test_squash_message.py
+    - governance/landing/cli.py
+    - governance/landing/engine.py
+    - governance/landing/tests/test_cli_write_master_attestation.py
+    - governance/lane-record/tests/test_lane_record.py
+    - governance/lifecycle/tests/test_squash_message_gate.py
+    - governance/platform/repo-settings.yaml
+    - governance/spawn/render.py
+    - scripts/check-landing.sh
+    - scripts/check-lane-record.sh
+    - scripts/check-merge-guard.sh
+    - scripts/check-pr-contract.sh
+    - scripts/check-pr-queue-squash-guard.sh
+    - scripts/check-pr-runner.sh
+    - scripts/check-squash-message.sh
+    - scripts/lib/gh-bounded.sh
+    # The gate itself: it has to NAME the transports (its detector regexes, its
+    # header, and the self-test's planted fixtures — a plant that did not contain
+    # the real verb would provoke nothing, so the verb appears verbatim in this
+    # file). The entry is NOT an exemption: arm 3 still refuses a real
+    # INVOCATION found in this file, because it is not a merge path, so listing
+    # it here cannot hide one.
+    - scripts/check-merge-identity.sh
+  # The only other principal, and the conditions on it: a time-box, a record,
+  # and a page to the owner who acknowledges it.
+  break_glass:
+    actor: cto-root
+    actor_kind: team
+    rights:
+      - merge-to-master
+    max_window_minutes: 120
+    audit_record:
+      # The record's shape (JSON Schema), the validator that enforces it
+      # (stdlib-only, and it refuses a schema keyword it cannot enforce rather
+      # than under-enforcing it silently), the append-only journal of USES, and
+      # the directory of records. A use with no record is refused by name
+      # (`break-glass-use-without-audit-record:<id>`); so is a record that is
+      # malformed, attributed to a principal this declaration does not name, or
+      # outside `max_window_minutes`.
+      schema: governance/platform/break-glass/schema/record.schema.json
+      validator: governance/platform/break-glass/validate.py
+      journal: governance/platform/break-glass/uses.json
+      records_dir: governance/platform/break-glass/records
+    paging:
+      # What counts as "the owner was paged": the record must name the channel
+      # the page went to and the owner who acknowledged it. The requirement is
+      # declared here; the transport is the operator's, and the record is the
+      # evidence that it happened.
+      requires_channel: true
+      requires_owner_ack: true
