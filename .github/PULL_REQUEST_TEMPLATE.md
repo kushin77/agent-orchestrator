@@ -89,6 +89,17 @@ Gate-changing: <no | yes — paths>
 - [ ] This PR does not change a governed surface's measured class (docs/SURFACE-CLASS.md).
 - [ ] This PR changes one — I updated docs/SURFACE-CLASS.md in this same PR.
 
+## Code review (code-review-sme)
+
+<!--
+issue #1537: paste the code-review-sme persona's (registry/personas/cards/
+code-review-sme.yaml) review report for this diff — its line-by-line findings
+and verdict. For a non-code change (docs/config-only, no reviewable diff
+lines), write `N/A — doc-only change` instead.
+-->
+
+<the code-review-sme report, or `N/A — doc-only change`>
+
 ## Evidence
 
 Two outputs, each by its real command: the acceptance criteria the issue named,
