@@ -24,6 +24,22 @@ are all injectable hooks: the CLI wires the real ``gh``/subprocess
 implementations, the test suite injects fakes. Everything that talks to the
 network or the host is a hook; everything that decides (tier reading, model
 resolution, the escalation loop, the ledger write) is a pure function.
+
+---knowledge---
+module_id: governance.dispatch.tiered
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [dependency-injection, pure-function-core]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TieredRefusal, load_policy, read_tier, resolve_model, parse_acceptance_commands, run_commands, max_attempts_from, escalate_label_for]
+invariants: "everything that talks to the network or host is an injected hook; everything that decides is a pure function"
+gotchas: ""
+related: ["#1524"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
