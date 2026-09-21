@@ -19,6 +19,14 @@
 #
 # Nothing here decides WHO may call a verb; that is identity/rbac. This file
 # declares WHAT a verb is, what it costs to call it, and what it records.
+#
+# WHERE an invocation is recorded -- the canonical rail for each act, the row
+# each rail actually writes, and the measured fact that the `audit:` value below
+# is a label on that row and not a field in it -- is stated once, in
+# control-plane/control/README.md ("Where an invocation is recorded"). Read it
+# before assuming a control act is unlogged, or that
+# .board/dispatch-audit.jsonl is a ledger of these verbs: it is the
+# dispatch-arbitration rail, not this one (issue #1548).
 
 schema: cmr.control-verbs/v1
 
