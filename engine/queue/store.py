@@ -14,6 +14,22 @@ exclusive lock. Two stores back the seam, sharing one snapshot contract:
 
 The store never reasons about lifecycle — it only persists/restores a
 :class:`QueueSnapshot`. All policy lives in ``engine.queue.queue.JobQueue``.
+
+---knowledge---
+module_id: engine.queue.store
+system: engine
+app: queue
+solution_class: enterprise
+patterns: [persistence-seam, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [QueueSnapshot, Store, task_to_dict, task_from_dict, audit_to_dict, audit_from_dict, InMemoryStore, FileStore]
+invariants: ""
+gotchas: "the in-memory and file stores must round-trip the snapshot identically"
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

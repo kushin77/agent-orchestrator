@@ -15,6 +15,22 @@ namespace):
     python3 -m engine.memory.cli export --store /tmp/mem.json --tenant acme
     python3 -m engine.memory.cli forget --store /tmp/mem.json --tenant acme \\
         --scope session --dry-run
+
+---knowledge---
+module_id: engine.memory.cli
+system: engine
+app: memory
+solution_class: class
+patterns: [subcommand-table, tri-state-exit, offline-by-construction]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [cmd_store, cmd_get, cmd_search, cmd_enrich, cmd_export, cmd_forget, cmd_prune, cmd_stats, (+2 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -56,6 +56,22 @@ Contract doc: ``engine/loop/README.md``.  Owner lane: engine
 (``docs/EXECUTION-PLAN.md``).  Import as ``engine.loop.*`` from the repo root
 (``engine/`` is a PEP-420 namespace package) — the adapters additionally
 require ``engine.core``/``engine.queue`` (repo root on ``sys.path``).
+
+---knowledge---
+module_id: engine.loop.__init__
+system: engine
+app: loop
+solution_class: template
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [ModelTier, TIER_ORDER, next_tier, tier_rank, LoopOutcome, ActionKind, EscalationTrigger, EscalationTargetKind, (+28 more)]
+invariants: ""
+gotchas: ""
+related: ["#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from .escalate import (

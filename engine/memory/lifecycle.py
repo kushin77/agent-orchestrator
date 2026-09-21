@@ -5,6 +5,22 @@ policies per scope". This module owns the *policy vocabulary* (what a scope
 is allowed to hold and how long) plus the pure eviction primitive the store
 applies inline on every write. The store is the stateful actor; this module
 stays dependency-free so ``store`` can import it without a cycle.
+
+---knowledge---
+module_id: engine.memory.lifecycle
+system: engine
+app: memory
+solution_class: enterprise
+patterns: [lifecycle-state-machine, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [EvictionPolicy, ScopePolicy, default_policies, resolve_ttl, evict_down_to]
+invariants: "capacity, eviction and expiry are declared per scope; eviction removes only what policy allows"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

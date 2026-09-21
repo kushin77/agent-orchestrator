@@ -47,6 +47,22 @@ Contract doc: ``engine/multiagent/README.md``. Import as
 ``engine.multiagent.*`` from the repo root (engine/ is a PEP-420 namespace
 package); the base modules are importable from ``engine/`` on ``sys.path``
 too. Everything is offline, stdlib-only Python 3.14 + PyYAML.
+
+---knowledge---
+module_id: engine.multiagent.__init__
+system: engine
+app: multiagent
+solution_class: template
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [Lane, LaneRole, Mission, Subtask, AgentTask, AgentResult, ResultStatus, TaskKind, (+38 more)]
+invariants: ""
+gotchas: ""
+related: ["#24"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from .consensus import (

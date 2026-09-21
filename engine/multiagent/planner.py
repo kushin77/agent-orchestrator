@@ -9,6 +9,22 @@ work escalates back to the planner for re-planning — bounded by
 an injected callable (``decomposer``) so tests are fully deterministic; in
 production the decomposer is typically itself an agent loop exposed through
 the runner seam (``engine/loop``, issue #23 — see ``loop_seam.py``).
+
+---knowledge---
+module_id: engine.multiagent.planner
+system: engine
+app: multiagent
+solution_class: enterprise
+patterns: [derived-view, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [HierarchicalPlanner, static_decomposer, subtask_ok, make_subtask]
+invariants: ""
+gotchas: "the static decomposer is the honest fallback, not a fake planner"
+related: ["#24"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

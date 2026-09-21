@@ -19,6 +19,22 @@ Access model (the isolation contract, documented in ``README.md``):
 Semantics of a write: storing the same ``(container, key)`` again is an
 idempotent upsert (same deterministic ``memory_id``), so a re-store refreshes
 content/TTL/embedding instead of duplicating (unbounded growth prevention).
+
+---knowledge---
+module_id: engine.memory.store
+system: engine
+app: memory
+solution_class: enterprise
+patterns: [persistence-seam, tenant-scoped, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [MemoryStore, FileStore]
+invariants: ""
+gotchas: "the store seam has an in-memory and a file implementation that must agree"
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

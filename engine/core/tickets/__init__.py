@@ -18,6 +18,22 @@ beside it — so a restarted process replays the same ticket.
 
 Import as ``core.tickets`` with ``engine/`` on ``sys.path`` (mirrors the
 sibling ``core`` package).
+
+---knowledge---
+module_id: engine.core.tickets.__init__
+system: engine
+app: core
+solution_class: template
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [TicketState, TicketReview, TicketProjection, DecompositionOutcome, TicketLifecycleError, lifecycle_order, legal_moves, next_ticket_state, (+17 more)]
+invariants: ""
+gotchas: ""
+related: ["#634"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

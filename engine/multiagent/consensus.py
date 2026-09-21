@@ -11,6 +11,22 @@ explicit and carries a machine-readable reason (``all_abstained``,
 :func:`tally_votes` is the pure, deterministic decision core (heavily unit
 tested); :func:`run_consensus` obtains the votes through the injected runner
 seam so the whole protocol is testable with a scripted runner.
+
+---knowledge---
+module_id: engine.multiagent.consensus
+system: engine
+app: multiagent
+solution_class: enterprise
+patterns: [closed-vocabulary, deterministic-output, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [vote_from_agent_result, tally_votes, run_consensus]
+invariants: "a quorum outcome is declared, not inferred; an unreachable quorum is a named outcome"
+gotchas: ""
+related: ["#24"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

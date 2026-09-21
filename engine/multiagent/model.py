@@ -15,6 +15,22 @@ expertise consensus, policy gates) and ``services/ai-personas`` (persona
 archetypes mapped onto lanes), and ``capital-underwriting/scripts/agent/*``
 (dispatch daemon shapes).  Everything here is plain JSON-safe data so a plan
 or report can be embedded in an engine-core workflow event and replayed.
+
+---knowledge---
+module_id: engine.multiagent.model
+system: engine
+app: multiagent
+solution_class: enterprise
+patterns: [domain-model, closed-vocabulary, immutable-models]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LaneRole, ResultStatus, TaskKind, VoteChoice, ThresholdRule, ConsensusOutcome, Lane, validate_lanes, (+20 more)]
+invariants: "lane roles, kinds and vote choices are a closed vocabulary; lanes are validated before a run"
+gotchas: ""
+related: ["#24"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

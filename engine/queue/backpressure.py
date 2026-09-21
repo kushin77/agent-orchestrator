@@ -6,6 +6,22 @@ RUNNING). Beyond that bound the authority refuses new work with
 :class:`BackpressureError` rather than unboundedly growing memory/disk — the
 queue is bounded, so a runaway producer cannot starve the workers or hide a
 sick tenant behind an ever-growing backlog.
+
+---knowledge---
+module_id: engine.queue.backpressure
+system: engine
+app: queue
+solution_class: enterprise
+patterns: [tenant-scoped, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BackpressureError, open_count, would_exceed_budget]
+invariants: "admission is bounded per tenant; a queue over budget refuses rather than grows"
+gotchas: ""
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -3,6 +3,22 @@
 Mirror of the gateway/health YAML-config convention: a ``QueueConfig`` with
 sane defaults, optionally overridden from ``queue.yaml`` via ``load_config``.
 No network, no containers — everything runs on a caller-supplied clock.
+
+---knowledge---
+module_id: engine.queue.config
+system: engine
+app: queue
+solution_class: class
+patterns: [read-only-optional-input, schema-validated-loader]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [QueueConfig, default_config, load_config]
+invariants: "a missing config file yields the declared defaults"
+gotchas: ""
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

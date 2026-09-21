@@ -11,6 +11,22 @@ failure, never a silent pass).
 no network) but genuinely capable of failing: an object missing a required
 field, or a property of the wrong type, returns a non-empty error string.
 Tests exercise both the accept and the reject paths.
+
+---knowledge---
+module_id: engine.loop.schema
+system: engine
+app: loop
+solution_class: enterprise
+patterns: [schema-validation, closed-schema, reject-unknown-field, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [coerce_json, SchemaValidator, validate_output]
+invariants: "an output that does not satisfy its declared schema is refused, never coerced into validity"
+gotchas: ""
+related: ["#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

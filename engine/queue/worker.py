@@ -14,6 +14,22 @@ An exception — including ``SystemExit``, the Python analogue of a shell
 ``fail``: the queue records FAILED (or retries), never SUCCEEDED. A worker
 killed outright (no ack, no fail) leaves a leased task whose lease lapses;
 the orphan reaper then requeues or dead-letters it — again, never SUCCEEDED.
+
+---knowledge---
+module_id: engine.queue.worker
+system: engine
+app: queue
+solution_class: class
+patterns: [lifecycle-state-machine]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [Outcome, Worker]
+invariants: ""
+gotchas: ""
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

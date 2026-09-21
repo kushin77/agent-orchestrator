@@ -9,6 +9,22 @@ existing task instead of enqueueing a duplicate.
 Exact-fingerprint idea adapted from the issue-aggregator ``deduplication.py``
 (strategy 1, normalized fingerprinting); the semantic/trigram strategies there
 are ML/Postgres-bound and out of scope for an offline queue.
+
+---knowledge---
+module_id: engine.queue.dedup
+system: engine
+app: queue
+solution_class: enterprise
+patterns: [exactly-once, content-digest]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [canonical_json, fingerprint_payload, find_by_idempotency_key]
+invariants: "a repeated idempotency key resolves to the existing task; no second side effect is created"
+gotchas: ""
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

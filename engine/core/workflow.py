@@ -6,6 +6,22 @@ projects one :class:`EventRecord` onto the in-memory object exactly as
 built from a persisted log is therefore byte-for-byte equivalent to the live
 object the engine was mutating before an interruption — that equivalence is
 what makes resume-after-restart deterministic.
+
+---knowledge---
+module_id: engine.core.workflow
+system: engine
+app: core
+solution_class: enterprise
+patterns: [read-model, projection, replay-not-store, fail-closed]
+derives_from: null
+owner_sme: architecture-sme
+tier: L1
+interfaces: [StepExecutionState, WorkflowExecution]
+invariants: "the projection is derived from the event log and never becomes a second source of truth"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

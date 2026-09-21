@@ -20,6 +20,22 @@ Usage (from the repo root)::
 
 The state file defaults to ``$AO_QUEUE_STORE`` or ``<cwd>/.ao-queue.json``.
 Exit codes: 0 ok, 1 operational error, 2 usage.
+
+---knowledge---
+module_id: engine.queue.cli
+system: engine
+app: queue
+solution_class: class
+patterns: [subcommand-table, tri-state-exit, offline-by-construction]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [cmd_enqueue, cmd_claim, cmd_start, cmd_renew, cmd_ack, cmd_fail, cmd_reap, cmd_replay, (+5 more)]
+invariants: ""
+gotchas: ""
+related: ["#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -15,6 +15,22 @@ BUDGET_EXHAUSTED, FAILED — fails the task with the decision's reason, so the
 task lands in the queue's retry/dead-letter surface instead of being
 silently marked done.  A task whose worker dies mid-loop is handled by the
 queue's lease + orphan-reaper machinery (again never recorded SUCCEEDED).
+
+---knowledge---
+module_id: engine.loop.queue_adapter
+system: engine
+app: loop
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Outcome, LoopTaskProcessor]
+invariants: ""
+gotchas: "resolves queue tasks with the loop without re-declaring the queue's own lifecycle"
+related: ["#23", "#22"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

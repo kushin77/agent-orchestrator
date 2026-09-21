@@ -33,6 +33,22 @@ static-first / delta-last block discipline lifted from
    The pack is consumed as opaque bytes and never re-derived - the ADR-0018
    no-re-derivation rule: a shape that exists in a published contract is
    *consumed, never mirrored*.
+
+---knowledge---
+module_id: engine.memory.prompt_cache
+system: engine
+app: memory
+solution_class: enterprise
+patterns: [content-digest, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [estimate_tokens, scan_dynamic, contains_dynamic, PrefixError, render_memory_block, footprint, validate_block_order, split_static_dynamic, (+5 more)]
+invariants: "a block that contains dynamic content is refused as a cache prefix, never silently accepted"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

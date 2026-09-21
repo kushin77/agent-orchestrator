@@ -25,6 +25,22 @@ never a second copy of the machinery:
 
 Every handler writes its payload into the workflow's event log, so a resumed
 run reconstructs the whole ticket with no hidden in-memory state.
+
+---knowledge---
+module_id: engine.core.tickets.handlers
+system: engine
+app: core
+solution_class: enterprise
+patterns: [contract-first, lifecycle-state-machine, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [register_decomposer, resolve_decomposer, decomposition_from_report, TicketDecomposeHandler, TicketDispatchHandler, TicketExecuteHandler, TicketReviewHandler, TicketCloseHandler, (+1 more)]
+invariants: "the decomposer is resolved from a declared registry and an unregistered reference is refused"
+gotchas: ""
+related: ["#634"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

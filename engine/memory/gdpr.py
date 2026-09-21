@@ -13,6 +13,22 @@ JSON-serializable structures and never cross the tenant boundary.
   narrowed by agent/session/scope/kind. Deterministically ordered.
 * ``forget`` - erase a tenant's memories under the same filters, with a
   ``dry_run`` that reports what *would* be erased without deleting.
+
+---knowledge---
+module_id: engine.memory.gdpr
+system: engine
+app: memory
+solution_class: enterprise
+patterns: [tenant-scoped, lifecycle-state-machine, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ForgetReport, export_memory, forget]
+invariants: "forget is scoped and complete for its scope; export returns only the requesting tenant's data"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

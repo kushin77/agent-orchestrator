@@ -19,6 +19,22 @@ Built-in handler keys (registered by :class:`Engine`):
 A handler raises :class:`StepFailure` to record a domain failure into the
 event log; any other exception is also captured (with its message) as a step
 failure so the engine never dies mid-transcript.
+
+---knowledge---
+module_id: engine.core.handlers
+system: engine
+app: core
+solution_class: enterprise
+patterns: [contract-first, lifecycle-state-machine, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [StepContext, Handler]
+invariants: "a step handler returns a typed outcome; an unknown handler key is refused, never guessed"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

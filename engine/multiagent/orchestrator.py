@@ -11,6 +11,22 @@ Composes the two patterns from the issue into one deterministic run:
 Everything runs through the injected runner seam
 (``run_agent(agent_id, task) -> AgentResult``) so a scripted runner makes the
 whole composition deterministic and offline-testable.
+
+---knowledge---
+module_id: engine.multiagent.orchestrator
+system: engine
+app: multiagent
+solution_class: enterprise
+patterns: [lifecycle-state-machine, fail-closed]
+derives_from: null
+owner_sme: architecture-sme
+tier: L1
+interfaces: [MultiAgentOrchestrator]
+invariants: "the orchestrator joins its lanes' results; it owns no lane's own policy"
+gotchas: ""
+related: ["#24"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

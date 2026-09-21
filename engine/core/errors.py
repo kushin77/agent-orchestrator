@@ -6,6 +6,22 @@ corrupt event log from an illegal state transition without string matching.
 The root is :class:`EngineError`; handlers raise :class:`StepFailure` for a
 step/compensation that should be treated as failed (its message is recorded
 in the event log), not as a programming bug.
+
+---knowledge---
+module_id: engine.core.errors
+system: engine
+app: core
+solution_class: class
+patterns: [exception-taxonomy, single-root]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [EngineError, NamespaceError, UnknownNamespaceError, NamespaceExistsError, CrossNamespaceError, WorkflowError, UnknownWorkflowError, WorkflowValidationError, (+5 more)]
+invariants: "every core error derives from EngineError"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

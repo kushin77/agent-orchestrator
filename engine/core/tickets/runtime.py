@@ -18,6 +18,22 @@ or a log re-read from :class:`core.events.FileJsonlEventStore` after a
 restart — and refuses a log that skips a state, revisits one, or changes the
 tenant mid-flight.  Replay is deterministic: the same log always projects to
 the same :class:`TicketProjection`.
+
+---knowledge---
+module_id: engine.core.tickets.runtime
+system: engine
+app: core
+solution_class: enterprise
+patterns: [read-model, projection, tenant-scoped, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TicketRuntime]
+invariants: "the ticket projection is rebuilt from its own event stream, never hand-maintained"
+gotchas: ""
+related: ["#634"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

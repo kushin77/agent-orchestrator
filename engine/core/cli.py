@@ -8,6 +8,22 @@ It stands up an in-memory engine, provisions a tenant via the provisioning
 saga, runs a provider-agnostic task workflow through an injected fake model
 gateway, simulates an interruption + resume on a JSONL event log, and prints
 the resulting transcripts.  Everything is offline and deterministic.
+
+---knowledge---
+module_id: engine.core.cli
+system: engine
+app: core
+solution_class: class
+patterns: [subcommand-table, tri-state-exit, offline-by-construction]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: []
+invariants: ""
+gotchas: "a demo surface: it drives stand-in collaborators and invents no production state"
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

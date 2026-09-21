@@ -15,6 +15,22 @@ live here:
   (never down, never a cycle), then to a human, then to ``none`` — which is
   precisely why a loop is guaranteed to terminate: a session can escalate at
   most ``len(TIER_ORDER)-1`` times before it must settle or hand off.
+
+---knowledge---
+module_id: engine.loop.escalate
+system: engine
+app: loop
+solution_class: enterprise
+patterns: [derived-view-over-priority, explainable-score, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ComplexityScore, ComplexityScorer, EscalationDecision, EscalationEngine]
+invariants: "the complexity score is explainable and deterministic; escalation is decided by declared thresholds"
+gotchas: ""
+related: ["#23"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

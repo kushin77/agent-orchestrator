@@ -26,6 +26,22 @@ is deterministic from the policy).  Saga workflows never retry a step
 the registered compensations of every earlier succeeded step in *reverse*
 completion order, then the workflow ends ROLLED_BACK (or FAILED when a
 compensation itself fails).
+
+---knowledge---
+module_id: engine.core.runtime
+system: engine
+app: core
+solution_class: enterprise
+patterns: [lifecycle-state-machine, tenant-scoped, fail-closed]
+derives_from: null
+owner_sme: architecture-sme
+tier: L1
+interfaces: [RealClock, ExecutionReport, provisioning_spec, Engine]
+invariants: "execution is durable and replay-driven; every step is namespace-scoped and every effect compensatable"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

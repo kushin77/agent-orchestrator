@@ -7,6 +7,22 @@ pipeline pattern), and each round is bounded by ``max_fan_out`` — a plan that
 exceeds the bound is refused (``FanOutLimitError``), never silently trimmed.
 Disjoint-work validation enforces the model-level guarantee that work never
 collides across lanes (leaderboard fanout doctrine).
+
+---knowledge---
+module_id: engine.multiagent.fanout
+system: engine
+app: multiagent
+solution_class: enterprise
+patterns: [declared-authority, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [FanOutError, FanOutLimitError, PlanValidationError, validate_plan, FanOutDispatcher]
+invariants: "fan-out is bounded by the plan's declared limit; exceeding it is refused, never truncated silently"
+gotchas: ""
+related: ["#24"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

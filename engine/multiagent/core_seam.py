@@ -16,6 +16,22 @@ registers the multi-agent handlers:
 Both handlers import ``engine.core`` at call time via the repo-root PEP-420
 namespace (``engine/`` has no ``__init__.py``), matching the sibling
 ``engine.queue`` / ``engine.memory`` packages.
+
+---knowledge---
+module_id: engine.multiagent.core_seam
+system: engine
+app: multiagent
+solution_class: pattern
+patterns: [cross-engine-adapter, join-not-own, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [register_multiagent_handlers, fan_join_workflow, aggregate_report_from_join_output]
+invariants: ""
+gotchas: ""
+related: ["#24"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

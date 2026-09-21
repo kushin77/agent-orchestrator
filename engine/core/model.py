@@ -15,6 +15,22 @@ compensation shapes from ``shared-temporal/patterns/multi_tenancy.go`` and
 tracking shape from ``shared-temporal/governance/cost-tracking.ts``; the
 event-sourced workflow transcript shape from ``git-rca-workspace/
 src/core/workflow_engine.py``.
+
+---knowledge---
+module_id: engine.core.model
+system: engine
+app: core
+solution_class: enterprise
+patterns: [domain-model, closed-vocabulary, immutable-models]
+derives_from: null
+owner_sme: architecture-sme
+tier: L1
+interfaces: [WorkflowStatus, StepStatus, WorkflowKind, StepKind, EventKind, RetryPolicy, CostEntry, Compensation, (+10 more)]
+invariants: "statuses and kinds are a closed vocabulary; serialisation is lossless both ways"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

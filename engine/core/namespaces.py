@@ -12,6 +12,22 @@ Namespaces also carry the per-workflow cost + SLA aggregates harvested from
 ``shared-temporal/governance/cost-tracking.ts`` / ``sla-enforcement.ts``: a
 completed workflow is recorded into *its own* namespace's ledger, so a cost
 or SLA report for tenant B never includes tenant A's workflows.
+
+---knowledge---
+module_id: engine.core.namespaces
+system: engine
+app: core
+solution_class: enterprise
+patterns: [tenant-scoped, no-cross-tenant-default, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Namespace, plan_retention_days, NamespaceRegistry]
+invariants: "a namespace is the isolation boundary; a cross-namespace read is an error, never a fallback"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -15,6 +15,22 @@ A production deployment can inject a model-backed embedder behind the same
 ``Embedder`` protocol (harvested ``vscode-memory`` embedding_service /
 qdrant_client shape); the store and retriever never depend on *which*
 embedder is used, only on the protocol.
+
+---knowledge---
+module_id: engine.memory.embedding
+system: engine
+app: memory
+solution_class: pattern
+patterns: [pure-function-core, offline-deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [tokenize, Embedder, cosine_similarity, BagOfWordsEmbedder]
+invariants: "embeddings are deterministic and depend on no network call"
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
