@@ -241,8 +241,10 @@ body_file="${AO_PR_BODY_FILE:-}"
 range="${AO_PR_RANGE:-origin/master..HEAD}"
 # The reference line, as a PYTHON regex (it is matched by the helper below).
 # Both the repo's colon-less form (`Refs owner/repo#n`) and git's own colon form
-# (`Refs: owner/repo#n`) are accepted.
-trailer_pattern="${AO_TRAILER_PATTERN:-Refs:?\\s+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+}"
+# (`Refs: owner/repo#n`) are accepted, and the `owner/repo` slug is OPTIONAL
+# (issue #1593): a bare `Refs #n` names the same repo the commit already lives
+# in, so it is not a weaker claim, only a shorter spelling.
+trailer_pattern="${AO_TRAILER_PATTERN:-Refs:?\\s+(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+}"
 # The landed audit's enforcement boundary: the commit that landed this gate.
 # Everything strictly before it is pre-contract legacy (grandfathered); the
 # boundary itself is checked explicitly, everything after must carry the trailer.
@@ -476,7 +478,7 @@ check_commits() { # <range>
 
 check_body() { # <body-file>
   local body="$1"
-  if ! grep -qE '^Closes[[:space:]]+#[0-9]+' "$body"; then
+  if ! grep -qE '^Closes:?[[:space:]]+#[0-9]+' "$body"; then
     findings+=("pr-body-missing-closes")
   fi
   # A filled-in assistant line names a runtime and a parenthesised mode. The
@@ -1301,6 +1303,12 @@ MD
   commit_in a.txt "Refs kushin77/agent-orchestrator#288" "a properly trailed commit"
   a_sha="$(git -C "$scratch" rev-parse HEAD)"
   expect "a real trailer and a filled body pass" 0 "$good_body" "$base..$a_sha"
+
+  # 1h. issue #1593: the bare `Refs #<n>` form (no owner/repo slug) names the
+  #     same repo the commit already lives in, so it is accepted too.
+  commit_in ah.txt "Refs #288" "a commit carrying the bare Refs form"
+  ah_sha="$(git -C "$scratch" rev-parse HEAD)"
+  expect "a bare 'Refs #<n>' trailer (#1593) passes" 0 "$good_body" "${ah_sha}^..$ah_sha"
 
   # 2. the reference in the SUBJECT only (the measured defect: audit clean, no trailer)
   commit_in b.txt "" "Refs kushin77/agent-orchestrator#288: ref only in the subject"
