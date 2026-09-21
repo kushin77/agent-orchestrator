@@ -67,6 +67,15 @@ governance/board/violations.jsonl
 # arbitration-outcome record per claim/release, written by claims.arbitrate().
 .board/dispatch-audit.jsonl
 
+# The live-resource lease ledger (issue #1545) is runtime state for the same
+# reason the claim ledgers are: one acquire/release record per lease, appended
+# by `governance/dispatch/resource_lease.py` on every `--apply` of a route that
+# holds a resource. A lease is a claim on the machine that is running, so
+# committing it would put a moving holding signal — and a stale lease blocking a
+# peer — in the diff. The DECLARED policy it reads (the per-type TTLs and their
+# ordering invariants) is `governance/policy/lease.py`, and that IS tracked.
+.board/resource-claims.jsonl
+
 # Fleet steering mailboxes are runtime state (schema + standing directive are tracked)
 .fleet/inbox/
 .fleet/outbox/
