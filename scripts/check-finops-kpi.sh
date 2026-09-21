@@ -15,6 +15,22 @@
 # CANNOT-ASSESS, never a pass; over ceiling is NOT-OK.
 #
 # Usage: bash scripts/check-finops-kpi.sh
+#
+# ---knowledge---
+# module_id: scripts.check-finops-kpi
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [self-proving-gate, ratchet-metric]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: "a missing policy file or missing tracked file is CANNOT-ASSESS, never a pass"
+# gotchas: "dependency-free grep/sed parse of cost-policy.yaml -- no PyYAML"
+# related: ["#1580"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
