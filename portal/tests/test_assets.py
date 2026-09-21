@@ -38,6 +38,12 @@ REQUIRED_VIEWS = [
     "usage",         # Usage
     "audit",         # Audit (verify chain)
     "approvals",     # Approvals feed (real-time)
+    # The two board frames (issue #1522): the tenant task board and the
+    # fleet-wide board. Listed here so the frame contract below — tokens.css +
+    # console.css + api.js, each linked by the document itself — is enforced on
+    # them by the `portal` suite, not only by the lane that added them.
+    "taskboard",     # Tenant task board (engine ticket-log replay)
+    "board",         # Fleet board (.board snapshot + claims)
 ]
 
 
