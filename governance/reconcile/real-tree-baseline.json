@@ -5,6 +5,21 @@
   "measured_by": "governance/reconcile/real_tree_baseline.py generation, issue #740",
   "entries": [
     {
+      "kind": "branch",
+      "name": "issue-1504",
+      "reason": "measured 2026-09-21, train fold check-reconcile (issue #1545): box branch at 01ebf5b7, 1 commit ahead of origin/master, no session beat/claim/landing record explains it; not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1489-fix",
+      "reason": "measured 2026-09-21, train fold check-reconcile (issue #1545): box worktree at 8cfe60a0, 2 commits ahead of origin/master, clean (0 dirty files); not yet reclaimed/explained"
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1497-gatecov",
+      "reason": "measured 2026-09-21, train fold check-reconcile (issue #1545): box worktree at 82175ea7, 4 commits ahead of origin/master, clean (0 dirty files); not yet reclaimed/explained"
+    },
+    {
       "kind": "worktree",
       "name": "/home/akushnir/agent-orchestrator/.claude/worktrees/agent-a01e3a67cd7761947",
       "reason": "pre-#740 baseline: real-tree audit measured this artifact unmatched before the gate was pointed at reality (#708/#740 fan-out stranding); not yet reclaimed/explained"

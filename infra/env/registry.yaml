@@ -180,6 +180,14 @@ variables:
     secret: false
     required_by: [deploy, local-run]
     readers: [portal/server/control_audit.py]
+  - name: AO_RESOURCE_CLAIM_LEDGER
+    purpose: >-
+      overrides the live-resource claim ledger path so a caller that must not
+      touch the working tree's board (a gate, a CI step) can point it at a
+      scratch path instead of the default .board/resource-claims.jsonl.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [governance/dispatch/resource_lease.py]
   - name: AO_FLEET_DIR
     purpose: >-
       the fleet state directory (sessions, claims, gates) shared by the runtime,
