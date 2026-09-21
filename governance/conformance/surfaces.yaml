@@ -152,6 +152,12 @@ surface_roots:
 # fail), and each waiver is honoured only for the root it names — a new root
 # still has to be declared or waived on its own.
 waived_roots:
+  catalog: >-
+    The vendored CMR indexer's generated output (catalog/indexer/index-graph.json,
+    catalog/indexer/out/catalog.db), committed so the graph is available without
+    re-running the indexer (issue #1528). It ships no contract, suite or control
+    of its own -- it is a build artifact consumed BY other surfaces' tooling
+    (scripts/check-codeidx-surface.sh), not a product surface.
   config: >-
     Declarative job data for this repo's own tooling (config/fleet-jobs.json),
     read by the fleet cron and the runbook. It is INPUT to other surfaces'

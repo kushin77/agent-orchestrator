@@ -1,0 +1,763 @@
+{
+  "assets": [
+    {
+      "kind": "doc",
+      "language": "markdown",
+      "module": null,
+      "path": "catalog/README.md",
+      "repo": "kushin77/CMR",
+      "sha256": "5e60c101582500c15ed1147cf6bf06b474dac6defc61bbe26c2a2acbb3551a7d",
+      "size": 4166
+    },
+    {
+      "kind": "consumption-data",
+      "language": "markdown",
+      "module": null,
+      "path": "catalog/consumption/README.md",
+      "repo": "kushin77/CMR",
+      "sha256": "6afde2b92fb5b5f2937e6897010b657cae3b59a3f8e8f14edec4152a6b6151ff",
+      "size": 2448
+    },
+    {
+      "kind": "config",
+      "language": "json",
+      "module": null,
+      "path": "catalog/crossref/crossref.json",
+      "repo": "kushin77/CMR",
+      "sha256": "22c20d85f807bfae438b8bff80f2b9ce33a82e2e5cfa639e3024bbab5ba79526",
+      "size": 19914
+    },
+    {
+      "kind": "tooling",
+      "language": "json",
+      "module": null,
+      "path": "catalog/indexer/.mcp.json",
+      "repo": "kushin77/CMR",
+      "sha256": "514e6a5c8e16811835b75f8f260ac7467b9aac7c75cc7a9bf91811fef835d91c",
+      "size": 169
+    },
+    {
+      "kind": "tooling",
+      "language": "markdown",
+      "module": null,
+      "path": "catalog/indexer/README.md",
+      "repo": "kushin77/CMR",
+      "sha256": "091f03a3427dd7599ff6b9ec293ba8fabdb64a3b0adf16dd71c1972571dbbe01",
+      "size": 3600
+    },
+    {
+      "kind": "tooling",
+      "language": "python",
+      "module": null,
+      "path": "catalog/indexer/__init__.py",
+      "repo": "kushin77/CMR",
+      "sha256": "995cea73f066a22f8d18e63e56722827613e9a29568e8c3e13ae1768a92c42fe",
+      "size": 392
+    },
+    {
+      "kind": "tooling",
+      "language": null,
+      "module": null,
+      "path": "catalog/indexer/__pycache__/__init__.cpython-314.pyc",
+      "repo": "kushin77/CMR",
+      "sha256": "4556d54561dfff6ce3f7889413fe2d720e3afcf975dfe33ca3fa00ac94a3b9de",
+      "size": 595
+    },
+    {
+      "kind": "tooling",
+      "language": null,
+      "module": null,
+      "path": "catalog/indexer/__pycache__/freshness.cpython-314.pyc",
+      "repo": "kushin77/CMR",
+      "sha256": "79360eb652baf14cc83d7f86147ab81a7ade5f5a2a3a32960e729e1af9133c06",
+      "size": 8017
+    },
+    {
+      "kind": "tooling",
+      "language": null,
+      "module": null,
+      "path": "catalog/indexer/__pycache__/model.cpython-314.pyc",
+      "repo": "kushin77/CMR",
+      "sha256": "988870ccdf6c02c7a42f0accae8239775fadb46cca79a0cb2191b98b7bb87657",
+      "size": 5194
+    },
+    {
+      "kind": "tooling",
+      "language": null,
+      "module": null,
+      "path": "catalog/indexer/__pycache__/provenance.cpython-314.pyc",
+      "repo": "kushin77/CMR",
+      "sha256": "4621660027451bb85a896a3d1f0c781d83bba6d31bde394f6b4f2c9fee7748b6",
+      "size": 3850
+    },
+    {
+      "kind": "tooling",
+      "language": null,
+      "module": null,
+      "path": "catalog/indexer/__pycache__/secret_scan.cpython-314.pyc",
+      "repo": "kushin77/CMR",
+      "sha256": "d5779f403a9bc06be87b85cad672b80629c2bb1228c2621e1287d1b036e15bd2",
+      "size": 5562
+    },
+    {
+      "kind": "tooling",
+      "language": "sql",
+      "module": null,
+      "path": "catalog/indexer/catalog_schema.sql",
+      "repo": "kushin77/CMR",
+      "sha256": "4356a9e2d45acb1d43aaaf03feed7ee25f12f680822f9c9e286b93220fcc1607",
+      "size": 2987
+    },
+    {
+      "kind": "tooling",
+      "language": "python",
+      "module": null,
+      "path": "catalog/indexer/context_pack.py",
+      "repo": "kushin77/CMR",
+      "sha256": "5f295cc6fed2bf16eb8519846caacbc7e7a2d7b1b04813f3e3072832fc14ae81",
+      "size": 7897
+    },
+    {
+      "kind": "tooling",
+      "language": "python",
+      "module": null,
+      "path": "catalog/indexer/diff.py",
+      "repo": "kushin77/CMR",
+      "sha256": "7d81748531d5436ce5763aab7722a5fbbdb0ea7f8e6b68f785c97339aed4d434",
+      "size": 5525
+    },
+    {
+      "kind": "tooling",
+      "language": "python",
+      "module": null,
+      "path": "catalog/indexer/freshness.py",
+      "repo": "kushin77/CMR",
+      "sha256": "94e4e91bb31f2c0dca10e837f26206200ebebf00e0cf198459889b688c0a168d",
+      "size": 5874
+    },
+    {
+      "kind": "tooling",
+      "language": "python",
+      "module": null,
+      "path": "catalog/indexer/index.py",
+      "repo": "kushin77/CMR",
+      "sha256": "418fb40cb18a265b32d3179e07df1b7d97f10cb6aa8663ae19f14e08b051a310",
+      "size": 19045
+    },
+    {
+      "kind": "tooling",
+      "language": "python",
+      "module": null,
+      "path": "catalog/indexer/mcp_server.py",
+      "repo": "kushin77/CMR",
+      "sha256": "3dc8e0873095e90064fe307489a466d657c36166f258fc6951ffe38bb3fd8ed5",
+      "size": 7120
+    },
+    {
+      "kind": "tooling",
+      "language": "python",
+      "module": null,
+      "path": "catalog/indexer/model.py",
+      "repo": "kushin77/CMR",
+      "sha256": "9c059844fc16341fa3946aac5f1ba859da46def9746f942f62a41fcdd0830848",
+      "size": 3453
+    },
+    {
+      "kind": "tooling",
+      "language": "python",
+      "module": null,
+      "path": "catalog/indexer/provenance.py",
+      "repo": "kushin77/CMR",
+      "sha256": "d5d07b36e78660ee63e0717ca29b31b28cd8844cc8c52d386e6aea44d2786302",
+      "size": 3205
+    },
+    {
+      "kind": "tooling",
+      "language": "python",
+      "module": null,
+      "path": "catalog/indexer/secret_scan.py",
+      "repo": "kushin77/CMR",
+      "sha256": "95c4ebd6c77a735fd5ab15e8dccf4cb0631d9856ec6360bd2d45479a4e03a679",
+      "size": 3793
+    },
+    {
+      "kind": "tooling",
+      "language": "shell",
+      "module": null,
+      "path": "catalog/indexer/test_context_pack.sh",
+      "repo": "kushin77/CMR",
+      "sha256": "949e1df178fe615b0b238bf45cd82c3aebb1ec7beef71fc037868180742a6288",
+      "size": 4504
+    },
+    {
+      "kind": "config",
+      "language": "tsv",
+      "module": null,
+      "path": "catalog/mandatory.tsv",
+      "repo": "kushin77/CMR",
+      "sha256": "4ebda57b6d3dd46cb6ca1fe929ef5a764f5d692adea310626912fc25d4f9e248",
+      "size": 854
+    },
+    {
+      "kind": "module-data",
+      "language": null,
+      "module": ".gitkeep",
+      "path": "catalog/modules/.gitkeep",
+      "repo": "kushin77/CMR",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "kind": "repo-data",
+      "language": null,
+      "module": null,
+      "path": "catalog/repos/.gitkeep",
+      "repo": "kushin77/CMR",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "kind": "repo-data",
+      "language": "json",
+      "module": null,
+      "path": "catalog/repos/repo-inventory.json",
+      "repo": "kushin77/CMR",
+      "sha256": "8c77bf4ee1fb000a410f7735f7a091ce5d7c970cd93e03703c9b9d8700a18765",
+      "size": 62488
+    },
+    {
+      "kind": "repo-data",
+      "language": "markdown",
+      "module": null,
+      "path": "catalog/repos/repo-inventory.md",
+      "repo": "kushin77/CMR",
+      "sha256": "dc8716f59af6ca8050450d9afc4c54f9b141a5d879ceb5669e19426104fd9be6",
+      "size": 17539
+    },
+    {
+      "kind": "repo-data",
+      "language": "shell",
+      "module": null,
+      "path": "catalog/repos/repo-inventory.sh",
+      "repo": "kushin77/CMR",
+      "sha256": "48fe468e526a1ac7014d6bd53779186216e623e08220cb381256f6cdb6fadb20",
+      "size": 26819
+    },
+    {
+      "kind": "schema",
+      "language": null,
+      "module": null,
+      "path": "catalog/schemas/.gitkeep",
+      "repo": "kushin77/CMR",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "kind": "schema",
+      "language": "json",
+      "module": null,
+      "path": "catalog/schemas/architecture-manifest.schema.json",
+      "repo": "kushin77/CMR",
+      "sha256": "04f508eb6d2b16c0d3307b107113f4a58514094dd10bd810df73bd4d0bbaec94",
+      "size": 4215
+    },
+    {
+      "kind": "schema",
+      "language": "json",
+      "module": null,
+      "path": "catalog/schemas/crossref.schema.json",
+      "repo": "kushin77/CMR",
+      "sha256": "01121132b39a46cd290d7c1e6cc9090f9c9de434c048b223347d1d65e8e6f687",
+      "size": 5621
+    },
+    {
+      "kind": "schema",
+      "language": "yaml",
+      "module": null,
+      "path": "catalog/schemas/examples/gdc-manifest.invalid.yaml",
+      "repo": "kushin77/CMR",
+      "sha256": "178b3d6c787e961ac965d1f9ab14334159584c44a7e7fe951891cc1ee9c11c08",
+      "size": 492
+    },
+    {
+      "kind": "schema",
+      "language": "yaml",
+      "module": null,
+      "path": "catalog/schemas/examples/gdc-manifest.valid.yaml",
+      "repo": "kushin77/CMR",
+      "sha256": "4e6d651bbbd29fabd1c097d7156ee80b08fe5266bf04e003fe9b2faaf389bd54",
+      "size": 691
+    },
+    {
+      "kind": "schema",
+      "language": "json",
+      "module": null,
+      "path": "catalog/schemas/examples/invalid.json",
+      "repo": "kushin77/CMR",
+      "sha256": "8bfbd4a5496ef95361da9bc433d0d450601de446eb14ced239cc896037438f22",
+      "size": 204
+    },
+    {
+      "kind": "schema",
+      "language": "json",
+      "module": null,
+      "path": "catalog/schemas/examples/saas-rbac.valid.json",
+      "repo": "kushin77/CMR",
+      "sha256": "4c364705fe7af93376e02c26b0612f4a3d01eb10787533ea85b01c6f6016674d",
+      "size": 984
+    },
+    {
+      "kind": "schema",
+      "language": "markdown",
+      "module": null,
+      "path": "catalog/schemas/fixtures/module/README.md",
+      "repo": "kushin77/CMR",
+      "sha256": "279871c5cd835e3392d7cebf994ca7165a7b22e2581f9d446090255198a7f3cd",
+      "size": 977
+    },
+    {
+      "kind": "schema",
+      "language": "python",
+      "module": null,
+      "path": "catalog/schemas/fixtures/module/check_fixtures.py",
+      "repo": "kushin77/CMR",
+      "sha256": "3db2af01657734256cef92ab8c6b8cdc73bdd37f5bf98b3b5b74497c4b1c6245",
+      "size": 2987
+    },
+    {
+      "kind": "schema",
+      "language": "json",
+      "module": null,
+      "path": "catalog/schemas/fixtures/module/fail/bogus-type.module.json",
+      "repo": "kushin77/CMR",
+      "sha256": "1513de363f5a548900e2140903640e0886acd5eebcd217d636c1d9963c4cb574",
+      "size": 376
+    },
+    {
+      "kind": "schema",
+      "language": "json",
+      "module": null,
+      "path": "catalog/schemas/fixtures/module/pass/governance-type.module.json",
+      "repo": "kushin77/CMR",
+      "sha256": "bd961a0fb4d319e2a0ccf8d92df397dafbbea41197aafd1a0beaa8dd6deaad9b",
+      "size": 420
+    },
+    {
+      "kind": "schema",
+      "language": "json",
+      "module": null,
+      "path": "catalog/schemas/gdc-manifest.schema.json",
+      "repo": "kushin77/CMR",
+      "sha256": "f3911a573189018f67533ddf749d60cfb528a35eca9eca63c46c73c1a4f255c3",
+      "size": 4831
+    },
+    {
+      "kind": "schema",
+      "language": "json",
+      "module": null,
+      "path": "catalog/schemas/module.schema.json",
+      "repo": "kushin77/CMR",
+      "sha256": "afa3e594e8b0a9af64fb2903efe11ce2161415b51efe9fca0b927c3b303af668",
+      "size": 8891
+    },
+    {
+      "kind": "doc",
+      "language": "markdown",
+      "module": null,
+      "path": "catalog/topology/README.md",
+      "repo": "kushin77/CMR",
+      "sha256": "3ade73c97f25b3e78c4ce6b2764e6d802e5863f05a0029170ee4da299b05f730",
+      "size": 4900
+    },
+    {
+      "kind": "config",
+      "language": "python",
+      "module": null,
+      "path": "catalog/topology/graph_builder.py",
+      "repo": "kushin77/CMR",
+      "sha256": "43507bb3d2e85c704d2fdbca08177005a4e252121651e39ef10acd0f5b7debf6",
+      "size": 17046
+    },
+    {
+      "kind": "config",
+      "language": "python",
+      "module": null,
+      "path": "catalog/topology/render.py",
+      "repo": "kushin77/CMR",
+      "sha256": "692d1f060be63759c9874c17576e7c84b7c8f2324d9489e2eff88da40c76504e",
+      "size": 6084
+    },
+    {
+      "kind": "config",
+      "language": "json",
+      "module": null,
+      "path": "catalog/topology/topology.json",
+      "repo": "kushin77/CMR",
+      "sha256": "2b0c8ea79323fa6a1dc9a7a49bd9c988c117733ac38546202cdb3ced3180a807",
+      "size": 8796
+    },
+    {
+      "kind": "config",
+      "language": null,
+      "module": null,
+      "path": "catalog/topology/topology.mmd",
+      "repo": "kushin77/CMR",
+      "sha256": "8e7fa18e939c128a3a09178cd58404cc91b628f4798dd270ef73b132b0a31635",
+      "size": 2307
+    },
+    {
+      "kind": "config",
+      "language": "shell",
+      "module": null,
+      "path": "catalog/topology/topology.sh",
+      "repo": "kushin77/CMR",
+      "sha256": "3dc2c64089920eeec812c914f65be4895219985cc56e33375c436c5e67d19880",
+      "size": 3631
+    },
+    {
+      "kind": "config",
+      "language": "python",
+      "module": null,
+      "path": "catalog/validate.py",
+      "repo": "kushin77/CMR",
+      "sha256": "2ac98d2bc6e0322022802c7e41abc0c6b387ac1b57915709537665cc03d254ca",
+      "size": 19966
+    }
+  ],
+  "generated_at": "2026-09-20T19:08:19+00:00",
+  "mode": "apply",
+  "modules": [
+    {
+      "classes": [
+        "backend",
+        "indexing",
+        "data"
+      ],
+      "consumers": [],
+      "dependencies": [],
+      "features": [
+        "indexer",
+        "lang-ts-js",
+        "lang-python",
+        "lang-go",
+        "lang-java",
+        "lang-rust",
+        "lang-shell",
+        "cli",
+        "http-api",
+        "web-ui",
+        "mcp",
+        "lsp",
+        "secret-scan"
+      ],
+      "id": "code-indexing",
+      "name": "code-indexing",
+      "path": "catalog/modules/code-indexing/module.json",
+      "source_repo": "kushin77/code-indexing",
+      "type": "service",
+      "version": "v0.1.0"
+    },
+    {
+      "classes": [
+        "architecture",
+        "blueprint",
+        "ssot",
+        "backend",
+        "frontend",
+        "data"
+      ],
+      "consumers": [],
+      "dependencies": [],
+      "features": [
+        "ssot-extract",
+        "blueprint-gen",
+        "blueprint-engine",
+        "drift-detect",
+        "plan-preview",
+        "topology-graph",
+        "rest-api",
+        "portal-web",
+        "vendor-adapters",
+        "mechanical-checks",
+        "mcp-kb"
+      ],
+      "id": "diagrams",
+      "name": "diagrams",
+      "path": "catalog/modules/diagrams/module.json",
+      "source_repo": "kushin77/diagrams",
+      "type": "service",
+      "version": "v0.1.0"
+    },
+    {
+      "classes": [
+        "frontend",
+        "backend"
+      ],
+      "consumers": [],
+      "dependencies": [
+        "googleworkspace.group-rbac-sync"
+      ],
+      "features": [],
+      "id": "erp-crm",
+      "name": "ERP-CRM",
+      "path": "catalog/modules/erp-crm/module.json",
+      "source_repo": "kushin77/ERP-CRM",
+      "type": "app",
+      "version": null
+    },
+    {
+      "classes": [
+        "backend",
+        "integration"
+      ],
+      "consumers": [
+        "erp-crm",
+        "gohighlevel",
+        "purebliss",
+        "gmail-agent"
+      ],
+      "dependencies": [
+        "saas-rbac.rbac"
+      ],
+      "features": [
+        "addon-ui",
+        "control-engine",
+        "jml-lifecycle",
+        "group-rbac-sync",
+        "automation-recipes",
+        "audit-log",
+        "realtime-watch",
+        "live-data"
+      ],
+      "id": "googleworkspace",
+      "name": "GWS Google Workspace Module (GWS Control Center)",
+      "path": "catalog/modules/googleworkspace/module.json",
+      "source_repo": "kushin77/googleworkspace",
+      "type": "integration",
+      "version": "v0.3.0"
+    },
+    {
+      "classes": [
+        "backend",
+        "integration",
+        "security"
+      ],
+      "consumers": [
+        "erp-crm",
+        "shared-frontend"
+      ],
+      "dependencies": [],
+      "features": [
+        "rbac",
+        "scim"
+      ],
+      "id": "saas-rbac",
+      "name": "saas-rbac",
+      "path": "catalog/modules/saas-rbac/module.json",
+      "source_repo": "kushin77/saas-rbac",
+      "type": "integration",
+      "version": "v2.4.0"
+    },
+    {
+      "classes": [
+        "frontend",
+        "ui",
+        "shell",
+        "design-system"
+      ],
+      "consumers": [],
+      "dependencies": [],
+      "features": [
+        "os-shell",
+        "native-addons",
+        "module-contract",
+        "design-tokens",
+        "app-template",
+        "iframe-mount",
+        "os-auth",
+        "vendor-sync"
+      ],
+      "id": "shared-frontend",
+      "name": "shared-frontend",
+      "path": "catalog/modules/shared-frontend/module.json",
+      "source_repo": "kushin77/shared-frontend",
+      "type": "frontend",
+      "version": "v0.2.0"
+    }
+  ],
+  "provenance": {
+    "epic_ref": "EPIC-10",
+    "excluded": {
+      "alerts/": "repo-specific Prometheus alerting \u2014 generalized out",
+      "dashboards/": "repo-specific Grafana dashboards \u2014 generalized out",
+      "repos.container.yml": "repo-specific fleet config \u2014 generalized out",
+      "repos.list": "verbatim copy forbidden \u2014 may reference repos whose test fixtures carry secrets (code-indexing issue #26)"
+    },
+    "harvested_at": "2026-09-06",
+    "harvested_from": "kushin77/code-indexing",
+    "issue_ref": "CMR-1002",
+    "ledger": "canibalization/clusters/indexer.tsv",
+    "license": "none",
+    "license_note": "no LICENSE file in the source repo (GitHub API /license -> 404); pattern-level reimplementation, no verbatim vendor code copied",
+    "module_tag": "v0.1.0",
+    "sources": {
+      ".mcp.json": ".mcp.json",
+      "README.md": "docs/architecture.md + docs/onboarding.md + repos.example.yml",
+      "catalog_schema.sql": "codeidx/catalog_schema.sql",
+      "diff.py": "codeidx/diff.py",
+      "freshness.py": "codeidx/freshness.py",
+      "index.py": "codeidx/index.py + codeidx/store.py (publication discipline)",
+      "mcp_server.py": "codeidx/mcp_server.py",
+      "model.py": "codeidx/model.py + codeidx/freshness.py",
+      "provenance.py": "codeidx/provenance.py",
+      "secret_scan.py": "codeidx/secret_scan.py + scripts/prescan-credentials.py"
+    },
+    "surveyed_commit": "e2af5f1",
+    "tag_commit": "67f9686"
+  },
+  "repos": [
+    {
+      "assets": 47,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": true,
+      "repo": "kushin77/CMR",
+      "role": "hub",
+      "status": "catalog"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": false,
+      "repo": "kushin77/ERP-CRM",
+      "role": "spoke",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": true,
+      "repo": "kushin77/shared-frontend",
+      "role": "vendor",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": true,
+      "repo": "kushin77/diagrams",
+      "role": "vendor",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": false,
+      "repo": "kushin77/googlecloudplatform",
+      "role": "vendor",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": true,
+      "repo": "kushin77/saas-rbac",
+      "role": "spoke",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": true,
+      "repo": "kushin77/googleworkspace",
+      "role": "vendor",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": false,
+      "repo": "kushin77/shared-governance",
+      "role": "vendor",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": false,
+      "repo": "kushin77/shared-services",
+      "role": "spoke",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": false,
+      "repo": "kushin77/shared-temporal",
+      "role": "spoke",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": false,
+      "repo": "kushin77/Shared_Integrations",
+      "role": "spoke",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": false,
+      "repo": "kushin77/SharedFeatures",
+      "role": "spoke",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": false,
+      "repo": "kushin77/github-workflow",
+      "role": "spoke",
+      "status": "never"
+    },
+    {
+      "assets": 0,
+      "auto_merge": false,
+      "checkout": null,
+      "freshness": null,
+      "onboarded": true,
+      "repo": "kushin77/code-indexing",
+      "role": "vendor",
+      "status": "never"
+    }
+  ],
+  "schema": "cmr.index/graph-v1",
+  "secret_hits": [],
+  "warnings": []
+}
