@@ -470,18 +470,32 @@ else
   # filed-finding recheck (a board read), neither of which this gate owns — and
   # since #917 stamps a beat for every lane, a dead lane's beat would red every
   # verify run through a verdict about sessions, not orphans.
-  real_out="$(python3 - "$main_root" "$root/$budget" <<'PY' 2>&1
+  real_out="$(AO_GATE_VENUE="${AO_GATE_VENUE:-lane}" python3 - "$main_root" "$root/$budget" <<'PY' 2>&1
+import os
 import sys
 from pathlib import Path
 from governance.reconcile import orphans
+
+# #1620: orphan-worktree / orphan-branch / orphan-issue-lane are counted
+# against the WHOLE box's state (every concurrent session's worktrees,
+# branches, lane records), so they swing with unrelated fleet activity, not
+# this checkout's own diff — orphans.venue_classify() is the single source
+# of truth for which kinds are advisory in the default "lane" venue.
+venue = os.environ.get("AO_GATE_VENUE", "lane")
+
 budget, expired = orphans.load_budget(sys.argv[2])
 report = orphans.walk(orphans.RepoOrphanOps(Path(sys.argv[1])), apply=False, budget=budget, budget_expired=expired)
 print("orphan-walk (dry-run): " + ", ".join(f"{k}={v}" for k, v in report.counts.items()))
 for kind, reason in report.unmeasured.items():
     print(f"  unmeasured {kind}: {reason}")
-for name in report.exceeded:
+
+blocking_names, advisory_names = orphans.venue_classify(report.exceeded, venue)
+for name in advisory_names:
+    print(f"  NOTE {name} (advisory in lane venue, #1620; blocking in AO_GATE_VENUE=attestation)")
+for name in blocking_names:
     print(f"  NOT-OK {name}")
-sys.exit(2 if not report.assessable else (1 if report.exceeded else 0))
+
+sys.exit(2 if not report.assessable else (1 if blocking_names else 0))
 PY
 )"
   real_rc=$?
