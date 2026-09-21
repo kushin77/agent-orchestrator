@@ -41,7 +41,9 @@
 #     1. the UNMUTATED copy produces NO finding — a rule that matches everything
 #        cannot pass this half;
 #     2. one mutation per property must move the verdict, and must do so BY NAME
-#        — the property under test is the property that fired;
+#        — the property under test is the property that fired. A property with
+#        two distinct arms (P3: a surface missing vs. a partial promotion)
+#        carries one control per arm, each asserting the arm it must name;
 #     3. a mutation that changes no bytes is reported NOOP and fails the gate.
 #
 # DEGRADE CONTRACT: every property is a text property, so the gate always
@@ -130,7 +132,16 @@ else:
         m = re.search(r"^  %s:\s*$(.*?)(?=^  \S|\Z)" % re.escape(name), reg, re.S | re.M)
         if not m:
             return None
-        d = re.search(r"^    default:\s*(\S+)\s*$", m.group(1), re.M)
+        # The value is a YAML scalar, NOT "the rest of the line". The registry's
+        # `default:` lines carry a trailing inline comment — commit 03c16d3d
+        # (#1789, 2026-09-21) appended one to all 20 surfaces — and an inline
+        # comment is valid YAML, which is how the file's own code-enforced reader
+        # reads it (`portal/server/fleet.py`: an explicit `default: on` or boolean
+        # True, parsed through a YAML loader). A rule that demands the scalar be
+        # the whole rest of the line reads a COMMENTED default as "unregistered";
+        # that is how this gate reported the three composed surfaces as missing
+        # from the very registry that declares them (issue #1823).
+        d = re.search(r"^    default:\s*([^#\s]+)\s*(?:#.*)?$", m.group(1), re.M)
         return None if d is None else d.group(1).strip().strip('"').lower() in ("on", "true")
     composed = {n: default_on(n) for n in ("fleet_projection", "remote_control", "operator_terminal")}
     missing = [n for n, v in composed.items() if v is None]
@@ -197,9 +208,14 @@ selftest() {
     return 1
   fi
   echo "SELFTEST: unmutated copy clean"
-  # one mutation per property; each must move the verdict BY NAME
+  # one mutation per property; each must move the verdict BY NAME. A property
+  # with two distinct failure arms (P3) carries one control per arm, and passes
+  # the reason it must name as $4 — by-name alone cannot tell "missing" from
+  # "partial promotion", and a rule that answered one arm for the other would
+  # otherwise satisfy both controls.
   mutate() { # $1 = property, $2 = rel file, $3 = python expression on the text
-    local prop="$1" rel="$2" expr="$3"
+             # $4 = optional substring the by-name line must also carry
+    local prop="$1" rel="$2" expr="$3" expect="${4:-}"
     local dir="$scratch.mut"; rm -rf "$dir"; cp -a "$scratch" "$dir"
     python3 - "$dir/$rel" "$expr" <<'PY'
 import pathlib, sys
@@ -228,11 +244,13 @@ PY
     local moved=0 line
     while IFS= read -r line; do
       case "$line" in
-        "$prop":*) moved=1; break ;;
+        # `"$expect"` empty matches every line, so the 3-argument form is
+        # unchanged: by-name only.
+        "$prop":*) case "$line" in *"$expect"*) moved=1; break ;; esac ;;
       esac
     done <<< "$out"
     if [ "$moved" -eq 0 ]; then
-      echo "SELFTEST FAIL: the $prop mutation did not move the verdict (got: ${out:-<none>})"
+      echo "SELFTEST FAIL: the $prop mutation did not move the verdict${expect:+ naming '$expect'} (got: ${out:-<none>})"
       return 1
     fi
     echo "SELFTEST OK: $prop refused by name"
@@ -242,11 +260,22 @@ PY
     're.sub(r"pip install([^\n]*)cryptography", "pip install\\1", t)' || fail=1
   mutate P2 contrib/shared-services/agentconsole.compose.yml \
     't.replace("container_name: shared-services-agentconsole", "container_name: wrong")' || fail=1
-  # P3's mutation is STATE-AWARE: it flips ONE of the three to the opposite of
-  # the others, which is a partial promotion whether the committed state is all
-  # on or all off — so the control cannot go stale as the promotion state moves.
+  # P3 has TWO arms and needs one control each.
+  #   1. a PARTIAL promotion: state-aware — it flips ONE of the three to the
+  #      opposite of the others, which is a partial promotion whether the
+  #      committed state is all on or all off, so the control cannot go stale as
+  #      the promotion state moves.
+  #   2. a surface GENUINELY ABSENT (renamed): the arm that must NOT be reachable
+  #      from a complete registry. It had no control at all, which is precisely
+  #      how issue #1823's build lived: the "missing" arm was firing on the
+  #      unmutated copy, and nothing in the self-test could tell that from a
+  #      correct rule.
   mutate P3 infra/feature-flags/registry.yaml \
-    're.sub(r"(  operator_terminal:\n    default: )(on|off)", lambda m: m.group(1) + ("off" if m.group(2) == "on" else "on"), t, count=1)' || fail=1
+    're.sub(r"(  operator_terminal:\n    default: )(on|off)", lambda m: m.group(1) + ("off" if m.group(2) == "on" else "on"), t, count=1)' \
+    "partial promotion" || fail=1
+  mutate P3 infra/feature-flags/registry.yaml \
+    't.replace("  fleet_projection:\n", "  fleet_projection_RENAMED:\n", 1)' \
+    "surfaces missing from the registry" || fail=1
   # P4's mutation APPENDS the stale claim rather than substituting a fixed line,
   # so it cannot go NOOP when the status line is reworded.
   mutate P4 docs/AGENTCONSOLE-HOSTING.md \
