@@ -172,31 +172,66 @@ else
   grep "DRIFT" "$work/drift.log" | sed 's/^/      /'
 fi
 
-# 2b2. If the declaration REQUIRES a status-check context, a live state that
-#      has silently dropped that context (protection object still present,
-#      but the gate it names is gone) must be caught by name too. This is the
-#      #724 shape one layer down: a required-checks field that can drift
-#      without the comparator ever noticing is an inert control.
-declared_rsc="$(python3 -c "
-import json
-want = json.load(open('/tmp/cbp-declared.json'))['want']
-print('yes' if want.get('required_status_checks') else 'no')
-")"
+# 2b2. A live status-checks field must never be able to disagree with the
+#      declaration unnoticed. The premise is the DECLARED CONTEXT SET in EITHER
+#      declaration — `protection.required_status_checks.contexts` and
+#      `required_status_contexts` (ADR-0028's posted name) — the same UNION
+#      section 4b below and `scripts/check-gate-status.sh --producer-probe`
+#      read, NOT the protection object alone.
+#
+#      Measured (#1815, 2026-09-21): with `required_status_checks` legitimately
+#      `null` under the owner-adopted single-developer method, a premise keyed
+#      on that object alone went FALSE and this whole arm went DORMANT. A
+#      self-control that silently stops running is exactly the formality GR-12
+#      forbids, and the case it would have dropped is the comparator's most
+#      load-bearing one here: a `null` declaration MUST still fail against a
+#      live status-checks object, or a declaration could hide a live
+#      (re-)introduction of a required check — the drift #1815 fixed in the
+#      other direction. The declaration's own SHAPE is read too, so the arm
+#      states the case it is actually proving rather than a label that only
+#      fits the configuration it used to run in.
+_rsc="$(python3 - "$POLICY" <<'PY'
+import sys
+try:
+    import yaml
+except ImportError:
+    sys.exit(2)
+try:
+    policy = yaml.safe_load(open(sys.argv[1])) or {}
+except OSError:
+    sys.exit(2)
+protection = policy.get("protection") or {}
+checks = protection.get("required_status_checks") or {}
+own = list(checks.get("contexts") or [])
+named = policy.get("required_status_contexts") or []
+if isinstance(named, str):
+    named = [named]
+union = own + [c for c in named if c not in own]
+print("yes" if union else "no", "field" if own else "named")
+PY
+)" || _rsc="no named"
+declared_rsc="${_rsc%% *}"
+declared_rsc_case="${_rsc##* }"
 if [ "$declared_rsc" = "yes" ]; then
   build_live "$work/rsc-drift.json" '{"required_status_checks": {"strict": false, "contexts": []}}'
   python3 "$COMPARE" /tmp/cbp-declared.json "$work/rsc-drift.json" >"$work/rsc-drift.log" 2>&1
   rc=$?
   if [ $rc -ne 1 ]; then
-    echo "check-branch-protection: FAIL — a DROPPED required status context was NOT caught (rc=$rc, expected 1)" >&2
+    echo "check-branch-protection: FAIL — a live status-checks object disagreeing with the declaration was NOT caught (rc=$rc, expected 1)" >&2
     sed 's/^/    /' "$work/rsc-drift.log" >&2
     fail=1
   elif ! grep -q "required_status_checks" "$work/rsc-drift.log"; then
-    echo "check-branch-protection: FAIL — the dropped context drift was not named by field" >&2
+    echo "check-branch-protection: FAIL — the status-checks drift was not named by field" >&2
     fail=1
   else
-    echo "  OK  a required status context silently dropped is caught and named:"
+    case "$declared_rsc_case" in
+      field) echo "  OK  a required status context silently dropped is caught and named:" ;;
+      *)     echo "  OK  a live status-checks object the declaration does not declare is caught and named:" ;;
+    esac
     grep "DRIFT" "$work/rsc-drift.log" | sed 's/^/      /'
   fi
+else
+  echo "  --  no status context is declared in either key, so there is no status-checks drift to provoke"
 fi
 
 # 2c. A wholly UNPROTECTED branch must be caught -- the exact state measured.
