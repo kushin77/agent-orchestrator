@@ -1,5 +1,6 @@
 """portal.server.livestore — read-only adapters over the LIVE registry + telemetry.
 
+
 The console is a *projection* over the control-plane entities, never a second
 source of truth (CMR portal doctrine). This module is the single seam that
 reads the control plane's **real** stores on this checkout, so the console's

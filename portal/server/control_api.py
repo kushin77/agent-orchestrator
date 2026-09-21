@@ -1,5 +1,6 @@
 """portal.server.control_api — the remote control API (issue #554, RC-3 of #551).
 
+
 WHY this exists. EPIC #551 exists because the fleet can be commanded only from
 its own keyboard: ``docs/REMOTE-CONTROL-GAP-ANALYSIS.md`` §2.6 measures eighteen
 verbs in ``fleet/control.py``, thirteen in ``fleet/channel.py`` and twenty-two

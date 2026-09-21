@@ -1,5 +1,6 @@
 """portal.server.auditlog — per-tenant tamper-evident audit chain.
 
+
 The Audit view and every mutation use this append-only, hash-chained ledger.
 The record shape and the verify semantics consume the frozen telemetry/ledger
 (issue #31) vocabulary — ``schemaVersion``/``seq``/``ts``/``tenantId``/

@@ -1,5 +1,6 @@
 """portal.server.ops_health — the ops/health/SLO serving surface (issue #342).
 
+
 WHY this exists: the observability lane (``telemetry/observability``) already
 computes everything an operator needs — per-tenant SLO verdicts over the real
 span store, breach alerts with the outcome-not-liveness doctrine, usage rows and

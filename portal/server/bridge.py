@@ -1,5 +1,6 @@
 """portal.server.bridge — the **versioned** live-data bridge (issue #339).
 
+
 WHY this exists: the platform already gathers and serves its own state, but it
 does so under four *independent, unversioned* endpoint families
 (``/api/fleet/*``, ``/api/telemetry/*``, ``/api/finops/*``, ``/api/ops/*``,

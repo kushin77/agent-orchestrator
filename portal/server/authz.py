@@ -1,5 +1,6 @@
 """portal.server.authz — console RBAC (super-admin vs tenant-admin).
 
+
 The permission vocabulary is *consumed* from the merged identity/rbac
 platform role pack (issue #12, ``identity/rbac/presets/platform.yaml``):
 roles ``owner`` (``*:*``), ``admin``, ``team-admin``, ``agent-operator``,

@@ -1,5 +1,6 @@
 """portal.server.fleet — the fleet-state projection adapter (issue #331).
 
+
 WHY this exists: the terminal dashboard (``fleet/console.py``) renders the
 fleet's live state into one tmux pane. A remote operator cannot open that pane,
 filter it, or feed it into another system. This module is the *server half* of

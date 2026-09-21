@@ -1,5 +1,6 @@
 """portal.server.surface_state — the runtime surface rollback overlay (#802).
 
+
 WHY this exists. Every console surface is gated by its declaration in
 ``infra/feature-flags/registry.yaml`` (``surfaces.<name>.default``), read
 fail-closed by :func:`portal.server.fleet.read_surface_default`. A declaration is

@@ -1,5 +1,6 @@
 """portal.server.skill_studio — the skill-studio serving surface (issue #642, workbook-11).
 
+
 WHY this exists: the workbook-9 lane already ships the whole author → test →
 publish workflow as a library (``registry/packs/skills.SkillStudio``), including
 the gate that matters — *publish is refused without green eval evidence derived

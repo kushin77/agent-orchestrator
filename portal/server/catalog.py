@@ -1,5 +1,6 @@
 """portal.server.catalog — read-model projections over :class:`ConsoleState`.
 
+
 Each view's data is a pure projection (never a second source of truth) over the
 console state, which is itself hydrated from the **live** registry +
 telemetry stores (issue #348): the agent roster resolves its identity from

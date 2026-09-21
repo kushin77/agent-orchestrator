@@ -1,5 +1,6 @@
 """portal.server.sso — console session verification against the OS auth gate.
 
+
 The console has **no login of its own**. The shared-frontend ``auth/`` gate
 ("one front door") runs Google OAuth and mints the RS256 ``os-session-token``
 (``purpose: os-session-token``, ``kid`` = RFC 7638 thumbprint, published at

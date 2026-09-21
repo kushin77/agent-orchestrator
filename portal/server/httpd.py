@@ -1,5 +1,6 @@
 """portal.server.httpd — stdlib http.server binding for the console app.
 
+
 Thin transport: decodes the request (path, query, JSON body, ``Cookie``
 header) into the :class:`ConsoleApplication` pipeline and writes the returned
 :class:`Response` (including any ``Set-Cookie`` the session endpoints issue).

@@ -1,5 +1,6 @@
 """portal.server.surface_health — a console surface's own readiness signal (#802).
 
+
 WHY this exists. The console ships a liveness route (``GET /api/healthz``: "the
 process answers") and nothing else about itself. A surface can be *promoted* and
 still be unable to serve — the view it redirects to is gone, the vocabulary its

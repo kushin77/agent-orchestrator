@@ -1,5 +1,6 @@
 """portal.server.controls — console policy controls (no UI-only state).
 
+
 Every toggle in the Policies/Controls view is bound, server-side, to a
 :class:`PolicyControl` through the :data:`CONTROL_POLICY_MAP` mapping table.
 The catalog consumes the frozen default-OFF vocabulary of the guardrails

@@ -1,5 +1,6 @@
 """portal.server.app — console route table + request pipeline (offline).
 
+
 Transport-free: :meth:`ConsoleApplication.handle` takes a method/path/query/
 body/cookie-map and returns a :class:`Response`. ``httpd.py`` binds it to
 ``http.server``; tests drive it directly (no sockets). Every API response

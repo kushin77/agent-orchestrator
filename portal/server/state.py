@@ -1,5 +1,6 @@
 """portal.server.state — console data model projected from the LIVE stores.
 
+
 The console is a *projection* over the control-plane entities, never a second
 source of truth (CMR portal doctrine). This module holds the console state and
 hydrates it from the control plane's real stores on this checkout (issue #348):

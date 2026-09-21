@@ -1,5 +1,6 @@
 """portal.server.control_audit — exactly-once control: one effect, one record.
 
+
 WHY this exists (issue #555, RC-4 of EPIC #551). RC-3 shipped the control
 channel and its refusals; it records nothing. Its ledger, ``InFlightCommands``,
 answers "this id is *still running*" and forgets the id the moment the command

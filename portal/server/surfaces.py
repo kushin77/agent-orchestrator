@@ -1,5 +1,6 @@
 """portal.server.surfaces — the portal-surfaces feed adapter (issue #350).
 
+
 WHY this exists: the OS shell's Settings→Modules page needs the *fleet-wide*
 surface catalog — which modules exist, what they are, which features each
 declares — and today it has to pin a revision of the CMR feed inside its own
