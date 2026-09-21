@@ -1,0 +1,16 @@
+# The GDC policy domain (issue #1763).
+#
+# GDC is the tag-authority dimension used in issue conformance labels
+# (`gdc:enterprise`) — NOT Google Distributed Cloud (RCA acronym table,
+# docs/rca/2026-09-21-policy-centralization-gap-review.md). The single declared
+# source is `governance/conformance/policy.yaml`: it lists `gdc` among the
+# `prefixed` (name:value) labels, binds it as an `expectations` rung
+# (`enterprise`/`elite`), and derives `gdc: enterprise` by default for a
+# newly-filed issue in its `filing` block. The enforcement point is therefore
+# the conformance gate at issue-file time (`governance/conformance/filing.py`).
+#
+# Schema: governance/policy/README.md.
+domain: gdc
+source_file: governance/conformance/policy.yaml
+enforcement_point: "governance/conformance gate at issue-file time (filing.py derives the gdc label from policy.yaml's filing + expectations blocks)"
+control_plane_visible: true
