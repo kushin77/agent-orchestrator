@@ -172,8 +172,8 @@ for line in lines:
 if current:
     paragraphs.append(current)
 
-ref_re = re.compile(r"Refs:?\s+[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+")
-closing_re = re.compile(r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[ \t]+#[0-9]+", re.IGNORECASE)
+ref_re = re.compile(r"Refs:?\s+(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+")
+closing_re = re.compile(r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+#[0-9]+", re.IGNORECASE)
 separator_re = re.compile(r"^-{2,}[ \t]*$")
 
 
@@ -209,7 +209,7 @@ for paragraph in reversed(paragraphs):
         region = paragraph + region
 
 this_close_re = re.compile(
-    r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)[ \t]+#" + re.escape(n) + r"\b",
+    r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+#" + re.escape(n) + r"\b",
     re.IGNORECASE,
 )
 if any(this_close_re.search(line) for line in region):
@@ -339,6 +339,34 @@ run_self_test() {
     echo "  OK    issue-42 branch, body with Closes #42: accepted"
   else
     echo "  FAIL  issue-42 branch, body with Closes #42: expected clean, got '$with_closes_finding'" >&2
+    failures=$((failures + 1))
+  fi
+
+  # issue #1593: the bare `Refs #<n>` form (no owner/repo slug) is accepted by
+  # the shared predicate.
+  local bare_refs_body
+  bare_refs_body="$(printf 'What changed.\n\nSome detail.\n\nRefs #1234')"
+  local bare_refs_msg bare_refs_finding
+  bare_refs_msg="$(render_message "fix(thing): do the thing" "1234" "$bare_refs_body")"
+  bare_refs_finding="$(classify_message "$bare_refs_msg")"
+  if [ -z "$bare_refs_finding" ]; then
+    echo "  OK    bare 'Refs #<n>' trailer (#1593): accepted"
+  else
+    echo "  FAIL  bare 'Refs #<n>' trailer (#1593): expected a clean verdict, got '$bare_refs_finding'" >&2
+    failures=$((failures + 1))
+  fi
+
+  # issue #1593: `Closes: #<n>` (git's own colon trailer form) satisfies the
+  # per-issue Closes check the same as the colon-less GitHub keyword form.
+  local colon_closes_body
+  colon_closes_body="$(printf 'What changed.\n\nRefs kushin77/agent-orchestrator#42\nCloses: #42')"
+  local colon_closes_msg colon_closes_finding
+  colon_closes_msg="$(render_message "fix(thing): do the thing" "42" "$colon_closes_body")"
+  colon_closes_finding="$(closes_finding "$colon_closes_msg" "42")"
+  if [ -z "$colon_closes_finding" ]; then
+    echo "  OK    issue-42 branch, body with 'Closes: #42' (#1593): accepted"
+  else
+    echo "  FAIL  issue-42 branch, body with 'Closes: #42' (#1593): expected clean, got '$colon_closes_finding'" >&2
     failures=$((failures + 1))
   fi
 
