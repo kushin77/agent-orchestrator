@@ -120,8 +120,8 @@ services:
     tf_flag: enable_web
     description: Public web surface (portal + shared-frontend) served at ai.purebliss.app.
   paperclip:
-    default: off  # UNRESOLVED per policy-gr5-enabled-by-default PR: NO-GO (issue #1515, 2026-09-20) predates this policy reversal (2026-09-21, same owner) which names paperclip live sync as in-scope for enabled-by-default; left off pending explicit owner call, not resolved by this PR
-    promoted: false
+    default: on  # RESOLVED 2026-09-21 (owner, explicit call): supersedes the 2026-09-20 NO-GO (issue #1515)
+    promoted: true
     posture: hold
     phase: 7
     tf_flag: enable_paperclip
@@ -129,7 +129,7 @@ services:
       Self-hosted upstream paperclip runtime beside the control plane (issue
       #411, ADR-0013): a process boundary, not a control-plane service. Pinned
       OCI image (infra/paperclip/release.yaml), health-probed at GET /api/health,
-      nothing vendored. Inert until a reviewed go-live promotes this flag.
+      nothing vendored.
   hermes:
     default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false

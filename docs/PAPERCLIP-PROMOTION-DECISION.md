@@ -1,7 +1,15 @@
 # Paperclip promotion decision — go/no-go (issue #1515)
 
-**Decision:** NO-GO — `enable_paperclip` is **not** promoted to a real
-environment at this time; the flag stays `default = false` (documented-inert).
+**Superseded 2026-09-21.** The enabled-by-default policy reversal
+(policy-gr5-enabled-by-default, GR-5/AO-GR-6) is an explicit owner decision,
+made the day after this record, that new capabilities ship enabled by
+default. The owner confirmed directly that it supersedes this NO-GO:
+`enable_paperclip` now defaults `true` in `infra/terraform/variables.tf` and
+`infra/feature-flags/registry.yaml`. The text below is kept as history.
+
+**Original decision (2026-09-20, superseded):** NO-GO — `enable_paperclip` is
+**not** promoted to a real environment at this time; the flag stays
+`default = false` (documented-inert).
 
 **Owner sign-off:** kushin77 — recorded by the merge of the PR closing #1515
 (the decision doc itself is the record; no separate approval mechanism is

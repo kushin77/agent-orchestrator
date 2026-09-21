@@ -45,9 +45,11 @@ TF_VARS = os.path.join(ROOT, "infra", "terraform", "variables.tf")
 # Flags this checker accepts at "off" under policy-gr5-enabled-by-default: the
 # owner's default is ON, not a prohibition on off, so an entry here still
 # needs a cited decision (checked by the reader modules, not mechanically
-# here). enable_paperclip is UNRESOLVED, not settled: see the comment on it in
-# infra/terraform/variables.tf and infra/feature-flags/registry.yaml.
-OFF_BY_EXPLICIT_DECISION = {"enable_paperclip"}
+# here). enable_paperclip's 2026-09-20 NO-GO (issue #1515) was superseded by
+# explicit owner call on 2026-09-21 (see infra/terraform/variables.tf and
+# infra/feature-flags/registry.yaml) — it defaults on like everything else,
+# so this set is currently empty.
+OFF_BY_EXPLICIT_DECISION: set[str] = set()
 
 CANONICAL_SERVICES = [
     "registry",

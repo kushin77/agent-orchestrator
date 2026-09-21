@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T17:52:01Z",
+  "generated_at": "2026-09-21T20:32:04Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1266,7 +1266,7 @@
       "labels": [
         "epic:vendor-compliance"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T21:09:21Z",
@@ -1280,7 +1280,7 @@
       "labels": [
         "epic:vendor-compliance"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T21:09:23Z",
@@ -1294,7 +1294,7 @@
       "labels": [
         "epic:vendor-compliance"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T21:09:24Z",
@@ -1308,7 +1308,7 @@
       "labels": [
         "epic:vendor-compliance"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T21:35:41Z",
@@ -1334,7 +1334,7 @@
       "labels": [
         "epic:vendor-compliance"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T22:20:48Z",
@@ -1389,7 +1389,7 @@
       "labels": [
         "epic:vendor-compliance"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T21:17:29Z",
@@ -1403,7 +1403,7 @@
       "labels": [
         "epic:vendor-compliance"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T20:45:35Z",
@@ -1417,7 +1417,7 @@
       "labels": [
         "epic:vendor-compliance"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T21:09:26Z",
@@ -1431,7 +1431,7 @@
       "labels": [
         "epic:vendor-compliance"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T20:32:46Z",
@@ -7175,7 +7175,7 @@
         "priority:P0",
         "type:task"
       ],
-      "parent": 125,
+      "parent": 1722,
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-14T22:11:25Z",
@@ -11436,7 +11436,7 @@
     {
       "number": 1276,
       "title": "merge rights live only with the queue's service identity \u2014 agent tokens open PRs, GitHub refuses their merges",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -11449,7 +11449,7 @@
       "parent": 1254,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:55:36Z",
       "files": []
     },
     {
@@ -11751,7 +11751,7 @@
     {
       "number": 1338,
       "title": "reconcile: the 7 residual real-tree quarantine exemptions need a per-artifact owner call (successor to #1311)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:fleet",
@@ -11766,7 +11766,7 @@
       "parent": 1268,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T19:00:26Z",
       "files": []
     },
     {
@@ -12695,7 +12695,7 @@
     {
       "number": 1496,
       "title": "scripts/: 208 shell scripts each re-implement root-detection, contains(), ok/bad() and the python3 guard \u2014 adopt the one shared lib, bounded",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -12708,7 +12708,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T19:38:45Z",
       "files": []
     },
     {
@@ -12755,18 +12755,6 @@
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-21T18:29:37Z",
-      "files": []
-    },
-    {
-      "number": 1737,
-      "title": "gate: wire portal suite into check-pytest-suites (feature-flag defaults + no-hang confirmed)",
-      "state": "OPEN",
-      "milestone": "",
-      "labels": [],
-      "parent": null,
-      "blocked_by": [],
-      "cross_refs": [],
-      "closed_at": "",
       "files": []
     },
     {
@@ -13794,7 +13782,7 @@
     {
       "number": 1563,
       "title": "spog: cross-engine Sessions view v1 (read .fleet/.board/.deepseek-agent)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
         "area:standards",
@@ -13811,13 +13799,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:20:16Z",
       "files": []
     },
     {
       "number": 1564,
       "title": "spog: operator controls (assign/pause/reassign/escalate/kill) on Sessions view",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
         "area:standards",
@@ -13834,7 +13822,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:49:58Z",
       "files": []
     },
     {
@@ -13962,7 +13950,7 @@
     {
       "number": 1573,
       "title": "[cto] CTO office module: harvested from leaderboard + capital-underwriting; root/super-admin arm of the fleet",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:standards",
@@ -13976,7 +13964,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:44:06Z",
       "files": []
     },
     {
@@ -14108,7 +14096,7 @@
     {
       "number": 1603,
       "title": "isolation-landed holds 5 settled lanes (no trailing ticket trailer) and its remedy is another lane's branch",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -14121,7 +14109,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T19:16:12Z",
       "files": []
     },
     {
@@ -14145,7 +14133,7 @@
     {
       "number": 1619,
       "title": "ADR: no promotion state in the vocabulary \u2014 'accepted' cannot be distinguished from 'live'",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -14158,7 +14146,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:28:08Z",
       "files": []
     },
     {
@@ -14179,7 +14167,7 @@
     {
       "number": 1625,
       "title": "dispatch: wire the A2A peer-check standard into its four cadence points (session start, pre-claim, fleet loop, pre-dispatch)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
         "area:standards",
@@ -14192,13 +14180,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:50:25Z",
       "files": []
     },
     {
       "number": 1627,
       "title": "wire (or confirm) prune-worktrees.sh schedule \u2014 declared but NOT-SCHEDULED + 7 orphan worktrees",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -14211,13 +14199,13 @@
       "parent": 1543,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:11:41Z",
       "files": []
     },
     {
       "number": 1631,
       "title": "boundary gate fails open on a rotted snapshot: the #132/#133 vendor-compliance quarantine is tracked by the closed #358 \u2014 successor tracker",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M29 - Module adoption & capability (diagrams \u00b7 code-indexing \u00b7 monitoring)",
       "labels": [
         "area:board",
@@ -14231,7 +14219,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:26:54Z",
       "files": []
     },
     {
@@ -14256,7 +14244,7 @@
     {
       "number": 1642,
       "title": "gates: fixture-seeding checks do not neutralise an exported GIT_DIR (SP-11)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -14272,7 +14260,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:11:41Z",
       "files": []
     },
     {
@@ -14332,7 +14320,7 @@
     {
       "number": 1651,
       "title": "[cto] no single command runs the PMO -> paperclip -> hermes -> lane -> verify -> merge -> attest loop end to end",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
         "area:standards",
@@ -14345,13 +14333,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:44:43Z",
       "files": []
     },
     {
       "number": 1652,
       "title": "docs: correct stale 'hermes is the orchestration half' claim in integrations/paperclip/reporting/README.md against ADR-0033",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
         "area:standards",
@@ -14364,13 +14352,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:06:00Z",
       "files": []
     },
     {
       "number": 1653,
       "title": "docs: diagram fleet/brain.py + governance/dispatch/ internal dispatch loop for ARCHITECTURE-2026-09.md",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
         "area:standards",
@@ -14383,7 +14371,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:06:00Z",
       "files": []
     },
     {
@@ -14404,7 +14392,7 @@
     {
       "number": 1661,
       "title": "gate of record is non-deterministic: governance/lifecycle reds the venue on content that does not touch it (2 of 3 samples), and the failing test is not publishable",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -14417,13 +14405,13 @@
       "parent": 1254,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:55:37Z",
       "files": []
     },
     {
       "number": 1665,
       "title": "[cmr-gap] googlecloudplatform: onboarding gap analysis (grade\u2192govern\u2192catalog\u2192consume\u2192verify)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M25 - Per-Repo Agent Fleet & CTO Overlay",
       "labels": [
         "area:standards",
@@ -14436,7 +14424,7 @@
       "parent": 1648,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:49:39Z",
       "files": []
     },
     {
@@ -14480,7 +14468,7 @@
     {
       "number": 1668,
       "title": "EPIC: isolation & A2A lease enforcement",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M9 - A2A & Inter-Agent Interop",
       "labels": [
         "area:standards",
@@ -14493,13 +14481,13 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T18:58:24Z",
       "files": []
     },
     {
       "number": 1669,
       "title": "EPIC: PR lifecycle never fails \u2014 issue \u2192 implement \u2192 verify \u2192 merge \u2192 close issue + PR + artifacts, templated end to end",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -14510,7 +14498,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:59:15Z",
       "files": []
     },
     {
@@ -14531,7 +14519,7 @@
     {
       "number": 1671,
       "title": "train: detect a fold invalidated by master moving and re-cut automatically (3 trains went stale 2026-09-20/21)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -14542,7 +14530,7 @@
       "parent": 1669,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:55:37Z",
       "files": []
     },
     {
@@ -14614,7 +14602,7 @@
     {
       "number": 1676,
       "title": "gate-of-record: a producer that is not a 16-minute local make verify behind a box cap of 4 (shared-services runner or CI venue with gh)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -14625,13 +14613,13 @@
       "parent": 1669,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:55:38Z",
       "files": []
     },
     {
       "number": 1682,
       "title": "runner: remote fleet runs DeepSeek only \u2014 manifest pins FLEET_RUNNER=deepseek / FLEET_RUNNER_PROFILE=deepseek-native (.42 runner self-held since 2026-09-18)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -14642,7 +14630,7 @@
       "parent": 1669,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:55:38Z",
       "files": []
     },
     {
@@ -14660,7 +14648,7 @@
     {
       "number": 1688,
       "title": "train: a check declared as an inline command is permanently unrunnable, so it can never be attributed (pytest-fleet, pytest-suites, ...)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -14671,7 +14659,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:55:38Z",
       "files": []
     },
     {
@@ -14689,7 +14677,7 @@
     {
       "number": 1694,
       "title": "conformance: 67 milestoned open issues lack priority/area/gdc \u2014 a cascading label debt the class backfill just exposed",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -14700,7 +14688,7 @@
       "parent": 1254,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T17:54:59Z",
       "files": []
     },
     {
@@ -14718,6 +14706,548 @@
       "blocked_by": [],
       "cross_refs": [],
       "closed_at": "2026-09-21T17:41:25Z",
+      "files": []
+    },
+    {
+      "number": 1717,
+      "title": "focus: the committed .board/focus.json pins a stale active epic, so lanes cut from master are refused out-of-epic-pooled for the real epic child",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T18:45:21Z",
+      "files": []
+    },
+    {
+      "number": 1722,
+      "title": "boundary: retire the 49 masked findings (22 stale quarantine entries, 27 uncovered children)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 132,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T18:45:09Z",
+      "files": []
+    },
+    {
+      "number": 1725,
+      "title": "gate: wire the 5 remaining suites into check-pytest-suites (paperclip/reporting, portal, scripts, governance/knowledge, governance/modules)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T18:56:16Z",
+      "files": []
+    },
+    {
+      "number": 1727,
+      "title": "gate: wire the 5 remaining suites into check-pytest-suites (paperclip/reporting, portal, scripts, knowledge, modules)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T18:29:34Z",
+      "files": []
+    },
+    {
+      "number": 1733,
+      "title": "[cmr-gap] googlecloudplatform: record baseline conformance grade",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1666,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1734,
+      "title": "[cmr-gap] googlecloudplatform: apply governance bundle (dependabot + gitleaks + Terraform governance)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:knowledge-index",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1666,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1737,
+      "title": "gate: wire portal suite into check-pytest-suites (feature-flag defaults + no-hang confirmed)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T19:45:58Z",
+      "files": []
+    },
+    {
+      "number": 1738,
+      "title": "spog: live-instance observation of Sessions operator controls",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1667,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1741,
+      "title": "gate: governance/isolation test_authorship.py red on master (4 failures)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T19:03:20Z",
+      "files": []
+    },
+    {
+      "number": 1744,
+      "title": "Migrate remaining scripts/*.sh to scripts/lib/common.sh helpers",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1496,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T19:37:55Z",
+      "files": []
+    },
+    {
+      "number": 1748,
+      "title": "gateway(nous): the Nous provider credential must be an IaC-declared secret (Secret Manager + IAM + injection), flag-gated OFF",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pmo:triaged",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T19:34:13Z",
+      "files": []
+    },
+    {
+      "number": 1749,
+      "title": "gate: check-code-headers is red on master \u2014 20 files carry no ---knowledge--- block and are not in the baseline",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T19:30:07Z",
+      "files": []
+    },
+    {
+      "number": 1755,
+      "title": "gate: check-reconcile-orphans.sh is a 64-line stub that always exits 0 \u2014 #1753 deleted 463 lines of it",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pmo:triaged",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T19:58:52Z",
+      "files": []
+    },
+    {
+      "number": 1756,
+      "title": "spog settings: no middleware aggregator (portal/server/settings.py)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1667,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T19:56:03Z",
+      "files": []
+    },
+    {
+      "number": 1757,
+      "title": "spog settings: no Settings view exists (frontend gap)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1667,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:04:20Z",
+      "files": []
+    },
+    {
+      "number": 1758,
+      "title": "spog settings: config/fleet-jobs.json has no portal reader",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1667,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:10:07Z",
+      "files": []
+    },
+    {
+      "number": 1759,
+      "title": "spog settings: scripts/skip-budget.json has no portal reader",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1667,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:14:02Z",
+      "files": []
+    },
+    {
+      "number": 1760,
+      "title": "spog settings: tier-policy / paperclip-hermes / Nous flags have no portal-facing projection",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1667,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:09:10Z",
+      "files": []
+    },
+    {
+      "number": 1763,
+      "title": "policy: no policy-registry aggregation verb in control-plane/ (structural gap)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:26:29Z",
+      "files": []
+    },
+    {
+      "number": 1764,
+      "title": "policy: Paperclip has no policy-delivery path from this repo's declarations",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1765,
+      "title": "policy(git): branch/merge policy fragmented across 4+ sources, branch protection not IaC-declared",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1766,
+      "title": "policy(cloudflare): edge/DNS/WAF policy has no single spec, implicit across 5+ scripts and docs",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1767,
+      "title": "policy(gcs): Terraform-declared bucket policy has no governance/ mirror for control-plane visibility",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1768,
+      "title": "policy(local-dev): AO-GR-17 not registered as a control-plane-visible policy domain",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1769,
+      "title": "policy: CMR/vendor GDC-equivalent policy claim unresolved -- vendor/CMR has no matching artifact",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1771,
+      "title": "portal: add make portal-demo target so merged surfaces are actually viewable",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1667,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T19:58:02Z",
+      "files": []
+    },
+    {
+      "number": 1776,
+      "title": "gate: check-code-headers self-test fails 2 of 47 arms \u2014 #1753 added a lib/common.sh dependency its scratch tree does not carry",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:05:44Z",
+      "files": []
+    },
+    {
+      "number": 1779,
+      "title": "gate: code-headers is red on master over one file \u2014 scripts/portal-demo.py landed with no header and no debt row",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P2",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:07:40Z",
+      "files": []
+    },
+    {
+      "number": 1784,
+      "title": "secrets: the runner model credential is not IaC-declared, and its profile demands ANTHROPIC_* for a DeepSeek deployment",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P1",
+        "security",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:16:22Z",
+      "files": []
+    },
+    {
+      "number": 1787,
+      "title": "runner: the fleet default is the Anthropic CLI while its declared vocabulary is DeepSeek \u2014 switch the default, with lane fitness now measured",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:23:28Z",
+      "files": []
+    },
+    {
+      "number": 1790,
+      "title": "fleet: the live loop's venue is a closed epic's stranded branch (HEAD 629f22f5, 203 behind master), so the checkout-behind remedy cannot apply and the queue is frozen",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
       "files": []
     }
   ]

@@ -81,20 +81,15 @@ variable "enable_web" {
   default     = true # policy-gr5-enabled-by-default
 }
 
-# enable_paperclip — UNRESOLVED per the policy-gr5-enabled-by-default PR:
-# go/no-go decision (issue #1515) is NO-GO as of 2026-09-20 (owner sign-off,
-# docs/PAPERCLIP-PROMOTION-DECISION.md), but the enabled-by-default policy
-# reversal is dated 2026-09-21 (one day later, same owner) and its own
-# preamble names "Paperclip live sync" as in-scope for the reversal. This PR
-# does not resolve that ordering on its own authority; left at
-# default = false pending an explicit owner call, flagged in the PR body at
-# the same prominence as the CloudBuild trigger exception. If un-paused,
-# promote only via a reviewed terraform plan with enable_paperclip = true —
-# never an ad-hoc apply (GR-5).
+# enable_paperclip — RESOLVED 2026-09-21 (owner, explicit call): the
+# enabled-by-default policy reversal supersedes the 2026-09-20 NO-GO
+# (issue #1515, docs/PAPERCLIP-PROMOTION-DECISION.md). Promotion still goes
+# through a reviewed terraform plan, never an ad-hoc apply (GR-5) — flipping
+# this variable's declared default is that review.
 variable "enable_paperclip" {
-  description = "Deploy the self-hosted upstream paperclip runtime beside the control plane (issue #411, ADR-0013). OFF pending an explicit owner call resolving the NO-GO (#1515, 2026-09-20) vs. policy-gr5-enabled-by-default (2026-09-21) date ordering."
+  description = "Deploy the self-hosted upstream paperclip runtime beside the control plane (issue #411, ADR-0013). ON by default per the 2026-09-21 enabled-by-default policy, which the owner confirmed supersedes the prior NO-GO (#1515, 2026-09-20)."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_hermes" {
