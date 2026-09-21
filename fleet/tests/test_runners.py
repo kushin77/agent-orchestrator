@@ -311,3 +311,53 @@ def test_the_hold_does_not_flap_when_the_runner_resolves_but_cannot_honour(
     assert len(escalations) == 1, (
         f"holding across cycles must not re-escalate: got {len(escalations)}"
     )
+
+
+def test_every_profile_credential_is_an_iac_declared_secret() -> None:
+    """#1784: the credential a profile needs is a declared IaC secret.
+
+    The operator's directive — "all creds need to be iac secrets" — is made
+    mechanical here rather than left as prose in a docstring: a profile names the
+    mount in ``infra/fleet/secrets_contract.py`` that PROVISIONS its credential,
+    and that name must resolve. A profile that needs a credential and names
+    nothing, or names a mount that does not exist, is refused.
+
+    This is the cross-file half of the contract: the runner half declares which
+    secret backs it, and the IaC half declares where that secret comes from. Two
+    files agreeing is the whole of the claim, so it is checked rather than
+    assumed.
+    """
+    import importlib
+    import pathlib
+    import sys
+
+    repo_root = pathlib.Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(repo_root / "infra" / "fleet"))
+    try:
+        secrets_contract = importlib.import_module("secrets_contract")
+    finally:
+        sys.path.pop(0)
+
+    for profile in runners.PROFILES.values():
+        assert profile.iac_secret, (
+            f"{profile.id} declares no IaC secret — its credential would have to be "
+            "exported by hand, which is the defect (issue #1784)"
+        )
+        assert profile.iac_secret in secrets_contract.BY_NAME, (
+            f"{profile.id}: {profile.iac_secret!r} is not declared in "
+            "infra/fleet/secrets_contract.py — a profile may only name a mount that "
+            "exists, or its remedy points at nothing"
+        )
+
+    # The arm must be able to fail: a name that is genuinely absent is absent, so
+    # the assertion above is not vacuously true for every string.
+    bogus = runners.RunnerProfile(
+        id="bogus",
+        executable="bogus",
+        model_flag="-m",
+        models={},
+        iac_secret="not-a-declared-mount",
+    )
+    assert bogus.iac_secret not in secrets_contract.BY_NAME, (
+        "the membership arm is vacuous unless an undeclared name is genuinely absent"
+    )
