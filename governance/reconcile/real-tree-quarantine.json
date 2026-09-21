@@ -1,18 +1,49 @@
 {
   "version": 1,
   "note": "Named, leased exemptions for the real-tree worktree/branch audit (issues #1291, #1311, #1321). Each entry excuses ONE artifact — kind, name, and the tip the exemption was measured at — and only while the lease below holds AND this document is in force in the venue the check is running in: `venue.git_common_dir` names the repository instance (every worktree of one checkout, lane worktrees included, answers it; no other clone does). At that venue every rule bites: a new artifact is never absorbed (it is not listed); an artifact whose tip has moved is not absorbed (it is no longer the artifact named here); an entry that no longer targets an unmatched artifact FAILS as a stale exemption; and an entry that is honoured but no longer NEEDED is REFUTED and FAILS by name (issue #1311) — an artifact whose whole committed work is already on the default branch by `git patch-id --stable`, and a worktree that holds no uncommitted work of its own, is holding nothing an exemption protects, and its home is real-tree-baseline.json instead. That rule is why this document shrank by 18 entries in the #1311 edit (15 refuted by exactly that proof, 3 whose work a live `git ls-remote` showed preserved on a remote branch — all 18 moved to the reviewed baseline), and by one more in the same lane: `worktree /tmp/ao968-pristine` was reaped by the machine's own `/tmp` scratch guard and the file it held uncommitted (`portal/tests/test_fleet_syspath_isolation.py`) is on the default branch (`3aadeda0`, #968) — a resolution, so its entry was removed rather than restated. 15 were refuted by exactly that proof and 3 more had their work preserved on a remote branch (measured live with `git ls-remote`), so all 18 moved to the reviewed baseline. At ANOTHER venue the whole document is inert — reported entry by entry as NOT-APPLICABLE, honouring nothing (an artifact that is unmatched there stays a finding: this document does not speak for that checkout) and not fatal (a stale exemption is a claim about THIS disk, which another checkout cannot observe). That distinction is the fix for #1317, which emptied this document because its entries could never be honoured on a pristine clone — a true measurement whose remedy un-quarantined all of them on the one box that has them. This document's tracker moved once more in the #1311 edit: its predecessor #1311 was the tracker for the whole set while it shrank from 25 entries to 7, and the residual would have lapsed the moment #1311 closed — so the lease names #1338, the issue that owns the 7 remaining per-artifact owner calls, measured open over REST at write time. Closing a tracker lapses its exemptions; the tracker is therefore always an issue that is meant to stay open while entries remain. Every remaining entry is the AGENTS.md rule 17 class, re-measured at the timestamp in its own reason: work that exists nowhere else, which the worker is forbidden to discard, so it must be reported rather than silently red — and reported rather than silently reaped. This parcel of the document closed on 2026-09-19 (issue #1338): all six remaining entries named artifacts whose work existed nowhere else, and all six were re-measured at origin/master 00cbd753 with the refuters this check runs (`real_tree_baseline._Surplus` / `landing.RepoLanding.surplus_patch_identity` -> '' for all six, so not one of them had landed) plus the question the rows themselves assert and the check does not ask: is the tip preserved on a remote. Every one of the six is now carried by a remote ref - origin/rescue/issue-1028-canon = 88ea96d70a3f, origin/issue-1114-dispatch-master-green = d084114b73e8, origin/rescue/issue-830-reaper-schedule = af843aaf8289, origin/fix/1042-governance-test-basenames = 47ac6de35e04, and origin/rescue/agent-ad284eb-ticket-conftest = 6d47b5abdc35 carrying the one uncommitted file of worktree agent-ad284eb1ac275c0c6 at sha256 af180c20a113 - each read live with `git ls-remote --heads origin` and `git for-each-ref --contains` - so no exemption was still protecting the only copy and each went to real-tree-baseline.json in the same reviewed edit, with the measurement that ended it. Nothing local was deleted: every artifact is still on this box at the tip it was measured at. Nothing here may be restored: a row claiming a work exists nowhere else while a live `ls-remote` says otherwise is exactly what governance/reconcile/tests/test_quarantine_exemption_claims.py refuses by name. This document is therefore EMPTY, which makes the lease below inert - a lease bounding no entry has no power to turn a finding into a pass - and it is still stamped, live, because an empty document whose tracker had lapsed would be a landmine for the next lane that needs an entry. A future rule 17 artifact needs a NEW, measured entry here; the six retired rows are not to be restored.",
-  "tracked_by": "#1338",
+  "tracked_by": "#1602",
   "tracking": {
     "state": "open",
-    "measured_at": "2026-09-19T22:02:44Z",
-    "measured_by": "governance/reconcile (issue #1338 lane, session 0f7c03282391)",
-    "max_age_hours": 24,
-    "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1338 -> state=open at 2026-09-19T22:02:44Z"
+    "measured_at": "2026-09-20T22:51:14Z",
+    "measured_by": "gate-1656 landing lane (fix/train-1656-quarantine-reconcile)",
+    "max_age_hours": 168,
+    "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1602 -> state=open at 2026-09-20T22:51:14Z"
   },
   "venue": {
     "git_common_dir": "/home/akushnir/agent-orchestrator/.git",
     "measured_on": "ElevatedIQ-AK",
     "why": "The repository instance these exemptions were measured in — every worktree of this checkout (lane worktrees included) resolves to it, and no pristine clone does. Without it, `the artifact is gone` and `the artifact was never here` are indistinguishable, which is what made #1317 empty this document."
   },
-  "quarantine": []
+  "quarantine": [
+    {
+      "kind": "branch",
+      "name": "issue-1338-quarantine",
+      "tip": "ac1179b43cdde93a2069e5551d965b20206f5fed",
+      "reason": "issue #1338 was REOPENED 2026-09-20 because this branch carries an unlanded commit (ac1179b4 \"fix(reconcile): the six residual artifacts get their measured disposition (#1338)\") that check-reconcile.sh's own real-tree walk found no trace of on origin/master by patch identity — work exists nowhere else, AGENTS.md rule 17 forbids discarding it. Lease until ~2026-09-27 (7d, #1602)."
+    },
+    {
+      "kind": "worktree",
+      "name": "/home/akushnir/ao-worktrees/ao-1338-0a207946",
+      "tip": "ac1179b43cdde93a2069e5551d965b20206f5fed",
+      "reason": "Same branch, same commit, same reopened #1338 — the worktree checked out on issue-1338-quarantine at the same unlanded tip. Lease until ~2026-09-27 (7d, #1602)."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1485",
+      "tip": "d7b70cc41a1c59536021291faa989ecc225d29dd",
+      "reason": "issue #1485 was REOPENED 2026-09-20 because this branch carries an unlanded commit (d7b70cc4 \"fix(reconcile): retire the six real-tree exemptions after parking their work\") not present on origin/master by patch identity — work exists nowhere else, AGENTS.md rule 17 forbids discarding it. Lease until ~2026-09-27 (7d, #1602)."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-1424",
+      "tip": "18813b234767c49ec0101e60fffbc76ebf9d94d4",
+      "reason": "governance.isolation.worktree.content_landed(root, 'issue-1424') = True — its change (vendor/CMR submodule init in the verify pipeline) is on origin/master by patch identity, so it is not unlanded, unfinished work. Deleting the branch (`git branch -D`) was permission-denied in the landing session; quarantined instead of reaped so the finding does not go red while the local delete stays blocked. Lease until ~2026-09-27 (7d, #1602) — safe to delete by hand once the block clears."
+    },
+    {
+      "kind": "branch",
+      "name": "issue-gate-status-bytecount",
+      "tip": "d29364c0c950b7f46a2c1992a644ef2b8c948b69",
+      "reason": "governance.isolation.worktree.content_landed(root, 'issue-gate-status-bytecount') = True — its fix (scripts/check-gate-status.sh's self-test measuring in characters, not bytes, Refs #1382) is on origin/master by patch identity (landed in the #1382 train wave, a7518cff), even though its own PR #1480 was closed unmerged. `git branch -D` was permission-denied in the landing session; quarantined instead of reaped for the same reason as issue-1424. Lease until ~2026-09-27 (7d, #1602) — safe to delete by hand once the block clears."
+    }
+  ]
 }
