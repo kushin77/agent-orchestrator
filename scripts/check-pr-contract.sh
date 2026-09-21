@@ -236,6 +236,11 @@
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# GIT_DIR and friends are neutralised (issue #1642, SP-11): the selftest
+# below seeds a scratch repo with `git -C`, which does not override an
+# exported GIT_DIR — an exported one would write into the real repo instead.
+# shellcheck source=scripts/lib/unset-git-env.sh
+source "$root/scripts/lib/unset-git-env.sh"
 repo="$root"
 body_file="${AO_PR_BODY_FILE:-}"
 range="${AO_PR_RANGE:-origin/master..HEAD}"

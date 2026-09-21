@@ -51,7 +51,8 @@ for tool in python3 git; do
     exit 2
   fi
 done
-unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+# shellcheck source=scripts/lib/unset-git-env.sh
+source "$root/scripts/lib/unset-git-env.sh"
 export GIT_CONFIG_GLOBAL=/dev/null
 
 budget="governance/reconcile/orphan-budget.yaml"
