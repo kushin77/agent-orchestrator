@@ -313,9 +313,11 @@ def test_the_gate_clears_every_identity_variable(lane, var):
     exactly this one — if a fifth variable is ever added here, the gate must learn
     it or the ambient leak returns by a new name.
     """
-    gate = (REPO_ROOT / "scripts" / "check-session-isolation.sh").read_text(encoding="utf-8")
-    landed = (REPO_ROOT / "scripts" / "check-isolation-landed.sh").read_text(encoding="utf-8")
-    for source in (gate, landed):
-        unset_lines = [line for line in source.splitlines() if line.startswith("unset GIT_")]
-        assert unset_lines, "the gate does not clear the ambient identity env"
-        assert var in " ".join(unset_lines)
+    lib_rel = "scripts/lib/unset-git-env.sh"
+    unset_lib = (REPO_ROOT / lib_rel).read_text(encoding="utf-8")
+    unset_lines = [line for line in unset_lib.splitlines() if line.startswith("unset GIT_")]
+    assert unset_lines, "the shared lib does not clear the ambient identity env"
+    assert var in " ".join(unset_lines)
+    for name in ("check-session-isolation.sh", "check-isolation-landed.sh"):
+        gate = (REPO_ROOT / "scripts" / name).read_text(encoding="utf-8")
+        assert lib_rel in gate, f"{name} no longer sources {lib_rel}"
