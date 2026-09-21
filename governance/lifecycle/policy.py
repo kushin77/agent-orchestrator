@@ -1,5 +1,21 @@
 """The lifecycle package's declared acceptance policy — read, never duplicated (issue #885).
 
+---knowledge---
+module_id: governance.lifecycle.policy
+system: governance
+app: lifecycle
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state, declared-authority]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [default_controls_path, PolicyUnavailable, RetirePolicy, QuarantinePolicy, InvariantDecl, Policy, load, load_for_model]
+invariants: ""
+gotchas: ""
+related: ["#591", "#885"]
+do_not_duplicate: null
+---knowledge---
+
 Two judgments this module reads from ``controls.yaml`` (a sibling of this file)
 so they are declared once and enforced from one place:
 

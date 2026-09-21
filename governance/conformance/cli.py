@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Conformance CLI — CMR class / pattern / template enforcement (issue #140).
 
+---knowledge---
+module_id: governance.conformance.cli
+system: governance
+app: conformance
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state, fail-closed, offline-hermetic]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [cmd_check, cmd_change_set, cmd_policy, cmd_labels, cmd_report, cmd_file, cmd_filing_check, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#140", "#174", "#297", "#320", "#517", "#1160"]
+do_not_duplicate: null
+---knowledge---
+
 Checks the board (is in-scope work classified, and does the declared class hold?),
 a change set (does the work honour the cross-cutting mandates?), and the filing
 path itself (can an unclassified issue still be filed? — issue #320).

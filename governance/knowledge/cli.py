@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Knowledge-index CLI — build, validate, query, report (issue #139).
 
+---knowledge---
+module_id: governance.knowledge.cli
+system: governance
+app: knowledge
+solution_class: pattern
+patterns: [no-false-green, honesty-tri-state, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_build, cmd_validate, cmd_query, cmd_coverage, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#139"]
+do_not_duplicate: null
+---knowledge---
+
 Runs the indexer on demand. The scheduled path (a Makefile target driven by the
 ops runner's cron) simply calls ``build``; nothing here needs a human.
 

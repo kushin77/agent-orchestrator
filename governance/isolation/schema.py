@@ -1,5 +1,21 @@
 """Validate this surface's persisted records against `isolation.schema.json` (issue #885).
 
+---knowledge---
+module_id: governance.isolation.schema
+system: governance
+app: isolation
+solution_class: class
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RecordSchemaViolation, problems, validate]
+invariants: ""
+gotchas: ""
+related: ["#591", "#885"]
+do_not_duplicate: null
+---knowledge---
+
 Reuses the stdlib-only JSON-Schema subset validator
 ``governance/modules/schema.py`` already implements (issue #591) rather than
 re-implementing one: this module only knows *which* ``$defs`` entry corresponds

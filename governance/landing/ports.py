@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The effects a landing needs — injected, with real implementations (#764).
 
+---knowledge---
+module_id: governance.landing.ports
+system: governance
+app: landing
+solution_class: enterprise
+patterns: [honesty-tri-state, deterministic, dry-run-default, injected-effects, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PortError, CommandResult, PullRequest, LandingOps, GitHubOps, Planned, RecordingOps]
+invariants: ""
+gotchas: ""
+related: ["#269", "#764", "#998", "#1072", "#1114"]
+do_not_duplicate: null
+---knowledge---
+
 The landing engine is a decision plus an ordered set of effects:
 
     push -> open PR -> pre-merge contract -> merge decision -> squash-merge

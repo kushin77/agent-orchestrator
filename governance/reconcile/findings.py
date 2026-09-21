@@ -1,5 +1,21 @@
 """A filed finding reaches a terminal state — or it is named, never written off (#973).
 
+---knowledge---
+module_id: governance.reconcile.findings
+system: governance
+app: reconcile
+solution_class: enterprise
+patterns: [offline-hermetic, dry-run-default, idempotent, injected-effects, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Entry, FindingState, Charged, FindingCloser, GhCloser, read_ledger, lifecycle_entries, resolve_key, recheck_findings, counts]
+invariants: ""
+gotchas: ""
+related: ["#241", "#786", "#973", "#1299"]
+do_not_duplicate: null
+---knowledge---
+
 ``governance/lifecycle/report.py`` files a governance finding on the board once per
 fingerprint and dedupes repeats through ``.fleet/board-reports.json``. Filing is
 idempotent; **unfiling was not**. Nothing in the fleet retired a lifecycle

@@ -1,5 +1,21 @@
 """The canonical knowledge source catalogue (issue #139).
 
+---knowledge---
+module_id: governance.knowledge.sources
+system: governance
+app: knowledge
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SourceSpec, specs_for_kind, required_specs]
+invariants: ""
+gotchas: ""
+related: ["#139", "#608", "#616", "#621", "#626", "#627"]
+do_not_duplicate: null
+---knowledge---
+
 Declarative, not hand-maintained: each entry names a kind, a glob, an owner and
 whether the source is required. The indexer consumes this; nothing else lists
 knowledge sources, so there is exactly one place to add a new one — which is what

@@ -1,5 +1,21 @@
 """The registered-runtime set -- DERIVED from the repository's registry, never typed.
 
+---knowledge---
+module_id: governance.notices.runtime_registry
+system: governance
+app: notices
+solution_class: enterprise
+patterns: [honesty-tri-state, declared-authority]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RegistryUnavailable, Runtime, pack_release_paths, live_pack_profiles, catalog_identities, fanout_path, transport_name, registered_runtimes, contract_ids, contract_identities, (+3 more)]
+invariants: ""
+gotchas: ""
+related: ["#1268", "#1269", "#1376", "#1385", "#1412"]
+do_not_duplicate: null
+---knowledge---
+
 THE RULE THIS FILE MAKES MECHANICAL (issue #1269, EPIC #1268)
 ------------------------------------------------------------
 A standing notice must be acked by EVERY REGISTERED RUNTIME. The load-bearing word

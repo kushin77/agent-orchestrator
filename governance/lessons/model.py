@@ -1,5 +1,21 @@
 """Model for the RCA + lessons ledger (issue #141).
 
+---knowledge---
+module_id: governance.lessons.model
+system: governance
+app: lessons
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [now_iso, parse_date, days_since, is_suggestion, is_lesson, ticket_kind_for, Finding, errors, warnings, Entry, (+3 more)]
+invariants: ""
+gotchas: ""
+related: ["#140", "#141", "#152", "#402", "#1028", "#1178"]
+do_not_duplicate: null
+---knowledge---
+
 The ledger is the *single* authoritative record of what went wrong, why, what
 was done about it, and what the organization learned. It lives at
 ``governance/lessons/ledger.jsonl`` (one JSON object per line). This module owns

@@ -1,5 +1,21 @@
 """Live CMR pin sync for the knowledge indexer (issue #887, lane L8/#878).
 
+---knowledge---
+module_id: governance.knowledge.live_sync
+system: governance
+app: knowledge
+solution_class: pattern
+patterns: [provoked-negative-control]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PinSyncError, PinnedBundle, validate_pin_shape, live_vendor_head, pinned_bundle, check_drift]
+invariants: ""
+gotchas: ""
+related: ["#878", "#887"]
+do_not_duplicate: null
+---knowledge---
+
 The knowledge indexer (:mod:`indexer`) catalogues *static* sources — files
 already in the tree. This module is the one place that consumes the *live*
 state of the CMR standards pin so the indexer (and its gate) can answer:

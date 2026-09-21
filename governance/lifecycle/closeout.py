@@ -1,5 +1,21 @@
 """Close-out executor — drive an item to hygiene, and refuse a false success.
 
+---knowledge---
+module_id: governance.lifecycle.closeout
+system: governance
+app: lifecycle
+solution_class: enterprise
+patterns: [honesty-tri-state, fail-closed, offline-hermetic, idempotent, injected-effects]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CloseOutOps, Step, Unassessed, CloseOutResult, evidence_subject, closeout, describe]
+invariants: ""
+gotchas: ""
+related: ["#263", "#321", "#622", "#623", "#626", "#786"]
+do_not_duplicate: null
+---knowledge---
+
 ``audit`` says what is broken. This says what to *do* about it, in an order that
 is derived from the incident that motivated the module rather than from taste:
 

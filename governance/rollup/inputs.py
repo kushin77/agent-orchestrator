@@ -1,5 +1,21 @@
 """Input loading + validation for the enterprise roll-up (issue #151).
 
+---knowledge---
+module_id: governance.rollup.inputs
+system: governance
+app: rollup
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [PyYamlMissing, InputProblem, LoadedInputs, load_schema, load_org, load_inventory, inventory_paths, load_inputs, with_problems]
+invariants: ""
+gotchas: ""
+related: ["#151"]
+do_not_duplicate: null
+---knowledge---
+
 Reading is the only thing this module does. The org declaration and the per-repo
 fleet inventories are parsed, validated against ``schema.yaml``, and turned into
 immutable facts; every input's sha256 travels with the facts so the report can

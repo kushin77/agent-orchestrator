@@ -1,5 +1,21 @@
 """Dispatch's append-only arbitration audit trail (issue #885).
 
+---knowledge---
+module_id: governance.dispatch.audit
+system: governance
+app: dispatch
+solution_class: pattern
+patterns: [append-only-ledger, no-false-green, honesty-tri-state]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [AuditUnavailable, record_refusal, record_grant, record_tiered_attempt, render, append, read]
+invariants: ""
+gotchas: ""
+related: ["#885", "#1524"]
+do_not_duplicate: null
+---knowledge---
+
 ``arbitrate()`` (claims.py) refuses or grants every dispatch, and until this
 module existed that verdict was printed to a caller's terminal and then lost —
 nothing durable recorded *why* a unit was refused, or what was granted. This

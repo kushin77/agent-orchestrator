@@ -1,5 +1,21 @@
 """Violation -> remediation issue generation, with dedup/merge (issue #142).
 
+---knowledge---
+module_id: governance.remediation.generator
+system: governance
+app: remediation
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [title_for, build_issue, merge, generate]
+invariants: ""
+gotchas: ""
+related: ["#140", "#142"]
+do_not_duplicate: null
+---knowledge---
+
 Consumes `governance.conformance` `Finding` objects (board conformance checks
 and change-set mandate checks, issue #140) and produces `RemediationIssue`
 payloads: title, labels, summary, owner lane, corrective steps, policy

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Shared vocabulary for the governance/sync engine (issue #44).
 
+---knowledge---
+module_id: governance.sync.model
+system: governance
+app: sync
+solution_class: class
+patterns: [no-false-green, honesty-tri-state]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [DriftState, aggregate_states]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The sync/drift subtree is one lane with one contract, so its modules share a
 closed vocabulary instead of redefining each other's enums. ``DriftState`` is
 the honest tri-state every drift assessment returns; the manifest/catalog

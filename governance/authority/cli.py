@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Authority CLI — the gate-facing surface of the authority model (issue #150).
 
+---knowledge---
+module_id: governance.authority.cli
+system: governance
+app: authority
+solution_class: enterprise
+patterns: [honesty-tri-state]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [cmd_validate, cmd_can_act, cmd_sod, cmd_closure, cmd_isolation, cmd_controls, cmd_selfcheck, cmd_matrix, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#150"]
+do_not_duplicate: null
+---knowledge---
+
 Exit-code contract (guardrails/honesty tri-state, issue #28):
 
 * ``0`` OK            — the decision is ALLOW / the matrix is valid / every control met

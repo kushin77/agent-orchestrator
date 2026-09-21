@@ -1,5 +1,21 @@
 """The frozen dispatch record shapes, validated with the repo's stdlib-only subset validator (issue #885).
 
+---knowledge---
+module_id: governance.dispatch.schema
+system: governance
+app: dispatch
+solution_class: class
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SchemaUnavailable, SchemaViolation, load, problems, validate]
+invariants: ""
+gotchas: ""
+related: ["#885", "#1545"]
+do_not_duplicate: null
+---knowledge---
+
 Three shapes leave this package for disk (a ``ClaimEvent`` in the claims
 ledger, an ``Issue`` row in the board snapshot, the ``queue.yaml`` wave
 document) plus the audit record (``audit.py``) and the live-resource lease

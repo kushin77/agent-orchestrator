@@ -1,5 +1,21 @@
 """Typed ticket edges over the lessons ledger (issue #402).
 
+---knowledge---
+module_id: governance.lessons.edges
+system: governance
+app: lessons
+solution_class: enterprise
+patterns: [deterministic]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [load_records, ticket_edges, TypedEdge, ticket_kind, normalize_origin, remediation_issue, edges, edge_dicts, as_dict, pmo_rows, (+2 more)]
+invariants: ""
+gotchas: ""
+related: ["#402"]
+do_not_duplicate: null
+---knowledge---
+
 The lessons register is not a silo joined by hand: it is an **edge source** in
 the ticket graph (ADR-0014). This module is that edge emission, and it is the
 **single** place a lessons cross-record reference is turned into a node id —

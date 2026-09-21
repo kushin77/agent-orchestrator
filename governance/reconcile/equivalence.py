@@ -1,5 +1,21 @@
 """Content-equivalence stranding predicate (#740).
 
+---knowledge---
+module_id: governance.reconcile.equivalence
+system: governance
+app: reconcile
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [EquivalenceUnavailable, EquivalenceReport, content_equivalent]
+invariants: ""
+gotchas: ""
+related: ["#740"]
+do_not_duplicate: null
+---knowledge---
+
 ``git merge-base --is-ancestor <lane HEAD> <base>`` answers "is this lane's
 commit reachable from the base branch". That is the wrong question once a
 landing path squash-merges or replays commits: a fully-landed lane's original

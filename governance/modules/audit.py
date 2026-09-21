@@ -1,5 +1,21 @@
 """The registry's append-only audit trail (issue #591).
 
+---knowledge---
+module_id: governance.modules.audit
+system: governance
+app: modules
+solution_class: enterprise
+patterns: [append-only-ledger, honesty-tri-state, deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [AuditUnavailable, records, summary, render, read, append]
+invariants: ""
+gotchas: ""
+related: ["#591"]
+do_not_duplicate: null
+---knowledge---
+
 The registry's refusals *are* its compliance signal, and until this module
 existed they were printed by a script and lost: nothing durable recorded that the
 registry refused a name, or which state it judged a name to be in. This module

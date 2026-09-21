@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Repo isolation — the two-fleet demonstration (issue #150).
 
+---knowledge---
+module_id: governance.authority.isolation
+system: governance
+app: authority
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [RepoState, RepoStateStore, IsolationStep, IsolationReport, verify_isolation]
+invariants: ""
+gotchas: ""
+related: ["#150"]
+do_not_duplicate: null
+---knowledge---
+
 Acceptance criterion: *two repos' fleets are demonstrated to be fully isolated —
 no shared state, no cross-repo writes — with the enterprise controller as the
 only cross-repo actor.*

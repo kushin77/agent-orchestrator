@@ -1,5 +1,21 @@
 """Provocation driver — the tag authority's negative control (issue #1175).
 
+---knowledge---
+module_id: governance.tagging.provoke
+system: governance
+app: tagging
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Provocation, provoke_unknown_dimension, provoke_unknown_value, provoke_value_pattern, provoke_vocabulary_drift, provoke_name_authority_drift, provoke_posture_contradiction, provoke_required_missing, provoke_unknown_target, provoke_unknown_gate, (+7 more)]
+invariants: ""
+gotchas: ""
+related: ["#1175"]
+do_not_duplicate: null
+---knowledge---
+
 A refusal declared in `taxonomy.yaml` that no one can provoke is a formality
 (GR-12), and this driver is what makes the declaration falsifiable. For every
 refusal the taxonomy declares it:

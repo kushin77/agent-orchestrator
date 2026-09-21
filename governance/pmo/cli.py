@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """``governance/pmo/cli.py`` — the PMO layer's machine surface (issue #403 + follow-on).
 
+---knowledge---
+module_id: governance.pmo.cli
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state, declared-authority, projection-not-authority, offline-hermetic]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [main]
+invariants: ""
+gotchas: ""
+related: ["#401", "#403", "#635", "#1648"]
+do_not_duplicate: null
+---knowledge---
+
 Eight subcommands, each a **derived query over the ticket graph** (ADR-0014,
 issue #401) — never a store, never a second source of ``status``:
 

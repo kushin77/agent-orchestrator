@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Verify-gate model for the merge-governance surface (EPIC-00 issue #43).
 
+---knowledge---
+module_id: governance.merge.gate
+system: governance
+app: merge
+solution_class: pattern
+patterns: [no-false-green, honesty-tri-state, offline-hermetic, injected-effects]
+derives_from: null
+owner_sme: code-review-sme
+tier: L1
+interfaces: [GateStatus, status_from_exit_code, VerifyOutcome, outcome_from_exit_code, aggregate_exit_codes, green_gate, red_gate, cannot_assess_gate]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Models the repository's pre-merge verification contract (issue #29,
 ``scripts/merge-gate.sh``) as an injectable, offline tri-state check consumed
 by the merge-governance engine. This is a *model* of the gate — the live gate

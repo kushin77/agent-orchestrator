@@ -1,5 +1,21 @@
 """The hub side of the registry — read the authority, mirror its own gate.
 
+---knowledge---
+module_id: governance.modules.hub
+system: governance
+app: modules
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Seed, HubModule, MandatoryRow, HubCatalog, safe_asset_path, seed_path, read_mandatory_tsv, load]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Authority: the pinned hub submodule ``vendor/CMR`` (read-only). Two surfaces
 are read and **must agree**:
 

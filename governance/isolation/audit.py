@@ -1,5 +1,21 @@
 """Lane audit — the isolation contract, re-checked against the real worktree.
 
+---knowledge---
+module_id: governance.isolation.audit
+system: governance
+app: isolation
+solution_class: pattern
+patterns: [lane-isolation, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [authored_commits, trailer_violations, audit_lane, audit_all]
+invariants: ""
+gotchas: ""
+related: ["#287", "#288"]
+do_not_duplicate: null
+---knowledge---
+
 Provisioning establishes isolation once; this module re-derives it from the
 filesystem and git every time it is asked. That is the difference between a
 convention (someone was told to work in a worktree) and an institution (the

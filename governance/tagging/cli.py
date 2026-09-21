@@ -1,5 +1,21 @@
 """Tagging CLI — the tag authority's verbs (issue #1175).
 
+---knowledge---
+module_id: governance.tagging.cli
+system: governance
+app: tagging
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state, injected-effects, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [repo_root, cmd_lint, cmd_check, cmd_plan, cmd_matrix, cmd_schema, cmd_board, parse_classification, derive_pr_labels, cmd_pr_labels, (+3 more)]
+invariants: ""
+gotchas: ""
+related: ["#322", "#1175", "#1179", "#1254", "#1328", "#1427"]
+do_not_duplicate: null
+---knowledge---
+
     lint     judge the authority itself: taxonomy shape, drift against every
              borrowed authority, rule/gate resolution, refusal-set completeness,
              the frozen shapes and the declared controls

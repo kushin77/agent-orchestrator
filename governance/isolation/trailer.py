@@ -1,5 +1,21 @@
 """The ticket-trailer predicate — one implementation, shared with the PR gate.
 
+---knowledge---
+module_id: governance.isolation.trailer
+system: governance
+app: isolation
+solution_class: pattern
+patterns: [no-false-green, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PredicateUnavailable, LandedResult, findings_in, named_findings, classify_commit, run_landed]
+invariants: ""
+gotchas: ""
+related: ["#287", "#288"]
+do_not_duplicate: null
+---knowledge---
+
 Golden rule 1 (`AGENTS.md`) requires every commit a session authors to carry
 ``Refs kushin77/agent-orchestrator#<n>``. Where that reference sits is the
 substance of the rule: it must be a line of the message's **trailing trailer

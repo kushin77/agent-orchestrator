@@ -1,5 +1,21 @@
 """Wave ledger: append, query, and SLO assertions (issue #181, gaps 3 + 6).
 
+---knowledge---
+module_id: governance.waves.ledger
+system: governance
+app: waves
+solution_class: pattern
+patterns: [append-only-ledger, deterministic]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [parse_iso, compute_duration_s, compute_verify_rate, build_record, append_record, read_ledger, query, slo_violations, ledger_stats]
+invariants: ""
+gotchas: ""
+related: ["#181"]
+do_not_duplicate: null
+---knowledge---
+
 The ledger is an append-only JSONL file (``governance/waves/ledger.jsonl``), one
 record per wave. Appending computes the derived fields — ``duration_s`` from the
 two ISO timestamps, and ``verify_rate = 1 - verify_failures / issues`` — so the

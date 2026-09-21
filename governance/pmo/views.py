@@ -1,5 +1,21 @@
 """The PMO views — derived queries over the ticket graph (issue #403).
 
+---knowledge---
+module_id: governance.pmo.views
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [no-false-green, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [Finding, View, reconcile, deps, lanes, report, raid, aging, gates]
+invariants: ""
+gotchas: ""
+related: ["#403", "#635"]
+do_not_duplicate: null
+---knowledge---
+
 CMR's doctrine (``vendor/CMR/docs/PROGRAM-MANAGEMENT.md``) names five PMO
 abilities and a surface ``fleet/pmo.sh {deps,lanes,report,raid,aging}``. Here
 each ability is a **query over the ticket graph** (:mod:`graph`), never a store:

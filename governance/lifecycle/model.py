@@ -1,5 +1,21 @@
 """The GitHub work-item lifecycle and its closure invariants (issue #269).
 
+---knowledge---
+module_id: governance.lifecycle.model
+system: governance
+app: lifecycle
+solution_class: enterprise
+patterns: [provoked-negative-control, offline-hermetic, lane-isolation, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Invariant, invariant, owes_closure, invariants_for, verified_head, measurement_venues, evidence_problem, names_the_landed_tree, evidence_green, stage_of]
+invariants: ""
+gotchas: ""
+related: ["#170", "#263", "#269", "#786", "#885", "#1003"]
+do_not_duplicate: null
+---knowledge---
+
 Isolation (#263) guarantees a lane *opens* correctly: one identity, one branch,
 one worktree, one signature. This module covers the other half — the **close**.
 A work item that reaches a terminal state must leave every artifact it created in

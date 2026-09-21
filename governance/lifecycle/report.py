@@ -1,5 +1,21 @@
 """Board reporting — a governance finding reaches the board as an issue (#321).
 
+---knowledge---
+module_id: governance.lifecycle.report
+system: governance
+app: lifecycle
+solution_class: enterprise
+patterns: [offline-hermetic, dry-run-default, idempotent, injected-effects]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [IssueFiler, FindingLike, BoardReport, finding_key, BoardReporter, board_report_findings, GhFiler]
+invariants: ""
+gotchas: ""
+related: ["#140", "#321", "#992", "#1247", "#1251", "#1266"]
+do_not_duplicate: null
+---knowledge---
+
 The reconciliation worker deliberately shelves a lane whose unmerged work exists
 nowhere else, and the lifecycle audit finds items whose artifacts never reached a
 terminal state. Both used to report into a log line nobody reads. This module is

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The evidence a landing demands: a green, commit-named merge attestation (#764).
 
+---knowledge---
+module_id: governance.landing.evidence
+system: governance
+app: landing
+solution_class: enterprise
+patterns: [honesty-tri-state]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Attestation, read_attestation, write_master_attestation, same_commit, Gap, evidence_gap]
+invariants: ""
+gotchas: ""
+related: ["#764", "#1114"]
+do_not_duplicate: null
+---knowledge---
+
 ``scripts/merge-gate.sh run`` is the executable pre-merge contract (issue #29);
 on green it writes ``.verify/merge-attestation.json`` naming the commit it
 attested. This module *reads* that artifact and answers one question for the

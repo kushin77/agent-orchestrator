@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The one seam that consumes ``governance/merge`` (#764).
 
+---knowledge---
+module_id: governance.landing.verdict
+system: governance
+app: landing
+solution_class: pattern
+patterns: [injected-effects]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [MergeSeamError, MergeVerdict, merge_modules, gate_outcome, describes_green, decide]
+invariants: ""
+gotchas: ""
+related: ["#764"]
+do_not_duplicate: null
+---knowledge---
+
 The merge rule lives in ``governance/merge`` and only there: ``model.merge_verdict``
 is the single rule ("this lane may be merged"), and
 ``engine.MergeGovernanceEngine`` drives the state machine that enforces it

@@ -1,5 +1,21 @@
 """Conformance domain model: the class ladder, findings and reports (issue #140).
 
+---knowledge---
+module_id: governance.conformance.model
+system: governance
+app: conformance
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [Finding, errors, warnings, Policy, Classified, ConformanceReport]
+invariants: ""
+gotchas: ""
+related: ["#140", "#174", "#320", "#517", "#1182"]
+do_not_duplicate: null
+---knowledge---
+
 The model keeps three ideas separate, because conflating them is how a quality
 gate turns into a formality:
 

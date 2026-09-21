@@ -1,5 +1,21 @@
 """Model for the governance board enforcement gate (issue #143).
 
+---knowledge---
+module_id: governance.board.model
+system: governance
+app: board
+solution_class: pattern
+patterns: [no-false-green, honesty-tri-state]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [ExceptionInvalid, CheckResult, Exception_, BoardReport, aggregate_status]
+invariants: ""
+gotchas: ""
+related: ["#139", "#142", "#143"]
+do_not_duplicate: null
+---knowledge---
+
 The board does not invent new checks — it is the honest aggregator over the
 gates issues #139-#142 already built (knowledge index, CMR conformance, RCA +
 lessons, remediation dispatch). Its job is narrow and load-bearing: run every

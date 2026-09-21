@@ -1,5 +1,21 @@
 """A live projection of dispatch's real state (issue #885).
 
+---knowledge---
+module_id: governance.dispatch.live
+system: governance
+app: dispatch
+solution_class: pattern
+patterns: [provoked-negative-control]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [project, render]
+invariants: ""
+gotchas: ""
+related: ["#885"]
+do_not_duplicate: null
+---knowledge---
+
 ``status`` already prints the active milestone, the frontier and the live
 claims, computed fresh from the real ledger and snapshot on every call — but
 nothing captured *that projection itself* as an artifact a drift check could

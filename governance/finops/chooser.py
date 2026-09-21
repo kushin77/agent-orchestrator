@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """FinOps model chooser — tier + thinking-effort enforcement (M26, issue #164).
 
+---knowledge---
+module_id: governance.finops.chooser
+system: governance
+app: finops
+solution_class: enterprise
+patterns: [honesty-tri-state, offline-hermetic, bounded-work]
+derives_from: null
+owner_sme: cfo
+tier: L1
+interfaces: [PolicyUnavailable, InputUnreadable, Finding, SpawnRecord, load_policy, vocabulary, render_vocabulary, role_kind, model_fingerprint, choose, (+6 more)]
+invariants: ""
+gotchas: ""
+related: ["#163", "#164"]
+do_not_duplicate: null
+---knowledge---
+
 The brain issues a directive carrying a FinOps block (``model.tier`` +
 ``model.thinking``). This module turns that block into a **spawn record** and
 refuses everything else:

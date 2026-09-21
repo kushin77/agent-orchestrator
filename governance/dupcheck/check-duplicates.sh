@@ -25,6 +25,22 @@
 # Exit contract: the gate's — 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage: as the gate (see `bash scripts/check-duplicates.sh --help`).
+#
+# ---knowledge---
+# module_id: governance.dupcheck.check-duplicates
+# system: governance
+# app: dupcheck
+# solution_class: class
+# patterns: [honesty-tri-state]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: ["#698", "#1164"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"

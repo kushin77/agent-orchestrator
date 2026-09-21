@@ -1,5 +1,21 @@
 """Board snapshot: the committed board state a claim is validated against.
 
+---knowledge---
+module_id: governance.dispatch.snapshot
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [fail-closed, offline-hermetic, idempotent, injected-effects, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [parse_files, parse_edges, now_iso, parse_iso, age_minutes, is_stale, build_snapshot, github_records, save, load, (+10 more)]
+invariants: ""
+gotchas: ""
+related: ["#128", "#152", "#170", "#322", "#708", "#727"]
+do_not_duplicate: null
+---knowledge---
+
 The gate of record runs offline, so it cannot call GitHub. Instead the board
 state is a tracked artifact, `.board/snapshot.json`, refreshed explicitly with
 ``python3 governance/dispatch/cli.py snapshot --from-github`` (the only

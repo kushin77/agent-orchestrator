@@ -1,5 +1,21 @@
 """Ecosystem module registry — one honest view of every module (issue #445).
 
+---knowledge---
+module_id: governance.modules
+system: governance
+app: modules
+solution_class: class
+patterns: [append-only-ledger, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#445", "#591"]
+do_not_duplicate: null
+---knowledge---
+
 The registry federates four surfaces into one deterministic document:
 
 * the **hub catalog** — ``vendor/CMR/catalog/mandatory.tsv`` and

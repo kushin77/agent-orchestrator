@@ -1,5 +1,21 @@
 """Build the institutional knowledge index (issue #139 / M24).
 
+---knowledge---
+module_id: governance.knowledge.indexer
+system: governance
+app: knowledge
+solution_class: enterprise
+patterns: [deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [now_iso, repo_name, sha256_file, iter_matches, extract_keywords, keywords_for_bytes, build_index, drift_findings, load_catalog, write_catalog, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#139"]
+do_not_duplicate: null
+---knowledge---
+
 The indexer walks the declarative catalogue in `sources.py`, records provenance
 for every asset it finds, refuses to accept credential-shaped content, and reports
 coverage per kind. It is the single generator: nothing in this repository

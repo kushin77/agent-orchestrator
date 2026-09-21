@@ -1,5 +1,21 @@
 """Landed-history enforcement — the ticket-trailer rule, over history that shipped.
 
+---knowledge---
+module_id: governance.isolation.landed
+system: governance
+app: isolation
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state, offline-hermetic, lane-isolation, commit-trailer]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BaselineMalformed, Entry, Baseline, Finding, Assessment, load_baseline, range_commits, assess]
+invariants: ""
+gotchas: ""
+related: ["#287", "#288", "#308", "#826", "#832", "#836"]
+do_not_duplicate: null
+---knowledge---
+
 The lane audit (:mod:`governance.isolation.audit`) re-derives isolation from the
 *live* worktrees, so a commit that has already landed is never examined.
 :mod:`governance.isolation.trailer` closed half of that gap by delegating one

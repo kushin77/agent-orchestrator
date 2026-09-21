@@ -1,5 +1,21 @@
 """Is a run in flight? The marker's OWN evidence — never the loop's pid (#793).
 
+---knowledge---
+module_id: governance.spawn.liveness
+system: governance
+app: spawn
+solution_class: pattern
+patterns: [bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [stale_seconds, process_alive, beat_age_seconds, Verdict, marker_verdict, read_marker, runs_in_flight, contradiction]
+invariants: ""
+gotchas: ""
+related: ["#723", "#724", "#793"]
+do_not_duplicate: null
+---knowledge---
+
 `fleet/watchdog.py::run_in_flight()` used to ask whether a run marker's ``pid``
 was alive. That ``pid`` is the **loop's**, not the run's, and a loop outlives
 every run it dispatches — so a crashed run left a marker that read as "in

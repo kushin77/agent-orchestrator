@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """lessons_sync.py — the cross-repo lessons-sync CONTRACT gate (issue #424).
 
+---knowledge---
+module_id: governance.lessons-sync.lessons_sync
+system: governance
+app: lessons-sync
+solution_class: enterprise
+patterns: [provoked-negative-control, honesty-tri-state, fail-closed, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [InputError, check_contract, check_ledger_ref, check_discoverable, check_peer_close, parse_cmr_index, check_cmr_ledger, check_cmr_source, refresh_cmr_baseline, evaluate, (+3 more)]
+invariants: ""
+gotchas: ""
+related: ["#141", "#181", "#402", "#403", "#424", "#99999"]
+do_not_duplicate: null
+---knowledge---
+
 There is a lessons loop on each side of the repo boundary: `kushin77/deepseek`
 builds one (`kushin77/deepseek#84`, `kushin77/deepseek#79`) and this repository
 builds one (`#402`/`#403`, on top of `governance/lessons/`). `#181`'s gap

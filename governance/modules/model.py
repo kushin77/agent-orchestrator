@@ -1,5 +1,21 @@
 """Vocabulary and value objects for the ecosystem module registry (issue #445).
 
+---knowledge---
+module_id: governance.modules.model
+system: governance
+app: modules
+solution_class: pattern
+patterns: [no-false-green, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CannotAssess, Refusal, sorted_refusals]
+invariants: ""
+gotchas: ""
+related: ["#445", "#591", "#952"]
+do_not_duplicate: null
+---knowledge---
+
 The registry gives the ecosystem **one honest view of every module** —
 mandatory status, consumer assets, pin/rev, owning repo, board ref and a health
 probe — assembled by **reference** from the hub's own registry

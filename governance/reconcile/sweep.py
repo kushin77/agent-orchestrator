@@ -1,5 +1,21 @@
 """Reconciliation sweep — turn an orphaned session into a clean workspace (#304).
 
+---knowledge---
+module_id: governance.reconcile.sweep
+system: governance
+app: reconcile
+solution_class: enterprise
+patterns: [provoked-negative-control, append-only-ledger, honesty-tri-state, offline-hermetic, dry-run-default]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Step, Action, SweepReport, ReconcileOps, RecheckFindings, sweep, board_report_action, IsolationUnavailable, RepoOps, describe, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#304", "#321", "#628", "#699", "#702", "#885"]
+do_not_duplicate: null
+---knowledge---
+
 Detection is the easy half (``heartbeat.judge``). This is the half that can
 destroy work if it is wrong, so the rule is explicit and three-way. For an
 orphaned lane, the question is not "is it dead?" but **"where does its work

@@ -1,5 +1,21 @@
 """Hygiene audit — every work item that did not close cleanly, named (issue #269).
 
+---knowledge---
+module_id: governance.lifecycle.audit
+system: governance
+app: lifecycle
+solution_class: enterprise
+patterns: [offline-hermetic, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Finding, Quarantine, load_quarantine, declared_parent, audit_item, in_scope, audit, applicable_invariants, hygiene]
+invariants: ""
+gotchas: ""
+related: ["#170", "#269", "#720", "#834", "#1003", "#1149"]
+do_not_duplicate: null
+---knowledge---
+
 The audit is **offline**: it reads a lifecycle record (produced by
 ``cli.py collect`` at runtime, or by a fixture in the gate) and never touches the
 network. That is deliberate. A gate that depends on live GitHub state is green

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Reconcile command line — stamp sessions, sweep orphans, run the worker (#304).
 
+---knowledge---
+module_id: governance.reconcile.cli
+system: governance
+app: reconcile
+solution_class: enterprise
+patterns: [honesty-tri-state, dry-run-default, lane-isolation, bounded-work, explain-every-artifact]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_stamp, cmd_clear, cmd_status, cmd_sweep, cmd_watch, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#304", "#321", "#628", "#706", "#740", "#885"]
+do_not_duplicate: null
+---knowledge---
+
     python3 governance/reconcile/cli.py stamp --session <id> --issue <n> --agent <a> --pid <pid>
     python3 governance/reconcile/cli.py status
     python3 governance/reconcile/cli.py status --disk                 # report-only (#628)

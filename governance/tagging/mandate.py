@@ -1,5 +1,21 @@
 """The tag authority's mandate — the constitution must declare it (issue #1183).
 
+---knowledge---
+module_id: governance.tagging.mandate
+system: governance
+app: tagging
+solution_class: pattern
+patterns: [provoked-negative-control]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [contract, check, main]
+invariants: ""
+gotchas: ""
+related: ["#1175", "#1183"]
+do_not_duplicate: null
+---knowledge---
+
 A rule that only prose carries is advice (GR-29 / AO-GR-4: *a rule in a document
 is advisory until its gate ships*). The tag authority has had its behavioural
 half since #1175 — five checks, eleven provoked refusals, artifact round trips —

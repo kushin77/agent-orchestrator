@@ -1,5 +1,21 @@
 """Health probes — a spec per module, honest about whether it ever ran.
 
+---knowledge---
+module_id: governance.modules.health
+system: governance
+app: modules
+solution_class: pattern
+patterns: [offline-hermetic, deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [catalog_spec, pending_spec, well_formed, claims_ok_without_running]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Every registry entry carries a health probe, and the probe is a **spec** plus a
 **status**. The deterministic offline build never runs a probe, and an unrun
 probe reports ``not-run`` — never ``ok``. ``--probe`` is the live mode: it runs

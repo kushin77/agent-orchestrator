@@ -1,5 +1,21 @@
 """The ACTIVE-EPIC resolver — single-epic-focused BAU (epic #707, lane F1/#716).
 
+---knowledge---
+module_id: governance.dispatch.focus
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [no-false-green, fail-closed, offline-hermetic, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [FocusInvalid, Focus, validate_schema, load, save, resolve, self_heal, active, open_children, pooled, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#707", "#716", "#718", "#719", "#900", "#1189"]
+do_not_duplicate: null
+---knowledge---
+
 The chronological-dispatch rule (GR-20) makes dispatch *ordered*; this module
 makes it *coherent*: at any moment the fleet focuses on exactly ONE epic, works
 its children, and only when that epic closes does it move on. A milestone

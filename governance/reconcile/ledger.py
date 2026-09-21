@@ -1,5 +1,21 @@
 """The reconciliation ledger — an append-only trail of every decision (#885).
 
+---knowledge---
+module_id: governance.reconcile.ledger
+system: governance
+app: reconcile
+solution_class: pattern
+patterns: [provoked-negative-control, append-only-ledger, honesty-tri-state]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LedgerUnavailable, ledger_path, validate_record, append, record_sweep_decision, record_real_tree_verdict, read, verify]
+invariants: ""
+gotchas: ""
+related: ["#885", "#1291", "#1311", "#1321"]
+do_not_duplicate: null
+---knowledge---
+
 `sweep()` decides, per session, whether to reclaim, park, shelve, report, fail
 — or, now, refuse under the batch-limit control (`policy.py`). And
 `real_tree_baseline.check_real_tree()` renders a verdict on the whole disk

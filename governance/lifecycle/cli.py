@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Lifecycle command line — audit the board's hygiene, and close an item out (#269).
 
+---knowledge---
+module_id: governance.lifecycle.cli
+system: governance
+app: lifecycle
+solution_class: enterprise
+patterns: [provoked-negative-control, append-only-ledger, no-false-green, honesty-tri-state, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [lifecycle_root, scratch_root, failed_checks, journal_path, read_journal, write_journal, lane_head, commit_is_contained, tree_relation, trees_are_identical, (+18 more)]
+invariants: ""
+gotchas: ""
+related: ["#170", "#269", "#287", "#321", "#622", "#623"]
+do_not_duplicate: null
+---knowledge---
+
     python3 governance/lifecycle/cli.py audit            # live board, offline rules
     python3 governance/lifecycle/cli.py audit --record r.json --json
     python3 governance/lifecycle/cli.py close --issue 269

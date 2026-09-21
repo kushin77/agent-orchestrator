@@ -1,5 +1,21 @@
 """Conformance checking for issues and change sets (issue #140).
 
+---knowledge---
+module_id: governance.conformance.checker
+system: governance
+app: conformance
+solution_class: enterprise
+patterns: [fail-closed, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [PolicyUnavailable, now_iso, load_policy, load_snapshot, LabelsUnavailable, load_label_inventory, default_filing_labels, unresolvable_labels, audit_filing_labels, record_label_inventory, (+6 more)]
+invariants: ""
+gotchas: ""
+related: ["#140", "#320", "#1160"]
+do_not_duplicate: null
+---knowledge---
+
 Two surfaces are checked, and they answer different questions:
 
 * **The board** — is every item of in-scope work classified, and does the class it

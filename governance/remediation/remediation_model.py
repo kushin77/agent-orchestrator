@@ -1,4 +1,21 @@
 """Remediation domain model: turning a conformance finding into actionable work
+
+---knowledge---
+module_id: governance.remediation.remediation_model
+system: governance
+app: remediation
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [severity_for, lane_for, sla_hours_for, dedup_key, RemediationIssue, RemediationReport]
+invariants: ""
+gotchas: ""
+related: ["#140", "#142"]
+do_not_duplicate: null
+---knowledge---
+
 (issue #142).
 
 A `Finding` from `governance/conformance` (issue #140) says a rule was broken.

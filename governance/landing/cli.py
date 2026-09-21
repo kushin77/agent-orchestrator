@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Landing command line (#764) — one green lane, landed, with no human step.
 
+---knowledge---
+module_id: governance.landing.cli
+system: governance
+app: landing
+solution_class: enterprise
+patterns: [honesty-tri-state, dry-run-default, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [resolve_author, resolve_ai_assistance, cmd_land, cmd_write_master_attestation, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#764", "#1114", "#1127"]
+do_not_duplicate: null
+---knowledge---
+
     python3 governance/landing/cli.py land --issue 764            # DRY RUN (default)
     python3 governance/landing/cli.py land --issue 764 --apply    # land it
     AO_LAND_APPLY=1 python3 governance/landing/cli.py land --issue 764

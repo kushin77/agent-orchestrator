@@ -1,5 +1,21 @@
 """Knowledge-surface controls: pin-drift policy + vendor-compliance gaps.
 
+---knowledge---
+module_id: governance.knowledge.knowledge_controls
+system: governance
+app: knowledge
+solution_class: pattern
+patterns: [no-false-green, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [VendorComplianceGap, measure_vendor_compliance_gaps]
+invariants: ""
+gotchas: ""
+related: ["#125", "#132", "#133", "#878", "#887"]
+do_not_duplicate: null
+---knowledge---
+
 Issue #887 (lane L8/#878). Two controls live here:
 
 1. **Pin-drift policy** — the knowledge surface must refuse to serve a

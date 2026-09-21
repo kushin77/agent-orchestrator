@@ -1,5 +1,21 @@
 """Query the knowledge index with source-backed evidence (issue #139).
 
+---knowledge---
+module_id: governance.knowledge.query
+system: governance
+app: knowledge
+solution_class: class
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [QueryResult, query, coverage_report, summarize]
+invariants: ""
+gotchas: ""
+related: ["#139"]
+do_not_duplicate: null
+---knowledge---
+
 A result is never just a title: every hit carries the provenance of the asset it
 came from and the compliance context for its kind. "Query results return
 source-backed evidence and compliance context" is the acceptance criterion, and it

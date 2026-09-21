@@ -1,5 +1,21 @@
 """Is this artifact's *work* already on the default branch? (#1291)
 
+---knowledge---
+module_id: governance.reconcile.landing
+system: governance
+app: reconcile
+solution_class: enterprise
+patterns: [fail-closed, lane-isolation, bounded-work, explain-every-artifact]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LandingUnavailable, RepoLanding]
+invariants: ""
+gotchas: ""
+related: ["#628", "#1158", "#1165", "#1291", "#1310", "#1311"]
+do_not_duplicate: null
+---knowledge---
+
 The worktree/branch audit (``audit.py``, issue #628) explains an artifact by a
 session beat, a claim record, or the *landing history* — and the landing history
 was only ever the close-out journal ``.fleet/lifecycle/<issue>.json``, which is

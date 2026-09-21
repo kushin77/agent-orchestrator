@@ -1,5 +1,21 @@
 """Board-snapshot freshness — the age the committed dispatch queue tolerates.
 
+---knowledge---
+module_id: governance.dispatch.queue_freshness
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [provoked-negative-control, fail-closed, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CannotAssess, Finding, Freshness, tolerance_minutes, parse_iso, assess]
+invariants: ""
+gotchas: ""
+related: ["#170", "#727", "#1077", "#1189"]
+do_not_duplicate: null
+---knowledge---
+
 ``.board/snapshot.json`` is the **committed, offline stand-in for the live
 board**: the gate of record runs offline (``scripts/verify.sh`` makes no network
 call), so every "is this issue still open?" answer is resolved against a

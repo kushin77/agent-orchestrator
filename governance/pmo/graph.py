@@ -1,5 +1,21 @@
 """Load the ticket graph for the PMO views (issue #403).
 
+---knowledge---
+module_id: governance.pmo.graph
+system: governance
+app: pmo
+solution_class: enterprise
+patterns: [provoked-negative-control, offline-hermetic]
+derives_from: null
+owner_sme: pmo-sme
+tier: L1
+interfaces: [CannotAssess, Graph, issue_number, parse_timestamp, age_days, load]
+invariants: ""
+gotchas: ""
+related: ["#401", "#403"]
+do_not_duplicate: null
+---knowledge---
+
 The PMO layer is **queries over the ticket graph** (ADR-0014, issue #401), never
 a store of its own. This module is the one place that materialises the graph:
 it builds the projection **in memory** from the committed ledgers — the same

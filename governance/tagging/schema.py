@@ -1,5 +1,21 @@
 """Validate the authority's artifacts against their frozen shapes (issue #1175).
 
+---knowledge---
+module_id: governance.tagging.schema
+system: governance
+app: tagging
+solution_class: class
+patterns: [offline-hermetic, deterministic]
+derives_from: governance/modules/schema.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [SchemaUnavailable, shapes, problems, validate, as_json]
+invariants: ""
+gotchas: ""
+related: ["#1175"]
+do_not_duplicate: null
+---knowledge---
+
 `tagging.schema.json` freezes the shape of the taxonomy, the rules, the controls
 and one ledger row. This module is the thin reader that applies it, reusing the
 repository's stdlib-only JSON-Schema subset validator

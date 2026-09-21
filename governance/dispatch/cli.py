@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Claim-time issue-order enforcement — command line (issue #157, hardened #170).
 
+---knowledge---
+module_id: governance.dispatch.cli
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [provoked-negative-control, no-false-green, honesty-tri-state, fail-closed, offline-hermetic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_audit, cmd_eligible, cmd_claim, cmd_dispatch, cmd_release, cmd_status, cmd_liveness, cmd_dangling, cmd_focus, cmd_pool, (+10 more)]
+invariants: ""
+gotchas: ""
+related: ["#157", "#170", "#699", "#702", "#707", "#718"]
+do_not_duplicate: null
+---knowledge---
+
 Exit codes follow the repo's tri-state convention (guardrails/honesty):
 
 * ``0`` — OK

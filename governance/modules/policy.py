@@ -1,5 +1,21 @@
 """The module registry's declared acceptance policy — read, never duplicated (issue #591).
 
+---knowledge---
+module_id: governance.modules.policy
+system: governance
+app: modules
+solution_class: enterprise
+patterns: [no-false-green, honesty-tri-state, declared-authority, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PolicyUnavailable, Condition, Judgment, Policy, load]
+invariants: ""
+gotchas: ""
+related: ["#591", "#952"]
+do_not_duplicate: null
+---knowledge---
+
 The registry refuses in several places (a duplicated module id, a mandatory
 consumer asset with no seed, drift between the hub's two surfaces, a declared
 target that landed unregistered, module source carried in-tree) and refuses

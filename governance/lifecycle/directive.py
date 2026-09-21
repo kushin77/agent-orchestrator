@@ -1,5 +1,21 @@
 """The authorisation directive, and the mailbox move that ends it (#821).
 
+---knowledge---
+module_id: governance.lifecycle.directive
+system: governance
+app: lifecycle
+solution_class: enterprise
+patterns: [provoked-negative-control, append-only-ledger, idempotent]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [DirectiveRefused, Directive, mailboxes, records, resolve, stranded, landed_issues, consume, retire]
+invariants: ""
+gotchas: ""
+related: ["#693", "#695", "#821", "#861", "#885"]
+do_not_duplicate: null
+---knowledge---
+
 A brain-minted directive is the chain edge that authorises a lane: it is written
 to ``.fleet/sent/<id>.json`` and ``claim --directive <id>`` validates it
 (``AGENTS.md`` golden rule 14). *Consumed* means the record has reached

@@ -1,5 +1,21 @@
 """A live projection of real lane state — exposed through `cli.py audit --live` (issue #885).
 
+---knowledge---
+module_id: governance.isolation.live
+system: governance
+app: isolation
+solution_class: pattern
+patterns: [deterministic, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LiveLane, project, render]
+invariants: ""
+gotchas: ""
+related: ["#885"]
+do_not_duplicate: null
+---knowledge---
+
 Every other read in this package answers "what does the record say" (a lane's
 minted identity, a speculative-base attestation). This module re-derives a
 projection of that same state **from the real worktrees on disk, right now** —

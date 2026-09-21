@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Independent SME reviewer assignment for merge governance (issue #43).
 
+---knowledge---
+module_id: governance.merge.reviewer
+system: governance
+app: merge
+solution_class: enterprise
+patterns: [offline-hermetic]
+derives_from: null
+owner_sme: code-review-sme
+tier: L1
+interfaces: [ReviewerError, NoReviewerAvailableError, NoAuditorAvailableError, SeparationViolationError, SelfReviewError, SelfAuditError, AuditorCannotExecuteError, ReviewerPersona, load_platform_personas, mirror_assign_reviewer, (+2 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Every PR under merge governance gets an **independent SME reviewer persona**
 (assigned, not the author), and the merge decision's evidence is open to an
 independent auditor. This module is the governance-layer consumer of the

@@ -1,5 +1,21 @@
 """Dispatch's declared acceptance policy — read, never restated (issue #885).
 
+---knowledge---
+module_id: governance.dispatch.policy
+system: governance
+app: dispatch
+solution_class: pattern
+patterns: [no-false-green, honesty-tri-state, declared-authority]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PolicyUnavailable, Controls, load, stale_minutes]
+invariants: ""
+gotchas: ""
+related: ["#322", "#885"]
+do_not_duplicate: null
+---knowledge---
+
 Before this module existed, dispatch's controls were Python constants spread
 across three files (`model.py`'s reason tuples, `snapshot.py`'s staleness
 threshold) with no artifact a reviewer or a test could point at independently

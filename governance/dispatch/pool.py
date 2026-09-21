@@ -1,5 +1,21 @@
 """The out-of-epic **pool** — the queue for work the active epic is not driving.
 
+---knowledge---
+module_id: governance.dispatch.pool
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [provoked-negative-control, append-only-ledger, no-false-green, offline-hermetic, idempotent]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PoolInvalid, PoolRecord, note, read, numbers, drain, drain_and_report, record_and_raise_message, self_control, truncate_only]
+invariants: ""
+gotchas: ""
+related: ["#707"]
+do_not_duplicate: null
+---knowledge---
+
 Epic focus (#707) makes the fleet drive exactly one epic. That focus is only
 honest if the work it defers is *parked*, not deleted: an out-of-epic issue is
 refused `out-of-epic-pooled`, recorded here, and picked up again when the focus

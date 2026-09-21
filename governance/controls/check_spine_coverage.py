@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
 """governance/controls/check_spine_coverage.py — validates
+
+---knowledge---
+module_id: governance.controls.check_spine_coverage
+system: governance
+app: controls
+solution_class: enterprise
+patterns: [provoked-negative-control, honesty-tri-state]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [load_yaml, parse_rule_ids, declared_suites, split_gate, check, main]
+invariants: ""
+gotchas: ""
+related: ["#803", "#878", "#890"]
+do_not_duplicate: null
+---knowledge---
+
 governance/controls/spine-coverage.yaml against the repository (#890, lane
 L11 of EPIC #878).
 

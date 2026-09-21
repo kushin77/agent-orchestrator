@@ -1,5 +1,21 @@
 """Where every envelope field comes from — one reader each, no second copy.
 
+---knowledge---
+module_id: governance.spawn.sources
+system: governance
+app: spawn
+solution_class: enterprise
+patterns: [provoked-negative-control, offline-hermetic, lane-isolation, commit-trailer, bounded-work]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [read_json, verify_text, verify_command, verify_field, snapshot_index, focus_field, session_field, trailer_field, claim_field, gate_field, (+5 more)]
+invariants: ""
+gotchas: ""
+related: ["#263", "#723", "#724", "#793", "#1301", "#1413"]
+do_not_duplicate: null
+---knowledge---
+
 The envelope is only worth anything if its fields are read from the REAL
 institutions rather than restated. So each field is read from the module that
 already owns it:

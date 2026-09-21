@@ -1,5 +1,21 @@
 """The frozen registry schema, and the validator that holds the generator to it (issue #591).
 
+---knowledge---
+module_id: governance.modules.schema
+system: governance
+app: modules
+solution_class: enterprise
+patterns: [honesty-tri-state, offline-hermetic, deterministic]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SchemaUnavailable, SchemaViolation, load, check_schema, problems, validate]
+invariants: ""
+gotchas: ""
+related: ["#447", "#591"]
+do_not_duplicate: null
+---knowledge---
+
 The registry's row shape was implicit in ``registry.py`` and promised only in
 prose (``docs/MODULE-REGISTRY.md``): #447 already composes a summary from it and
 later consumers will read it, so the shape is frozen as an artifact

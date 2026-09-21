@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Provenance manifest schema + generator (issue #44, acceptance criterion 1).
 
+---knowledge---
+module_id: governance.sync.provenance
+system: governance
+app: sync
+solution_class: enterprise
+patterns: [offline-hermetic]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [ProvenanceError, Finding, ProvenanceManifest, validate_manifest, generate_manifest, content_sha256_of]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 A provenance manifest records, per consuming repository, every shared asset it
 consumes/vendors and the canonical source each asset came from:
 

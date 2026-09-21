@@ -1,5 +1,21 @@
 """Code-native lane landing for agent-orchestrator (issue #764).
 
+---knowledge---
+module_id: governance.landing
+system: governance
+app: landing
+solution_class: template
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#764"]
+do_not_duplicate: null
+---knowledge---
+
 Landing a verified lane used to be a manual sequence — push the branch, open a
 PR, run the pre-merge contract, merge, delete the branch, close the issue — so
 every delivery ended with "…and then a human does the last mile". This package

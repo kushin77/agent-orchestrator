@@ -1,5 +1,21 @@
 """The live stage projection — every in-scope item, where it really sits (issue #885).
 
+---knowledge---
+module_id: governance.lifecycle.live
+system: governance
+app: lifecycle
+solution_class: class
+patterns: [provoked-negative-control]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [project, check_live]
+invariants: ""
+gotchas: ""
+related: ["#885"]
+do_not_duplicate: null
+---knowledge---
+
 ``cli.py status --issue <n>`` answers "where does *this* item sit"; nothing in
 the package answered "where does *everything on the board* sit" without an
 operator looping the single-issue verb over every number. This module is that
