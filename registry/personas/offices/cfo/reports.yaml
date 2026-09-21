@@ -1,0 +1,27 @@
+# registry/personas/offices/cfo/reports.yaml — FinOps roles/SMEs the CFO
+# office coordinates or receives reports from. Not an org-chart redefinition
+# (registry/personas/org-chart.yaml remains the single source for reporting
+# edges) — this file only lists which existing persona cards are in the
+# CFO office's operating scope.
+
+schemaVersion: 1
+office: cfo
+
+reportsIn:
+  - persona: cfo
+    cardRef: registry/personas/cards/cfo.yaml
+    role: office-head
+
+coordinatesWith:
+  - persona: platform-sme
+    cardRef: registry/personas/cards/platform-sme.yaml
+    for: "gateway/proxy routing, harness-side injection surfaces (lever #1 of PROMPT-REDUCTION-PLAN.md)"
+  - persona: docs-sme
+    cardRef: registry/personas/cards/docs-sme.yaml
+    for: "instruction-file dedup (CLAUDE.md/AGENTS.md/.cursorrules)"
+  - persona: pmo-sme
+    cardRef: registry/personas/cards/pmo-sme.yaml
+    for: "dispatch cadence and priority; CFO cannot override PMO priority (see charter.yaml denies.bypass-pmo-priority)"
+
+kpiConsumers:
+  - "governance/pmo/finops-inputs.json (only emitted if governance/pmo/policy.yaml exists on origin/master — verified ABSENT as of this authoring, so this file is NOT emitted this pass; see docs/cfo/PROMPT-REDUCTION-PLAN.md for the contract documentation)"
