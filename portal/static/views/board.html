@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Board — agent-orchestrator console</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Board</h1>
+    <span class="hint" style="font-size:var(--os-font-size-xs)">fleet issue roster</span>
+    <span class="grow"></span>
+    <span id="boardCounts" class="badge" data-rows="0" data-rejected="0">—</span>
+  </header>
+
+  <main class="view-main" id="app"><div class="empty">loading…</div></main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    /* The fleet board (issue #880, view via #1522).
+     *
+     * This is the FLEET-WIDE board — every issue in `.board/snapshot.json`
+     * joined with its latest unreleased claim from `.board/claims.jsonl` — and
+     * it is org-scoped, not tenant-scoped (portal/server/app.py `_route_board`
+     * takes no `?tenant=`). It is deliberately distinct from the tenant
+     * `taskboard.html`, which projects one tenant's ticket lifecycle.
+     *
+     * The honesty half is rendered, not hidden: a source row the schema refuses
+     * is served in `data.rejected` with its identifier and the exact defect, and
+     * this frame lists it. A corrupt source degrades by naming the bad row, so
+     * the board can never present a best-effort row as a real one.
+     */
+    (async function () {
+      "use strict";
+      var app = document.getElementById("app");
+      var counts = document.getElementById("boardCounts");
+      var rows = [];
+      var filters = { state: "", lane: "", claim: "" };
+
+      function fail(err) {
+        if (err.status === 401) { window.location.href = "/auth/login"; return; }
+        var card = CP.el("div", { class: "card" },
+          CP.el("div", { class: "empty error-text", text: err.message }));
+        if (err.code === "feature_disabled") {
+          card.appendChild(CP.el("div", { class: "hint", text:
+            "The fleet board ships feature-flag-gated OFF " +
+            "(portal/config/feature-flags.yaml surfaces.fleet_board)." }));
+        } else if (err.code === "board_unavailable") {
+          card.appendChild(CP.el("div", { class: "hint", text:
+            "The board's projected sources (telemetry) are not readable from " +
+            "this checkout — the surface says so rather than serving an empty board." }));
+        }
+        CP.clear(app).appendChild(card);
+      }
+
+      function options(values, current) {
+        var box = CP.el("select", { class: "mono" },
+          CP.el("option", { value: "", text: "any" }));
+        values.forEach(function (value) {
+          box.appendChild(CP.el("option", { value: value, text: value }));
+        });
+        box.value = current;
+        return box;
+      }
+
+      function visible() {
+        return rows.filter(function (row) {
+          if (filters.state && row.state !== filters.state) return false;
+          if (filters.lane && row.lane !== filters.lane) return false;
+          if (filters.claim === "claimed" && !row.claimed_by) return false;
+          if (filters.claim === "unclaimed" && row.claimed_by) return false;
+          return true;
+        });
+      }
+
+      function table(list) {
+        var tbl = CP.el("table", { class: "tbl", id: "boardTable" });
+        tbl.appendChild(CP.el("thead", {},
+          CP.el("tr", {},
+            CP.el("th", { text: "#" }), CP.el("th", { text: "Title" }),
+            CP.el("th", { text: "State" }), CP.el("th", { text: "Lane" }),
+            CP.el("th", { text: "Claimed by" }), CP.el("th", { text: "Claimed at" }),
+            CP.el("th", { text: "Labels" }))));
+        var body = CP.el("tbody");
+        list.forEach(function (row) {
+          body.appendChild(CP.el("tr", { "data-issue": String(row.number) },
+            CP.el("td", { class: "mono", html: "<b>" + CP.esc("#" + row.number) + "</b>" }),
+            CP.el("td", { text: row.title }),
+            CP.el("td", {}, CP.el("span", {
+              class: "badge " + (row.state === "CLOSED" ? "ok" : "info"),
+              "data-state": row.state, text: row.state })),
+            CP.el("td", { class: "mono", text: row.lane || "—" }),
+            CP.el("td", { class: "mono", text: row.claimed_by || "—" }),
+            CP.el("td", { class: "mono dim", text: row.claimed_at || "—" }),
+            CP.el("td", {}, (row.labels || []).map(function (label) {
+              return CP.el("span", { class: "chip", text: label });
+            }))));
+        });
+        tbl.appendChild(body);
+        return tbl;
+      }
+
+      function render() {
+        var list = visible();
+        var lanes = rows.map(function (row) { return row.lane; })
+          .filter(function (lane, index, all) {
+            return lane && all.indexOf(lane) === index;
+          }).sort();
+        CP.clear(app);
+
+        var filtersCard = CP.el("section", { class: "card", id: "boardFilters" });
+        filtersCard.appendChild(CP.el("div", { class: "spread" },
+          CP.el("strong", { text: "Filters" }),
+          CP.el("span", { class: "hint mono", "data-visible": String(list.length),
+            "data-total": String(rows.length), text: list.length + " of " + rows.length + " row(s)" })));
+        var stateSelect = options(["OPEN", "CLOSED"], filters.state);
+        var laneSelect = options(lanes, filters.lane);
+        var claimSelect = options(["claimed", "unclaimed"], filters.claim);
+        var bar = CP.el("div", { class: "flex",
+          style: "gap:var(--os-space-3);flex-wrap:wrap;margin-top:var(--os-space-2)" },
+          CP.el("label", { class: "field" }, "state", stateSelect),
+          CP.el("label", { class: "field" }, "lane", laneSelect),
+          CP.el("label", { class: "field" }, "claim", claimSelect),
+          CP.el("button", { class: "btn ghost small", text: "reset",
+            onclick: function () {
+              filters = { state: "", lane: "", claim: "" };
+              render();
+            } }));
+        stateSelect.addEventListener("change", function () { filters.state = stateSelect.value; render(); });
+        laneSelect.addEventListener("change", function () { filters.lane = laneSelect.value; render(); });
+        claimSelect.addEventListener("change", function () { filters.claim = claimSelect.value; render(); });
+        filtersCard.appendChild(bar);
+        app.appendChild(filtersCard);
+
+        var card = CP.el("section", { class: "card" });
+        if (list.length) {
+          card.appendChild(table(list));
+        } else {
+          card.appendChild(CP.el("div", { class: "empty dim", text: "No row matches the filter." }));
+        }
+        app.appendChild(card);
+      }
+
+      var payload;
+      try {
+        payload = await CP.get("/api/board/rows");
+      } catch (err) { fail(err); return; }
+
+      var data = payload.data || {};
+      rows = data.rows || [];
+      var rejected = data.rejected || [];
+      counts.textContent = rows.length + " row(s)" +
+        (rejected.length ? " · " + rejected.length + " refused" : "");
+      counts.setAttribute("data-rows", String(rows.length));
+      counts.setAttribute("data-rejected", String(rejected.length));
+
+      var schemaCard = CP.el("section", { class: "card" },
+        CP.el("div", { class: "spread" },
+          CP.el("strong", { text: "Source of truth" }),
+          CP.el("span", { class: "hint mono", text:
+            ".board/snapshot.json + .board/claims.jsonl · " + data.schema })));
+      schemaCard.appendChild(CP.el("div", { class: "hint", text:
+        "Every row is joined and schema-validated before it is served — " +
+        "portal/schemas/fleet-board-row.schema.json." }));
+      app.appendChild(schemaCard);
+
+      if (rejected.length) {
+        var rc = CP.el("section", { class: "card", id: "rejectedRows" });
+        rc.appendChild(CP.el("div", { class: "spread" },
+          CP.el("strong", { text: "Refused by name" }),
+          CP.el("span", { class: "hint", text: "a malformed source row is reported, never served" })));
+        var rt = CP.el("table", { class: "tbl" });
+        rt.appendChild(CP.el("thead", {},
+          CP.el("tr", {},
+            CP.el("th", { text: "Row" }), CP.el("th", { text: "Defect" }))));
+        var rb = CP.el("tbody");
+        rejected.forEach(function (entry) {
+          rb.appendChild(CP.el("tr", { "data-rejected": entry.identifier },
+            CP.el("td", { class: "mono", text: entry.identifier }),
+            CP.el("td", { class: "error-text", text: (entry.errors || []).join("; ") })));
+        });
+        rt.appendChild(rb);
+        rc.appendChild(rt);
+        app.appendChild(rc);
+      }
+
+      render();
+    })();
+  </script>
+</body>
+</html>

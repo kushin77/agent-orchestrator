@@ -164,6 +164,22 @@ GitHub-writing code path at all — `--apply` lives in `cli.py`.
 The PMO **coordinates; it never does lane work**. It never merges, never
 reassigns an issue, never writes to another lane's files. Every subcommand is
 read-only over the projection; `report` output is a *view*, never an authority.
+
 `dispatch --apply` is the one narrow exception (one idempotent PMO comment +
 label per issue), and even that never executes lane work itself — it hands the
 plan to whoever runs it.
+
+## `plan` — the enterprise project plan (issue #1648)
+
+`python3 governance/pmo/cli.py plan [--json|--live|--paperclip]` renders
+`governance/pmo/plan.yaml` (every task across the fleet, tagged with a
+milestone and a priority, converging on "CRM + Asterisk voice operational").
+`--live` reconciles it against real GitHub issue state and is rc 1 on: a task
+closed while its milestone's exit criteria are unmet, a dependency-order
+violation, or a task whose issue does not exist. `--paperclip` emits the
+Paperclip import/sync payload (see `docs/PMO-PROJECT-PLAN.md` §"Paperclip
+control loop" — no live sync adapter exists yet; issue #1649). A task never
+carries a stored `status`; `status_source: github` on every task is the only
+statement the plan makes about status, and the schema forbids anything else.
+`docs/PMO-PROJECT-PLAN.md` is the same renderer's `--json`-free output,
+regenerated and freshness-gated by `scripts/check-pmo-rollup.sh`.

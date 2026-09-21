@@ -57,6 +57,7 @@ from policy import Policy
 from policy import load as load_policy
 from priority import priority as derive_priority
 from views import VIEWS, Finding, View, reconcile
+import plan as plan_module
 
 REPO_SLUG = "kushin77/agent-orchestrator"
 
@@ -89,6 +90,37 @@ def _fail(findings) -> int:
     return 1
 
 
+def _run_plan(argv: list[str]) -> int:
+    """``pmo plan`` — the enterprise project plan (issue #1648), a separate
+    surface from the ticket-graph VIEWS above because it has its own inputs
+    (``plan.yaml``/``plan.schema.json``) and its own flags."""
+    parser = argparse.ArgumentParser(prog="pmo plan", description="the PMO enterprise project plan")
+    parser.add_argument("--root", default=".", help="repository root (default: .)")
+    parser.add_argument("--json", action="store_true", help="emit the plan as JSON")
+    parser.add_argument("--live", action="store_true", help="check live GitHub state (rc-1 rules)")
+    parser.add_argument("--paperclip", action="store_true", help="emit the Paperclip import/sync payload")
+    args = parser.parse_args(argv)
+
+    try:
+        document = plan_module.load_plan(args.root)
+    except plan_module.CannotAssess as exc:
+        print(f"pmo plan: CANNOT-ASSESS — {exc}", file=sys.stderr)
+        return 2
+
+    findings = plan_module.check_plan(document, live=args.live)
+
+    if args.paperclip:
+        print(json.dumps(plan_module.render_paperclip(document), indent=2, sort_keys=True))
+    elif args.json:
+        print(json.dumps(document, indent=2, sort_keys=True))
+    else:
+        print(plan_module.render_table(document))
+
+    if findings:
+        for finding in findings:
+            print(f"  FAIL  {finding.render()}", file=sys.stderr)
+        return 1
+    return 0
 def _overlay_live_labels(graph: Graph) -> list[str]:
     """Best-effort: overlay freshly pulled GitHub labels (``--live``).
 
@@ -189,6 +221,10 @@ def _apply_dispatch(view: View) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "plan":
+        return _run_plan(argv[1:])
+
     parser = argparse.ArgumentParser(
         prog="pmo",
         description="PMO views derived from the ticket graph (issue #403 + follow-on).",

@@ -412,7 +412,51 @@ else
   unproven=$((unproven + 1))
 fi
 
-expected_controls=13
+# --- 14. the enterprise project plan (issue #1648) runs offline and its
+# dependency-order-violation rule is provoked, not assumed ------------------
+echo "== plan (issue #1648) =="
+if pmo plan --json > "$scratch/plan-real.json" 2>"$scratch/plan-real.err"; then
+  if json_ok "$scratch/plan-real.json"; then
+    echo "  OK    plan renders offline over the committed plan.yaml"
+  else
+    echo "  FAIL  plan did not emit a JSON document" >&2
+    unproven=$((unproven + 1))
+  fi
+else
+  echo "  FAIL  plan could not be derived from the committed plan.yaml:" >&2
+  sed 's/^/        /' "$scratch/plan-real.err" >&2
+  unproven=$((unproven + 1))
+fi
+
+plan_fixture="$scratch/plan-fixture"
+mkdir -p "$plan_fixture/governance/pmo"
+cp governance/pmo/plan.schema.json "$plan_fixture/governance/pmo/plan.schema.json"
+cat > "$plan_fixture/governance/pmo/plan.yaml" <<'YAML'
+goal: "fixture goal"
+milestones:
+  - id: M0
+    name: "only"
+    order: 0
+    exit_criteria:
+      - description: "x"
+        command: "true"
+        expect: "0"
+tasks:
+  - id: t-a
+    repo: agent-orchestrator
+    issue: 1
+    module: x
+    milestone: M0
+    priority: 1
+    depends_on: ["t-does-not-exist"]
+    sme: platform-sme
+    tier: L0
+    status_source: github
+YAML
+check_refused "plan dependency-order-violation (unknown dep)" "t-does-not-exist" \
+  python3 governance/pmo/cli.py plan --root "$plan_fixture"
+
+expected_controls=14
 if [ "$controls" -ne "$expected_controls" ]; then
   echo "check-pmo-rollup: FAIL — expected $expected_controls controls, ran $controls" >&2
   unproven=$((unproven + 1))
