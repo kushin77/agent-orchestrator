@@ -17,6 +17,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`AUTHORITY-MODEL.md`](AUTHORITY-MODEL.md) | Scoped admin rights, repo separation, schema-enforced separation of duties, end-to-end closure (EPIC #144, issue #150). |
 | [`BOARD-METADATA-AUDIT.md`](BOARD-METADATA-AUDIT.md) | The live board-metadata pass — every open issue's `class/type/priority/area` (+`gdc`/`pillar`), milestone, `epic:<slug>` and declared chain edges, with the before/after coverage and the consumer transcripts (issue #1158). |
 | [`CANNIBALIZATION.md`](CANNIBALIZATION.md) | Harvest index — which harvested asset holds what, where the canonical copy of a duplicated asset belongs, and the per-lane provenance records (EPIC-00 phase 0, issue #8; the console entry is §17, issue #813). |
+| [`CLOUDFLARE-POLICY.md`](CLOUDFLARE-POLICY.md) | The declarative Cloudflare edge policy — ingress, WAF, DNS (issue #1766) |
 | [`CMR-GAP-GOOGLECLOUDPLATFORM.md`](CMR-GAP-GOOGLECLOUDPLATFORM.md) | CMR gap analysis — googlecloudplatform onboarding (grade → govern → catalog → consume → verify → flip) |
 | [`CROSS-REFERENCE-SPINE.md`](CROSS-REFERENCE-SPINE.md) | Typed relationship edges (`cmr-refs:` markers, closed vocabulary, RCA nodes) — EPIC #138, issue #384. |
 | [`CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md`](CROSS-REPO-DEEPSEEK-ENHANCEMENTS.md) | DeepSeek and peer enhancements consumed/linked by the remote-control program (issue #549). |

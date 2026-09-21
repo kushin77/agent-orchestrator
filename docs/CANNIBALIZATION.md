@@ -729,7 +729,8 @@ the tree.
 
 **See also.** `docs/OPERATOR-ACCESS.md` §6 documents the route end to end,
 including why the hostname is useless without the Access app and why a service
-token is what makes it headless.
+token is what makes it headless. The declarative edge policy these sections
+implement is stated once in [`CLOUDFLARE-POLICY.md`](CLOUDFLARE-POLICY.md).
 
 ---
 
