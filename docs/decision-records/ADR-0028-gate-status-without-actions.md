@@ -1,3 +1,13 @@
+---
+id: ADR-0028
+status: superseded
+date: 2026-09-15
+deciders: [owner]
+req: [issue #803, issue #807, issue #808]
+supersedes: []
+superseded_by: ADR-0035
+---
+
 # ADR-0028 — A code-native gate becomes a *required* protection via a commit status, with Actions banned
 
 > **Superseded 2026-09-21 (single-developer method).** `ao/gate-of-record` is no longer a required status check on `master` and merge trains / the PR runner are retired. A PR lands with `scripts/check-squash-message.sh --pr N` then `gh pr merge N --squash`; `make verify` on a PR branch is code-only and advisory, box-state checks live in `make master-attestation` (#1673, #1676). See `AGENTS.md` "Landing a PR". The text below is kept as history.

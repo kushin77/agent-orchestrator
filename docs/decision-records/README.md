@@ -108,6 +108,7 @@ policy) — see [`GOLDEN-RULES.md`](../GOLDEN-RULES.md) provenance.
 ## Tooling
 
 - New ADRs start from the [template](template.md).
-- ADR front-matter and cross-references are validated as part of `make verify`
-  once CI lands (issue #6); until then, ADR links are covered by the markdown
-  link check in `make verify`.
+- `status:` front-matter is a closed vocabulary (`reserved`/`proposed`/
+  `accepted`/`live`/`superseded`/`deprecated`), enforced by
+  `scripts/check-adr-status.sh` in `make verify` (issue #1619). ADR links are
+  covered separately by the markdown link check in `make verify`.

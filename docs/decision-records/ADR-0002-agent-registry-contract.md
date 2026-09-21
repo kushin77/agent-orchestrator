@@ -1,3 +1,12 @@
+---
+id: ADR-0002
+status: reserved
+date: 2026-09-08
+deciders: []
+req: []
+supersedes: []
+---
+
 # ADR-0002: Agent Registry & Profiling contract
 
 **STATUS: reserved** for issues #9–#14 (phase 1 — Agent Registry &

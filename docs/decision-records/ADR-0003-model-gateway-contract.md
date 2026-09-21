@@ -1,3 +1,12 @@
+---
+id: ADR-0003
+status: reserved
+date: 2026-09-08
+deciders: []
+req: []
+supersedes: []
+---
+
 # ADR-0003: Model Gateways contract
 
 **STATUS: reserved** for issues #15–#20 (phase 2 — Model Gateways). Not a

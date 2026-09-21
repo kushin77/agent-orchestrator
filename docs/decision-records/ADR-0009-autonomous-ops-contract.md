@@ -1,3 +1,12 @@
+---
+id: ADR-0009
+status: reserved
+date: 2026-09-08
+deciders: []
+req: []
+supersedes: []
+---
+
 # ADR-0009: Autonomous ops / governance contract
 
 **STATUS: reserved** for issues #43–#47 (phase 8 — Autonomous ops /

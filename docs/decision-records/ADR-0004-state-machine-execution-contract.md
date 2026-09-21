@@ -1,3 +1,12 @@
+---
+id: ADR-0004
+status: reserved
+date: 2026-09-08
+deciders: []
+req: []
+supersedes: []
+---
+
 # ADR-0004: State-machine execution contract
 
 **STATUS: reserved** for issues #21–#25 (phase 3 — State-machine execution).

@@ -1,3 +1,12 @@
+---
+id: ADR-0005
+status: reserved
+date: 2026-09-08
+deciders: []
+req: []
+supersedes: []
+---
+
 # ADR-0005: Security & guardrails contract
 
 **STATUS: reserved** for issues #26–#30 (phase 4 — Security & guardrails). Not
