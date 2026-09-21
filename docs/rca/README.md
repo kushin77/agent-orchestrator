@@ -44,3 +44,7 @@ Issue 1760's Done line was already met by the settings aggregator landed the
 same day (commit 25aad1be): dispatch tier policy, provider flags, and the
 Nous secret declaration all project through the standard schema, tests
 pinned in portal/tests/test_settings_aggregator.py.
+
+Issue 1759's Done line was already met by the same settings aggregator: the
+gate skip-budget domain projects scripts/skip-budget.json rows via the
+standard schema, tests already pin it.
