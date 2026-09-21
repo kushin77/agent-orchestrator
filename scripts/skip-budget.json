@@ -317,6 +317,21 @@
         "command": "crontab -l"
       },
       "reason": "`check-worktree-cap: CANNOT-ASSESS -- reaper schedule could not be determined: prune-worktrees: schedule: CANNOT-ASSESS -- crontab -l failed with rc=127: ... crontab: command not found`. The reaper's schedule is read from the LIVE crontab, by design (scripts/prune-worktrees.sh), so with no `crontab` binary the question cannot be answered at all. `crontab -l` is that probe quoted verbatim (#1361)."
+    },
+    {
+      "check": "merge-identity",
+      "kind": "live-dependent",
+      "issue": 1276,
+      "tracked_by": "#1276",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-21T17:38:00Z",
+        "measured_by": "issue-1276 lane (session ao-1669-l1276, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1276 -> state=open at 2026-09-21T17:38:00Z",
+        "max_age_hours": 720
+      },
+      "mechanism": "the LIVE master merge restriction, read with gh (org + repo rulesets and their bypass_actors: gh api /orgs/kushin77/rulesets --paginate; gh api repos/kushin77/agent-orchestrator/rulesets)",
+      "reason": "kind: live-dependent (the third kind, #1410) -- the PLATFORM half of the merge right is UNOBSERVED in this sandbox: nothing here can create the `ao-merge-queue` principal or read the org/repo ruleset that guards master (no org admin, no network). scripts/check-merge-identity.sh supplies the live reading through --live-fixture, and with NO reading it answers rc 2 CANNOT-ASSESS naming `live-ruleset-not-asserted` -- never a pass, exactly as its honesty contract requires, because a gate that fails open is worse than none. The DECLARATION half (the updated governance/platform/branch-protection.yaml, the auto-wired check, the break-glass audit record + validator, the queue as the only merge identity) assesses offline and is what #1276 lands; the operator step that supplies the principal and the ruleset binding is recorded in the PR body. Honoured BY NAME while the mechanism cannot answer, NOT stale when the check assesses (rc 0 with a supplied reading), and REFUSED the moment the check FAILS (rc 1), because a failing check is a FINDING, not a skip."
     }
   ],
   "why-these-entries-exist": [
