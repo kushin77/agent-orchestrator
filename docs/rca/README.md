@@ -35,3 +35,7 @@ The real-tree quarantine (governance/reconcile/real-tree-quarantine.json) held
 7 residual exemptions tracked while open; the earlier landing chain retired
 all 7 into the reviewed baseline, so the quarantine array is empty on the
 default branch.
+
+The shared shell library (scripts/lib/common.sh) landed in two waves and now
+covers every scripts/*.sh script except the gate of record itself
+(verify.sh, check-gate-lock.sh), which keep their own reviewed copy.
