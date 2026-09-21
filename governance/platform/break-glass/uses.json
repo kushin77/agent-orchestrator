@@ -1,0 +1,5 @@
+{
+  "schema": "ao.break-glass-uses/v1",
+  "note": "The break-glass USE journal (kushin77/agent-orchestrator#1276). One entry per use of the break-glass merge authority, appended by `bash scripts/branch-protection.sh break-glass`, each carrying the `record` field that names its audit record under governance/platform/break-glass/records/. A use whose record is absent, malformed, attributed to a principal the declaration does not name, or outside its declared time-box is refused BY NAME by scripts/check-merge-identity.sh (break-glass-use-without-audit-record / use-record-invalid), which makes 'break-glass is recorded' an enforced fact rather than an intention. The journal is committed on purpose: `.fleet/` is uncommitted runtime state, and an audit trail nobody can read after the fact is not an audit trail.",
+  "uses": []
+}

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ao.break-glass-record/v1",
+  "description": "One break-glass merge-authority use, recorded as an auditable artifact (kushin77/agent-orchestrator#1276). The merge right to master lives with ONE queue identity; the named break-glass actor is the only other principal, and every use of it must leave this record: who used it, why, for which pull request, inside which time-box, which channel the owner was paged on, and who acknowledged the page. Enforced by governance/platform/break-glass/validate.py (stdlib-only subset validator: the schema is the single source of truth for the shape, the validator adds the cross-field checks a schema cannot express) and refused by name by scripts/check-merge-identity.sh.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "at",
+    "actor",
+    "actor_kind",
+    "principal_expected",
+    "action",
+    "branch",
+    "reason",
+    "window_minutes",
+    "expires_at",
+    "paged",
+    "evidence",
+    "declared_by"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ao.break-glass-record/v1",
+      "type": "string",
+      "description": "The record's own identity. A record whose schema string is anything else is refused by name."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^bg-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{6}$",
+      "description": "Minted by scripts/branch-protection.sh break-glass: bg-<UTC date>T<UTC time>Z-<hex>. It is also the name of the file under records/, so a use and its record resolve to each other by one id."
+    },
+    "at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "description": "When the break-glass authority was taken (UTC, second resolution)."
+    },
+    "actor": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The principal that used the break-glass right. scripts/check-merge-identity.sh refuses a record whose actor is not the actor the declaration names (record-actor-not-declared)."
+    },
+    "actor_kind": {
+      "type": "string",
+      "enum": ["team", "user", "integration"]
+    },
+    "principal_expected": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The queue identity that normally holds the merge right. Naming it on the record is what makes a bypass a measured exception rather than an unstated drift from the declaration."
+    },
+    "action": {
+      "type": "string",
+      "enum": ["merge", "push", "ruleset-bypass"]
+    },
+    "branch": {
+      "const": "master",
+      "type": "string"
+    },
+    "pr": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "The pull request merged under break-glass, or null for a direct push with no pull request (the case this issue exists to make visible)."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 20,
+      "description": "Why the queue identity could not be used. A short reason is refused by name: an unexplained bypass cannot be reviewed after the fact."
+    },
+    "window_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1440
+    },
+    "expires_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "description": "The break-glass right is time-boxed: the validator refuses a record whose expiry is not after its start (record-expiry-not-after-start) and one whose window exceeds the declared ceiling."
+    },
+    "paged": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "at", "ack_by"],
+      "description": "The page to the owner. A record without it is refused by name, so 'break-glass pages the owner' is evidence rather than intention.",
+      "properties": {
+        "channel": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the page went (a notice id, a mailbox directive, a chat channel)."
+        },
+        "at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "ack_by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The owner who acknowledged the page. A page nobody acknowledged is an escalation that did not land (the failure governance/notices was built for, #1269)."
+        }
+      }
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The command output, commit or url the use can be checked against."
+    },
+    "declared_by": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
