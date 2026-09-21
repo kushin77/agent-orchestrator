@@ -1,0 +1,292 @@
+#!/usr/bin/env bash
+# scripts/git-hooks/pre-commit — file-lease enforcement at commit time (issue #1541).
+#
+# WHAT THIS IS
+#   The git front-end of the claim / file-lease system that already exists:
+#   governance/policy/lease.py (the declared TTLs), governance/dispatch/claims.py
+#   (the ledger reader, `active_claims` and `find_file_conflict`) and
+#   .board/claims/ (the one-file-per-event ledger). Until this hook the lease was
+#   enforced only at CLAIM time (governance/dispatch/cli.py claim --files) and
+#   again offline by `make verify`; a session that committed directly hit nothing,
+#   so enforcement ended exactly where cooperation ended (ISOLATION-REVIEW §2-3).
+#
+# WHAT IT REFUSES, AND HOW
+#   It reads the STAGED file set and the LIVE claims (expired leases are dropped by
+#   `active_claims`), then asks the ledger's own predicate — `file_claims_conflict`,
+#   via `claims.find_file_conflict`, never a re-implementation — whether a staged
+#   file overlaps a live claim that is not this branch's. On a conflict it prints
+#   the holding claim's issue number and exits 1. Nothing else is refused.
+#
+#   Two identities, because the branch is the lane (AGENTS.md rule 15):
+#     * the branch resolves to a LIVE claim (issue-<n> -> the claim on page <n>):
+#       the claim's (issue, agent) is this session's identity, so a file leased to
+#       THIS claim passes and a file leased to any other live claim is refused;
+#     * the branch has NO live claim (an unclaimed session — the very session the
+#       review measured committing straight onto a leased file): there is no
+#       identity to exempt, so a staged file leased to ANY live claim is refused.
+#   Both arms refuse the same thing — "this file is leased and you are not the
+#   lessee". A file no live claim leases always passes.
+#
+# FAIL-OPEN, BY CONSTRUCTION (this fires on every commit; blast radius is the point)
+#   The hook is installed only by an explicit operator opt-in (`make install-hooks`)
+#   and is never a side effect of `make verify`. When it cannot know, it ALLOWS the
+#   commit and says so on stderr rather than blocking work it does not understand:
+#   a detached HEAD; a branch that is not a lane branch (issue-<n>); no ledger and
+#   no live claims at all; python3 absent; the dispatch module unimportable; the
+#   ledger unreadable or malformed. `verify: PARKED`-class infrastructure trouble in
+#   a hook must never wedge every commit in the checkout (GR-12 lives in the gate,
+#   not here).
+#
+# THE OPT-OUT (documented in docs/LEASE-HOOK.md — this hook is bypassable BY DESIGN)
+#   1. `git commit --no-verify` — Git's own bypass. This hook cannot observe it, and
+#      does not pretend to: `make verify` (the offline lease check) remains the
+#      backstop for the commit it can no longer see.
+#   2. `AO_LEASE_HOOK_OVERRIDE="<justification>"` — honoured HERE, and the
+#      justification is PRINTED, so the bypass announces itself instead of being
+#      silent. The convention is to carry the same justification in the commit body.
+#
+# EXIT CODES (guardrails/honesty tri-state, consumed never redefined)
+#   0 allow / 1 refuse (a staged file is leased to another live claim). There is no
+#   2: a hook's CANNOT-ASSESS is an ALLOW, because the commit is the work and a hook
+#   that cannot assess must not invent a refusal.
+#
+# Usage: invoked by git with no arguments. Runnable standalone against a staged
+#   fixture (scripts/check-lease-hook.sh does exactly that):
+#     bash scripts/git-hooks/pre-commit; echo "rc=$?"
+#   Extra arguments are ignored: git supplies none, and a hook that parsed them
+#   would change behaviour on a claim about its own invocation.
+set -u
+
+LABEL="pre-commit(lease)"
+
+root="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -z "$root" ]; then
+  printf '%s: note: not inside a git work tree — ALLOWING\n' "$LABEL" >&2
+  exit 0
+fi
+
+# The opt-out, checked first so a bypass is announced even when nothing else runs.
+if [ -n "${AO_LEASE_HOOK_OVERRIDE:-}" ]; then
+  printf '%s: OVERRIDDEN by AO_LEASE_HOOK_OVERRIDE\n' "$LABEL" >&2
+  printf '%s: justification: %s\n' "$LABEL" "$AO_LEASE_HOOK_OVERRIDE" >&2
+  printf '%s: carry the same justification in the commit body (docs/LEASE-HOOK.md)\n' "$LABEL" >&2
+  exit 0
+fi
+
+branch="$(git -C "$root" symbolic-ref --quiet --short HEAD 2>/dev/null)"
+if [ -z "$branch" ]; then
+  printf '%s: note: detached HEAD — no lane claim to enforce; ALLOWING\n' "$LABEL" >&2
+  exit 0
+fi
+
+issue=""
+case "$branch" in
+  issue-*) issue="${branch#issue-}" ;;
+esac
+case "$issue" in
+  ''|*[!0-9]*)
+    printf '%s: note: branch %s is not a lane branch (issue-<n>) — ALLOWING\n' "$LABEL" "$branch" >&2
+    exit 0
+    ;;
+esac
+
+if ! command -v python3 >/dev/null 2>&1; then
+  printf '%s: note: python3 is not on PATH — cannot read the claim ledger; ALLOWING\n' "$LABEL" >&2
+  exit 0
+fi
+
+# The ledger logic is the existing one, imported — never re-implemented here.
+# Its argv is explicit so the heredoc can only ever be the PROGRAM, never a payload.
+exec python3 - "$root" "$issue" "$branch" <<'PY'
+"""File-lease enforcement for one staged commit (issue #1541).
+
+Imports the repository's own claim reader and conflict predicate:
+    governance/dispatch/claims.read_ledger   -> every claim event, both sources
+    governance/dispatch/claims.active_claims -> issue -> LIVE claim (TTL applied)
+    governance/dispatch/claims.find_file_conflict -> the conflict, or None
+    governance/dispatch/model.FileClaim      -> what a staged file claims
+
+A staged file's region set is read from `git diff --cached -U0` (the new-file
+side of each hunk), so a lease that names DISJOINT regions of the same file does
+not conflict — the semantics `file_claims_conflict` already declares (#702).
+Where a region cannot be known, the file is treated as WHOLE: a deletion, a
+binary diff, an unparseable diff or an untouched range all fall back to `None`,
+which overlaps every region. The fallback is conservative on purpose: an unknown
+region may not be reported as "no conflict".
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+ALLOW = 0
+REFUSE = 1
+LABEL = "pre-commit(lease)"
+
+
+def note(message: str) -> None:
+    print(f"{LABEL}: note: {message}", file=sys.stderr)
+
+
+def git(root: str, *args: str) -> tuple[int, str]:
+    """Run one git command in ``root``; return (rc, stdout)."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", root, *args],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        return 127, f"{exc}"
+    return proc.returncode, proc.stdout
+
+
+def staged_paths(root: str) -> list[str] | None:
+    """Every path the commit touches (added/copied/modified/renamed/deleted)."""
+    rc, out = git(root, "diff", "--cached", "--name-only", "--no-color", "--no-ext-diff")
+    if rc != 0:
+        return None
+    return [line for line in out.splitlines() if line.strip()]
+
+
+# `@@ -a,b +c,d @@` — the new-file side is (c, d); d omitted means one line.
+_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+
+def staged_regions(root: str, path: str) -> tuple[tuple[int, int], ...] | None:
+    """The new-file line regions this commit touches in ``path``; None = WHOLE file."""
+    rc, out = git(
+        root, "diff", "--cached", "--unified=0", "--no-color", "--no-ext-diff", "--", path
+    )
+    if rc != 0:
+        return None
+    regions: list[tuple[int, int]] = []
+    for line in out.splitlines():
+        if line.startswith("Binary files ") or line.startswith("GIT binary patch"):
+            return None
+        match = _HUNK.match(line)
+        if match is None:
+            continue
+        start = int(match.group(1))
+        count = int(match.group(2)) if match.group(2) is not None else 1
+        if count == 0:
+            return None
+        regions.append((start, start + count - 1))
+    if not regions:
+        return None
+    return tuple(regions)
+
+
+def render(regions: tuple[tuple[int, int], ...] | None) -> str:
+    if regions is None:
+        return "whole file"
+    return ", ".join(f"{start}" if start == end else f"{start}-{end}" for start, end in regions)
+
+
+def load_dispatch(root: str):
+    """Import the repo's claim reader; raise if it is not importable here.
+
+    Both entries are needed and both are chosen here rather than inherited: the
+    dispatch directory supplies the BARE names its modules use (`import pool`,
+    `from model import FileClaim`) and the repository root supplies the package
+    path `model.py` itself uses (`from governance.policy import lease`). Git runs
+    a hook with the shell's cwd, which may be a subdirectory, so the working
+    directory is deliberately NOT part of the resolution.
+    """
+    dispatch = Path(root) / "governance" / "dispatch"
+    if not (dispatch / "claims.py").is_file():
+        raise FileNotFoundError(f"{dispatch}/claims.py")
+    sys.path.insert(0, str(Path(root).resolve()))
+    sys.path.insert(0, str(dispatch))
+    import claims  # noqa: E402  (path is chosen above, deliberately)
+    from model import FileClaim  # noqa: E402
+
+    return claims, FileClaim
+
+
+def main() -> int:
+    root, issue_text, branch = sys.argv[1], sys.argv[2], sys.argv[3]
+    issue = int(issue_text)
+
+    try:
+        claims, file_claim = load_dispatch(root)
+    except Exception as exc:  # noqa: BLE001 — any failure here is a fail-open, by contract
+        note(f"claim reader unavailable ({exc.__class__.__name__}: {exc}) — ALLOWING")
+        return ALLOW
+
+    # The ledger directory is the reader's own default source; passing it (rather
+    # than the frozen .jsonl) is what makes a fully-migrated board readable too.
+    try:
+        events = claims.read_ledger(Path(root) / ".board" / "claims")
+        live = claims.active_claims(events)
+    except Exception as exc:  # noqa: BLE001
+        note(f"claim ledger unreadable ({exc}) — ALLOWING")
+        return ALLOW
+
+    mine = live.get(issue)
+    if mine is None:
+        # No identity to exempt. The check still runs: a staged file leased to a
+        # LIVE claim is refused, which is the unclaimed-session case the review
+        # measured. Files no live claim leases pass, as always.
+        identity_issue, identity_agent = issue, ""
+        note(
+            f"branch {branch} has no live claim (issue #{issue}); staged files are "
+            "checked against every live claim"
+        )
+    else:
+        identity_issue, identity_agent = mine.issue, mine.agent
+
+    paths = staged_paths(root)
+    if paths is None:
+        note("git diff --cached failed — ALLOWING")
+        return ALLOW
+    if not paths:
+        return ALLOW
+
+    conflicts: list[tuple[str, object, object]] = []
+    for path in paths:
+        staged = file_claim(path=path, regions=staged_regions(root, path))
+        hit = claims.find_file_conflict((staged,), live, identity_issue, identity_agent)
+        if hit is not None:
+            holder, _staged, held = hit
+            conflicts.append((path, holder, held))
+
+    if not conflicts:
+        return ALLOW
+
+    print(
+        f"{LABEL}: REFUSED — {len(conflicts)} staged file(s) are leased to another live claim.",
+        file=sys.stderr,
+    )
+    for path, holder, held in conflicts:
+        print(
+            f"{LABEL}:   {path} is leased to claim #{holder.issue} "
+            f"(agent {holder.agent or '<unknown>'}, lane {holder.lane or '<none>'}); "
+            f"held: {render(held.regions)}",
+            file=sys.stderr,
+        )
+    print(
+        f"{LABEL}:   this commit is issue #{identity_issue} "
+        f"as agent {identity_agent or '<no live claim>'} on branch {branch}",
+        file=sys.stderr,
+    )
+    print(f"{LABEL}: to proceed, ONE of:", file=sys.stderr)
+    print(
+        f"{LABEL}:   * git commit --no-verify   (Git's own bypass; this hook cannot see it)",
+        file=sys.stderr,
+    )
+    print(
+        f'{LABEL}:   * AO_LEASE_HOOK_OVERRIDE="<justification>" git commit …   '
+        "(honoured here, and printed so the bypass is announced)",
+        file=sys.stderr,
+    )
+    print(f"{LABEL}: see docs/LEASE-HOOK.md", file=sys.stderr)
+    return REFUSE
+
+
+sys.exit(main())
+PY
