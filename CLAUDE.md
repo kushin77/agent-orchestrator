@@ -33,6 +33,11 @@ bash -n <file>.sh
   (`docs/EXECUTION-PLAN.md`). An orchestrating lead does not write lane code
   inline.
 - **Local-code-first (GR-17):** debug against this checkout first.
+- **SME personas:** the dispatchable personas live in
+  `~/.copilot/agents/<id>.agent.md`; the platform persona registry mirrors them
+  as `registry/personas/cards/<id>.yaml`; the persona spec's canonical copy is
+  `vendor/CMR/docs/SME-PROFILES.md` (there is no local `docs/SME-PROFILES.md`
+  here — `docs/CANNIBALIZATION.md` §3.1).
 - **Never:** push directly to `master`; commit secrets (env only, GR-6); run
   ad-hoc `terraform apply` (GR-5); merge failing work (verification evidence
   first, owner autonomous-merge mandate); edit `vendor/` (pinned submodule);

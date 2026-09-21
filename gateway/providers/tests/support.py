@@ -33,7 +33,7 @@ def chat_body_for(provider: str, model: str, text: str) -> dict:
             "usage": {"input_tokens": 12, "output_tokens": 7},
             "model": model,
         }
-    if provider in ("openai", "deepseek", "paperclip", "copilot"):
+    if provider in ("openai", "deepseek", "paperclip", "copilot", "nous"):
         return {
             "choices": [{"message": {"content": text}}],
             "usage": {"prompt_tokens": 12, "completion_tokens": 7},
@@ -86,6 +86,7 @@ def auth_header_name(provider: str) -> str | None:
         "deepseek": "authorization",
         "paperclip": "authorization",
         "copilot": "authorization",
+        "nous": "authorization",
         "ollama": None,
         "hermes": None,
     }[provider]

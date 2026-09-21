@@ -1,46 +1,205 @@
 {
   "schema": "ao.verify.skip-budget/v1",
   "why": "The named, shrink-only record of every check `make verify` is allowed to record as SKIP (rc 2 CANNOT-ASSESS) -- scripts/verify.sh's skip ratchet (issue #1199). A skip is named here or the run is REFUSED by name: the composite will not publish a `verify: PASS` whose skip set is narrated by nobody. Three kinds, all precise: `venue` (the check cannot assess because a NAMED PRECONDITION this venue must supply is not supplied -- honoured only while it is NOT supplied, so it de-activates itself the moment the venue supplies it; a check that still cannot assess WITH its precondition supplied is a defect of the CHECK, #1176, and is refused by name). A venue precondition has exactly TWO measured forms, never an assertion: a repo-relative PATH that must be absent (`vendor/CMR/sync`), and a COMMAND this venue must be able to run (`gh auth status`, supplied only when the command exits 0). The command form is the check's OWN probe quoted verbatim -- scripts/check-skip-ratchet.sh refuses a command that no file under scripts/ runs, so this record cannot invent a precondition nobody measures -- and `standing-gap` (the check's inputs ARE present and it still cannot assess, so it must name the OPEN issue that tracks it and is STALE the moment it assesses -- the entry must then be deleted) and `live-dependent` (the check's ASSESSABILITY is a property of the WORLD, #1410: the entry names the LIVE `mechanism` that did not answer and the OPEN issue that tracks it, is honoured BY NAME while the check cannot assess, is NOT stale when the check assesses -- reported as not biting, never failed -- and is REFUSED when the check FAILS, because a failing check is a FINDING, not a skip. It declares no precondition: a precondition is a named thing THIS VENUE supplies, and this kind's blindness is not this venue's to supply). An entry that matters is matched EXACTLY (check + kind + the declared precondition, or the issue), so it cannot widen to cover a different blindness.",
+  "tracking-lease": {
+    "why": "Every entry carries the QUARANTINE's lease -- `tracked_by` plus `tracking {state, measured_at, measured_by, measured_via, max_age_hours}` -- and is honoured ONLY while that block says the tracking issue is OPEN and the measurement is younger than the term (scripts/lib/skip-ratchet.py, issue #1499). The shape is BORROWED, not invented: governance/reconcile/real-tree-quarantine.json plus real_tree_baseline.py's QuarantineLease honour nothing unless state == open and the measurement is inside max_age_hours -- one exemption vocabulary in this repository, not two. A state that is not open, and a measurement older than the term, are each REFUSED by name (rc 1); a MISSING or malformed block is CANNOT-ASSESS (rc 2), because a declaration that cannot be read is never read as still excused. The lease is checked on EVERY entry, not only on the ones that skipped: on a developer box these entries do not bite at all (gh, docker and crontab are present), so a lease inspected only where a skip happened would never have looked at the 13 whose trackers had closed -- which is exactly how the defect this field exists for stayed invisible.",
+    "measurement": {
+      "measured_at": "2026-09-20T13:14:34Z",
+      "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+      "measured_via": "REST, one read per tracker: gh api repos/kushin77/agent-orchestrator/issues/<n> --jq .state, at 2026-09-20T13:14:34Z",
+      "observed": "#1295 open; #1504 open; #1361 closed 2026-09-19T01:03:11Z (not_planned, closing comment: Superseded by #1295); #1382 closed 2026-09-19T15:50:08Z",
+      "max_age_hours": 720,
+      "renewal": "the lease is REFUSED once the measurement is older than 720h (30 days): re-read every entry's tracked_by, update tracking.measured_at and state, or retire the entry. The run prints a NOTE on every pass once an entry is inside the last 25% of its term, so the lapse is visible before it bites.",
+      "note": "Where a `reason` cites (#1361) or (#1382), that is the issue the gap was FILED under, usually quoted from the check's own message; it is history, not the tracker. The tracker an entry is leased to is `tracked_by`, and `tracked_by` must spell the same issue as the entry's own `issue` -- one tracker per entry, spelled once."
+    }
+  },
+  "tracking-repoint-2026-09-20": {
+    "why": "The named decision for all 13 entries of this record (issue #1499): each named a tracker that had been CLOSED -- #1361 for the 11 `venue` entries, #1382 for the two `live-dependent` ones -- while the composite still honoured them and the venue read green. PER ENTRY, BY NAME, one of two decisions was taken: RE-POINT at the live issue that now tracks the gap, or RETIRE. Every entry is RE-POINTED and NONE is retired, and that is a measurement rather than a preference: the named preconditions are still absent in the Cloud Build venue (it still installs no gh, docker or crontab and still cannot initialise vendor/CMR), so retiring the entries would not remove a false green -- it would red that venue on 13 checks it cannot assess for an environment reason, and block every pull request. The entries die with the venue, which is #1295's own subject. This block is LOAD-BEARING, not decorative: scripts/check-skip-ratchet.sh asserts that every row names a committed entry, that the row's `now` is that entry's `tracked_by`, and that `now` differs from `was` -- so the decision cannot silently drift away from the entries it describes.",
+    "measured_at": "2026-09-20T13:14:34Z",
+    "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+    "retired": [],
+    "rows": [
+      {
+        "check": "branch-protection",
+        "decision": "re-point",
+        "was": "#1382",
+        "now": "#1295",
+        "basis": "#1382 closed 2026-09-19T15:50:08Z and tracked the PRODUCER of the required context -- a question this entry already declared itself independent of. The blindness this check actually has here is the venue: it reads branch protection live with gh, and the Cloud Build container installs no gh, which is the gap #1361 filed and #1295 superseded. The live successor is #1295."
+      },
+      {
+        "check": "cmr-knowledge",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned at 2026-09-19T01:03:11Z with the closing comment Superseded by #1295; the declared precondition vendor/CMR/sync/validate-cmr-pin.py is still absent in that venue, so the entry is needed and is re-pointed rather than retired."
+      },
+      {
+        "check": "cmr-pin",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "Same tracker, same closing comment, same still-absent precondition (vendor/CMR/sync/validate-cmr-pin.py): #1361 closed not_planned 2026-09-19T01:03:11Z, superseded by #1295."
+      },
+      {
+        "check": "codeidx-surface",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); vendor/CMR/templates/module/.mcp.json is still unreadable in that venue."
+      },
+      {
+        "check": "diagrams-declaration",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); the vendored contract paths this check names are still unreadable in that venue."
+      },
+      {
+        "check": "fleet-cron-dev-run",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); the venue still installs no docker, so its own probe 'docker compose version' still cannot succeed there."
+      },
+      {
+        "check": "fleet-cron-image",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); the venue still installs no docker, so its own probe 'docker info' still cannot succeed there."
+      },
+      {
+        "check": "gate-status",
+        "decision": "re-point",
+        "was": "#1382",
+        "now": "#1504",
+        "basis": "#1382 closed 2026-09-19T15:50:08Z. The LIVE mechanism this entry names is the commit-statuses source read with gh (the commit under test's statuses, then the most recent default-branch commits), and #1504 is the open issue for exactly that source against the required context -- the venue's check-run and its required context disagree, so a run that ends success can leave a stale red or publish nothing. #1382 tracked the producer question, which closed with the producer built (#1356's shared-services runner)."
+      },
+      {
+        "check": "module-brief",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); the pinned hub catalog is still absent in that venue, exactly as the check reports."
+      },
+      {
+        "check": "module-registry",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); the pinned hub catalog is still absent in that venue. This entry's own reason claimed it named the open issue that tracks the CI half -- it named a closed one, which is the defect of issue #1499."
+      },
+      {
+        "check": "reconcile-orphans",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); the venue still installs no gh, so the check's own guard 'command -v gh' still fails there."
+      },
+      {
+        "check": "repo-settings",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); the venue still installs no gh, so its own probe 'gh auth status' still cannot succeed there."
+      },
+      {
+        "check": "worktree-cap",
+        "decision": "re-point",
+        "was": "#1361",
+        "now": "#1295",
+        "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); the venue still installs no crontab, so the reaper's schedule still cannot be read there."
+      }
+    ]
+  },
   "entries": [
     {
       "check": "branch-protection",
       "kind": "live-dependent",
-      "issue": 1382,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "mechanism": "the GitHub branch-protection source, read live with gh (gh api repos/<owner>/<repo>/branches/master/protection)",
-      "reason": "kind: live-dependent -- #1410, moved off `venue` (#1394). This check reads the LIVE GitHub protection, and it drives scripts/check-gate-status.sh's producer probe, whose LIVE half needs `gh` too. With `gh` supplied it assesses (measured: rc 0 on a box). With no `gh` at all it cannot, and where `gh` answers and the API read does not -- `gh-unauthenticated` / `gh-repo-unresolvable` / `gh-statuses-unreadable` -- it answers rc 2 NAMING THE SOURCE, exactly as its honesty contract requires. That last case is a property of the WORLD and not a defect of the check, which is what this kind says: honoured BY NAME while the mechanism cannot answer, NOT stale when the check assesses, and REFUSED the moment the check FAILS (rc 1), because a failing check is a finding, not a skip. It was a `standing-gap` because the producer probe could never assess, then a `venue` entry carrying the precondition `gh auth status`; that kind's refusal told the operator to repair a check that was behaving correctly whenever `gh` was present and the API still silent, which is the mislabel #1410 removes. Independent of #1382: nothing here is waiting on a producer to exist."
+      "reason": "kind: live-dependent -- #1410, moved off `venue` (#1394). This check reads the LIVE GitHub protection, and it drives scripts/check-gate-status.sh's producer probe, whose LIVE half needs `gh` too. With `gh` supplied it assesses (measured: rc 0 on a box). With no `gh` at all it cannot, and where `gh` answers and the API read does not -- `gh-unauthenticated` / `gh-repo-unresolvable` / `gh-statuses-unreadable` -- it answers rc 2 NAMING THE SOURCE, exactly as its honesty contract requires. That last case is a property of the WORLD and not a defect of the check, which is what this kind says: honoured BY NAME while the mechanism cannot answer, NOT stale when the check assesses, and REFUSED the moment the check FAILS (rc 1), because a failing check is a finding, not a skip. It was a `standing-gap` because the producer probe could never assess, then a `venue` entry carrying the precondition `gh auth status`; that kind's refusal told the operator to repair a check that was behaving correctly whenever `gh` was present and the API still silent, which is the mislabel #1410 removes. It names the VENUE gap: its blindness in the Cloud Build container is that the venue supplies no `gh` at all, which is #1295 (the issue #1361 was superseded by on 2026-09-19). It was never waiting on a producer to exist -- #1382, the tracker it used to name, closed 2026-09-19T15:50:08Z and tracked the gate-status producer instead."
     },
     {
       "check": "cmr-knowledge",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": "vendor/CMR/sync/validate-cmr-pin.py",
       "reason": "`CANNOT-ASSESS CMR_VALIDATOR_UNAVAILABLE: vendor/CMR/sync/validate-cmr-pin.py not present (vendor/CMR submodule not initialized?)` -- in Cloud Build the submodule cannot be initialised offline (`fatal: could not read Username for 'https://github.com'`), so this path is absent there and present in every worktree (#1361)."
     },
     {
       "check": "cmr-pin",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": "vendor/CMR/sync/validate-cmr-pin.py",
       "reason": "`check-cmr-pin: CANNOT-ASSESS -- vendor/CMR/sync/validate-cmr-pin.py not present (vendor/CMR submodule not initialized?)` -- the same absent precondition as cmr-knowledge (#1361)."
     },
     {
       "check": "codeidx-surface",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": "vendor/CMR/templates/module/.mcp.json",
       "reason": "`check-codeidx-surface: CANNOT-ASSESS - vendored mandatory seed unreadable: vendor/CMR/templates/module/.mcp.json (initialise vendor/CMR)` -- named by the check itself (#1361)."
     },
     {
       "check": "diagrams-declaration",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": "vendor/CMR/catalog/schemas/architecture-manifest.schema.json",
       "reason": "`check-diagrams-declaration: CANNOT-ASSESS - vendored contract unreadable: .../architecture-manifest.schema.json, .../gdc-manifest.schema.json, .../templates/module/gdc-manifest.yaml (initialise vendor/CMR)` -- the first of the three paths the check names (#1361)."
     },
     {
       "check": "fleet-cron-dev-run",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": {
         "command": "docker compose version"
       },
@@ -49,7 +208,15 @@
     {
       "check": "fleet-cron-image",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": {
         "command": "docker info"
       },
@@ -58,28 +225,60 @@
     {
       "check": "gate-status",
       "kind": "live-dependent",
-      "issue": 1382,
+      "issue": 1504,
+      "tracked_by": "#1504",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1504 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "mechanism": "the GitHub commit-statuses source, read live with gh (gh api repos/<owner>/<repo>/commits/<sha>/statuses)",
       "reason": "kind: live-dependent -- #1410, moved off `venue` (#1394). The producing question is answered in two halves. The TREE half (is a producer REACHED from the path that makes the PR verdict?) needs nothing of the venue, is provable offline, and is unchanged. The LIVE half is READ with `gh` -- the commit under test's statuses, then the most recent default-branch commits -- because the ONLY field the tree carries about liveness is infra/cloudbuild/verify-trigger.yaml's `disabled:`, and this repository PINS that `true` by policy (scripts/check-cloudbuild.sh requires \"must ship disabled: true (GR-5)\"), so a probe that reads it as live state names a condition the tree can never falsify. Measured 2026-09-19: the probe answered `CANNOT-ASSESS REQUIRED-BUT-GATED-OFF` (rc 2) while the live trigger is ENABLED and `ao/gate-of-record` is posted (2adbe48b, 83ff32db, 0dbb0e68). In a venue without a working `gh` the check therefore cannot assess -- that is a VENUE gap, named by the check's own probe, and this entry de-activates itself the moment the venue supplies `gh`. With `gh` supplied the check assesses: rc 0 when the context is observed producing, rc 1 BY NAME when the source WAS read and nothing is producing (a finding about the repository, not an inability to assess -- so not a skip). NOT a `standing-gap` (that kind goes STALE the moment the check assesses) and NOT a `venue` entry (#1410): supplying `gh` is not what this check needs, the commit-statuses SOURCE must answer. The residual #1394 measured is exactly why the move was needed: with `gh auth status` succeeding but the repository/API reads failing, the check answers rc 2 naming the source, and the `venue` kind then refused the entry with 'this is a defect of the check, not of the venue (#1176)' -- a red that was RIGHT (the required context's liveness genuinely cannot be established) carrying a SECOND REASON that was WRONG, telling the operator to repair a check that was behaving correctly. As `live-dependent` the entry is honoured BY NAME while the mechanism cannot answer, is NOT stale when the check assesses, and is REFUSED if the check FAILS (rc 1), because a failing check is a finding, not a skip."
     },
     {
       "check": "module-brief",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": "vendor/CMR/catalog/mandatory.tsv",
       "reason": "`check-module-brief: CANNOT-ASSESS -- the pinned hub catalog is absent; expected vendor/CMR/catalog/mandatory.tsv and vendor/CMR/catalog/modules` -- named by the check itself (#1361)."
     },
     {
       "check": "module-registry",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": "vendor/CMR/catalog/mandatory.tsv",
-      "reason": "`check-module-registry: CANNOT-ASSESS -- the pinned hub catalog is absent; expected vendor/CMR/catalog/mandatory.tsv and vendor/CMR/catalog/modules` -- the venue case this record documented from the start, now naming the open issue that tracks the CI half (#1361)."
+      "reason": "`check-module-registry: CANNOT-ASSESS -- the pinned hub catalog is absent; expected vendor/CMR/catalog/mandatory.tsv and vendor/CMR/catalog/modules` -- the venue case this record documented from the start, now naming the LIVE issue that tracks the CI half (#1295, which superseded #1361 on 2026-09-19)."
     },
     {
       "check": "reconcile-orphans",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": {
         "command": "command -v gh"
       },
@@ -88,7 +287,15 @@
     {
       "check": "repo-settings",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": {
         "command": "gh auth status"
       },
@@ -97,7 +304,15 @@
     {
       "check": "worktree-cap",
       "kind": "venue",
-      "issue": 1361,
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-20T13:14:34Z",
+        "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open at 2026-09-20T13:14:34Z",
+        "max_age_hours": 720
+      },
       "precondition": {
         "command": "crontab -l"
       },
@@ -105,10 +320,10 @@
     }
   ],
   "why-these-entries-exist": [
-    "The list holds ONLY the gaps of the CLOUD BUILD venue (#1361) and no local one, and that is a measurement, not an omission. In the two venues a DEVELOPER produces, nothing skips: (a) a FRESH WORKTREE (`git worktree add` of this repo) was run end to end -- 202 checks rc 0, 1 check rc 1 (an unrelated `reconcile` real-tree drift baseline), 0 checks rc 2, verdict `verify: FAIL (1 of 203 checks failed)` with NO `skipped:` clause at all; (b) the populated checkout of the same commit. A skip that appears on the developer box is therefore a FINDING, not a known limit, and the ratchet refuses it by name with the remedy printed beside it -- which is the property this issue asked for: a skip bucket that cannot be permanently populated. Every entry that IS in this record is one of the required check's runner's own gaps: `control-plane-verify (purebliss-ghl)` runs `make verify` inside a bare `python:3.14` container with no `gh`, no docker (so no compose v2 plugin), no `crontab`, and no network with which to initialise `vendor/CMR`, so those twelve checks answer rc 2 there on EVERY run. That is filed as #1361, the open issue each entry names; supplying the tool or repairing the check deletes the entry, and a stale entry fails the run by name. Each of them is an `unused_venue_entry` on every local run -- a NOTE, never a failure -- and bites only in the venue whose precondition is genuinely absent.",
-    "Two of those entries carry the THIRD kind, `live-dependent` (#1410), and they are there because neither older kind can say what is true of them: as `venue` entries they were honoured only while their declared precondition (`gh auth status`) was NOT supplied, so the moment `gh` answered and the repository/API read still failed, the ratchet refused them as a defect of the CHECK rather than of the venue (#1176) -- the red was right and the REASON was wrong, telling the operator to repair a check that was behaving correctly. An authenticated-but-unreadable source is a property of the WORLD, so these two name the LIVE mechanism they depend on in `mechanism`, are honoured BY NAME while it cannot answer, do NOT go stale when the check assesses (reported as not biting -- on a developer box with a working `gh` both assess, rc 0), and are REFUSED the moment the check FAILS (rc 1), because a failing check is a FINDING, not a skip. The shrink-only property is kept: each names the OPEN issue (#1382) that tracks the mechanism.",
+    "The list holds ONLY the gaps of the CLOUD BUILD venue (#1361) and no local one, and that is a measurement, not an omission. In the two venues a DEVELOPER produces, nothing skips: (a) a FRESH WORKTREE (`git worktree add` of this repo) was run end to end -- 202 checks rc 0, 1 check rc 1 (an unrelated `reconcile` real-tree drift baseline), 0 checks rc 2, verdict `verify: FAIL (1 of 203 checks failed)` with NO `skipped:` clause at all; (b) the populated checkout of the same commit. A skip that appears on the developer box is therefore a FINDING, not a known limit, and the ratchet refuses it by name with the remedy printed beside it -- which is the property this issue asked for: a skip bucket that cannot be permanently populated. Every entry that IS in this record is one of the required check's runner's own gaps: `control-plane-verify (purebliss-ghl)` runs `make verify` inside a bare `python:3.14` container with no `gh`, no docker (so no compose v2 plugin), no `crontab`, and no network with which to initialise `vendor/CMR`, so those twelve checks answer rc 2 there on EVERY run. That is filed as #1361 -- which is now CLOSED (2026-09-19T01:03:11Z, superseded by #1295) -- so each entry names the live successor #1295 instead, and the lease below REFUSES an entry whose tracked_by is not open (see tracking-repoint-2026-09-20); supplying the tool or repairing the check deletes the entry, and a stale entry fails the run by name. Each of them is an `unused_venue_entry` on every local run -- a NOTE, never a failure -- and bites only in the venue whose precondition is genuinely absent.",
+    "Two of those entries carry the THIRD kind, `live-dependent` (#1410), and they are there because neither older kind can say what is true of them: as `venue` entries they were honoured only while their declared precondition (`gh auth status`) was NOT supplied, so the moment `gh` answered and the repository/API read still failed, the ratchet refused them as a defect of the CHECK rather than of the venue (#1176) -- the red was right and the REASON was wrong, telling the operator to repair a check that was behaving correctly. An authenticated-but-unreadable source is a property of the WORLD, so these two name the LIVE mechanism they depend on in `mechanism`, are honoured BY NAME while it cannot answer, do NOT go stale when the check assesses (reported as not biting -- on a developer box with a working `gh` both assess, rc 0), and are REFUSED the moment the check FAILS (rc 1), because a failing check is a FINDING, not a skip. The shrink-only property is kept, and it is what caught these two: each names the OPEN issue that tracks the mechanism, and BOTH of the trackers they named have since closed -- #1382 closed 2026-09-19T15:50:08Z, which is why they now name the live trackers #1504 (the statuses source the gate-status check reads) and #1295 (the venue that supplies no gh, which is branch-protection's blindness).",
     "The two checks that used to occupy the bucket are NOT here because they were REPAIRED, not because they were excused: `dispatch-queue` (#1189) and `paperclip-routines` (#1176) both reach real verdicts (measured at origin/master a60ab88: rc 0 each, 9 and 11 controls provoked). Naming them would be the fiction this ratchet exists to prevent.",
     "The `venue` KIND is not hypothetical and was measured too: in a tree carrying no local submodule objects (so `git submodule update --init vendor/CMR` cannot succeed offline), `module-registry`, `diagrams-declaration` and `codeidx-surface` each answer rc 2 -- `the pinned hub catalog is absent` / `vendored contract unreadable` / `vendored mandatory seed unreadable` -- exactly as each check's own header declares. A lane in that venue names them with the precondition path it is missing, or supplies the submodule; it does not get a silent PASS.",
-    "Growing this list is a deliberate act naming the PRECONDITION the venue lacks -- a repo-relative PATH, or a COMMAND the venue must be able to run -- together with the OPEN issue that tracks supplying it (#1361 for the Cloud Build container); shrinking it is automatic -- an entry whose check assesses FAILS the run until the entry is deleted."
+    "Growing this list is a deliberate act naming the PRECONDITION the venue lacks -- a repo-relative PATH, or a COMMAND the venue must be able to run -- together with the OPEN issue that tracks supplying it (#1295 for the Cloud Build container, which superseded #1361 on 2026-09-19; a closed tracker is now REFUSED by name); shrinking it is automatic -- an entry whose check assesses FAILS the run until the entry is deleted."
   ]
 }

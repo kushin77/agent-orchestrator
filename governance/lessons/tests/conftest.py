@@ -132,9 +132,13 @@ def suggestion(number: int = 1, rca_id: str = "RCA-0001", **overrides) -> dict:
 class StubProbe:
     """A :class:`checker.GitProbe` stand-in: no subprocess, explicit answers."""
 
-    def __init__(self, *, available: bool = True, shallow: bool = False, **options):
+    def __init__(
+        self, *, available: bool = True, shallow: bool = False, narrow: bool = False,
+        **options
+    ):
         self.available = available
         self.shallow = shallow
+        self.narrow = narrow
         self._tracked = options.get("tracked", {})
         self._commits = set(options.get("commits", ()))
 

@@ -17,6 +17,7 @@ without touching the pinned submodule or the registry lane's files:
 | `modules/ollama/module.json` | `ollama` | `ollama` | The local Ollama provider module (issue #349). |
 | `modules/hermes/module.json` | `hermes` | `hermes` | The Hermes local agent-service provider module (issue #349). |
 | `modules/paperclip/module.json` | `paperclip` | `paperclip` | The vendored Paperclip planning/status-report provider module (issue #349). |
+| `modules/nous/module.json` | `nous` | `nous` | The Nous Research cloud inference-API provider module (issue #1559): OpenAI-compatible `chat/completions` behind a required Bearer key, billed against account credits. |
 
 The claude/anthropic entry is **referenced, not re-declared**, by the proxy
 routing policy (`gateway/proxy/config/routing.yaml` `routingGroups.purebliss-team`)

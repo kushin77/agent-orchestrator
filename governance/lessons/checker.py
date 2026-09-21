@@ -376,6 +376,30 @@ class GitProbe:
         code, out = self._run("rev-parse", "--is-shallow-repository")
         return code == 0 and out.strip() == "true"
 
+    @property
+    def narrow(self) -> bool:
+        """A checkout that only ever fetched ONE branch's history.
+
+        ``--unshallow``/``--deepen`` only extends the depth of the ref this
+        checkout already has -- it never reaches an object that exists solely
+        on a DIFFERENT branch (a still-open lane's tip, a squash-merged PR's
+        pre-squash commit). A CI runner that clones a single ref (issue #727's
+        venue-blindness class) is therefore missing objects `cat-file -e` will
+        never find, for a reason that has nothing to do with the citation
+        being wrong. Counting the remote-tracking branches this checkout
+        actually holds is a cheap, reliable stand-in for "was every branch
+        fetched here" — a single (or zero) `refs/remotes/origin/*` entry means
+        this checkout cannot be trusted to resolve a commit outside its own
+        ref's ancestry, exactly like `shallow` cannot be trusted to resolve
+        one outside its depth.
+        """
+        if not self.available:
+            return False
+        code, out = self._run("for-each-ref", "--format=%(refname)", "refs/remotes/origin")
+        if code != 0:
+            return False
+        return len([line for line in out.splitlines() if line.strip()]) <= 1
+
     def tracked(self, relative_path: str) -> Optional[bool]:
         """``True``/``False`` when git can answer, ``None`` when it cannot."""
         if not self.available:
@@ -1116,6 +1140,23 @@ def _unresolvable_evidence(record_id: str, sha: str, probe: GitProbe) -> List[Fi
                 subject=record_id,
                 severity=SEVERITY_WARNING,
                 remediation="run the gate from a full clone to resolve the evidence",
+            )
+        ]
+    if probe.narrow:
+        return [
+            Finding(
+                code=CODE_EVIDENCE_UNRESOLVABLE,
+                message=(
+                    "%s names commit %s, which this checkout's single-branch "
+                    "fetch cannot resolve (it may exist on a branch this venue "
+                    "never fetched)" % (record_id, sha)
+                ),
+                subject=record_id,
+                severity=SEVERITY_WARNING,
+                remediation=(
+                    "run the gate from a checkout that fetched every branch "
+                    "(refs/remotes/origin/*), not only the ref under test"
+                ),
             )
         ]
     return [

@@ -62,6 +62,7 @@ from providers.events import (
     ModelCallEvent,
 )
 from providers.gemini import GeminiProvider
+from providers.nous import NousProvider
 from providers.ollama import OllamaProvider
 from providers.openai import OpenAIProvider
 from providers.paperclip import PaperclipProvider
@@ -80,6 +81,7 @@ PROVIDER_CLASSES: dict[str, type] = {
         CopilotProvider,
         DeepSeekProvider,
         HermesProvider,
+        NousProvider,
         OpenAIProvider,
         GeminiProvider,
         OllamaProvider,

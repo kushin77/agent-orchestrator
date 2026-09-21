@@ -4,17 +4,56 @@ Issue: [#1156](https://github.com/kushin77/agent-orchestrator/issues/1156) ·
 Measured: **2026-09-17T16:22Z** · Base: `origin/master` `2fa292cc` ·
 Lane: `docs/` + board (filed issues) · Epic: [#878](https://github.com/kushin77/agent-orchestrator/issues/878)
 
-**Re-derive:**
+**Re-derive:** — the values are the `2fa292cc` snapshot; where the same command prints something
+else at `5357190f` the line says so. §"Status at re-measurement" is the state of the five gaps.
 
 ```bash
 git rev-parse origin/master
 bash scripts/check-system-app-declaration.sh          # the system-app gate, with its own controls
 bash scripts/check-docs.sh                            # docs-lint, incl. docs-index membership
 bash scripts/check-conformance.sh                     # the filing seam's filing-check half
-ls scripts/check-*.sh | wc -l                         # 158 check scripts, all auto-discovered (#698)
-grep -rn 'dupcheck' scripts/ Makefile                 # empty == the ADR-0010 detector is unwired
+ls scripts/check-*.sh | wc -l                         # 158 at the snapshot; 195 at 5357190f
+grep -rn 'dupcheck' scripts/ Makefile                 # empty at the snapshot; 12 at 5357190f — the
+                                                      # detector moved to scripts/check-duplicates.sh
+                                                      # (#1164, closed); this path is a stub now
 sed -n '79,85p' governance/conformance/policy.yaml   # the filing defaults that derive area:governance
 ```
+
+## Status at re-measurement — 2026-09-20, `origin/master` = `5357190f`
+
+**Everything in this document is the 2026-09-17 measurement at `2fa292cc`**, kept as the
+measurement it was rather than re-written. This section is the state of the one class of claim the
+doc is *actionable* for — the five gaps it filed — and it exists because those claims are
+present-tense in the bodies below while the tree has moved on. A reader who trusts a row instead of
+re-running it is reading a promise, which is the failure the gate-of-record's own sibling names in
+[`scripts/check-gate-coverage.sh`](../scripts/check-gate-coverage.sh): *"a snapshot, never a
+promise … re-measure it rather than trusting this line"*.
+
+**All five filed issues are CLOSED, and every gap closed with them:**
+
+| Filed | The gap, as §4.1 / §4.2 / §5 / §7 / §8 record it | State at `5357190f` | Re-derive — the command that shows it closed |
+|---|---|---|---|
+| [#1160](https://github.com/kushin77/agent-orchestrator/issues/1160) | §4.2 gap 1, §5 row 3 — `filing-check` proved label *derivation* and never label *existence*, so the gate was green while `gh` refused `area:governance` | **closed 2026-09-18T15:50:40Z** | `bash scripts/check-conformance.sh` → `filing-check: OK (18 of 18 expectations held)`, including *"every label the filing defaults derive exists on the repository"* and *"refuses a filing default naming a label the repository does not have"* |
+| [#1161](https://github.com/kushin77/agent-orchestrator/issues/1161) | §4.2 gap 3, §5 row 2 — the tree scan saw `category: "system"` only in `.json/.yaml/.yml`, so a `.ts` declaration was invisible | **closed 2026-09-18T16:02:04Z** | `grep -n SCANNED_SUFFIXES -A5 scripts/check-system-app-declaration.sh` → `.json .jsonc .json5 .yaml .yml .toml .ts .tsx .js .jsx .mjs .cjs` |
+| [#1162](https://github.com/kushin77/agent-orchestrator/issues/1162) | §4.1, §8 row 3 — `control-plane/cockpit/` run by `make cockpit` and gated by nothing; its suite undeclared | **closed 2026-09-18T16:43:24Z** | `grep -n cockpit scripts/pytest-suites.txt scripts/verify.sh` → `scripts/pytest-suites.txt:64:control-plane/cockpit` and `scripts/verify.sh:691` (`pytest-cockpit` → `control-plane/cockpit/tests`) |
+| [#1163](https://github.com/kushin77/agent-orchestrator/issues/1163) | §4.1 `ABSENT`, §4.2 gap 5, §8 row 4 — this repo's own `module.json` validated by nothing | **closed 2026-09-18T15:59:38Z** | `sed -n '2,3p' scripts/check-module-manifest.sh` → *"this repository's OWN root `module.json`, validated against the `cmr.module/v1` schema it declares (issue #1163)"* |
+| [#1164](https://github.com/kushin77/agent-orchestrator/issues/1164) | §4.1, §4.2 gap 2, §5 row 1, §7 B4, §8 row 5 — the ADR-0010 no-fork detector was invoked by nothing | **closed 2026-09-18T16:30:54Z** | `grep -rn 'dupcheck' scripts/ Makefile \| wc -l` → **12** (was `0`): the detector is `scripts/check-duplicates.sh`, auto-wired by `scripts/discover-checks.sh`, and `governance/dupcheck/check-duplicates.sh` is a forwarding stub carrying no copy of the rule |
+
+**Two §5 rows need reading, not just a date:**
+
+* **Row 1 (`governance/dupcheck/check-duplicates.sh`) no longer holds** — #1164 above.
+* **Row 5 (`governance/merge`) is stale in all three of its parts**, measured at `5357190f`: the
+  count is **12**, not 51 (`grep -cP '^(suite|script)\t' scripts/gate-coverage-baseline.txt`); the
+  line the Evidence cell quotes — `suite governance/merge swept-only #524` — **is not in the file
+  it cites** (`grep -cF 'suite governance/merge swept-only #524' scripts/gate-coverage-baseline.txt`
+  → `0`); and `governance/merge` **is not a baseline row at all** (`bash
+  scripts/check-gate-coverage.sh` → `suites declared=99 WIRED=87 UNWIRED=12 (baselined 12)`, and
+  those 12 rows name `#1501`/`#1509`, never `#524`).
+
+Three dates, so they are not confused: this doc measured **2026-09-17**; the five gaps closed
+**2026-09-18**; this status section is **2026-09-20**. The bodies below keep their snapshot text;
+§4.1, §4.2, §5 and §8 each carry a pointer here rather than a silent rewrite — re-writing a
+measurement's own rows is the thing §9 says this analysis did not do.
 
 ## Why this doc exists
 
@@ -125,7 +164,16 @@ ENFORCED.
 | **DECLARED-ONLY** | **2** ← `docs/SURFACE-CLASS.md` content, `docs/AUTHORITY-MODEL.md` content |
 | **ABSENT** | **1** ← validation of this repo's own `module.json` against `cmr.module/v1` |
 
+> **Re-measured 2026-09-20** (§"Status at re-measurement"): every name in the
+> `IMPLEMENTED-UNGATED` and `ABSENT` rows except `governance/merge` was closed on 2026-09-18 by its
+> own lane — #1160, #1161, #1162, #1163, #1164. The counts above are the `2fa292cc` snapshot.
+
 ### 4.2 The five worst gaps, by name
+
+> **Re-measured 2026-09-20** (§"Status at re-measurement"): gaps 1, 2, 3 and 5 are closed
+> (#1160, #1164, #1161, #1163 — all 2026-09-18), and gap 4's `governance/merge` suite is no longer
+> a baselined swept-only row. The text below is kept as the 2026-09-17 finding, with each gap's
+> re-derivation in that section.
 
 1. **The default filing path derives a label that does not exist** (`policy.yaml:84` → `area:governance`). Measured: the seam handed `gh issue create` the label set and GitHub refused with `could not add label: 'area:governance' not found`; `filing-check` is green because it proves *derivation*, not *existence*. **Every defaulted filing fails**, and the gate that owns the seam cannot see it. (#1160)
 2. **The ADR-0010 no-fork rule is enforced by nothing that runs** (`governance/dupcheck/check-duplicates.sh`). The README's own words: *"This helper makes that rule mechanical."* No gate-invocation file names it, so the rule is advisory. (#1164)
@@ -138,13 +186,17 @@ ENFORCED.
 A guard is **inert** when its pass and fail paths collapse to one exit code, when it cannot observe
 the thing it claims to, or when it is never reached by the gate of record. Measured here:
 
+> **Re-measured 2026-09-20:** rows 1, 2 and 3 are closed (#1164, #1161, #1160 — all 2026-09-18) and
+> row 5 is stale in all three of its parts; each is corrected in place below, with the command that
+> re-derives it. Only **row 4** (`scripts/check-drift.sh`) still holds as written.
+
 | Guard | Why it is inert | Evidence |
 |---|---|---|
-| `governance/dupcheck/check-duplicates.sh` | implemented (3 subcommands, tri-state) and **invoked by nothing** — not `scripts/verify.sh`, not `Makefile`, not `gate.sh`/`merge-gate.sh`, not any `check-*.sh`; it is inside a package, so `scripts/discover-checks.sh` (which globs `scripts/check-*.sh`) does not auto-wire it either | `grep -rn 'dupcheck' scripts/ Makefile` → empty |
-| `scripts/check-system-app-declaration.sh`'s tree scan | cannot observe a `category: "system"` declaration outside `.json/.yaml/.yml` (`:157`), so the `OK the tree matches the claim` line can print while an app declaration exists in another file type | §6.2: `.ts` plant → rc 0; identical `.yaml` plant → rc 1 |
-| `filing-check` (the conformance gate's filing half) | proves the label *derivation* and the two refusal halves, but never that the derived labels exist on the repo — so the gate is green while the production filing path is refused by GitHub | §6.3: `filing-check: OK (13 of 13)` **and** `gh` refuses `area:governance` |
-| `scripts/check-drift.sh` | **denylisted** from the gate of record (`scripts/check-denylist.txt:18`), and its own history (recorded in `scripts/check-ungated-suites.sh:20-26`) is that its only signal on the ungated-suite class was a `stderr` WARN under rc 0 | `scripts/check-denylist.txt:18`; `check-ungated-suites.sh:20-26` |
-| `governance/merge` suite | reached only by `make gate` / `make tests`; `scripts/check-gate-coverage.sh` **accepts** a declared-but-swept-only suite by design (74 baselined), so nothing fails | `scripts/gate-coverage-baseline.txt` (`suite governance/merge swept-only #524`) |
+| `governance/dupcheck/check-duplicates.sh` — **closed by #1164, 2026-09-18** | implemented (3 subcommands, tri-state) and **invoked by nothing** — not `scripts/verify.sh`, not `Makefile`, not `gate.sh`/`merge-gate.sh`, not any `check-*.sh`; it is inside a package, so `scripts/discover-checks.sh` (which globs `scripts/check-*.sh`) does not auto-wire it either | `grep -rn 'dupcheck' scripts/ Makefile` → **empty at `2fa292cc`; 12 at `5357190f`** — the detector is now `scripts/check-duplicates.sh` (auto-wired) and this path is a forwarding stub, so the row no longer holds |
+| `scripts/check-system-app-declaration.sh`'s tree scan — **closed by #1161, 2026-09-18** | cannot observe a `category: "system"` declaration outside `.json/.yaml/.yml` (`:157`), so the `OK the tree matches the claim` line can print while an app declaration exists in another file type | §6.2: `.ts` plant → rc 0; identical `.yaml` plant → rc 1. **At `5357190f` the scan reads twelve suffixes** — `grep -n SCANNED_SUFFIXES -A5 scripts/check-system-app-declaration.sh` |
+| `filing-check` (the conformance gate's filing half) — **closed by #1160, 2026-09-18** | proves the label *derivation* and the two refusal halves, but never that the derived labels exist on the repo — so the gate is green while the production filing path is refused by GitHub | §6.3: `filing-check: OK (13 of 13)` **and** `gh` refuses `area:governance`. **At `5357190f`:** `bash scripts/check-conformance.sh` → `filing-check: OK (18 of 18 expectations held)`, incl. *"every label the filing defaults derive exists on the repository"* |
+| `scripts/check-drift.sh` | **denylisted** from the gate of record (`scripts/check-denylist.txt:18`), and its own history (recorded in `scripts/check-ungated-suites.sh:20-26`) is that its only signal on the ungated-suite class was a `stderr` WARN under rc 0 | `scripts/check-denylist.txt:18`; `check-ungated-suites.sh:20-26`. **The citation is off at `5357190f`:** line 18 is a `#` comment and the `drift` row is at **:26** — the claim holds, the line number does not |
+| `governance/merge` suite — **stale at `5357190f`** | reached only by `make gate` / `make tests`; `scripts/check-gate-coverage.sh` **accepts** a declared-but-swept-only suite by design (51 baselined at #1458's re-measurement — `grep -cP '^(suite|script)\t' scripts/gate-coverage-baseline.txt`), so nothing fails | `scripts/gate-coverage-baseline.txt` (`suite governance/merge swept-only #524`). **None of this measures at `5357190f`:** the count is **12**, the quoted line is **absent** (`grep -cF` → `0`), and the suite is **not the baseline at all** — see §"Status at re-measurement" |
 
 Two controls that are **not** inert, recorded so the list is not read as blanket distrust:
 
@@ -263,6 +315,11 @@ refusal**, then **rc 0** once indexed. This is the E2E proof for deliverable #4 
 Filed through `governance/conformance/filing.py` (declaring labels derived from `policy.yaml`; see
 §6.3 for why the *default* area had to be overridden to file at all):
 
+> **Re-measured 2026-09-20:** all five are **CLOSED** — #1160 `2026-09-18T15:50:40Z`,
+> #1161 `2026-09-18T16:02:04Z`, #1162 `2026-09-18T16:43:24Z`, #1163 `2026-09-18T15:59:38Z`,
+> #1164 `2026-09-18T16:30:54Z`. The gap each one named is closed with it; per-gap re-derivation is
+> in §"Status at re-measurement". The verdict class column is the 2026-09-17 state.
+
 | Issue | Title | Verdict class |
 |---|---|---|
 | [#1160](https://github.com/kushin77/agent-orchestrator/issues/1160) | the filing default derives `area:governance`, which does not exist on the repo — every defaulted filing is refused by GitHub while `filing-check` stays green | IMPLEMENTED-UNGATED / inert guard |
@@ -304,13 +361,14 @@ sed -n '150,170p' scripts/check-system-app-declaration.sh     # scan_tree, incl.
 bash scripts/check-system-app-declaration.sh                  # rc 0 + 5 provoked controls
 
 # the governance path: which check binds which package
-ls scripts/check-*.sh | wc -l                                 # 158, all auto-discovered
-grep -rn 'dupcheck' scripts/ Makefile                         # empty == unwired
+ls scripts/check-*.sh | wc -l                                 # 158 at the snapshot; 195 at 5357190f
+grep -rn 'dupcheck' scripts/ Makefile                         # empty at the snapshot; 12 at 5357190f
 sed -n '480,489p' Makefile                                    # surface-class runs surfaces.yaml
 
 # the filing seam (the live half is network-gated)
 sed -n '79,85p' governance/conformance/policy.yaml
-bash scripts/check-conformance.sh                             # filing-check: OK (13 of 13)
+bash scripts/check-conformance.sh                             # OK (13 of 13) at the snapshot;
+                                                              # OK (18 of 18) at 5357190f
 gh label list --repo kushin77/agent-orchestrator | grep -i '^area'   # no area:governance
 
 # the gate of record

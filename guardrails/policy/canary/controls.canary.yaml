@@ -1,0 +1,78 @@
+# guardrails/policy/canary/controls.canary.yaml
+# NON-PRODUCTION canary scope for the `hermes-head-guardrails` control
+# (issue #1519, parent #1510; EPIC #878 lane L10; policy
+# bundles/platform/hermes-head.yaml, ADR-0029).
+#
+# WHY THIS FILE EXISTS
+#   `hermes-head.yaml` shipped as a fully-written default-deny allow-list whose
+#   control was `enabled: false`, so the policy had never been exercised against
+#   a shipped registry: every earlier proof built its "control ON" registry
+#   in-process, in a test fixture. A guardrail that has never fired in any
+#   environment is a declaration, not a control. This file is the committed
+#   canary SCOPE in which the policy's first BLOCK is produced by an artifact
+#   rather than by a fixture.
+#
+# WHAT THE CANARY SCOPE IS
+#   scope = (registry: THIS FILE — `hermes-head-guardrails` enabled) ×
+#           (bundle:  guardrails/policy/bundles/platform/hermes-head.yaml)
+#
+#   The scope is deliberately NARROW. It loads only the hermes-head policy, so
+#   the BLOCK it proves can only have come from `hermes-head.yaml`, and it
+#   registers only the one control that policy references (the startup gate
+#   requires a bundle's referenced controls to be registered; a narrower bundle
+#   therefore needs a narrower registry). That also means this file cannot drift:
+#   there is no second copy of the other nine controls to re-sync.
+#
+# WHAT IT IS (and is not)
+#   * The single entry below MIRRORS the shipped production control of the same
+#     id field for field — `name`, `description`, `mode`, `implemented_by` and
+#     `since` are identical — with exactly three deliberate differences:
+#     `enabled: true` (production is `enabled: false`), the `on_since_rationale`
+#     the registry validator requires of any control that ships ON, and a
+#     canary-specific `notes`. The mirror is asserted mechanically by
+#     guardrails/policy/tests/test_hermes_guardrail_canary.py, which fails by
+#     field name if this entry drifts from the shipped one, and fails if
+#     production silently flips its own value.
+#   * It is NOT the deployed default and NOT a production promotion.
+#     `default_controls_file()` still resolves to `guardrails/policy/controls.yaml`,
+#     nothing loads this path unless a caller names it explicitly, and production
+#     still carries `hermes-head-guardrails: enabled: false`. Promoting the
+#     control is a separate, recorded decision (E1's ADR); this file is not it.
+#
+# HOW IT IS PROVEN (offline, deterministic, no network)
+#   `guardrails/policy/canary/README.md` carries the exact commands, their real
+#   output and the canary result. The audit half uses the real
+#   `guardrails/policy/audit.py` sink (`JsonlAuditLog`) writing a real JSON-lines
+#   ledger that a SECOND process reads back — not an in-memory assertion.
+#
+# RETIREMENT
+#   Delete this file when the control's production promotion is decided and
+#   recorded (E1's ADR), or supersede it with a wider canary scope.
+
+version: 1
+controls:
+  - id: hermes-head-guardrails
+    name: Hermes head-of-org guardrails
+    description: >-
+      Activates the hermes-head-guardrails policy: hermes may dispatch/direct
+      only through the gateway and under its budget ceiling; hermes is
+      refused on self-promotion, approving a full rollout, touching secrets,
+      and running IaC apply.
+    enabled: true
+    on_since_rationale: >-
+      issue #1519 canary scope: this NON-PRODUCTION registry exists to prove the
+      hermes-head policy fires one named BLOCK against a committed artifact
+      rather than a test fixture. Production
+      (guardrails/policy/controls.yaml) keeps this control `enabled: false`;
+      promoting it is a separate, recorded decision (E1's ADR), and this file is
+      not that decision.
+    mode: block
+    implemented_by:
+      - guardrails/policy/bundles/platform/hermes-head.yaml
+    since: "issue #951"
+    notes: >
+      (informational) CANARY SCOPE ONLY (issue #1519) — production ships this
+      control OFF. The canary also depends on the platform's hermes provider
+      flag `enable_hermes` (infra/feature-flags/registry.yaml, sibling lane
+      #950), which is still declared-only and not read by any call site; that
+      is a named boundary of this proof, not something this file changes.

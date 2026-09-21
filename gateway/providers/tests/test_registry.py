@@ -10,6 +10,7 @@ and the metering/audit hooks firing on every call with the full stamp.
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -436,7 +437,7 @@ def test_provider_configs_are_exposed() -> None:
     # ACTIVE configs, though its adapter + config remain in the catalog so a
     # reviewed go-live can re-enable it.
     assert names == {"anthropic", "deepseek", "openai", "copilot", "gemini",
-                     "ollama", "paperclip"}
+                     "ollama", "paperclip", "nous"}
     assert "hermes" not in names
     assert registry.config_for("ollama").requires_key is False
     assert "hermes" in default_provider_configs()
@@ -480,3 +481,41 @@ def test_hermes_flag_is_read_fail_closed(tmp_path) -> None:
     on = tmp_path / "on.yaml"
     on.write_text("services:\n  hermes:\n    default: on\n", encoding="utf-8")
     assert flag_enabled(on) is True
+
+
+def test_nous_is_a_keyed_cloud_provider_not_the_local_hermes_hop() -> None:
+    """#1559: Nous is the billed cloud target; hermes stays the keyless local hop."""
+    registry = _registry()
+    nous = registry.config_for("nous")
+    assert nous.base_url == "https://inference-api.nousresearch.com/v1"
+    assert nous.api_path == "/chat/completions"
+    assert nous.requires_key is True
+    assert nous.fallback == ("ollama",)
+    assert nous.tier_model_for("MAX") == "openai/gpt-6-astra-fast"
+    # the local hop is untouched: this provider is additive, not a re-point.
+    # hermes is retired-by-default (issue #1518), so check its catalog config
+    # rather than the default (flag-off) registry's active set.
+    assert default_provider_configs()["hermes"].requires_key is False
+
+
+def test_the_finops_credit_declaration_prices_exactly_what_nous_routes() -> None:
+    """#1559: the credit meter and the tier map must name the same model ids.
+
+    A provider that routes to a model its own FinOps declaration does not price
+    would record every call as unmetered - silently. This is the cheap guard
+    that keeps the two in-lane declarations from drifting apart.
+    """
+    import yaml
+
+    root = Path(__file__).resolve().parents[3]
+    declaration = yaml.safe_load(
+        (root / "gateway" / "finops" / "provider-credits.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    declared = declaration["providers"]["nous"]["models"]
+    routed = set(_registry().config_for("nous").tier_models.values())
+    assert routed == set(declared), (
+        f"routed {sorted(routed)} != priced {sorted(declared)}"
+    )
+    assert all(declared[model]["pricePublished"] is True for model in routed)

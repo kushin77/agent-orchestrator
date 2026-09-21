@@ -93,7 +93,7 @@ that carries them.
 | `lesson-invalid-status` | error | a `LESSON-` that is open, or a `SUGGEST-` that is closed |
 | `suggestion-without-remediation` | error | an open idea with no proposed change |
 | `suggestion-without-owner` | error | an open idea with nobody accountable |
-| `evidence-unresolvable` | error | a cited commit is not in this repository's history, or a cited artifact is absent (a **deviation** in a shallow clone, where history cannot be resolved) |
+| `evidence-unresolvable` | error | a cited commit is not in this repository's history, or a cited artifact is absent (a **deviation** in a shallow clone or a single-branch checkout, where history cannot be resolved — issue #727's venue-blindness class) |
 | `edge-unresolved` | error | a cross-record reference cannot be typed as a ticket edge (a malformed `origin` or `remediation_issue`, issue #402) |
 | `board-incident-without-rca` | error | an issue carrying the `incident` **record** label is closed and no `INC-*` line names it as its origin |
 | `board-incident-pending` | deviation | the same, while that issue is still open |
