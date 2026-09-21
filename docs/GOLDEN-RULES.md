@@ -38,7 +38,8 @@ Rules fall into two parts: **Part A — delivery & repo spine** (how work on thi
 product is done) and **Part B — platform & SaaS spine** (what the product
 enforces at runtime). Part B rules are *product contracts*: the pillar that owns
 each surface must ship the stated mechanical verification with it, flag-gated
-OFF (AO-GR-6), not add it later.
+ON by default once merged and tested (AO-GR-6, policy-gr5-enabled-by-default),
+not add it later.
 
 ## Precedence
 
@@ -84,7 +85,7 @@ each a golden rule (or composition of two) in this file — not prose aspiration
 
 | Policy | Golden rule(s) | What it means here |
 |---|---|---|
-| **Flag-gated OFF** | [AO-GR-6](#ao-gr-6--flag-gated-off-by-default) | Every new surface ships invisible until deliberately enabled. |
+| **Enabled by default** | [AO-GR-6](#ao-gr-6--flag-gated-off-by-default) | Every new capability ships ON by default once merged and tested (policy-gr5-enabled-by-default, 2026-09-21); named exceptions stay off by recorded owner decision. |
 | **Verify with evidence before merge** | [AO-GR-3](#ao-gr-3--verify-before-done) + [AO-GR-11](#ao-gr-11--merge-governance-evidence-gated) | Merge only on green `make verify` with actual output attached. |
 | **No-false-green** | [AO-GR-4](#ao-gr-4--no-false-green-gates) | Every gate can genuinely fail; formalities are rejected. |
 | **Control plane never executes** | [AO-GR-12](#ao-gr-12--control-plane-never-executes) | The platform decides and directs; it never does the work it orchestrates. |
@@ -168,21 +169,35 @@ mandate).
   validates (`terraform validate`).
 - Live changes arrive only via PR → plan → apply by the deployer identity.
 
-### AO-GR-6 — Flag-gated OFF by default
+<a name="ao-gr-6--flag-gated-off-by-default"></a>
+### AO-GR-6 — Enabled by default (policy-gr5-enabled-by-default)
 
-**Rule.** Every new product surface ships **behind a feature flag defaulting to
-OFF**. Nothing is tenant-visible until deliberately enabled via the rollout
-pipeline (issue #45).
+**Rule.** Reversed by explicit owner decision (2026-09-21, single-developer
+environment — same pattern as the "single-developer landing method" doctrine
+note elsewhere in this repo; see `policy-gr5-enabled-by-default` PR). New
+capabilities — application/UI surfaces AND live infrastructure/credentialed
+external calls (CloudBuild triggers, Hermes/Nous cloud API calls, Paperclip
+live sync, anything spending money or calling a real external service with a
+real credential) — ship **behind a feature flag defaulting to ON** once
+merged and tested. A capability is either fully built and ON, or not yet
+merged; there is no third "built but off" state. This rule was previously
+named "Flag-gated OFF by default" (hence the anchor above); named exceptions
+recorded elsewhere (e.g. an explicit owner NO-GO decision for a specific
+surface, or a live-credential/gcloud-mutation surface an owner has not yet
+called) stay off and must cite the decision that keeps them off.
 
-**Why.** Shipping a half-built surface ON leaks incomplete or insecure behavior
-to tenants; flag-gating makes rollout a reviewable, reversible act instead of a
-deploy accident (EPIC-00 rollout doctrine).
+**Why.** An ambiguous half-on state (flag-gated but nobody flips it) is worse
+than either state cleanly declared: it hides finished work as if unfinished.
+In a single-developer environment the owner reviews every merge directly, so
+the deliberate-reviewed-rollout value flag-gating-OFF existed for is already
+provided by the merge itself (EPIC-00 rollout doctrine, revised).
 
 **Verify.**
-- Every new surface's configuration default is `disabled`/`off` (declared in
-  IaC/config, not inferred).
-- Enabling a surface is a deliberate, reviewed change through the rollout
-  pipeline — never an ambient side effect of deploy.
+- Every new surface's configuration default is `enabled`/`on` (declared in
+  IaC/config, not inferred), unless it carries a recorded exception citing an
+  explicit owner decision.
+- Disabling a surface (an exception) is itself a deliberate, recorded,
+  reviewed decision — never an ambient "just leave it off for now".
 
 ### AO-GR-7 — No secrets in code, files, or git history
 
@@ -262,7 +277,8 @@ reviewer for the product).
 ## Part B — platform & SaaS spine
 
 > These are product contracts. The pillar issue that builds each surface must
-> ship the listed verification with it (flag-gated OFF), so governance is
+> ship the listed verification with it (flag-gated ON by default,
+> policy-gr5-enabled-by-default), so governance is
 > **platform-enforced**, not doc-only (leaderboard R8).
 
 ### AO-GR-12 — Control plane never executes

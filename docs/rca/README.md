@@ -30,6 +30,11 @@ Filename: `docs/rca/<yyyy-mm-dd>-<slug>.md`.
   #1603's four merged lanes have no live `.fleet/lanes` record anywhere to
   release: two were already reaped, two were never opened as isolation
   lanes. The Done line is satisfied vacuously.
+- [`2026-09-21-gr5-enabled-by-default.md`](2026-09-21-gr5-enabled-by-default.md) —
+  the GR-5/AO-GR-6 policy reversal (owner decision 2026-09-21): new
+  capabilities ship enabled by default instead of flag-gated off. Full flip
+  list, the CloudBuild and paperclip exceptions, and hardcoded-old-default
+  test fixes.
 
 The real-tree quarantine (governance/reconcile/real-tree-quarantine.json) held
 7 residual exemptions tracked while open; the earlier landing chain retired

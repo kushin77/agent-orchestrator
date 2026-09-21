@@ -412,30 +412,31 @@ def test_a_store_that_disappears_under_a_live_connection_is_announced(stores):
 # --- AC: the surface ships flag-gated OFF, before authN ----------------------
 
 
-def test_the_surface_is_refused_before_authN_while_the_flag_is_off(stores):
-    """An unpromoted surface is invisible — not merely protected."""
+def test_the_surface_is_visible_and_requires_authn_when_flag_is_on(stores):
+    """A promoted surface is visible and requires authentication (GR-5 reversal)."""
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     default_feed = LiveFeed(  # enabled=None: the registry decides
         repo_root=REPO_ROOT,
         calls_store_path=stores[CALLS],
         verdicts_store_path=stores[VERDICTS],
     )
-    assert default_feed.enabled is False, "the registry declares the surface off"
+    assert default_feed.enabled is True, "the registry now declares the surface on by default (GR-5 reversal)"
     app = build_app(sso=console_sso(), live_feed=default_feed)
 
     response = app.handle("GET", "/api/telemetry/stream")  # no session cookie at all
-    assert response.status == 404
-    assert response.payload["error"]["code"] == "feature_disabled"
+    assert response.status == 401
+    assert response.payload["error"]["code"] == "unauthorized"
 
     authed = app.handle(
         "GET",
         "/api/telemetry/stream",
         cookies={SESSION_COOKIE: AUTH_GATE.mint("root@platform.example.com", "acme")},
     )
-    assert authed.status == 404, "a valid session does not open a gated surface"
-    assert authed.payload["error"]["code"] == "feature_disabled"
+    assert authed.status == 200, "a valid session can now access a gated-on surface"
 
 
-def test_registry_declares_the_live_feed_surface_off():
+def test_registry_declares_the_live_feed_surface_on():
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     import yaml
 
     document = yaml.safe_load(
@@ -444,8 +445,8 @@ def test_registry_declares_the_live_feed_surface_off():
         )
     )
     entry = document["surfaces"]["telemetry_live_feed"]
-    assert entry["default"] in (False, "off")
-    assert entry["promoted"] is False
+    assert entry["default"] in (True, "on")
+    assert entry["promoted"] is False  # promoted still false; it's enabled by default now instead
     assert entry["service"] == "portal"
 
 

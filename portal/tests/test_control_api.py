@@ -146,33 +146,37 @@ def _app_with_platform_admin(**kwargs):
 # ---------------------------------------------------------------------------
 # the flag: OFF, and evaluated before AuthN
 # ---------------------------------------------------------------------------
-def test_the_surface_ships_flag_gated_off():
-    """The declaration is the promotion switch, and it says OFF (GR-5)."""
+def test_the_surface_ships_flag_gated_on():
+    """The declaration is the promotion switch, and it says ON (GR-5 reversal 2026-09-21)."""
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     registry = yaml.safe_load(FEATURE_FLAGS.read_text(encoding="utf-8"))
     entry = registry["surfaces"][SURFACE]
-    assert entry["default"] in (False, "off")
-    assert entry["promoted"] is False
+    assert entry["default"] in (True, "on")
+    assert entry["promoted"] is False  # promoted still false; it's enabled by default now instead
     assert entry["service"] == "portal"
     assert entry["tf_flag"] == "enable_portal"
 
 
-def test_an_unpromoted_family_is_invisible_to_a_caller_with_no_session(client):
-    """404, not 401: the flag gate precedes AuthN, so the family is *absent*.
+def test_a_promoted_family_requires_authn_not_hidden_by_flag(client):
+    """401, not 404: the flag is ON by default, so the family is visible but requires authentication.
 
-    This is the flag's whole point. If the gate ran after AuthN the answer would
-    be ``401`` — which tells an unauthenticated probe that the surface exists.
+    This test changed from testing the OFF-gate invisibility to testing that an enabled family
+    still requires AuthN before allowing access.
     """
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     status, payload = client.post(_control_url("fleet.status"))
-    assert status == 404
-    assert payload["error"]["code"] == "feature_disabled"
-    assert SURFACE in payload["error"]["message"]
+    assert status == 401
+    assert payload["error"]["code"] == "unauthorized"
 
 
-def test_an_unpromoted_family_is_invisible_to_an_authenticated_caller_too(super_client):
-    """The surface is not merely unauthorised: a super-admin gets the same 404."""
+def test_a_promoted_family_is_visible_to_an_authenticated_caller(super_client):
+    """With the flag ON, even a super-admin sees the route, not a 404 feature_disabled."""
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     status, payload = super_client.post(_control_url("fleet.pause"))
-    assert status == 404
-    assert payload["error"]["code"] == "feature_disabled"
+    # With flag ON, the route is visible and accepts the request (200 success)
+    # rather than rejecting it with feature_disabled (404).
+    assert status == 200
+    assert "commandId" in payload.get("data", {})
 
 
 def test_a_promoted_family_answers_authn_before_anything_else(app):

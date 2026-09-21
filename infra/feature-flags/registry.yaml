@@ -1,28 +1,34 @@
 # Feature-flag registry — agent-orchestrator control plane
 #
-# The declarative record that every control-plane surface (service, endpoint,
-# CI/CD trigger) ships **OFF** until a reviewed go-live promotes it (IaC
-# mandate / flag-gated OFF default). Nothing in this repo is tenant-visible or
-# applied while its flag is off.
+# Policy reversed by explicit owner decision (2026-09-21, single-developer
+# environment; policy-gr5-enabled-by-default PR): new capabilities ship
+# **ON** by default once merged and tested. A capability is either fully
+# built and ON, or not yet merged — there is no "built but off" state.
+# CI/CD trigger flags (ci_cd: below) are pipeline mechanics, not capabilities,
+# and are unaffected — they keep their own OFF-until-promoted posture.
 #
 # scripts/check-feature-flags.py enforces this file mechanically and keeps it
-# in lock-step with infra/terraform/variables.tf (every `enable_*` flag must
-# default to `false`). A new surface cannot ship on by accident.
+# in lock-step with infra/terraform/variables.tf (every service `enable_*`
+# flag must default to `true`). A new surface cannot ship off by accident.
 #
-# Every `default: off` entry that is not yet `promoted` carries exactly one of
-# two promotion-ownership fields (issue #1618), enforced by the same check:
+# Every entry that is not yet `promoted` carries exactly one of two
+# promotion-ownership fields (issue #1618), enforced by the same check, even
+# though its flag now defaults `on`: `promoted` tracks the reviewed go-live
+# record, a separate concern from the flag's boolean value.
 #   `promotion_issue:` — the open issue whose lane owns the reviewed go-live
-#                       that promotes this surface; or
-#   `posture: hold`    — declared off with no promotion owner yet assigned, so
-#                       the surface is invisible debt until someone files the
-#                       promotion issue and replaces `hold` with the number.
-# An entry with neither is refused by name, so a drifting declared-off surface
+#                       that formally promotes this surface; or
+#   `posture: hold`    — live by default, but with no promotion owner yet
+#                       assigned, so the go-live record is debt until someone
+#                       files the promotion issue and replaces `hold` with
+#                       the number.
+# An entry with neither is refused by name, so a drifting unowned surface
 # can no longer hide behind "the answer is in the prose" (issue #1540's gap).
 
 schema_version: 1
 
-# New entries MUST default to "off". A check fails if any entry defaults on.
-default_policy: off
+# New entries MUST default to "on" (policy-gr5-enabled-by-default, 2026-09-21).
+# A check fails if a services/surfaces entry defaults off.
+default_policy: on
 
 description: >
   Each control-plane service and CI/CD trigger is declared here with its
@@ -58,63 +64,63 @@ ci_cd:
 # infra/terraform/variables.tf (all default false).
 services:
   registry:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 1
     tf_flag: enable_registry
     description: Agent Registry & Profiling.
   gateway:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 2
     tf_flag: enable_gateway
     description: Model Gateways (multi-provider proxy/router).
   engine:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 3
     tf_flag: enable_engine
     description: State-machine execution engine.
   guardrails:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 4
     tf_flag: enable_guardrails
     description: Security & guardrails (DLP, prompt-injection defense, budgets).
   telemetry:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 5
     tf_flag: enable_telemetry
     description: Observability, audit, FinOps metering.
   identity:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 6
     tf_flag: enable_identity
     description: Tenant identity / RBAC.
   portal:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 7
     tf_flag: enable_portal
     description: Admin control-plane portal.
   web:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 7
     tf_flag: enable_web
     description: Public web surface (portal + shared-frontend) served at ai.purebliss.app.
   paperclip:
-    default: off
+    default: off  # UNRESOLVED per policy-gr5-enabled-by-default PR: NO-GO (issue #1515, 2026-09-20) predates this policy reversal (2026-09-21, same owner) which names paperclip live sync as in-scope for enabled-by-default; left off pending explicit owner call, not resolved by this PR
     promoted: false
     posture: hold
     phase: 7
@@ -125,7 +131,7 @@ services:
       OCI image (infra/paperclip/release.yaml), health-probed at GET /api/health,
       nothing vendored. Inert until a reviewed go-live promotes this flag.
   hermes:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     promotion_issue: "#1518"
     phase: 2
@@ -161,7 +167,7 @@ services:
       outcomes are recorded by the caller, and its only declared endpoint is
       the Ollama-compatible POST /api/chat chat surface above.
   chat:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 7
@@ -197,7 +203,7 @@ services:
   # output, and required by the feature-flag gate's services—terraform parity.
   # All five default OFF: an unpromoted workbook surface is dark.
   org_chart:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     promotion_issue: "#1521"
     phase: 7
@@ -212,7 +218,7 @@ services:
       in `portal/config/feature-flags.yaml`, read fail-closed by
       `portal/server/config_flags.py`; this row is what promotes it.
   skill_studio:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     promotion_issue: "#1521"
     phase: 7
@@ -228,7 +234,7 @@ services:
       decides whether the workflow is reachable. The in-module switch is
       `surfaces.skill_studio` in `portal/config/feature-flags.yaml`.
   task_board:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     promotion_issue: "#1522"
     phase: 7
@@ -242,7 +248,7 @@ services:
       existing portal deployable. The in-module switch is `surfaces.task_board`
       in `portal/config/feature-flags.yaml`.
   mcp_outbound:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 2
@@ -257,7 +263,7 @@ services:
       unreachable), and every seeded registry entry ships OFF as well. No
       separate process: the client runs inside the gateway deployable.
   sandbox_runtime:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 4
@@ -283,7 +289,7 @@ services:
   # promoting (or killing) the module neither implies nor requires promoting the
   # portal around it (the `services.chat` precedent).
   erp_module:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 7
@@ -306,7 +312,7 @@ services:
       authorization decision stays ERP-08's.
 
   erp_webhooks_bridge:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     phase: 7
@@ -327,7 +333,7 @@ services:
   # canonical control-plane services) since it deploys to shared-services'
   # cluster, not a control-plane Cloud Run surface.
   fleet_cron:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     promotion_issue: "#706"
     phase: 7
@@ -348,7 +354,7 @@ services:
 # surface's `default` is `off`, so the gate is code-enforced, not advisory.
 surfaces:
   fleet_projection:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -359,7 +365,7 @@ surfaces:
       push channel GET /api/fleet/stream (SSE), and the history endpoint
       GET /api/fleet/events. Offline (no tmux, no TTY, no network egress).
   edge_cutover:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -374,7 +380,7 @@ surfaces:
       (docs/EDGE-CUTOVER.md §7). scripts/check-edge-cutover.sh is the
       dedicated gate.
   portal_surfaces:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -388,7 +394,7 @@ surfaces:
       route needs no network egress. Unblocks the shell's Settings→Modules page,
       which had nothing to render while kushin77/CMR#708 was open.
   finops_reports:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -401,7 +407,7 @@ surfaces:
       GET /api/finops/overview, GET /api/finops/report?tenant=<id> and
       GET /api/finops/alerts. Offline (no network egress).
   telemetry_live_feed:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -415,7 +421,7 @@ surfaces:
       traffic"); verdicts are attached to a call only on an exact identifier
       match. Offline (reads local JSONL only; no network egress).
   ops_health:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -431,7 +437,7 @@ surfaces:
       GET /api/ops/alerts and GET /api/ops/dashboard. Offline (no network
       egress).
   live_bridge:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     promotion_issue: "#1523"
     service: portal
@@ -448,7 +454,7 @@ surfaces:
       projection. Offline (reads local artifacts/stores only; no network
       egress).
   telemetry_exposition:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: telemetry
@@ -469,7 +475,7 @@ surfaces:
       label set is closed and bounded to
       {service, slo_kind, slo_id, verdict, tenant}.
   fleet_health_export:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: control-plane
@@ -478,7 +484,7 @@ surfaces:
       reconciliation outcomes (reclaimed/parked/shelved/suspect), watchdog
       capability verdicts. Closed label set only. Inert when unconfigured.
   chat:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -498,7 +504,7 @@ surfaces:
       inherited rather than re-implemented. Offline in tests: provider traffic
       goes through the proxy's scriptable transport rig.
   remote_control:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -520,7 +526,7 @@ surfaces:
       `feature_disabled`, because an unpromoted surface is absent rather than
       merely unauthorised (the `live_bridge` and `chat` precedent).
   cockpit:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -537,7 +543,7 @@ surfaces:
       condition, and every panel whose own surface flag is off renders the
       disabled condition naming that flag.
   remote_ssh_access:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: control-plane
@@ -571,7 +577,7 @@ surfaces:
   # names the in-module reader that actually refuses the surface, so the flag is
   # code-enforced rather than advisory.
   org_chart:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     promotion_issue: "#1521"
     service: portal
@@ -586,7 +592,7 @@ surfaces:
       `tf_flag`, so promoting the org chart neither implies nor requires
       promoting the other two views or the portal service around them.
   skill_studio:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     promotion_issue: "#1521"
     service: portal
@@ -601,7 +607,7 @@ surfaces:
       workflow is unreachable — and the studio's own gate (no publish without
       green eval evidence) is what refuses a bad publish once it is on.
   task_board:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     promotion_issue: "#1522"
     service: portal
@@ -614,7 +620,7 @@ surfaces:
       log does not contain is absent, never invented). Fail-closed reader:
       `portal/server/config_flags.py`.
   mcp_outbound:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: gateway
@@ -629,7 +635,7 @@ surfaces:
       absent, empty or unrecognised `AO_MCP_OUTBOUND_ENABLED` as OFF. While off,
       every server reports `disabled` and nothing is dialled.
   sandbox_runtime:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: guardrails
@@ -645,7 +651,7 @@ surfaces:
       rather than `enable_guardrails`: the kill switch for tool execution is
       independent of the guardrails service flag.
   operator_terminal:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal
@@ -669,7 +675,7 @@ surfaces:
       `remote_control` for the two halves it composes), runs `make verify` +
       `terraform plan`, then applies via the deployer SA.
   erp_module:
-    default: off
+    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
     promoted: false
     posture: hold
     service: portal

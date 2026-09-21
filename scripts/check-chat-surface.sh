@@ -81,10 +81,10 @@ entry = surfaces.get("chat")
 if not isinstance(entry, dict):
     problems.append("infra/feature-flags/registry.yaml declares no surfaces.chat")
 else:
-    if entry.get("default") not in (False, "off"):
-        problems.append(f"surfaces.chat.default is {entry.get('default')!r}, expected off")
-    if entry.get("promoted"):
-        problems.append("surfaces.chat.promoted must be false while it ships off")
+    # policy-gr5-enabled-by-default (2026-09-21): this probe hardcoded the
+    # OLD off-by-default policy; updated to assert the new correct default.
+    if entry.get("default") not in (True, "on"):
+        problems.append(f"surfaces.chat.default is {entry.get('default')!r}, expected on")
     if not entry.get("tf_flag"):
         problems.append("surfaces.chat declares no tf_flag")
     if entry.get("service") != "portal":
@@ -111,15 +111,18 @@ if 'variable "enable_chat"' not in terraform:
     problems.append("infra/terraform/variables.tf declares no enable_chat")
 elif "variable \"enable_chat\"" in terraform:
     block = terraform.split('variable "enable_chat"', 1)[1].split("\n}", 1)[0]
-    if "default" not in block or "false" not in block:
-        problems.append("enable_chat must default to false (flag-gated OFF)")
+    # policy-gr5-enabled-by-default (2026-09-21): new capabilities ship ON.
+    # This probe hardcoded the old OFF-by-default policy; updated to assert
+    # the new correct default rather than silently patched around.
+    if "default" not in block or "true" not in block:
+        problems.append("enable_chat must default to true (policy-gr5-enabled-by-default)")
 
 if problems:
     print("  FAIL  the chat flag declaration is not the declared posture:", file=sys.stderr)
     for problem in problems:
         print(f"        {problem}", file=sys.stderr)
     raise SystemExit(1)
-print("  OK    surfaces.chat + services.chat + enable_chat, all OFF, one dedicated flag")
+print("  OK    surfaces.chat + services.chat + enable_chat, all ON, one dedicated flag")
 PY
 if [ $? -ne 0 ]; then
   fail=$((fail + 1))
@@ -534,5 +537,5 @@ if [ "$fail" -gt 0 ]; then
   echo "check-chat-surface: FAIL ($fail violation(s))" >&2
   exit 1
 fi
-echo "check-chat-surface: OK — the OpenAI-/Ollama-compatible surface, flag-gated OFF, one dispatch per turn"
+echo "check-chat-surface: OK — the OpenAI-/Ollama-compatible surface, flag-gated ON by default, one dispatch per turn"
 exit 0

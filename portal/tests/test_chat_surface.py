@@ -448,9 +448,10 @@ def _login(app, email: str, tenant_id: str, *, role: str = "user") -> StreamClie
 # --------------------------------------------------------------------------- #
 # Flag posture (GR-5: an unpromoted surface is invisible, and before AuthN)
 # --------------------------------------------------------------------------- #
-def test_registry_gate_reads_the_surface_closed_by_default(tmp_path: Path):
-    """``surfaces.chat`` absent, or declared off, both read as OFF."""
-    assert ChatSurface(repo_root=REPO_ROOT).enabled is False
+def test_registry_gate_reads_the_surface_open_by_default(tmp_path: Path):
+    """``surfaces.chat`` absent or declared on now reads as ON (GR-5 reversal 2026-09-21)."""
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
+    assert ChatSurface(repo_root=REPO_ROOT).enabled is True
     assert ChatSurface(
         repo_root=REPO_ROOT, registry_path=_registry(tmp_path, "off")
     ).enabled is False

@@ -431,30 +431,27 @@ def test_metering_and_audit_hooks_fire_per_call(sentiment_schema) -> None:
 
 
 def test_provider_configs_are_exposed() -> None:
+    # policy-gr5-enabled-by-default (2026-09-21): these two tests hardcoded
+    # the OLD off-by-default policy (hermes retired by default). Updated to
+    # assert the new correct default (registry.yaml services.hermes.default
+    # is now "on") rather than silently patched around.
     registry = _registry()
     names = set(registry.provider_configs())
-    # hermes is retired by default (enable_hermes off): it is absent from the
-    # ACTIVE configs, though its adapter + config remain in the catalog so a
-    # reviewed go-live can re-enable it.
+    # hermes is enabled by default (enable_hermes on): it is present in the
+    # ACTIVE configs.
     assert names == {"anthropic", "deepseek", "openai", "copilot", "gemini",
-                     "ollama", "paperclip", "nous"}
-    assert "hermes" not in names
+                     "ollama", "paperclip", "nous", "hermes"}
     assert registry.config_for("ollama").requires_key is False
     assert "hermes" in default_provider_configs()
 
 
-def test_hermes_retired_by_default() -> None:
-    """``enable_hermes`` off (default): the registry does not activate hermes.
-
-    The gate is fail-closed at routing time: hermes is absent from the active
-    config set, so it cannot be resolved, even though its adapter and config
-    remain in the catalog for a reviewed go-live to re-enable.
-    """
+def test_hermes_enabled_by_default() -> None:
+    """``enable_hermes`` on (default, policy-gr5-enabled-by-default): the
+    registry activates hermes without an explicit override."""
     registry = _registry()
-    assert registry.hermes_enabled is False
-    assert "hermes" not in registry.provider_configs()
-    with pytest.raises(ProviderConfigurationError):
-        registry.config_for("hermes")
+    assert registry.hermes_enabled is True
+    assert "hermes" in registry.provider_configs()
+    assert registry.config_for("hermes").requires_key is False
 
 
 def test_hermes_registers_when_enabled() -> None:

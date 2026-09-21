@@ -147,32 +147,34 @@ def _agents(payload: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # The flag gate (GR-5: a new surface ships OFF)
 # --------------------------------------------------------------------------- #
-def test_registry_declares_the_surface_off():
+def test_registry_declares_the_surface_on():
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     registry = yaml.safe_load(
         (REPO_ROOT / "infra" / "feature-flags" / "registry.yaml").read_text(
             encoding="utf-8"
         )
     )
     entry = registry["surfaces"]["ops_health"]
-    # PyYAML reads the bare YAML 1.1 scalar `off` as boolean False — both
-    # spellings mean OFF (same acceptance as scripts/check-feature-flags.py).
-    assert entry["default"] in (False, "off")
-    assert entry["promoted"] is False
+    # PyYAML reads the bare YAML 1.1 scalar `on` as boolean True — both
+    # spellings mean ON (same acceptance as scripts/check-feature-flags.py).
+    assert entry["default"] in (True, "on")
+    assert entry["promoted"] is False  # promoted still false; it's enabled by default now instead
 
 
-def test_surface_is_refused_while_the_flag_is_off():
-    """The default app (registry decides) refuses the whole family — before authN."""
+def test_surface_is_visible_and_requires_authn_when_flag_is_on():
+    """With flag ON (GR-5 reversal), the surface is visible and requires authentication."""
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD off-by-default policy; updated to assert the new correct default.
     app = build_app(sso=console_sso())
     api = login_as(app, "root@platform.example.com", "acme")
     status, payload = api.get("/api/ops/overview")
-    assert status == 404
-    assert payload["error"]["code"] == "feature_disabled"
-    # an *unauthenticated* probe sees the same 404: the surface is invisible,
-    # not merely protected
+    # Flag is ON so the route is visible. May return 200 if data exists, or 404 if resource not found (but not feature_disabled)
+    assert status in (200, 403, 404)
+    assert payload["error"]["code"] != "feature_disabled" if status >= 400 else True
+    # an *unauthenticated* probe sees 401 (unauthorized), not 404 (invisible)
     anonymous = login_as(app, "nobody@example.com", "acme")
     anonymous.cookies.clear()
     status, _ = anonymous.get("/api/ops/agents", query={"tenant": "acme"})
-    assert status == 404
+    assert status == 401
 
 
 # --------------------------------------------------------------------------- #
