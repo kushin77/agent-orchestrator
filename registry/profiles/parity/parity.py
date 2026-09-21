@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """AgentIdentity parity engine — one shared agent-identity schema (issue #346).
 
+---knowledge---
+module_id: registry.profiles.parity.parity
+system: registry
+app: profiles
+solution_class: enterprise
+patterns: [drift-detection, schema-parity, both-directions, no-hand-maintained-snapshot]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [evaluate, identity_findings, schema_parity_findings, seed_findings, closed_vocab_fields, CannotAssess]
+invariants: "agent-identity drift must be impossible to land SILENTLY, in BOTH directions, with no hand-maintained snapshot anywhere"
+gotchas: ""
+related: ["#346"]
+do_not_duplicate: null
+---knowledge---
+
 The point of this module is to make AGENT-IDENTITY DRIFT IMPOSSIBLE TO LAND
 SILENTLY, in BOTH directions, with no hand-maintained snapshot anywhere:
 

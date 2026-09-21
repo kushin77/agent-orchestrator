@@ -1,5 +1,21 @@
 """Agent Identity + Registry service (issue #10, work item 06, phase 1).
 
+---knowledge---
+module_id: registry.service
+system: registry
+app: service
+solution_class: class
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [the service public surface: AgentRegistry, IdentityService, RegistryStore, TaskRouter, ClosedCatalog]
+invariants: "the package re-exports the service surface; the companion audit log lives in registry/events, not here"
+gotchas: ""
+related: ["#10"]
+do_not_duplicate: null
+---knowledge---
+
 Self-contained package under ``registry/service/``. Importable as ``service``
 when ``registry/`` is on ``sys.path`` (the tests arrange this in
 ``tests/conftest.py``). The companion audit log lives in ``registry/events``

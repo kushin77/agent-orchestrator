@@ -1,5 +1,21 @@
 """Agent registry domain model (issue #10): tenant-scoped Agent rows + lifecycle.
 
+---knowledge---
+module_id: registry.service.model
+system: registry
+app: service
+solution_class: class
+patterns: [domain-model, lifecycle-state-machine, tenant-scoped]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Agent, agent_records, validate_agent_id, validate_tenant_id, require_transition]
+invariants: "an Agent row is derived from a FROZEN AgentProfile: the closed capabilitySet and toolAllowlist are inherited, never widened"
+gotchas: ""
+related: ["#10", "#9"]
+do_not_duplicate: null
+---knowledge---
+
 The Agent row is the unit the Agent Identity + Registry service manages. It is
 derived from a frozen AgentProfile (issue #9): an Agent instance is created
 from a ``profile_ref`` (an id in registry/profiles/seeds, e.g. ``coder``) and

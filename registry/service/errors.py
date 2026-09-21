@@ -1,5 +1,21 @@
 """Shared exception types for the Agent Identity + Registry service (issue #10).
 
+---knowledge---
+module_id: registry.service.errors
+system: registry
+app: service
+solution_class: class
+patterns: [exception-taxonomy, single-root]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [RegistryServiceError, UnknownCapabilityError, CrossTenantDenied, InvalidTransitionError, ToolNotAllowedError]
+invariants: "every service error derives from RegistryServiceError, so one clause catches the whole surface"
+gotchas: ""
+related: ["#10"]
+do_not_duplicate: null
+---knowledge---
+
 All registry-service errors derive from ``RegistryServiceError`` so a caller can
 catch the whole service surface with one clause; each subtype names the exact
 failure so a gate can distinguish a scope denial from a vocabulary error.

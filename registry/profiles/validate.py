@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """AgentProfile validator for the agent-orchestrator control plane (issue #9).
 
+---knowledge---
+module_id: registry.profiles.validate
+system: registry
+app: profiles
+solution_class: enterprise
+patterns: [schema-validation, self-proving-gate, no-false-green]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [validate_profile_data, validate_seed_file, schema_errors, parity_errors, self_test_errors, main]
+invariants: "every seed satisfies schema, catalog membership, parity and ledger coverage offline; an accepted broken fixture is a refusal"
+gotchas: ""
+related: ["#9"]
+do_not_duplicate: null
+---knowledge---
+
 Validates AgentProfile documents (registry/profiles/agent-profile.schema.json)
 declared as JSON or YAML. Enforces, with REAL exit codes and no network:
 

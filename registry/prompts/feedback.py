@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Feedback loop for the versioned prompt library.
 
+---knowledge---
+module_id: registry.prompts.feedback
+system: registry
+app: prompts
+solution_class: pattern
+patterns: [derived-view, fp-fn-metrics]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [Outcome, LabelMetrics, PromptVersionMetrics, load_events, compute_metrics, format_report]
+invariants: "a label predicted but not true is an FP and one true but not predicted an FN; per-version volume is what drives improvement"
+gotchas: ""
+related: ["#13"]
+do_not_duplicate: null
+---knowledge---
+
 Production outcomes (ground truth vs what a prompt version actually produced)
 are turned into per-prompt-version metrics. Each outcome carries the set of
 labels the prompt predicted and the set of ground-truth labels; a label is a

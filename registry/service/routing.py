@@ -1,5 +1,21 @@
 """Task-route table and capability resolution for the registry (issue #10).
 
+---knowledge---
+module_id: registry.service.routing
+system: registry
+app: service
+solution_class: enterprise
+patterns: [tenant-scoped, capability-resolution, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TaskRoute, RouteResolution, TaskRouter]
+invariants: "resolution fails closed: no active candidate that can serve the route's required capabilities is a refusal, never a fallthrough"
+gotchas: ""
+related: ["#10"]
+do_not_duplicate: null
+---knowledge---
+
 Answers "what can this task type be routed to" within one tenant. The router
 keeps tenant-scoped task-route tables (task type -> ordered candidate agents)
 and resolves them to the active candidates that can actually serve the route's

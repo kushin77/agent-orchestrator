@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """SME persona registry - tenant-scoped persona cards + lifecycle API.
 
+---knowledge---
+module_id: registry.personas.registry
+system: registry
+app: personas
+solution_class: enterprise
+patterns: [lifecycle-state-machine, tenant-scoped, integrity-digest, manifest-append]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PersonaRegistry, validate_card, validate_org_chart, card_from_yaml, load_catalog, main]
+invariants: "publishing a persona version records its digest in the manifest; an unpublished or retired persona is refused by name"
+gotchas: ""
+related: ["#11"]
+do_not_duplicate: null
+---knowledge---
+
 The persona library (EPIC-00 issue #11): packaged persona cards (name,
 expertise, owned lanes, default model tier, guardrails) that are tenant-
 extensible and map onto AgentProfiles (issue #9). Design (see README.md for

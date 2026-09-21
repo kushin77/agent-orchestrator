@@ -1,5 +1,21 @@
 """Tenant-scoped in-memory registry store (issue #10).
 
+---knowledge---
+module_id: registry.service.store
+system: registry
+app: service
+solution_class: pattern
+patterns: [tenant-scoped, append-only, persistence-seam]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [RegistryStore]
+invariants: "agents are keyed by tenant and agent id with no delete: an agent leaves service by retire, never by removal"
+gotchas: "a cross-tenant lookup must return None or raise, never a hit from another tenant"
+related: ["#10"]
+do_not_duplicate: null
+---knowledge---
+
 Persistence seam: agents are keyed by ``(tenant_id, agent_id)`` and every lookup
 is strictly tenant-scoped - asking for an agent that exists only in another
 tenant returns None / raises, never a cross-tenant hit. There is no delete:

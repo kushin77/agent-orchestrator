@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Tenant install/upgrade path for agent packs (issue #40).
 
+---knowledge---
+module_id: registry.packs.installer
+system: registry
+app: packs
+solution_class: enterprise
+patterns: [consumer-trust, rollback-anchor, drift-detection, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Installer, PackInstallError, PackSignatureError, ContentDriftError, UpgradeRollbackError, SyncPlanAction]
+invariants: "a pack whose attestation does not verify FAILS install, fail closed even when cryptography is unavailable"
+gotchas: ""
+related: ["#40"]
+do_not_duplicate: null
+---knowledge---
+
 Consumer-trust + drift-resilient install:
 
 1. **Signature gate** — the pack's attestation signature MUST verify against

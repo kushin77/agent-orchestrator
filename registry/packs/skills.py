@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Skill Studio backend — skill-level pack granularity (issue #640, workbook-9).
 
+---knowledge---
+module_id: registry.packs.skills
+system: registry
+app: packs
+solution_class: enterprise
+patterns: [skill-granularity, lifecycle-state-machine, drift-detection, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SkillStudio, SkillArtifact, SkillPublishRefused, SkillLifecycleError, skill_artifact_entry]
+invariants: "a skill is a first-class pack artifact type, on the same footing as a profile or a persona but narrower"
+gotchas: ""
+related: ["#640"]
+do_not_duplicate: null
+---knowledge---
+
 A **skill** is a first-class pack artifact type, on the same footing as a
 profile or a persona but *narrower*: it is one authored capability, versioned
 and installed on its own. This module owns the skill lifecycle, the

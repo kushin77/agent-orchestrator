@@ -1,5 +1,21 @@
 """Chat quality loop — prompt modules, eval harness and the feedback loop.
 
+---knowledge---
+module_id: registry.chat
+system: registry
+app: chat
+solution_class: class
+patterns: [package-contract, declared-boundary]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [the registry.chat package surface, registry.chat.__version__]
+invariants: "the package docstring names the four things the package owns; a fifth is a decision, never an import"
+gotchas: ""
+related: ["#509", "#500"]
+do_not_duplicate: null
+---knowledge---
+
 Issue ``kushin77/agent-orchestrator#509``, the quality half of the
 conversational surface (parent ``#500``, contract ``ADR-0023``). The package
 owns four things and nothing else:

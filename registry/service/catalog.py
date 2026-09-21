@@ -1,5 +1,21 @@
 """Closed-vocabulary and AgentProfile seed access (consumes the #9 contract).
 
+---knowledge---
+module_id: registry.service.catalog
+system: registry
+app: service
+solution_class: pattern
+patterns: [consume-never-redefine, closed-vocabulary, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ClosedCatalog, ResolvedProfile, load_catalog, require_capability, require_tool, resolve_profile]
+invariants: "this service CONSUMES the issue #9 contract; it never redefines a field name or a vocabulary"
+gotchas: ""
+related: ["#10", "#9"]
+do_not_duplicate: null
+---knowledge---
+
 The Agent Identity + Registry service *consumes* the issue-#9 contract; it
 never redefines field names or vocabulary. This module reads the two artifacts
 the #9 lane owns:

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """AgentPack registry + catalog (issue #40) — the pack control surface.
 
+---knowledge---
+module_id: registry.packs.registry
+system: registry
+app: packs
+solution_class: enterprise
+patterns: [lifecycle-state-machine, no-false-green, tenant-consumption]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PackRegistry, PackPublishError, PackLifecycleError, PackNotFoundError, PackAlreadyExistsError]
+invariants: "an invalid pack FAILS publish, and the lifecycle is planned -> live -> paused -> retired with no skipped rung"
+gotchas: ""
+related: ["#40"]
+do_not_duplicate: null
+---knowledge---
+
 ``PackRegistry`` is the "module registry for agent capabilities": it holds the
 published pack versions, enforces the pack lifecycle
 (``planned -> live -> paused -> retired``), validates every publish against

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Versioned prompt/instruction library - registry API.
 
+---knowledge---
+module_id: registry.prompts.registry
+system: registry
+app: prompts
+solution_class: enterprise
+patterns: [versioned-module, frozen-published-version, schema-constrained-output, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PromptRegistry, ResolvedModule, PromptModuleError, validate_with_schema, main]
+invariants: "a caller never builds an ad-hoc unversioned prompt at runtime; it resolves the pinned published version of a taskType"
+gotchas: ""
+related: ["#13"]
+do_not_duplicate: null
+---knowledge---
+
 The governance primitive for every model call in the control plane: a caller
 never builds an ad-hoc unversioned prompt at runtime. Instead it asks the
 registry to resolve the pinned published version of a taskType, which yields a

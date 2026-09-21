@@ -1,5 +1,21 @@
 """Live hermes head-agent registration sync (issue #889, lane L10).
 
+---knowledge---
+module_id: registry.sync.live
+system: registry
+app: sync
+solution_class: enterprise
+patterns: [validate-then-append, reuse-not-reimplement, fail-closed]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [register_head_agent, HeadRegistrationError, _validate_profile, _validate_persona, _load_module]
+invariants: "an event is appended ONLY after both the seed profile and the persona card validate against the live catalog"
+gotchas: "the validators are loaded by file path, because registry/profiles and registry/personas carry no __init__.py"
+related: ["#889"]
+do_not_duplicate: null
+---knowledge---
+
 Reads the real, committed seed profile + persona card off disk, validates
 each against its schema + the live catalog (loading
 ``registry/profiles/validate.py`` and ``registry/personas/registry.py`` by

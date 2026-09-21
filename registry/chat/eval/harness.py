@@ -1,5 +1,21 @@
 """The offline chat-quality eval harness (issue #509).
 
+---knowledge---
+module_id: registry.chat.eval.harness
+system: registry
+app: eval
+solution_class: class
+patterns: [offline-deterministic, fixture-driven, declared-expectation]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [EvalReport, CaseResult, CaseCheck, load_cases, run_case, evaluate, main]
+invariants: "every assertion is the fixture's DECLARED expectation; the harness re-derives none of it"
+gotchas: ""
+related: ["#509"]
+do_not_duplicate: null
+---knowledge---
+
     python3 -m registry.chat.eval.harness --cases registry/chat/eval/cases.yaml
 
 For every case the harness resolves the module version the fixture declares,

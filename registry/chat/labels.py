@@ -1,5 +1,21 @@
 """The declared label vocabulary for a chat turn — one vocabulary, no second.
 
+---knowledge---
+module_id: registry.chat.labels
+system: registry
+app: chat
+solution_class: pattern
+patterns: [one-vocabulary-no-second, lazy-authority-read, fail-closed]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [OUTCOMES, GROUNDING, LABELS, DECISION_LEVEL, TIERS, tiers]
+invariants: "an unreadable tier policy is refused by its own reader, never answered with an empty list"
+gotchas: "the tier read is lazy on purpose: a gate fixture copies registry/chat alone into a scratch tree"
+related: ["#509", "#1494"]
+do_not_duplicate: null
+---knowledge---
+
 A chat turn resolves to exactly one *outcome*, and a turn that answered
 additionally carries a *grounding* label. Those two families are the label sets
 the feedback loop scores, and the same outcomes are what the eval fixtures

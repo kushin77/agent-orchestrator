@@ -1,5 +1,21 @@
 """Feedback loop — real chat turns become per-version FP/FN evidence (#509).
 
+---knowledge---
+module_id: registry.chat.feedback
+system: registry
+app: chat
+solution_class: pattern
+patterns: [derived-view, fp-fn-metrics, one-vocabulary-no-second]
+derives_from: registry/prompts/feedback.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [FeedbackEvent, LabelMetrics, PromptVersionMetrics, load_events, compute_metrics, project, format_report, main]
+invariants: "the FP/FN vocabulary is the prompts view's existing one; this module declares no second"
+gotchas: ""
+related: ["#509"]
+do_not_duplicate: null
+---knowledge---
+
 A user's thumbs-up or thumbs-down (with an optional correction) is an *outcome
 label* on one specific ``(prompt module version, model, tier)`` — the triple the
 prompts view already aggregates on. The vocabulary is the existing one: the

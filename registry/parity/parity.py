@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Registry <-> canonical CMR vocabulary parity gate (issue #145).
 
+---knowledge---
+module_id: registry.parity.parity
+system: registry
+app: parity
+solution_class: enterprise
+patterns: [drift-detection, baseline-integrity, fail-closed, two-mode-verification]
+derives_from: null
+owner_sme: sync-sme
+tier: L1
+interfaces: [compare, evaluate, evaluate_offline, verify_source, check_baseline_integrity, refresh_baseline, self_test, main]
+invariants: "the registry MIRRORS the canonical CMR taxonomy; a divergence is named, never smoothed into a passing comparison"
+gotchas: "the frozen canonical vocabulary is registry/parity/canonical/cmr-role-vocabulary.json, the pinned side rather than this module"
+related: ["#145"]
+do_not_duplicate: null
+---knowledge---
+
 The agent-orchestrator registry is a CONSUMER of the CMR role taxonomy: it
 mirrors the canonical role, model-tier, worker-model and lane vocabulary so a
 tenant can address any canonical role without forking a parallel taxonomy.

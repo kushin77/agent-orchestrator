@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """A/B variant runner for prompt improvements.
 
+---knowledge---
+module_id: registry.prompts.abtest
+system: registry
+app: prompts
+solution_class: pattern
+patterns: [a-b-experiment, reuse-existing-metrics, offline-deterministic]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [Variant, EvalCase, AbExperiment, select_best, load_recorded_runs, metrics_for_recorded_run]
+invariants: "candidate variants are scored on the same labeled eval set before one becomes the next version of a taskType"
+gotchas: "the network-bound tuning of the source pattern, prompt_tuner.py, is deliberately stripped"
+related: ["#13"]
+do_not_duplicate: null
+---knowledge---
+
 Head-to-head evaluation of candidate prompt variants before one is published as
 the next version of a taskType. Each variant is scored on the same labeled eval
 set; per-variant FP/FN/accuracy is aggregated (reusing feedback.py) and the

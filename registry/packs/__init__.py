@@ -1,5 +1,21 @@
 """AgentPack registry + catalog package (issue #40).
 
+---knowledge---
+module_id: registry.packs
+system: registry
+app: packs
+solution_class: class
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [the packs public API re-exports: PackRegistry, Installer, sign_pack, verify_pack, PackEventLog]
+invariants: "the package re-exports the pack surface; the schemas stay files rather than becoming a second declaration"
+gotchas: ""
+related: ["#40"]
+do_not_duplicate: null
+---knowledge---
+
 Public API re-exports. Importable when ``registry/`` is on ``sys.path``::
 
     import sys; sys.path.insert(0, "registry")

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """CLI for the AgentIdentity parity check (issue #346).
 
+---knowledge---
+module_id: registry.profiles.parity.cli
+system: registry
+app: profiles
+solution_class: class
+patterns: [cli-wrapper, tri-state-exit]
+derives_from: registry/profiles/parity/parity.py
+owner_sme: sync-sme
+tier: L0
+interfaces: [main, exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+invariants: "the CLI adds no check of its own: it runs the parity engine and reports that engine's tri-state honestly"
+gotchas: ""
+related: ["#346"]
+do_not_duplicate: null
+---knowledge---
+
 Runs the whole check offline and reports drift with stable finding codes:
 
   0  OK            the shared schema's closed vocabularies equal this repo's

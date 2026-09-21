@@ -1,5 +1,21 @@
 """The citations envelope — every grounded claim names its source (ADR-0023).
 
+---knowledge---
+module_id: registry.chat.envelope
+system: registry
+app: chat
+solution_class: enterprise
+patterns: [contract-first, fail-closed]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [Envelope, Citation, validate_citations, envelope, envelope_dicts, fabricated, schema_requires_envelope, citation_floor]
+invariants: "a grounded claim that cannot name its fragment is fabricated, never rendered"
+gotchas: ""
+related: ["#509", "#504"]
+do_not_duplicate: null
+---knowledge---
+
 The envelope is the *shape* half of grounding: a grounded answer is a document
 whose ``citations`` array carries one entry per grounded claim, naming the
 retrieved fragment it came from (``fragment_id``) and that fragment's
