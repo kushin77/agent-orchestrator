@@ -15,10 +15,13 @@
 #   2026-09-14). A row deferred to a closed issue is a permanent excuse, and the
 #   detector could not say so because its closed-tracker rule covered only
 #   `script` rows. Both halves are retired by #1497: the rule now covers every
-#   live row, and 39 of those 51 rows are GONE because their suites run here —
-#   naming a suite makes its row STALE, which is a red gate. The twelve rows
-#   that remain are listed below, each owned by an OPEN issue; this check does
-#   not claim them, and `check-gate-coverage.sh` still reports them.
+#   live row, and 42 of those 51 rows are GONE because their suites run here —
+#   naming a suite makes its row STALE, which is a red gate. #1497 retired 39 of
+#   them on 2026-09-19; #1509 retired the last THREE on 2026-09-20, each once its
+#   venue cause had been measured in that venue and repaired rather than excused
+#   (see "WHAT IS NOT IN THIS LIST", below). The nine rows that remain are listed
+#   below, each owned by an OPEN issue; this check does not claim them, and
+#   `check-gate-coverage.sh` still reports them.
 #
 # WHAT IS MEASURED
 #   Every suite named below is run HERE, each in ISOLATION (its own pytest
@@ -57,7 +60,7 @@
 #   elsewhere" without either of them reading the other's state.
 #
 # WHAT IS NOT IN THIS LIST, AND WHY
-#   Twelve declared suites are NOT named here, so `scripts/check-gate-coverage.sh`
+#   NINE declared suites are NOT named here, so `scripts/check-gate-coverage.sh`
 #   still reports them `swept-only` and `scripts/gate-coverage-baseline.txt`
 #   carries one row each, tracked by an OPEN issue.
 #
@@ -74,15 +77,36 @@
 #     governance/modules                3 errors (no vendor/CMR in a worktree)
 #   (tracker #1501, OPEN).
 #
-#   THREE more are red in the CI venue (Cloud Build python:3.14, build 6845d8ad,
-#   `make verify: FAIL`) while green in a lane worktree, so naming them here
-#   reds the gate of record in the one venue it must stay green (tracker #1509,
-#   OPEN):
-#     guardrails/honesty       CI pytest exit 1, 74 passed alone in a lane worktree
-#     governance/lifecycle     CI pytest exit 1, 259 passed alone in a lane worktree
-#     governance/reconcile     CI pytest exit 1: test_the_shipped_document_re_measures_its_own_rows
-#                              re-measures the shipped quarantine document against its recorded
-#                              git common dir, which differs in a fresh CI checkout
+#   THREE MORE WERE EXCLUDED, AND ARE NAMED AGAIN (#1509). They are the rows
+#   #1497 baselined because they failed in the CI venue (Cloud Build python:3.14,
+#   build 6845d8ad) while passing alone in a lane worktree. Each cause was then
+#   MEASURED IN THE VENUE ITSELF — `python:3.14` at `/workspace`, uid 0,
+#   LANG=C.UTF-8, deps where `infra/cloudbuild/requirements-verify.txt` puts them —
+#   and repaired wherever a repair was the honest fix:
+#     guardrails/honesty     one arm could not establish its own PRE-CONDITION.
+#         test_unreadable_file_is_never_clean makes a mode-000 file and asserts the
+#         analyzer surfaces it — but uid 0 READS a mode-000 file, so the file was
+#         never unreadable and the arm reported NOT-OK about a state it never
+#         created. It now skips BY NAME there — "running as root; permissions do
+#         not block reads", the remedy telemetry/ledger's
+#         test_unreadable_file_is_cannot_assess already carries for the same
+#         pre-condition — and still measures in every non-root run, i.e. every lane
+#         and every developer.
+#     governance/reconcile   test_the_shipped_document_re_measures_its_own_rows
+#         asserted this checkout IS the repository instance the shipped quarantine
+#         document names (/home/akushnir/agent-orchestrator/.git). A foreign
+#         instance is a DESIGNED state, not a defect: `check_real_tree` reports
+#         every entry of a document that is not in force as inapplicable, honours
+#         nothing, and treats none of it as fatal (#1321). The arm therefore failed
+#         in every venue but the one machine the rows were measured on, and a
+#         pristine clone — exactly what the CI venue checks out — can never be that
+#         machine. It now asserts the OUT-OF-FORCE contract instead, against the
+#         SHIPPED document, by name: the same subject, satisfiable in any venue.
+#     governance/lifecycle   no repair: the suite is green in the venue itself (258
+#         passed, 1 skipped, its own named arm). Its five apparent CI failures were
+#         the MEASURING HARNESS's, not the suite's — a child interpreter that
+#         overwrites PYTHONPATH and so lost PyYAML; #1509 carries the first run and
+#         the corrected one on the record.
 #
 #   Naming one of them here would red the gate of record for every lane — the
 #   one outcome worse than the honest deferral, because a gate that is red on
@@ -121,7 +145,7 @@ if [ ! -d "$log_dir" ]; then
   exit 2
 fi
 
-LISTED=39
+LISTED=42
 ran=0
 failed=0
 
@@ -265,6 +289,17 @@ judge registry/chat $?
 
 timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q telemetry/chat/tests > "$(suite_log telemetry/chat)" 2>&1
 judge telemetry/chat $?
+
+# --- the three suites whose CI-venue red #1509 resolved, and which are named here
+#     again BECAUSE each cause was repaired rather than excused -------------------
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q guardrails/honesty/tests > "$(suite_log guardrails/honesty)" 2>&1
+judge guardrails/honesty $?
+
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/lifecycle/tests > "$(suite_log governance/lifecycle)" 2>&1
+judge governance/lifecycle $?
+
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q governance/reconcile/tests > "$(suite_log governance/reconcile)" 2>&1
+judge governance/reconcile $?
 
 if [ "$ran" -ne "$LISTED" ]; then
   printf 'check-pytest-suites: NOT-OK — %d suite(s) ran but %d are named in this check; the list and the run disagree\n' \
