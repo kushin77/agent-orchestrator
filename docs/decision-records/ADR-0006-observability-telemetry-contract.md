@@ -1,3 +1,12 @@
+---
+id: ADR-0006
+status: reserved
+date: 2026-09-08
+deciders: []
+req: []
+supersedes: []
+---
+
 # ADR-0006: Observability / telemetry contract
 
 **STATUS: reserved** for issues #31–#34 (phase 5 — Observability). Not a

@@ -1,3 +1,12 @@
+---
+id: ADR-0008
+status: reserved
+date: 2026-09-08
+deciders: []
+req: []
+supersedes: []
+---
+
 # ADR-0008: Control plane / portal contract
 
 **STATUS: reserved** for issues #38–#42 (phase 7 — Control plane / portal). Not

@@ -11,9 +11,16 @@ supersedes: []
 
 ## Status
 
-`proposed` · `accepted` · `superseded` · `deprecated` — pick one, keep it in
-sync with the front-matter. A record leaves `proposed` only via review. Reserved
-numbers are index-only (see [`README.md`](README.md)) and are not decided here.
+`reserved` · `proposed` · `accepted` · `live` · `superseded` · `deprecated` —
+pick one,
+keep it in sync with the front-matter `status:` key (checked by
+`scripts/check-adr-status.sh`, part of `make verify`). A record leaves
+`proposed` only via review. `accepted` means decided but not yet promoted;
+`live` means the decision's subject is deployed — add a `live_resource:`
+front-matter key naming the resource/service that makes it so. `superseded`
+requires a populated `superseded_by:` front-matter key naming the ADR that
+replaces it (issue #1619). Reserved numbers are index-only (see
+[`README.md`](README.md)) and are not decided here.
 
 ## Context
 

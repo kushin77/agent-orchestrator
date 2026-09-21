@@ -1,3 +1,12 @@
+---
+id: ADR-0007
+status: reserved
+date: 2026-09-08
+deciders: []
+req: []
+supersedes: []
+---
+
 # ADR-0007: Tenant identity / RBAC contract
 
 **STATUS: reserved** for issues #35–#37 (phase 6 — Tenant identity / RBAC). Not

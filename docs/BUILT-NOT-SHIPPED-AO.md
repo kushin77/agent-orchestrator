@@ -79,7 +79,7 @@ built-not-shipped) · **DELETED** (removed by a merged delete PR) ·
 | P-10 | Console container present on only one node | CANNOT-ASSESS | #1513 (host half); cross-repo |
 | P-11 | OS gate stale on `.31` | CANNOT-ASSESS | `shared-services#4242` (cross-repo) |
 | N-01 | Promotion ledger carries no owner for 38 off-by-default surfaces | **LIVE GAP** | **#1618** (filed by this sweep, Parent #1510) |
-| N-02 | ADR vocabulary has no promotion state | **LIVE GAP** | **#1619** (filed by this sweep, Parent #1510) |
+| N-02 | ADR vocabulary has no promotion state | **CLOSED** | **#1619**: vocabulary closed to `proposed`/`accepted`/`live`/`superseded`/`deprecated`, `scripts/check-adr-status.sh` gates it |
 | N-03 | `guardrails/dlp/egress.py` (`SAFE_EGRESS_...` helper no code path reached) | DELETED | PR **#1218** (merged 2026-09-18) |
 
 ## Rows, with the evidence that makes each one checkable
@@ -355,7 +355,23 @@ for f in docs/decision-records/ADR-*.md; do grep -q '^status:' "$f" || echo "$f"
 An ADR whose subject is deployed and one whose subject has never been promoted
 both read `status: accepted` — so "ADR accepted with nothing built" is
 undecidable from the metadata, which is exactly the row class this issue
-inventories. Owner: **#1619**, filed by this sweep with `Parent: #1510`.
+inventories.
+
+**Closed by #1619.** The `status:` vocabulary is now the closed set
+`reserved | proposed | accepted | live | superseded | deprecated`, declared
+once in `docs/decision-records/template.md` and enforced by
+`scripts/check-adr-status.sh` (wired into `make verify` via
+`scripts/discover-checks.sh`). All ADRs carry a `status:` key: the 8 index-only
+placeholders (ADR-0002..ADR-0009) took `status: reserved`, matching their
+existing `**STATUS: reserved** ... Not a decision.` body text; ADR-0028 took
+`superseded` with `superseded_by: ADR-0035` (its own banner
+says superseded, and ADR-0035 gives the single-developer landing method that
+replaced it an ADR home); every other pre-existing ADR kept `accepted`
+(no promotion evidence found — not invented). `superseded` requires a
+populated `superseded_by:` naming an existing ADR; `live` requires a
+populated `live_resource:`. The gate refuses a missing or out-of-vocabulary
+state, and an unresolvable `superseded_by`, by name; `--self-test` proves
+both directions.
 
 ### N-03 the DELETE exemplar — DELETED
 
