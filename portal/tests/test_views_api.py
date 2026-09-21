@@ -46,6 +46,7 @@ VIEW_NAMES = [
     "login", "shell", "tenants", "overview", "agents", "personas",
     "prompts", "policies", "budgets", "usage", "audit", "approvals",
     "finops", "ops",
+    "orgchart", "skillstudio",
 ]
 
 
