@@ -60,9 +60,8 @@
 #   elsewhere" without either of them reading the other's state.
 #
 # WHAT IS NOT IN THIS LIST, AND WHY
-#   ONE declared suite is NOT named here, so `scripts/check-gate-coverage.sh`
-#   still reports it `swept-only` and `scripts/gate-coverage-baseline.txt`
-#   carries one row, tracked by an OPEN issue.
+#   NONE. #1737 wired the last excluded suite (portal) in below; every
+#   declared suite named by no other gate now runs here.
 #
 #   #1501 (CLOSED) measured NINE suites failing, hanging, or unable to run in a
 #   lane venue on origin/master, each ALONE in a worktree, its own pytest
@@ -87,14 +86,12 @@
 #     integrations/paperclip/reporting  7 failed, 18 passed, 57 errors ->
 #                                        18 passed, 64 skipped (catalog-dir
 #                                        skip guard)
-#   ONE remains excluded, a genuine lane-venue precondition that #1725 could
-#   not repair here (portal/ is another lane's files):
-#     portal                            measured NOT hanging in this venue
-#                                        with pytest-timeout available (579
-#                                        passed, 8 failed, 164s); the 8
-#                                        failures are real portal findings
-#                                        (feature-flag default)
-#   (tracker #1737, OPEN — #1501 closed 2026-09-21 with portal unfixed).
+#   ONE MORE WAS FIXED AND NAMED ABOVE BY #1737: `portal` measured NOT hanging
+#   (579 passed, 8 failed, 164s with pytest-timeout available); the 8 failures
+#   were three `infra/feature-flags/registry.yaml` `surfaces:` entries
+#   (fleet_projection, remote_control, operator_terminal) shipping
+#   `default: on` in violation of GR-5. Flipped to `off`; portal is now
+#   579 -> 587 passed, 0 failed.
 #
 #   THREE MORE WERE EXCLUDED, AND ARE NAMED AGAIN (#1509). They are the rows
 #   #1497 baselined because they failed in the CI venue (Cloud Build python:3.14,
@@ -164,7 +161,7 @@ if [ ! -d "$log_dir" ]; then
   exit 2
 fi
 
-LISTED=50
+LISTED=51
 ran=0
 failed=0
 
@@ -350,6 +347,13 @@ judge governance/modules $?
 
 timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q integrations/paperclip/reporting/tests > "$(suite_log integrations/paperclip/reporting)" 2>&1
 judge integrations/paperclip/reporting $?
+
+# Repaired and wired in by #1737: the 8 failures were three portal-surface
+# feature-flag entries in infra/feature-flags/registry.yaml (fleet_projection,
+# remote_control, operator_terminal) shipping `default: on` in violation of
+# GR-5; not a suite defect. See scripts/gate-coverage-baseline.txt.
+timeout "$suite_timeout" env PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -p no:cacheprovider -q portal/tests > "$(suite_log portal)" 2>&1
+judge portal $?
 
 if [ "$ran" -ne "$LISTED" ]; then
   printf 'check-pytest-suites: NOT-OK — %d suite(s) ran but %d are named in this check; the list and the run disagree\n' \

@@ -343,8 +343,9 @@ services:
 # surface's `default` is `off`, so the gate is code-enforced, not advisory.
 surfaces:
   fleet_projection:
-    default: on
-    promoted: true
+    default: off
+    promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_portal
     description: >
@@ -492,8 +493,9 @@ surfaces:
       inherited rather than re-implemented. Offline in tests: provider traffic
       goes through the proxy's scriptable transport rig.
   remote_control:
-    default: on
-    promoted: true
+    default: off
+    promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_portal
     description: >
@@ -638,8 +640,9 @@ surfaces:
       rather than `enable_guardrails`: the kill switch for tool execution is
       independent of the guardrails service flag.
   operator_terminal:
-    default: on
-    promoted: true
+    default: off
+    promoted: false
+    posture: hold
     service: portal
     tf_flag: enable_portal
     description: >

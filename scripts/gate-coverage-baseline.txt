@@ -147,17 +147,11 @@
 # Each is exercised, real, in a venue where the placeholder is a real
 # submodule (attestation / any checkout with `git submodule update --init`).
 #
-# portal REMAINS, RE-POINTED to #1737 (OPEN; #1501 closed 2026-09-21 without
-# portal being fixed). Measured in this lane worktree with pytest-timeout
-# available (`--timeout=30`): the suite does NOT hang here — 579 passed, 8
-# failed, in 164s. The previously-reported "rc 124 after 240s, 3 failures" did
-# not reproduce. The 8 failures are real portal findings (the surface's
-# feature-flag registry declares `default: true`; the tests, and GR-5, expect
-# gated-off), owned by whoever owns `portal/` (out of scope for #1725, which
-# does not edit files under `portal/`). #1737 also has to be in the committed
-# board snapshot for this rule to read its state OFFLINE, so this lane spliced
-# an entry into `.board/snapshot.json` for it (and corrected #1501's stale
-# OPEN state to CLOSED there too).
+# portal is GONE (#1737, 2026-09-21): the 8 failures were three
+# `infra/feature-flags/registry.yaml` `surfaces:` entries (fleet_projection,
+# remote_control, operator_terminal) shipping `default: on` in violation of
+# GR-5, not a suite defect. Flipped to `off` and the suite is wired into
+# `scripts/check-pytest-suites.sh`, so this row is stale and removed.
 #
 # THE THREE CI-VENUE ROWS THAT STOOD HERE ARE GONE (#1509, 2026-09-20), and they
 # were retired the same way the thirty-nine before them were: naming each suite
@@ -188,4 +182,3 @@
 #   governance/lifecycle     no repair: green in the venue (258 passed, 1 skipped,
 #                            its own named arm). Its five apparent CI failures were
 #                            the MEASURING harness's, not the suite's.
-suite	portal	swept-only	#1737	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
