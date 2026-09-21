@@ -199,7 +199,13 @@ rule_no_scan_script() {
     # (ii) a checker that DECLARES itself the scan: a PP-N id in its identity
     #      header. Body prose is a citation of the doctrine, never a claim.
     header="$(awk 'c==2{exit} /^# ---knowledge---/{c++} c>=1{print}' "$f")"
-    if printf '%s\n' "$header" | grep -qE 'PP-[0-9]'; then
+    # bash-native regex test, never `printf ... | grep -q` (issue #1870): a
+    # quiet grep exits on its FIRST match and SIGPIPEs the producer, so under
+    # `pipefail` the pipeline status can become 141 and a PRESENT match reads
+    # as absent — the idiom scripts/check-verdict-contains.sh refuses. `[[ =~ ]]`
+    # has no producer to kill. (`contains` from lib/common.sh is a literal
+    # substring test, and this match is a regex.)
+    if [[ "$header" =~ PP-[0-9] ]]; then
       echo "REFUSED PP-1 no-scan-script: $f declares a PP-N id in its knowledge header — docs/PYTHON-PATTERNS.md says no source scan ships"
       rc=1
     fi
