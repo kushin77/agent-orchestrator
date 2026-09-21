@@ -18,6 +18,9 @@ Filename: `docs/rca/<yyyy-mm-dd>-<slug>.md`.
   the PR lifecycle gap report (epic #1669): stale merge trains, shared-index
   collisions, box-state gates redding every lane, hand-typed PR bodies, and
   the templated issue → merge → close-out state machine that replaces them.
+  Outcome: the epic closed 2026-09-21 under the single-developer method —
+  squash guard plus squash merge, `make land PR=N`, `scripts/pr-body.sh`,
+  `make docs-index`, and lane venue kept code-only.
 - [`2026-09-21-integrations-e2e-review.md`](2026-09-21-integrations-e2e-review.md) —
   the four-runtime (Paperclip/Hermes/DeepSeek/Claude) e2e review for epic
   #1268: per-integration frontend/backend/middleware status table, the
