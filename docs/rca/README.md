@@ -39,3 +39,8 @@ default branch.
 The shared shell library (scripts/lib/common.sh) landed in two waves and now
 covers every scripts/*.sh script except the gate of record itself
 (verify.sh, check-gate-lock.sh), which keep their own reviewed copy.
+
+Issue 1760's Done line was already met by the settings aggregator landed the
+same day (commit 25aad1be): dispatch tier policy, provider flags, and the
+Nous secret declaration all project through the standard schema, tests
+pinned in portal/tests/test_settings_aggregator.py.
