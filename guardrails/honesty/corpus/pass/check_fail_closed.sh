@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+# ---knowledge---
+# module_id: guardrails.honesty.corpus.pass.check_fail_closed
+# system: guardrails
+# app: honesty
+# solution_class: template
+# patterns: [negative-control, offline-fixture, fail-closed]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L0
+# interfaces: [the fail-closed positive control]
+# invariants: "an unreadable input is CANNOT-ASSESS with exit 2 and a violation is a hard failure with exit 1, so neither reads as a pass"
+# gotchas: ""
+# related: ["#28"]
+# do_not_duplicate: null
+# ---knowledge---
 # corpus/pass -- real honest artifact (issue #28, acceptance criterion 5).
 # Source: leaderboard tests/blockproof + verify-negative-controls.sh
 # fail-closed doctrine -- an unresolvable input is CANNOT-ASSESS (exit 2),

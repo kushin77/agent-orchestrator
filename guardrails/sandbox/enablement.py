@@ -30,6 +30,23 @@ The contract (declared in ``enablement.schema.json``):
   offline runtime** with no docker daemon and no network.
 
 Everything here is stdlib-only and offline.
+
+
+---knowledge---
+module_id: guardrails.sandbox.enablement
+system: guardrails
+app: sandbox
+solution_class: enterprise
+patterns: [feature-flag-gated-off, single-seam, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [EnablementError, SandboxEnablement, default_enablement, assert_not_auto_on]
+invariants: "exactly one flag per sandbox, and no environment variable is consulted, so the OFF-by-default posture is a property of the code rather than of everyone's memory"
+gotchas: "an env var would make the flag unobservable and unforgeable in a review, which is why the contract forbids one"
+related: ["#636", "#58"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

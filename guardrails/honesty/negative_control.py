@@ -26,6 +26,23 @@ Controls are declared in a YAML manifest:
 Guard paths are resolved against a base directory (default: the caller's
 current directory).  Guards are executed with ``bash`` so the executable bit
 is never a hidden precondition.
+
+
+---knowledge---
+module_id: guardrails.honesty.negative_control
+system: guardrails
+app: honesty
+solution_class: enterprise
+patterns: [no-false-green, negative-control, self-proving-gate]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [NegativeControl, ControlOutcome, load_manifest, run_control, run_controls, all_passed, write_report, controls_as_manifest]
+invariants: "a guard that returns OK on a planted mutation fails its own negative control; a guard with only a happy path proves nothing"
+gotchas: "each run produces a blockproof carrying the actual exit code and tri-state verdict, not an assertion"
+related: ["#28"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

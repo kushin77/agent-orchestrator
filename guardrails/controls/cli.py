@@ -29,6 +29,23 @@ select the state and audit files (defaults live beside the registry).
 
 The CLI bootstraps ``guardrails/`` onto ``sys.path`` (mirroring
 ``policy/cli.py``), so it runs from the repository root or from anywhere.
+
+
+---knowledge---
+module_id: guardrails.controls.cli
+system: guardrails
+app: controls
+solution_class: pattern
+patterns: [subcommand-table, tri-state-exit, named-refusal]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_list, cmd_get, cmd_toggle, cmd_check_report, cmd_self_test, main]
+invariants: "a toggle writes exactly one append-only audit record and persists state; an unknown control is refused"
+gotchas: ""
+related: ["#343"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

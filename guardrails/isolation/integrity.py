@@ -31,6 +31,23 @@ Canonical dataset shape (JSON-serializable):
         ...
       }
     }
+
+
+---knowledge---
+module_id: guardrails.isolation.integrity
+system: guardrails
+app: isolation
+solution_class: enterprise
+patterns: [tenant-scoped, fail-closed, drift-detection]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [scan_dataset, ProbeOutcome, run_cadence_probes, load_dataset, store_from_dataset, dataset_tenants, clone_dataset]
+invariants: "findings are reported with evidence rather than prose, and the runtime probes attempt the cross-tenant read or write themselves"
+gotchas: ""
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

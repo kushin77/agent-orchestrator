@@ -23,6 +23,23 @@ Subcommands:
     honesty attest --guard-id G --rc N --evidence E [--controls c1,c2] [-o f]
         Record a guard verdict as an attestation JSON document (evidence, not
         vibes).
+
+
+---knowledge---
+module_id: guardrails.honesty.cli
+system: guardrails
+app: honesty
+solution_class: pattern
+patterns: [subcommand-table, tri-state-exit, no-false-green]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [build_parser, main]
+invariants: "an aggregate containing any NOT-OK fails, and any CANNOT-ASSESS keeps it from passing"
+gotchas: ""
+related: ["#28"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

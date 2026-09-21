@@ -23,6 +23,23 @@ Action vocabulary (never deletes, never guesses):
                               denormalized ``tenant_id`` / owner hint names.
 * ``quarantine_duplicates`` — keep one canonical copy, quarantine the rest
                               of a cross-tenant duplicate id.
+
+
+---knowledge---
+module_id: guardrails.isolation.repair
+system: guardrails
+app: isolation
+solution_class: enterprise
+patterns: [all-or-nothing, audited-override, detect-first]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [RepairAction, plan_repairs, repair_execute]
+invariants: "repair validates and applies every action on a private clone first; if anything fails the caller's dataset is untouched"
+gotchas: "the plan is anchored on mechanism, never on the message text of the findings"
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

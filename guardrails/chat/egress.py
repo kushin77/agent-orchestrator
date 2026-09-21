@@ -25,6 +25,23 @@ Controls (``guardrails/policy``, default OFF — see :mod:`guardrails.chat.polic
   (send redacted) to ``BLOCK`` (send nothing);
 * ``tool-use-guard`` ON adds a prompt-injection analysis of the tool-call
   arguments before dispatch; a ``blocked`` analysis aborts the turn.
+
+
+---knowledge---
+module_id: guardrails.chat.egress
+system: guardrails
+app: chat
+solution_class: enterprise
+patterns: [fail-closed, scrub-before-dispatch, single-choke-point]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [OutboundTurn, ComponentDecision, EgressOutcome, ChatEgressGuard]
+invariants: "a block-class scrub match aborts the call and leaves dispatch_text empty, so the payload is never assembled"
+gotchas: "the DLP scrub gate is consumed read-only through dlp.engine.ScrubEngine; this lane never re-implements a rule"
+related: ["#507", "#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

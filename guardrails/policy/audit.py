@@ -15,6 +15,23 @@ Two implementations:
   hash-chained, per-tenant tamper-evident ledger is owned by the
   observability lane, issue #31; this lane provides the structured record
   seam that ledger consumes.)
+
+
+---knowledge---
+module_id: guardrails.policy.audit
+system: guardrails
+app: policy
+solution_class: enterprise
+patterns: [append-only, evidence-not-vibes, deterministic-output]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AuditRecord, utc_now_iso, AuditLog, InMemoryAuditLog, JsonlAuditLog]
+invariants: "every BLOCK is audit-logged, and the JSONL sink has no update or delete API"
+gotchas: "each record is self-describing so a reader can render or verify it without the policy bundle present"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

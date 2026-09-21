@@ -8,6 +8,23 @@ references that resolve against the deployed controls registry).  An invalid
 policy fails the deploy with a nonzero exit — never at runtime.  The engine
 itself additionally fails closed at evaluation time (see :mod:`policy.engine`)
 as a second line of defense, but a malformed bundle should never get that far.
+
+
+---knowledge---
+module_id: guardrails.policy.startup
+system: guardrails
+app: policy
+solution_class: enterprise
+patterns: [two-gate, fail-closed, schema-validation]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [package_root, default_bundle_dir, default_controls_file, StartupReport, validate_paths, build_bundle, build_engine]
+invariants: "an invalid policy fails the deploy with a nonzero exit, and the engine then fails closed again at evaluation time as a second line of defense"
+gotchas: "a malformed bundle should never get that far, so a failure here is a deploy gate rather than a runtime error"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

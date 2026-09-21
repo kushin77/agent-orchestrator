@@ -18,6 +18,23 @@ resolve it.  The action vocabulary aligns with the policy gate engine's
 BLOCK / WARN / LOG decision levels (AO-GR-19), where SME_REVIEW is the
 human-in-the-loop WARN.  An unrecognized severity raises rather than
 defaulting silently (fail closed).
+
+
+---knowledge---
+module_id: guardrails.isolation.triage
+system: guardrails
+app: isolation
+solution_class: enterprise
+patterns: [closed-vocabulary, named-refusal, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [TriageAction, action_for_severity, triage_finding, partition, gate_blocks]
+invariants: "critical and high auto-BLOCK; there is no silent path and no decide-later"
+gotchas: ""
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

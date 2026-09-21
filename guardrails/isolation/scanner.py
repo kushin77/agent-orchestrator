@@ -49,6 +49,23 @@ tenant-dimensioned index every access must carry that dimension.
                     Enumerated in the report; never reads as a pass.
 
 Deterministic ordering: findings and verdicts sort by file, owner, line.
+
+
+---knowledge---
+module_id: guardrails.isolation.scanner
+system: guardrails
+app: isolation
+solution_class: enterprise
+patterns: [static-analysis, detect-first, read-only-consumption, tenant-scoped]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AccessSite, Index, ModuleScan, analyze_module, scan_file, scan_paths]
+invariants: "the scanner reads Python with the stdlib ast module and never mutates anything"
+gotchas: "it models the tenant-store surfaces of a module first, then checks every access path on those indexes"
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

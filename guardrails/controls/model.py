@@ -19,6 +19,23 @@ Two invariants are structural, not advisory:
 The current state lives in :class:`ControlSet` (one boolean per control).  Its
 :meth:`ControlSet.toggle` writes exactly one append-only audit record and
 refuses an unknown control id — an unknown control is never silently created.
+
+
+---knowledge---
+module_id: guardrails.controls.model
+system: guardrails
+app: controls
+solution_class: enterprise
+patterns: [closed-vocabulary, feature-flag-gated-off, immutable-models]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ControlError, UnknownControlError, is_status, status_name, PolicyControl, ControlState, ControlSet, assert_refuses_default_on]
+invariants: "a control refuses to be constructed with default_enabled, so shipping one ON is not a state the model accepts"
+gotchas: "the guardrail status codes are a closed vocabulary; an unknown code is refused rather than coerced"
+related: ["#343"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -49,6 +49,23 @@ Untrusted-content tagging
 Callers MUST delimit untrusted content before it reaches the model. Use
 :func:`wrap_untrusted`; the module also neutralizes an embedded closing
 delimiter so untrusted text cannot early-close the tag and escape its bounds.
+
+
+---knowledge---
+module_id: guardrails.dlp.injection
+system: guardrails
+app: dlp
+solution_class: enterprise
+patterns: [fail-closed, untrusted-input, closed-vocabulary]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Signal, SignalHit, InjectionReport, InjectionDetector, wrap_untrusted, neutralize_untrusted]
+invariants: "a payload classified blocked never reaches egress"
+gotchas: "external content is untrusted by construction: the prompt gate and the output filter are two defenses over one detector"
+related: ["#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

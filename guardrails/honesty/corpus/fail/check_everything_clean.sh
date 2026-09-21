@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+# ---knowledge---
+# module_id: guardrails.honesty.corpus.fail.check_everything_clean
+# system: guardrails
+# app: honesty
+# solution_class: template
+# patterns: [negative-control, offline-fixture]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L0
+# interfaces: [the never-fails-function formality shape]
+# invariants: ""
+# gotchas: "the found and not-found paths deliberately return the same code, so the function name is a lie"
+# related: ["#28"]
+# do_not_duplicate: null
+# ---knowledge---
 # corpus/fail -- real incident artifact (issue #28, acceptance criterion 5).
 # Source: leaderboard scripts/guard/check-formality.sh, function rule -- a
 # check-named function whose found and not-found paths return the same code,

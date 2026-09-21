@@ -47,6 +47,23 @@ convention), or as ``guardrails.chat`` with the repository root on ``sys.path``:
     )
     turn.allowed         # False once any guard refuses
     turn.dispatch_text   # the payload that may leave (redacted), or "" when refused
+
+
+---knowledge---
+module_id: guardrails.chat
+system: guardrails
+app: chat
+solution_class: class
+patterns: [package-contract, public-surface, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [GuardOutcome, AttachedVerdicts, GroundingEnvelope, RetrievalGuard, ChatEgressGuard, InboundValidator, ChatTurnGuard, ControlBinding, GUARDS]
+invariants: "a turn's verdict is the strongest answer any guard gave, and a guard that could not run is undecidable, never a pass"
+gotchas: "the guard submodules are imported relatively so the package resolves under either its bare or its qualified name"
+related: ["#507"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

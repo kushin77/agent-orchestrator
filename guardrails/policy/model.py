@@ -6,6 +6,23 @@ checks in the startup gate, and turned into these immutable objects by the
 loader.  Rules are the executable unit of the gate engine: an
 action/subject/tenant scope plus an optional condition that decides
 BLOCK/WARN/LOG for the action when the scope and condition hold.
+
+
+---knowledge---
+module_id: guardrails.policy.model
+system: guardrails
+app: policy
+solution_class: pattern
+patterns: [domain-model, immutable-models, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [PolicyRule, Policy]
+invariants: "policies become these immutable objects only after schema and semantic validation has passed"
+gotchas: "a rule is an action, subject and tenant scope plus an optional condition that decides BLOCK, WARN or LOG"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

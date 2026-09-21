@@ -30,6 +30,23 @@ Fail-closed semantics (pentest negatives, all tested):
 
 Concurrency/durability are deliberately out of scope: this is the offline
 semantic core.  A later phase may back the same contract with a real store.
+
+
+---knowledge---
+module_id: guardrails.isolation.store
+system: guardrails
+app: isolation
+solution_class: enterprise
+patterns: [tenant-scoped, fail-closed, no-cross-tenant-default]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Record, record_id, record_tenant, TenantScopedStore]
+invariants: "every accessor requires the caller to name a tenant, so a row under tenant B is structurally invisible to a caller scoped to tenant A"
+gotchas: "scope is enforced at the store layer, never as an app-layer filter on top of an unscoped store"
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

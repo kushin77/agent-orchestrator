@@ -11,6 +11,23 @@ for enterprise policy engines.
 Import as ``policy`` with ``guardrails/`` on ``sys.path`` (the tests arrange
 this in ``tests/conftest.py``), mirroring the sibling packages
 (``engine/core``, ``registry/service``).
+
+
+---knowledge---
+module_id: guardrails.policy
+system: guardrails
+app: policy
+solution_class: class
+patterns: [package-contract, public-surface, fail-closed, feature-flag-gated-off]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [PolicyEngine, PolicyBundle, Policy, PolicyRule, DecisionLevel, DecisionResult, ControlRegistry, AuditLog, OpaBackend, validate_paths, build_engine]
+invariants: "the gate answers BLOCK, WARN or LOG with structured evidence and fail-closed defaults"
+gotchas: "import as policy with guardrails/ on sys.path, mirroring the sibling packages"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

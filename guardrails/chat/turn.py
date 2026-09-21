@@ -33,6 +33,23 @@ Verdicts are correlated to a turn by the platform's existing rule (issue #345):
 :meth:`ChatTurnGuard.attach_verdicts` attaches a verdict only on an exact
 identifier match, and reports the rest as standalone rather than inventing an
 owner.
+
+
+---knowledge---
+module_id: guardrails.chat.turn
+system: guardrails
+app: chat
+solution_class: enterprise
+patterns: [fail-closed, request-pipeline, single-choke-point]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [TurnOutcome, ChatTurnGuard]
+invariants: "the three guards run in the order a turn actually happens and the strongest verdict decides"
+gotchas: ""
+related: ["#507"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

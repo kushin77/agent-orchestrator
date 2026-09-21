@@ -20,6 +20,23 @@ Verdicts use the guard-honesty tri-state vocabulary (issue #28, consumed from
 the sibling ``guardrails/honesty`` lane): OK / NOT-OK / CANNOT-ASSESS, where
 CANNOT-ASSESS never reads as a pass.  Everything is offline, deterministic
 and depends only on the Python standard library.
+
+
+---knowledge---
+module_id: guardrails.isolation
+system: guardrails
+app: isolation
+solution_class: class
+patterns: [package-contract, public-surface, detect-first]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [Finding, FindingCategory, IndexVerdict, Severity]
+invariants: "detect is always on and mutates nothing; repair is opt-in, transactional and audited"
+gotchas: ""
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

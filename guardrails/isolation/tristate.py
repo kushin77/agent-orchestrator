@@ -10,6 +10,23 @@ Import path note: ``guardrails/`` is a PEP-420 namespace package.  When the
 isolation CLI runs from the repo root or the lane directory the package is
 importable as ``honesty``; the conftest used by the pytest suite inserts
 ``guardrails/`` on ``sys.path`` the same way the sibling lanes do.
+
+
+---knowledge---
+module_id: guardrails.isolation.tristate
+system: guardrails
+app: isolation
+solution_class: class
+patterns: [consume-never-restate, tri-state-exit, package-contract]
+derives_from: guardrails/honesty/tristate.py
+owner_sme: security-sme
+tier: L0
+interfaces: [EXIT_OK, EXIT_NOT_OK, EXIT_CANNOT_ASSESS, TriState, parse_status, from_exit_code, to_exit_code, aggregate_statuses]
+invariants: "the tri-state model is consumed read-only from the sibling honesty lane, so the exit-code contract has one source of truth"
+gotchas: "guardrails/ is a PEP-420 namespace package, so the sibling lane is importable under its bare name"
+related: ["#30", "#28"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

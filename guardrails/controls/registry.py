@@ -16,6 +16,23 @@ server-side model (issue #343):
 
 State persistence lives here too: :func:`load_state` / :func:`save_state` are
 the file seam that lets a *second reader* observe a flip made elsewhere.
+
+
+---knowledge---
+module_id: guardrails.controls.registry
+system: guardrails
+app: controls
+solution_class: pattern
+patterns: [consume-never-restate, delegate-never-re-derive, schema-validated-loader]
+derives_from: portal/server/controls.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [repo_root, default_controls_path, load_control_policy_map, load_controls, cross_check_policy_map, load_state, save_state, build_control_set]
+invariants: "every guardrails control must be present in the server-side policy map or the cross-check fails"
+gotchas: "the loader never imports YAML itself, so this lane carries no third-party import"
+related: ["#343", "#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

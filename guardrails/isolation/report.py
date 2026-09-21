@@ -4,6 +4,23 @@ Deterministic text/JSON renderers so a cadence scan can be read by a human,
 filed as evidence, and consumed by the triage gate.  Findings always carry
 their evidence snippet; verdict tables always show the honest tri-state and
 enumerate CANNOT-ASSESS surfaces (never hidden, never a pass).
+
+
+---knowledge---
+module_id: guardrails.isolation.report
+system: guardrails
+app: isolation
+solution_class: pattern
+patterns: [deterministic-output, read-model, honest-absence]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [finding_to_dict, finding_from_dict, verdict_to_dict, summary_to_dict, render_text, render_json]
+invariants: "verdict tables always enumerate the CANNOT-ASSESS surfaces, never hiding them and never reporting them as a pass"
+gotchas: ""
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

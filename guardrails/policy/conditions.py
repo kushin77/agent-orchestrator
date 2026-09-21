@@ -43,6 +43,23 @@ reason attached to the evidence.  Absence of an attribute is therefore never
 a silent pass: a rule that needs a field fails closed when the platform did
 not supply it.  Policy authors who mean "the attribute may or may not be
 present" use ``exists``/``missing``.
+
+
+---knowledge---
+module_id: guardrails.policy.conditions
+system: guardrails
+app: policy
+solution_class: enterprise
+patterns: [pure-function-core, closed-vocabulary, schema-validation]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [resolve_path, evaluate_condition, validate_condition]
+invariants: "a condition is a dependency-free predicate tree that is validated before it is ever evaluated"
+gotchas: "path resolution walks the context mapping directly, so an unresolvable path is a validation error rather than a silent false"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

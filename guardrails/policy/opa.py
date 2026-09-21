@@ -18,6 +18,23 @@ The default local engine stays :class:`PolicyEngine` (see
 :mod:`policy.engine`); :class:`LocalBackend` adapts it to the same
 :class:`PolicyBackend` protocol so a caller can swap backends without changing
 its call site.
+
+
+---knowledge---
+module_id: guardrails.policy.opa
+system: guardrails
+app: policy
+solution_class: enterprise
+patterns: [feature-flag-gated-off, fail-closed, dependency-inversion]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [PolicyBackend, LocalBackend, Transport, UrllibTransport, OpaBackend]
+invariants: "any OPA failure, whether an unreachable server, a non-200 response, an unparseable body or an unknown decision token, fails closed to BLOCK"
+gotchas: "the transport is injectable so the adapter is exercised offline against a fake; the real OPA server is not bundled"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

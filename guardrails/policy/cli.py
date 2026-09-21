@@ -20,6 +20,23 @@ Subcommands (exit codes are honest and documented):
 
 Defaults point at the shipped examples, so ``python policy/cli.py validate``
 works from the repository root without arguments.
+
+
+---knowledge---
+module_id: guardrails.policy.cli
+system: guardrails
+app: policy
+solution_class: pattern
+patterns: [subcommand-table, tri-state-exit, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_validate, cmd_evaluate, cmd_controls, main]
+invariants: "an invalid policy fails the deploy with a nonzero exit and never fails at runtime"
+gotchas: ""
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

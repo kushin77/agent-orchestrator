@@ -12,6 +12,23 @@ Run from anywhere (bootstraps ``guardrails/`` onto ``sys.path``):
 
 Everything is offline; no network, no model call. The operator sets
 ``AO_DLP_HMAC_KEY`` for signing (no embedded key).
+
+
+---knowledge---
+module_id: guardrails.dlp.cli
+system: guardrails
+app: dlp
+solution_class: pattern
+patterns: [subcommand-table, offline-by-construction, tri-state-exit]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_catalog, cmd_scrub, cmd_inspect, cmd_guard, cmd_selftest, cmd_audit_verify, build_parser, main]
+invariants: "everything is offline: no network and no model call"
+gotchas: "the operator supplies AO_DLP_HMAC_KEY; there is no embedded key"
+related: ["#27"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

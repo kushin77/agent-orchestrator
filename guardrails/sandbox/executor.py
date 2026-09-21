@@ -17,6 +17,23 @@ The executor is the decision surface of the tool-execution sandbox. For an
 The executor never executes a tool itself and never runs a tool without an
 enabled runtime; every refusal is a hard error or a denied result - there is
 no code path that turns a denial into a silent success.
+
+
+---knowledge---
+module_id: guardrails.sandbox.executor
+system: guardrails
+app: sandbox
+solution_class: enterprise
+patterns: [fail-closed, single-choke-point, feature-flag-gated-off]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AuditSink, SandboxExecutor]
+invariants: "the executor refuses unless itself and its injected runtime are enabled, and an undeclared category resolves to restricted"
+gotchas: "each dispatch writes one execution record to the optional audit sink, so a sandbox wired outside the MCP gateway still leaves a trace"
+related: ["#58"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

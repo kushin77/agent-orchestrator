@@ -10,6 +10,23 @@ fix) so a triage gate can act on mechanism, not on prose.
 An *index verdict* is the honest tri-state (OK / NOT-OK / CANNOT-ASSESS)
 result of scanning one tenant-store surface (an entity index inside a class,
 or a module-level container).
+
+
+---knowledge---
+module_id: guardrails.isolation.model
+system: guardrails
+app: isolation
+solution_class: pattern
+patterns: [domain-model, closed-vocabulary, tri-state-exit]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Severity, FindingCategory, Finding, IndexVerdict, ScanReport]
+invariants: "every finding carries enough evidence to reproduce it: target, location, rule, severity and fix"
+gotchas: ""
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

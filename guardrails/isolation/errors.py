@@ -2,6 +2,23 @@
 
 All fail-closed by design: a caller that cannot determine safety must get an
 exception, never a silently permissive answer.
+
+
+---knowledge---
+module_id: guardrails.isolation.errors
+system: guardrails
+app: isolation
+solution_class: class
+patterns: [exception-taxonomy, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [IsolationError, IsolationScopeError, ScanError, RepairAbortError]
+invariants: "a caller that cannot determine safety gets an exception, never a silently permissive answer"
+gotchas: ""
+related: ["#30"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

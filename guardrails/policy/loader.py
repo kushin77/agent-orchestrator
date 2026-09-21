@@ -7,6 +7,23 @@ defragsuite bundle shape).  Every single-policy document is checked against
 ``schema/policy.schema.json`` plus semantic rules *as it is loaded* — so an
 invalid policy fails at startup/deploy, never at runtime (issue #26
 acceptance #1 and #5).
+
+
+---knowledge---
+module_id: guardrails.policy.loader
+system: guardrails
+app: policy
+solution_class: pattern
+patterns: [schema-validated-loader, fail-closed, declared-authority]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [discover_policy_files, read_documents, policy_from_mapping, load_policy_file]
+invariants: "every single-policy document is checked against the schema and its semantic rules as it is loaded, so an invalid policy fails at deploy time and never at runtime"
+gotchas: "a bundle file holds either one policy document or a policies container whose elements are single-policy documents"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

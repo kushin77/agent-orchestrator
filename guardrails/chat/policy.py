@@ -32,6 +32,23 @@ Fail-closed binding (never "the control was missing, so carry on"):
 Enabling a control goes through the same validation the portal's write path
 uses (:meth:`ControlRegistry.from_mapping`), so an enabled control still has to
 carry its ``on_since_rationale`` (AO-GR-6).
+
+
+---knowledge---
+module_id: guardrails.chat.policy
+system: guardrails
+app: chat
+solution_class: enterprise
+patterns: [feature-flag-gated-off, declared-authority, consume-never-restate]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ControlBindingError, ControlBindingSpec, bound_ids, default_controls_path, ControlBinding]
+invariants: "flipping a control this lane binds must genuinely change the turn's observed verdict"
+gotchas: "controls.yaml is consumed read-only through policy.controls.ControlRegistry, never re-parsed here"
+related: ["#507", "#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

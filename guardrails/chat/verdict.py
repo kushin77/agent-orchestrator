@@ -27,6 +27,23 @@ Verdict attachment follows the platform's existing correlation rule (the live
 telemetry feed, issue #345): a verdict rides a turn only on an **exact
 identifier match** and stands alone otherwise. :func:`attach` never guesses an
 owner — no prefix, suffix or case-insensitive correlation is invented.
+
+
+---knowledge---
+module_id: guardrails.chat.verdict
+system: guardrails
+app: chat
+solution_class: enterprise
+patterns: [closed-vocabulary, tri-state-exit, fail-closed, consume-never-restate]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [GuardOutcome, decided, undecidable, aggregate, all_ran, finding, AttachedVerdicts, identifier_of]
+invariants: "a guard that could not run is recorded with ran=False and reports undecidable; it never gets to report LOG"
+gotchas: "the BLOCK/WARN/LOG vocabulary is consumed from policy.decision, so there is no second enum to drift against"
+related: ["#507", "#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -12,6 +12,23 @@ out-of-range quota all produce errors, so the contract is enforced offline
 with no third-party dependency. It is a validator, not a formality: a document
 that validates against a schema that forbids something genuinely fails when it
 contains that thing.
+
+
+---knowledge---
+module_id: guardrails.sandbox.schema
+system: guardrails
+app: sandbox
+solution_class: enterprise
+patterns: [schema-validation, offline-by-construction, no-false-green]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [validate_document, is_valid, load_schema, validate_document_file]
+invariants: "a document containing something a schema forbids genuinely fails: the validator is not a formality"
+gotchas: "it implements only the draft-07 subset the lane's own schemas need, including local definitions references"
+related: ["#58"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

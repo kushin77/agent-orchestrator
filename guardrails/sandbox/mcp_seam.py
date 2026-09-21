@@ -14,6 +14,23 @@ audit sink adds an execution-level record.
 The gateway/mcp code is imported read-only (lazily, so importing this package
 never requires ``gateway/`` on ``sys.path``) and is never modified. The full
 seam is proven end-to-end by ``tests/test_mcp_integration.py``.
+
+
+---knowledge---
+module_id: guardrails.sandbox.mcp_seam
+system: guardrails
+app: sandbox
+solution_class: enterprise
+patterns: [additive-only, dependency-inversion, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [tool_call_permission, sandboxed_tool, category_of]
+invariants: "a denial is converted into the gateway's isError result and an audit record, so a denial never becomes a silent success"
+gotchas: "the gateway/mcp code is imported read-only and lazily, so importing this package does not require the gateway"
+related: ["#20", "#58"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

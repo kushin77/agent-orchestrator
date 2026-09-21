@@ -23,6 +23,23 @@ exit code    meaning
 
 A JSON error document on stderr accompanies exit code 2, so a caller never has
 to guess whether a refusal was a decision or a failure.
+
+
+---knowledge---
+module_id: guardrails.chat.cli
+system: guardrails
+app: chat
+solution_class: pattern
+patterns: [subcommand-table, tri-state-exit, deterministic-output]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_controls, cmd_retrieval, cmd_guard_turn, cmd_inbound, build_parser, main]
+invariants: "every command prints one JSON document and maps its outcome onto the guard-honesty exit-code contract"
+gotchas: "run from guardrails/ so the package resolves the way its siblings do"
+related: ["#507", "#28"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
