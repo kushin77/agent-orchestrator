@@ -28,16 +28,61 @@ These tests pin both halves of the fix:
    a red. The two anti-over-reach arms below keep that from becoming a blanket
    "any failure is CANNOT-ASSESS": an empty log with a non-zero exit stays a
    red, and so does real gate output carrying a shell error alongside it.
+
+3. the venue must carry the helper's WHOLE load-time layer, not just its entry
+   point. `scripts/pr-queue.sh` `source`s `scripts/lib/common.sh` for
+   `find_repo_root` (since #1753), so a venue holding only the entry point fails
+   that `source`, leaves the root empty and exits 2 on the bare `cd` — a
+   CANNOT-ASSESS that is an artifact of the HARNESS, which every arm below would
+   otherwise read as a verdict on the tree. Same shape, and the same fix, as
+   `governance/futureproof/tests/test_futureproof.py`'s `DISCOVERY_LAYER`
+   (#1840, PR #1844) and `check-code-headers.sh`'s scratch tree (#1777).
 """
 
 from __future__ import annotations
 
 import os
+import posixpath
+import re
+import shutil
 import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "pr-queue.sh"
+SCRIPT_REL = SCRIPT.relative_to(REPO).as_posix()
+
+# The SET of files `scripts/pr-queue.sh` resolves at LOAD time: its entry point
+# plus everything it `source`s. The fixture below must carry the whole set —
+# copying only the entry point makes the `source` fail in the venue, so the
+# helper cannot resolve a repo root and every arm degrades to a CANNOT-ASSESS
+# for a reason that has nothing to do with the tree under test. The control
+# `test_the_venue_carries_the_helpers_whole_load_time_layer` derives this set
+# from the script itself, so a new load-time dependency fails BY NAME rather
+# than silently hollowing out every arm here.
+PR_QUEUE_LAYER = (SCRIPT_REL, "scripts/lib/common.sh")
+
+# The fleet's load-time source idiom, as used by scripts/*.sh since #1753:
+#   source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+_SOURCE_RE = re.compile(
+    r'^source "\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)/(?P<rel>[^"]+)"$',
+    re.MULTILINE,
+)
+
+
+def source_paths(script_text: str, script_rel: str) -> tuple[str, ...]:
+    """The files `script_text` `source`s at load time, repo-root-relative.
+
+    The idiom resolves the captured path against the SCRIPT's own directory, so
+    `scripts/pr-queue.sh` sourcing `lib/common.sh` resolves
+    `scripts/lib/common.sh`.
+    """
+    base = posixpath.dirname(script_rel)
+    return tuple(
+        posixpath.normpath(posixpath.join(base, m.group("rel")))
+        for m in _SOURCE_RE.finditer(script_text)
+    )
+
 
 # A stand-in for scripts/verify.sh. Committed at mode 100644 — the whole point.
 # It records that it ran, so a PASS can never be satisfied vacuously by a gate
@@ -60,7 +105,10 @@ def make_repo(tmp_path: Path) -> Path:
 
     `scripts/pr-queue.sh` is copied in WITHOUT a sibling `scripts/gate-status.sh`,
     so merged-tree evidence source (a) is skipped by construction (no `gh` call,
-    no network) and source (b) — the local merge-tree verify — is what runs.
+    no network) and source (b) — the local merge-tree verify — is what runs. It
+    is copied WITH the rest of its load-time layer (`PR_QUEUE_LAYER`): without
+    `scripts/lib/common.sh` the helper's own `source` fails and nothing here
+    would ever reach the code under test.
     """
     origin = tmp_path / "origin.git"
     git(tmp_path, "init", "--bare", "-q", str(origin))
@@ -73,9 +121,11 @@ def make_repo(tmp_path: Path) -> Path:
     gate = scripts / "verify.sh"
     gate.write_text(STAND_IN_GATE, encoding="utf-8")
     os.chmod(gate, 0o644)
-    queue = scripts / "pr-queue.sh"
-    queue.write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
-    os.chmod(queue, 0o755)
+    for rel in PR_QUEUE_LAYER:
+        target = repo / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(REPO / rel, target)
+    os.chmod(repo / SCRIPT_REL, 0o755)
     (repo / "README.md").write_text("seed\n", encoding="utf-8")
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "seed")
@@ -133,6 +183,30 @@ def merged_tree(
 def emits(lines: list[str], rc: int) -> str:
     """An AO_QUEUE_VERIFY_CMD that writes `lines` to stderr and exits `rc`."""
     return "; ".join(f"echo '{line}' >&2" for line in lines) + f"; exit {rc}"
+
+
+# The fixture's own contract, derived from the helper rather than restated: the
+# venue must carry every file `pr-queue.sh` resolves at load time. A future
+# #1753-style migration that adds another `source` would otherwise turn every
+# arm in this file into a CANNOT-ASSESS that reads like a verdict on the tree.
+def test_the_venue_carries_the_helpers_whole_load_time_layer(tmp_path: Path) -> None:
+    repo = make_repo(tmp_path)
+    needed = {
+        SCRIPT_REL,
+        *source_paths(SCRIPT.read_text(encoding="utf-8"), SCRIPT_REL),
+    }
+
+    missing = sorted(rel for rel in needed if not (repo / rel).is_file())
+    assert not missing, (
+        "the venue is missing pr-queue.sh's load-time "
+        f"dependencies: {missing} — the helper would exit 2 before reaching the "
+        "code under test"
+    )
+    assert needed == set(PR_QUEUE_LAYER), (
+        "PR_QUEUE_LAYER has drifted from what pr-queue.sh actually sources: "
+        f"the script needs {sorted(needed)}, the fixture copies "
+        f"{sorted(PR_QUEUE_LAYER)}"
+    )
 
 
 # The primitive, measured rather than assumed: the two invocations differ ONLY
