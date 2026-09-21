@@ -81,6 +81,21 @@
 #   1 NOT-OK         — a case misclassified, a bound not enforced, a mutant survived
 #   2 CANNOT-ASSESS  — python3/git missing, or the tree cannot be imported
 #
+# ---knowledge---
+# module_id: scripts.check-watchdog-bounded
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, offline-hermetic]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#366", "#739", "#773", "#793"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

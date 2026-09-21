@@ -26,6 +26,22 @@
 #   require_env PORTAL_AUTH_GATE_JWKS "auth-env-missing:PORTAL_AUTH_GATE_JWKS"
 
 # require_tool <name> <finding> — the binary must resolve on PATH.
+#
+# ---knowledge---
+# module_id: scripts.lib.preconditions
+# system: scripts
+# app: lib
+# solution_class: class
+# patterns: [tri-state-exit, provoked-negative-control, offline-hermetic]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [require_tool, require_env, require_gh_auth]
+# invariants: ""
+# gotchas: ""
+# related: ["#1199"]
+# do_not_duplicate: null
+# ---knowledge---
 require_tool() {
   local tool="$1" finding="$2"
   command -v "$tool" >/dev/null 2>&1 && return 0

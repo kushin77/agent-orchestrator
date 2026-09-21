@@ -16,6 +16,22 @@
 #      module makes `(?i)` a MODE. Under `grep -E` it is not a mode and not an
 #      error either: grep warns `? at start of expression`, compiles anyway,
 #      and then requires a LITERAL `?i` in the text. So the exemption matched
+#
+# ---knowledge---
+# module_id: scripts.check-secrets
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, named-refusal]
+# derives_from: null
+# owner_sme: security-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#938"]
+# do_not_duplicate: null
+# ---knowledge---
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 #      nothing a placeholder ever contains, and every generic assignment with
 #      an >=8-char value was refused even when the value said `placeholder`.

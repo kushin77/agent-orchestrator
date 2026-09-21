@@ -40,6 +40,22 @@
 #   AO_GATE_LOCK_TTL       default 900 seconds
 #
 # Usage: bash scripts/gate-lock.sh acquire|release|status|doctor|prune [options]
+#
+# ---knowledge---
+# module_id: scripts.gate-lock
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, dry-run-default, lane-isolation]
+# derives_from: fleet/gatelock.py
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [exec python3 fleet/gatelock.py]
+# invariants: ""
+# gotchas: ""
+# related: ["#724", "#948", "#1170"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 # A gate must not leave bytecode caches in the tree it is judging.

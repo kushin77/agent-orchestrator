@@ -41,6 +41,22 @@
 # Usage:
 #   bash scripts/check-context-pack-consumption.sh              # validate this repo
 #   bash scripts/check-context-pack-consumption.sh --self-test  # internal controls
+#
+# ---knowledge---
+# module_id: scripts.check-context-pack-consumption
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, named-refusal, schema-validation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#472", "#477"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 if ! command -v python3 >/dev/null 2>&1; then

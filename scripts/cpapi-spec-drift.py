@@ -26,6 +26,22 @@ router paths before comparing. That mapping is a real assumption, not a detail:
 it is named here and reported by `--explain`, because a future reader who does not
 know it will mistake the prefix for drift and "fix" the comparator into agreeing
 with a broken spec.
+
+---knowledge---
+module_id: scripts.cpapi-spec-drift
+system: scripts
+app: scripts
+solution_class: pattern
+patterns: [tri-state-exit]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [normalise, router_routes, spec_routes, compare, explain, main]
+invariants: ""
+gotchas: ""
+related: ["#816"]
+do_not_duplicate: null
+---knowledge---
 """
 from __future__ import annotations
 

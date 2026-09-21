@@ -54,6 +54,22 @@
 # every class backed by a control — an unbacked class is a formality, not a
 # gate. It also asserts the controls' own baseline is rc 0, so a harness that
 # simply always fails cannot pass the self-test.
+#
+# ---knowledge---
+# module_id: scripts.track-diagrams-capabilities
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, declared-authority, named-refusal, deterministic, schema-validation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [exec python3 -]
+# invariants: ""
+# gotchas: ""
+# related: ["#462", "#468", "#469"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

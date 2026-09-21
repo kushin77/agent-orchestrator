@@ -71,6 +71,22 @@
 #                   provable offline without root (the live path runs on every
 #                   gate invocation and uses the same parser)
 #   SCRATCH_GUARD   path to the machine guard       (default ~/laptop-manage/bin)
+#
+# ---knowledge---
+# module_id: scripts.check-scratch-safety
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, named-refusal, lane-isolation, deterministic]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#158", "#159", "#488"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

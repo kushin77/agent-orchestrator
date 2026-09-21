@@ -65,6 +65,22 @@
 #   in. It exists so the coverage half can be provoked against a COPY; the
 #   override is announced on stderr and echoed in the verdict, so a leaked value
 #   cannot silently redirect the assessment.
+#
+# ---knowledge---
+# module_id: scripts.check-gitignore
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, lane-isolation, schema-validation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#625", "#698", "#1139", "#1143"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 # --- the declaration -------------------------------------------------------

@@ -46,6 +46,22 @@ CLI
   judge.py --issue <n>            assess a real lane and print the verdict grid
   judge.py --subject-file <path>  judge a recorded subject offline (no network)
   judge.py --collect-only         write the collected subject as JSON and stop
+
+---knowledge---
+module_id: scripts.fleet-parity.judge
+system: fleet
+app: fleet-parity
+solution_class: pattern
+patterns: [tri-state-exit, provoked-negative-control, offline-hermetic, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [Unmeasured, Verdict, Report, check_name, judge_verify_output, judge_attestation_sha]
+invariants: ""
+gotchas: ""
+related: ["#796", "#799"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

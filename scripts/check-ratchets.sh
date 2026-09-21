@@ -99,6 +99,22 @@
 #   bash scripts/check-ratchets.sh --now 2026-10-02
 #   bash scripts/check-ratchets.sh --root <dir> --clock 2026-10-02
 #   bash scripts/check-ratchets.sh --self-test
+#
+# ---knowledge---
+# module_id: scripts.check-ratchets
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, offline-hermetic, lane-isolation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#1268", "#1335", "#1385", "#1414"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 #: The two boundaries of the rule, declared once and printed in every summary,

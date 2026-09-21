@@ -26,6 +26,22 @@
 # Usage:
 #   bash scripts/check-worktree-cap.sh              # check the real tree
 #   bash scripts/check-worktree-cap.sh --self-test   # provoke both refusals on scratch repos
+#
+# ---knowledge---
+# module_id: scripts.check-worktree-cap
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, named-refusal, lane-isolation, deterministic]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#830", "#1265", "#1620", "#1673"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

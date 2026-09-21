@@ -58,6 +58,22 @@
 # one worktree and requires it to be refused by name.
 #
 # Usage: scripts/verify.sh [verify|gate]
+#
+# ---knowledge---
+# module_id: scripts.verify
+# system: scripts
+# app: scripts
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, declared-authority, named-refusal, feature-flag-gated-off, bounded-work, lane-isolation, deterministic, schema-validation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#312", "#331", "#525", "#724"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

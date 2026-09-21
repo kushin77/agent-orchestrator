@@ -35,6 +35,22 @@
 #   bash scripts/check-paperclip-openapi.sh
 #   bash scripts/check-paperclip-openapi.sh --no-controls
 #   bash scripts/check-paperclip-openapi.sh --root DIR
+#
+# ---knowledge---
+# module_id: scripts.check-paperclip-openapi
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, named-refusal, deterministic, schema-validation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#413"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

@@ -110,6 +110,22 @@
 #                                 note; it is not read.
 #
 # --- end of usage ---
+#
+# ---knowledge---
+# module_id: scripts.check-gate-status
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, declared-authority, dry-run-default, feature-flag-gated-off, deterministic]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#739", "#803", "#1357", "#1394"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 # --- the probe seam, parsed BEFORE anything else -------------------------

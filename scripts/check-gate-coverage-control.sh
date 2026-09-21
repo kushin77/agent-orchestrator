@@ -31,6 +31,22 @@
 #   --prove  re-derive the refusal outside the gate and print the detector's own
 #            output verbatim (the one-command demonstration a human would
 #            otherwise have to reconstruct from scratch).
+#
+# ---knowledge---
+# module_id: scripts.check-gate-coverage-control
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, named-refusal]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#524", "#526", "#603", "#698"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

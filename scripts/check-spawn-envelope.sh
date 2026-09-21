@@ -60,6 +60,22 @@
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage: bash scripts/check-spawn-envelope.sh
+#
+# ---knowledge---
+# module_id: scripts.check-spawn-envelope
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, named-refusal, lane-isolation, schema-validation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#793", "#1371", "#1372", "#1377"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 # The gate of record must not leave bytecode caches in the tree it is judging.

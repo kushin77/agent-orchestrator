@@ -142,6 +142,22 @@
 # Offline, deterministic, no network, no containers.
 #
 # Usage: bash scripts/check-gate-coverage.sh
+#
+# ---knowledge---
+# module_id: scripts.check-gate-coverage
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, offline-hermetic, declared-authority, deterministic]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#29", "#499", "#524", "#526"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

@@ -52,6 +52,22 @@
 # Usage:
 #   scripts/check-codeidx-surface.sh              # validate this repo
 #   scripts/check-codeidx-surface.sh --self-test  # internal controls
+#
+# ---knowledge---
+# module_id: scripts.check-codeidx-surface
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, declared-authority, named-refusal, lane-isolation, deterministic]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#464", "#472", "#475", "#1526"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 if ! command -v python3 >/dev/null 2>&1; then

@@ -183,6 +183,22 @@
 # venue cannot post its own verdict, precedence belongs to `post --attestation`,
 # which owns that decision; republishing the red from here would hand the
 # required context back to a producer that provably cannot post it.
+#
+# ---knowledge---
+# module_id: scripts.gate-status
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, dry-run-default]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [die, read_attestation, attestation_age, fetch_venue_runs, venue_agreement, venue_publish_capability]
+# invariants: ""
+# gotchas: ""
+# related: ["#739", "#1350", "#1398", "#1400"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 # This script's own ABSOLUTE path, captured before the `cd` below: the self-test

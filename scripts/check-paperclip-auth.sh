@@ -29,6 +29,22 @@
 #   bash scripts/check-paperclip-auth.sh
 #   bash scripts/check-paperclip-auth.sh --no-controls
 #   bash scripts/check-paperclip-auth.sh --root DIR
+#
+# ---knowledge---
+# module_id: scripts.check-paperclip-auth
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, named-refusal]
+# derives_from: null
+# owner_sme: security-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#412", "#420"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

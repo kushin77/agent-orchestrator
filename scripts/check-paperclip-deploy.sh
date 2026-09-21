@@ -30,6 +30,22 @@
 # CANNOT-ASSESS must never be reported as a pass.
 #
 # Usage: bash scripts/check-paperclip-deploy.sh
+#
+# ---knowledge---
+# module_id: scripts.check-paperclip-deploy
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, named-refusal, feature-flag-gated-off]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#411"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

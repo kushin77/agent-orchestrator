@@ -29,6 +29,22 @@
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage: bash scripts/check-gate-lock-stale.sh
+#
+# ---knowledge---
+# module_id: scripts.check-gate-lock-stale
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, lane-isolation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#619", "#948"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 # The gate of record must not leave bytecode caches in the tree it is judging.

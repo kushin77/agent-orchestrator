@@ -49,6 +49,22 @@
 # Usage:
 #   bash scripts/check-squash-message.sh --pr <number>
 #   bash scripts/check-squash-message.sh --self-test
+#
+# ---knowledge---
+# module_id: scripts.check-squash-message
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, named-refusal]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#835", "#836", "#878", "#882"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

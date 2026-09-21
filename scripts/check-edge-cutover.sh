@@ -88,6 +88,22 @@
 #   bash scripts/check-edge-cutover.sh --self-test  # the provocation alone
 #   bash scripts/check-edge-cutover.sh --live       # measure the LIVE host
 #   bash scripts/check-edge-cutover.sh --root DIR   # analyse another tree
+#
+# ---knowledge---
+# module_id: scripts.check-edge-cutover
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, declared-authority, named-refusal, deterministic]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#607", "#731", "#936"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

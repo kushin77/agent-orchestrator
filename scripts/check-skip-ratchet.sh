@@ -86,6 +86,22 @@
 #   bash scripts/check-skip-ratchet.sh --self-test    # the provocations alone
 #   bash scripts/check-skip-ratchet.sh --root DIR     # assert ANOTHER tree
 # Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+#
+# ---knowledge---
+# module_id: scripts.check-skip-ratchet
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, named-refusal, lane-isolation, schema-validation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#1164", "#1176", "#1189", "#1199"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

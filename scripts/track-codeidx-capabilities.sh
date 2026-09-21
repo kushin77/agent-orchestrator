@@ -60,6 +60,22 @@
 #   bash scripts/track-codeidx-capabilities.sh --emit-doc-section  # doc section
 #   bash scripts/track-codeidx-capabilities.sh --snapshot FILE     # other recording
 #   bash scripts/track-codeidx-capabilities.sh --live              # opt-in network
+#
+# ---knowledge---
+# module_id: scripts.track-codeidx-capabilities
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, provoked-negative-control, no-false-green, offline-hermetic, declared-authority, named-refusal, deterministic]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [usage, say_cannot_assess, cleanup, reconcile, say_ok, say_flag]
+# invariants: ""
+# gotchas: ""
+# related: ["#473", "#479"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

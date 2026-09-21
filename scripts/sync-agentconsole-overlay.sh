@@ -43,6 +43,22 @@
 #   bash scripts/sync-agentconsole-overlay.sh --check [--manifest FILE]
 #   bash scripts/sync-agentconsole-overlay.sh --sync [--dry-run]
 #   bash scripts/sync-agentconsole-overlay.sh --self-test
+#
+# ---knowledge---
+# module_id: scripts.sync-agentconsole-overlay
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic, dry-run-default, schema-validation]
+# derives_from: null
+# owner_sme: sync-sme
+# tier: L0
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: ["#1510", "#1513"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

@@ -18,6 +18,22 @@
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage: bash scripts/land-lane.sh --issue <n> [cli flags…]
+#
+# ---knowledge---
+# module_id: scripts.land-lane
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, lane-isolation]
+# derives_from: governance/landing/cli.py
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [exec python3 governance/landing/cli.py]
+# invariants: ""
+# gotchas: ""
+# related: ["#764"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

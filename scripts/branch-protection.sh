@@ -19,6 +19,22 @@
 # declared, never clicked) and is not reproducible. This script is the repair:
 # the declared policy in governance/platform/branch-protection.yaml is the source
 # of truth, `apply` makes the live state match it, and `verify` proves it did.
+#
+# ---knowledge---
+# module_id: scripts.branch-protection
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, declared-authority]
+# derives_from: null
+# owner_sme: security-sme
+# tier: L1
+# interfaces: [die, compare, live_state]
+# invariants: ""
+# gotchas: ""
+# related: ["#739", "#803"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

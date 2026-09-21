@@ -110,6 +110,22 @@ Usage:
 Exit codes: 0 OK (every skip named, no stale entry, no lapsed lease) / 1 RATCHET
 VIOLATION (refused by name) / 2 CANNOT-ASSESS (the skip set could not be
 evaluated).
+
+---knowledge---
+module_id: scripts.lib.skip-ratchet
+system: scripts
+app: lib
+solution_class: class
+patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, offline-hermetic, named-refusal, lane-isolation, deterministic, schema-validation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CannotAssess, parse_utc, format_utc, tracked_issue, tracking_age_hours, lease_refusal]
+invariants: ""
+gotchas: ""
+related: ["#526", "#1176", "#1189", "#1193"]
+do_not_duplicate: null
+---knowledge---
 """
 from __future__ import annotations
 

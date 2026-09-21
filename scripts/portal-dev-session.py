@@ -59,6 +59,22 @@ Usage:
   python3 scripts/portal-dev-session.py                       # the doc's step 2
   python3 scripts/portal-dev-session.py --json                # for a gate
   python3 scripts/portal-dev-session.py --runtime-dir DIR --port 9999 --email a@b.example.com
+
+---knowledge---
+module_id: scripts.portal-dev-session
+system: scripts
+app: scripts
+solution_class: pattern
+patterns: [tri-state-exit, provoked-negative-control, offline-hermetic, named-refusal, feature-flag-gated-off, lane-isolation]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [DevSessionError, reserved_identity, default_runtime_dir, resolve_runtime_dir, refuse_deployed_env, write_promoted_registry]
+invariants: ""
+gotchas: ""
+related: ["#732", "#852"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

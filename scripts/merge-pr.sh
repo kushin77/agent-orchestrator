@@ -52,6 +52,22 @@
 # Usage:
 #   bash scripts/merge-pr.sh --pr <number>                  # dry run
 #   AO_MERGE_APPLY=1 bash scripts/merge-pr.sh --pr <number>  # execute
+#
+# ---knowledge---
+# module_id: scripts.merge-pr
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, offline-hermetic, named-refusal]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [usage, publish_landed_status, delete_head_branch]
+# invariants: ""
+# gotchas: ""
+# related: ["#960", "#976", "#991", "#996"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

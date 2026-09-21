@@ -16,6 +16,22 @@
 # A rule in a doc is advisory (the spine says so explicitly). This check is the
 # mechanical half: it asserts that each rule EXISTS in both the spine and the
 # canonical doctrine, that each names the failure it prevents, and that the
+#
+# ---knowledge---
+# module_id: scripts.check-fleet-durability-rules
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, bounded-work, lane-isolation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # codebase still contains the CONTROL the rule depends on. If a rule is deleted,
 # renamed, or its control is ripped out, this exits 1 by name.

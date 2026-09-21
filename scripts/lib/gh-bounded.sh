@@ -32,6 +32,22 @@
 # SHELL-PATTERNS: enforced by `scripts/check-gh-bounded.sh` — see the
 # "Enforced elsewhere" row in docs/SHELL-PATTERNS.md. A raw `for … do gh …; sleep …;
 # done` around gh is refused there.
+#
+# ---knowledge---
+# module_id: scripts.lib.gh-bounded
+# system: scripts
+# app: lib
+# solution_class: class
+# patterns: [bounded-work]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [gh_bounded, _gh_bounded_delay]
+# invariants: ""
+# gotchas: ""
+# related: ["#1550"]
+# do_not_duplicate: null
+# ---knowledge---
 BACKOFF_CAP_SECONDS=300
 
 gh_bounded() {

@@ -19,6 +19,22 @@
 # docs/OPERATOR-ACCESS.md §4.
 #
 # Usage: bash scripts/console.sh [--host H] [--port P]
+#
+# ---knowledge---
+# module_id: scripts.console
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [exec python3 -m portal.server.main]
+# invariants: ""
+# gotchas: ""
+# related: ["#763"]
+# do_not_duplicate: null
+# ---knowledge---
 set -uo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

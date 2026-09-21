@@ -24,6 +24,22 @@ capability is either fully built and ON, or not yet merged. There is no more
       drift with nobody responsible.
 
 Every branch above can genuinely fail; nothing here is a formality.
+
+---knowledge---
+module_id: scripts.check-feature-flags
+system: governance
+app: gates
+solution_class: enterprise
+patterns: [provoked-negative-control, self-proving-gate, named-refusal, feature-flag-gated-off]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [exit 0 OK, exit 1 NOT-OK]
+invariants: ""
+gotchas: ""
+related: ["#6", "#1618"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

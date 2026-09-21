@@ -82,6 +82,22 @@
 # is run directly, per this issue's own Verify section.
 #
 # Usage: bash scripts/check-git-config.sh [--bootstrap]
+#
+# ---knowledge---
+# module_id: scripts.check-git-config
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, lane-isolation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#5", "#608", "#616", "#624"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 bootstrap=0

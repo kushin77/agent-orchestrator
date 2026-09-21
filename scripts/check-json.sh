@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 # json-lint gate for `make verify` (GR-12): python3 -m json.tool on every
 # *.json outside vendor/ and .git. Exits nonzero on any invalid file.
+#
+# ---knowledge---
+# module_id: scripts.check-json
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [no-false-green]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

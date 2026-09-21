@@ -57,6 +57,22 @@
 #   bash scripts/check-knowledge-index.sh                the gate: self-test, then this tree
 #   bash scripts/check-knowledge-index.sh --self-test    the provocation alone
 #   bash scripts/check-knowledge-index.sh --root DIR     assess exactly DIR, no self-test
+#
+# ---knowledge---
+# module_id: scripts.check-knowledge-index
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, declared-authority, named-refusal]
+# derives_from: null
+# owner_sme: docs-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#139", "#1193", "#1198"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

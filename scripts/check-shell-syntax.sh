@@ -2,6 +2,22 @@
 # shell-syntax gate for `make verify` (GR-12): bash -n on every *.sh outside
 # vendor/ and .git. Exits nonzero on any syntax failure — the gate never
 # passes vacuously.
+#
+# ---knowledge---
+# module_id: scripts.check-shell-syntax
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [no-false-green, lane-isolation]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK]
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

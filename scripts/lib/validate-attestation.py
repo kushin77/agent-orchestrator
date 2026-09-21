@@ -25,6 +25,22 @@ Usage:
   python3 scripts/lib/validate-attestation.py <attestation.json> <schema.json>
 
 Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+
+---knowledge---
+module_id: scripts.lib.validate-attestation
+system: scripts
+app: lib
+solution_class: class
+patterns: [tri-state-exit, provoked-negative-control, no-false-green, schema-validation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [main]
+invariants: ""
+gotchas: ""
+related: ["#882", "#1199"]
+do_not_duplicate: null
+---knowledge---
 """
 from __future__ import annotations
 

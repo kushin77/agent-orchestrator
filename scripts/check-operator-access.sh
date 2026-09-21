@@ -33,6 +33,22 @@
 #
 # VACUITY: every surface group is stripped from a copy of the access doc, one at
 # a time, and each strip must be DETECTED by that group's own probe — so a group
+#
+# ---knowledge---
+# module_id: scripts.check-operator-access
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, no-false-green, dry-run-default, feature-flag-gated-off]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#763"]
+# do_not_duplicate: null
+# ---knowledge---
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # whose probes are wrong (a probe that another section also contains) fails this
 # gate instead of passing silently.

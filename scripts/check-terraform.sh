@@ -11,6 +11,22 @@
 # `terraform init` is always offline (-plugin-dir pointing at the local cache)
 # and uses a throwaway TF_DATA_DIR so nothing is written into the repo tree.
 # Usage: scripts/check-terraform.sh [all|fmt|validate]
+#
+# ---knowledge---
+# module_id: scripts.check-terraform
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [offline-hermetic]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK]
+# invariants: ""
+# gotchas: ""
+# related: ["#6"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

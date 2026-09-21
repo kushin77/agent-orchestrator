@@ -53,6 +53,22 @@
 #                                                  table (issue #1672); never
 #                                                  hand-edit docs/README.md's
 #                                                  index — run `make docs-index`
+#
+# ---knowledge---
+# module_id: scripts.check-docs
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, offline-hermetic]
+# derives_from: null
+# owner_sme: docs-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: ""
+# gotchas: ""
+# related: ["#616", "#629", "#804", "#1672"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"

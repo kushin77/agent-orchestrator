@@ -38,6 +38,22 @@
 #   .verify/gate-attestation.json   this gate's attestation
 #
 # Usage: bash scripts/gate.sh [gate]
+#
+# ---knowledge---
+# module_id: scripts.gate
+# system: scripts
+# app: scripts
+# solution_class: pattern
+# patterns: [tri-state-exit, provoked-negative-control, self-proving-gate, no-false-green, schema-validation]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L0
+# interfaces: [honesty_status, honesty_aggregate, line_of]
+# invariants: ""
+# gotchas: ""
+# related: ["#28", "#29"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
