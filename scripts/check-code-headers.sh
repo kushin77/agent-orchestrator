@@ -67,7 +67,7 @@
 # Usage:
 #   bash scripts/check-code-headers.sh                     the gate: provocation + the tree
 #   bash scripts/check-code-headers.sh --self-test         the provocation alone
-#   bash scripts/check-code-headers.sh --files F...        scan exactly these files
+#   bash scripts/check-code-headers.sh --files F...        the scope predicate, then exactly these files
 #   bash scripts/check-code-headers.sh --list              the schema this document declares
 #   bash scripts/check-code-headers.sh --schema            the same, machine-readable
 #   bash scripts/check-code-headers.sh --fingerprint F...  the baseline key for these files
@@ -562,6 +562,21 @@ def in_scope(rel):
     return not any(part in SKIP_DIRS for part in parts[:-1])
 
 
+def why_out_of_scope(rel):
+    """Name the reason `in_scope` said no, so a skipped path reads as a verdict."""
+    if not rel.endswith(tuple(EXT_KIND)):
+        return ("%s is not one of the extensions the standard covers (%s)"
+                % (os.path.splitext(rel)[1] or "no extension",
+                   ", ".join(sorted(EXT_KIND))))
+    parts = rel.split("/")
+    if parts[0] == "vendor":
+        return "under vendor/, a pinned submodule"
+    for part in parts[:-1]:
+        if part in SKIP_DIRS:
+            return "under %s/, which the tree scan skips" % part
+    return "not in scope"
+
+
 def scope_files(root):
     try:
         out = subprocess.run(["git", "-C", root, "ls-files", "--cached", "--others",
@@ -586,7 +601,21 @@ def run_tree(root, schema, authorities, tier, files=None):
     refusals, drifted = [], []
     for code, message in faults:
         refusals.append((BASELINE_REL, code, message))
-    targets = files if files is not None else scope_files(root)
+    if files is None:
+        targets, skipped = scope_files(root), []
+    else:
+        # An explicit list goes through the SAME predicate the tree scan uses (#1811).
+        # Without this the two entry points disagreed, and a lane could not trust
+        # `--files` as a scoped equivalent of the tree scan:
+        #   * a non-source extension reached classify(), whose EXT_KIND lookup raised
+        #     KeyError -- a traceback rather than a verdict; and
+        #   * a file under a SKIP_DIR (tests/, fixtures/, ...) was refused as
+        #     `unrecorded` although `scope_files` excludes it, so the naive list for a
+        #     directory could never exit 0 and the failure it showed was noise.
+        # Every lane in the header backfill hit one facet or the other.
+        targets, skipped = [], []
+        for rel in files:
+            (targets if in_scope(rel) else skipped).append(rel)
     classes = {"conformant": 0, "unrecorded": 0, "invalid": 0, "recorded": 0, "drifted": 0}
     for rel in targets:
         if not os.path.isfile(os.path.join(root, rel)):
@@ -611,6 +640,8 @@ def run_tree(root, schema, authorities, tier, files=None):
     stale = stale_rows(root, rows, schema, authorities)
     for rel, code, message in refusals:
         report(rel, "%s — %s" % (code, message))
+    for rel in skipped:
+        print("    note  %s: out of scope — %s" % (rel, why_out_of_scope(rel)), file=sys.stderr)
     for row in stale:
         why = "the file is gone" if not os.path.isfile(os.path.join(root, row["path"])) \
             else "the file now carries a valid block"
@@ -1034,6 +1065,23 @@ def self_test(real_root):
                                   text=True, env=dict(os.environ, AO_CODE_HEADERS_IN_PROVOCATION="1"))
             arms.expect("`--files %s` exits %d naming %s" % (os.path.basename(rel_path), want_rc, want),
                         (proc.returncode, want in (proc.stdout + proc.stderr)), (want_rc, True))
+
+        # The explicit list must pass the SAME predicate the tree scan uses (#1811).
+        # Two shapes, because the two entry points disagreed in two ways: a
+        # non-source extension crashed before it could be judged, and a file the
+        # tree scan skips was refused as unrecorded debt. Both must read as a
+        # VERDICT -- exit 0, say "out of scope", and owe no record.
+        for rel_path, label in ((place(root, "probe/cli-note.md", "# not a source extension\n"),
+                                 "a non-source extension"),
+                                (place(root, "probe/tests/cli-skipped.sh", "#!/usr/bin/env bash\nset -u\n"),
+                                 "a file under tests/")):
+            proc = subprocess.run(["bash", script, "--files", rel_path], capture_output=True,
+                                  text=True, env=dict(os.environ, AO_CODE_HEADERS_IN_PROVOCATION="1"))
+            transcript = proc.stdout + proc.stderr
+            arms.expect("`--files` on %s is out of scope, not a crash or a refusal" % label,
+                        (proc.returncode, "Traceback" in transcript,
+                         "out of scope" in transcript, "0 in scope" in transcript),
+                        (0, False, True, True))
 
         print("== the payload is real YAML (an oracle, when it is importable) ==")
         try:
