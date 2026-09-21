@@ -82,7 +82,7 @@
 # interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
 # invariants: ""
 # gotchas: ""
-# related: ["#1345", "#1351", "#1359", "#1368"]
+# related: ["#1345", "#1351", "#1359", "#1368", "#1753", "#1861"]
 # do_not_duplicate: null
 # ---knowledge---
 set -u
@@ -139,6 +139,7 @@ the lane's checkout, another lane's worktree, or the box's permit pool.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -149,16 +150,35 @@ root = Path(sys.argv[1])
 work = Path(sys.argv[2])
 arms_path = Path(sys.argv[3])
 
+# The orchestrator surface a venue needs in order to REACH its own verdict.
+# `scripts/lib/common.sh` is load-bearing and was absent (#1861): since #1753
+# every migrated `scripts/*.sh` opens with
+#   source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+#   root="$(find_repo_root)"
+# so a venue without it cannot even load `scripts/gate-lock.sh` -- admission
+# control dies on `find_repo_root: command not found`, the permit call answers
+# `python3: can't open file '/fleet/gatelock.py'`, and verify.sh exits 2 with
+# `the gate permit store is unusable; nothing was run` BEFORE the venue block.
+# Every arm then read that rc 2 as a verdict, so all six failed on a venue that
+# was simply unable to load the probe. The same #1753 ripple had already been
+# measured against #1839 (scripts/check-squash-message.sh, PR #1842) and #1840
+# (governance/futureproof, PR #1844).
 ORCHESTRATOR = (
     "scripts/verify.sh",
     "scripts/gate-lock.sh",
     "scripts/discover-checks.sh",
+    "scripts/lib/common.sh",
     "scripts/lib/skip-ratchet.py",
     "scripts/lib/validate-attestation.py",
     "governance/isolation/attestation.schema.json",
     "fleet/gatelock.py",
     "fleet/lease.py",
 )
+# `source .../lib/<name>` on any line of the surface. A declared tuple is a
+# snapshot and drifts (#1861); this makes the load-bearing surface derive itself,
+# and `assert_surface` below names a missing member instead of letting it become
+# six arm failures that read like verdicts.
+LIB_SOURCE_RE = re.compile(r"source[^\n]*?/lib/([A-Za-z0-9_.-]+)")
 FIXTURE_A = "venue-fixture-a"
 FIXTURE_B = "venue-fixture-b"
 CHECK_TOTAL = 2
@@ -193,14 +213,71 @@ def git(*args):
     )
 
 
-def copy_surface(venue):
+def surfaced_libs():
+    """The lib files the surface actually sources: `source .../lib/<name>` on any
+    line of the copied files. Derived, so a new load-time dependency enters the
+    venue instead of silently exiting the probe 2 (#1861)."""
+    names = set()
     for relative in ORCHESTRATOR:
         source = root / relative
+        try:
+            text = source.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        names.update(LIB_SOURCE_RE.findall(text))
+    return sorted(names)
+
+
+def copy_surface(venue):
+    for relative in surface_paths():
+        source = root / relative
         if not source.is_file():
-            cannot_assess("%s is missing from this tree" % relative)
+            cannot_assess("the surface needs %s, which is missing from this tree" % relative)
         target = venue / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
+
+
+def assert_surface(venue):
+    """Every `/lib/<name>` the mounted surface sources must exist in the venue,
+    AND the mount must be able to run the very call that died in #1861.
+
+    A guard, not a formality: it can fail, and when it does it NAMES the file.
+    Without it a missing load-time dependency exits the probe 2 before the venue
+    block, and all six arms read that rc 2 as a verdict -- the #1861 failure mode.
+
+    The dynamic half drives `scripts/gate-lock.sh status`, the real admission
+    entry point that #1753's `source .../lib/common.sh` broke: measured rc 0 with
+    the lib present, rc 2 (`common.sh: No such file or directory`,
+    `find_repo_root: command not found`) without it. Sourcing
+    `scripts/discover-checks.sh` is deliberately NOT the probe -- it continues
+    past a failed `source` and still defines its function, so it returns 0 either
+    way and would prove nothing.
+    """
+    missing = []
+    for name in surfaced_libs():
+        if not (venue / "scripts" / "lib" / name).is_file():
+            missing.append("scripts/lib/%s" % name)
+    if missing:
+        cannot_assess(
+            "the mounted surface cannot load: it sources %s, absent from the venue"
+            % ", ".join(missing)
+        )
+    env = dict(os.environ)
+    env["AO_GATE_LOCK_ROOT"] = str(work / "permits")
+    env["AO_GATE_MAX_CONCURRENT"] = "1"
+    try:
+        probe = subprocess.run(
+            ["bash", "scripts/gate-lock.sh", "status"],
+            cwd=str(venue), capture_output=True, text=True, timeout=60, env=env,
+        )
+    except subprocess.TimeoutExpired:
+        cannot_assess("the mounted surface did not answer `gate-lock.sh status` within 60s")
+    if probe.returncode != 0:
+        cannot_assess(
+            "the mounted surface cannot load its own orchestrator (gate-lock.sh status rc %d): %s"
+            % (probe.returncode, (probe.stderr.strip() or probe.stdout.strip()))
+        )
 
 
 def neuter(venue):
@@ -238,6 +315,7 @@ def mount(venue, rcs, budget=()):
     neuter(venue)
     fixture_checks(venue, rcs)
     write_budget(venue, list(budget))
+    assert_surface(venue)
     return venue
 
 
@@ -282,11 +360,18 @@ def commit_fixture(venue):
         cannot_assess("the intact venue could not take its fixture commit: %s" % proc.stderr.strip())
 
 
+def surface_paths():
+    """The declared surface plus every lib it sources -- the ONE definition both
+    the copy mount and the gitless export use, so a new load-time dependency
+    cannot reach one venue shape and not the other (#1861)."""
+    return list(ORCHESTRATOR) + ["scripts/lib/%s" % name for name in surfaced_libs()]
+
+
 def export_venue(venue):
     """The gitless shape: `git archive HEAD | tar -x` of the same surface."""
     venue.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
-        ["git", "-C", str(root), "archive", "HEAD", "--", *ORCHESTRATOR],
+        ["git", "-C", str(root), "archive", "HEAD", "--", *surface_paths()],
         capture_output=True, timeout=120,
     )
     if proc.returncode != 0:
@@ -341,6 +426,18 @@ def run_report(rc, text, attestation):
         out.append("venue line: %s" % lines[0])
     if verdict:
         out.append("verdict: %s" % verdict[0])
+    if not lines and not verdict:
+        # No venue line and no verdict: the probe refused before it could decide
+        # anything. Name its OWN reason rather than leaving the arm to infer one
+        # from rc 2 alone -- that inference is the #1861 failure (#1753 ripple).
+        for line in text.splitlines():
+            if "No such file or directory" in line or "command not found" in line:
+                out.append("load failure: %s" % line.strip()[:200])
+                break
+        for line in text.splitlines():
+            if line.startswith("verify: CANNOT-ASSESS"):
+                out.append("probe: %s" % line.strip()[:200])
+                break
     if isinstance(attestation, dict):
         node = attestation.get("venue_invalid")
         out.append(
@@ -520,6 +617,7 @@ staged("the exported venue", export_venue, venue)
 staged("the exported venue's surface", neuter, venue)
 staged("the exported venue's fixtures", fixture_checks, venue, ((FIXTURE_A, 0), (FIXTURE_B, 0)))
 staged("the exported venue's budget", write_budget, venue, ())
+staged("the exported venue's load surface", assert_surface, venue)
 rc, text, attestation = staged("the exported venue's run", run, venue)
 problems = []
 if rc != 0:
