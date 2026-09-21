@@ -42,6 +42,22 @@ FAIL-CLOSED CONTRACT (the repo's honesty tri-state)
     Exit codes: 0 OK / 1 REFUSED / 2 CANNOT-ASSESS. ``guard`` propagates the
     wrapped command's own exit code, having printed its own refusal BEFORE the
     command ran (a refused guard never runs the command).
+
+---knowledge---
+module_id: governance.dispatch.resource_lease
+system: governance
+app: dispatch
+solution_class: enterprise
+patterns: [append-only-ledger, fail-closed, locked-critical-section]
+derives_from: governance/dispatch/claims.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [acquire, release, guard, holder_of, live_leases, read, append, resource_type, ttl_seconds]
+invariants: "acquire()/release() hold one flock across read -> decide -> append, so two concurrent callers can never both observe a resource as free (#1545 TOCTOU fix); a ledger that cannot be read is CANNOT-ASSESS, never 'free'"
+gotchas: "read()/append() keep their unlocked public shape for callers that only need one half; acquire()/release() use the internal _locked()/_append_locked() pair instead"
+related: ["#1545"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

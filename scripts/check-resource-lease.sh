@@ -46,6 +46,22 @@
 # Exit-code contract (the repo's honesty tri-state): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage: bash scripts/check-resource-lease.sh
+#
+# ---knowledge---
+# module_id: scripts.check-resource-lease
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [self-proving-gate, no-false-green, real-artifact-fixture]
+# derives_from: governance/dispatch/resource_lease.py
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: "a refused guard never runs its wrapped command; the route and a real terraform plan (plan only, never apply) both consult the registry"
+# gotchas: "SKIPs visibly, not silently, when terraform is not installed"
+# related: ["#1545"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
