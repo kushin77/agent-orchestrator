@@ -1,5 +1,7 @@
 # Vendored hub: kushin77/CMR (Centralized Module Repository) — governance hub
-# for the agent-orchestrator product. Pinned to b6c49aa (main tip, 2026-09-08).
+# for the agent-orchestrator product. Pinned to 33d04e5 (main tip, 2026-09-21).
+# The hub carries no tags (measured: `git describe --tags 33d04e5` reports "No
+# names found"), so there is no `git describe --tags` output to record here.
 # Deliberately has NO `branch =` key. With one, `git submodule update --remote`
 # silently walks this submodule to that branch's tip and destroys the pin (fleet
 # doctrine — see kushin77/capital-underwriting .gitmodules). To move the pin:

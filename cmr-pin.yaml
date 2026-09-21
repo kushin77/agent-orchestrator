@@ -17,8 +17,8 @@
 #                     a live CMR ref is out of scope here, same as
 #                     sync/validate-cmr-pin.py — Phase 1 only validates shape)
 schema: cmr.standards-pin/v1
-bundle_ref: "b6c49aa03992dba9fe4b87b46104b8fc2f69f224"
-manifest_sha: "35d395611d775cc06d9a27da715345f6002dfef8b86f959777fe19841862060c"
-bundle_digest: "00cf63e270059480a5207ff43ecb4ff1f629a90a91b7db66c682493ddbd19ca0"
-delivered_at: "2026-09-16T19:56:47Z"
-delivered_by: "https://github.com/kushin77/agent-orchestrator/issues/949"
+bundle_ref: "33d04e5b6e35ad9a82d7ace9e10c5597fd21238d"
+manifest_sha: "2685fbed7b2e1161b84b31d47c72127b0b96e2d3c17d3822e83cd0195435f618"
+bundle_digest: "5df4b491c32185ecaa2dff6c77f18fb6bc2c8ebff35568422ccd2365f0ff8bff"
+delivered_at: "2026-09-21T23:52:10Z"
+delivered_by: "https://github.com/kushin77/agent-orchestrator/issues/1557"
