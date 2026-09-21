@@ -1,5 +1,7 @@
 # Merge / PR governance — independent SME reviewer + verify-gate (governance/merge)
 
+> **Superseded 2026-09-21 (single-developer method).** `ao/gate-of-record` is no longer a required status check on `master` and merge trains / the PR runner are retired. A PR lands with `scripts/check-squash-message.sh --pr N` then `gh pr merge N --squash`; `make verify` on a PR branch is code-only and advisory, box-state checks live in `make master-attestation` (#1673, #1676). See `AGENTS.md` "Landing a PR". The text below is kept as history.
+
 > Owner lane: **autonomous-ops / governance** (issue #43, work item 39, phase
 > 8). Parent: EPIC-00 (issue #4). Doctrine:
 > [`AGENTS.md`](../../AGENTS.md),

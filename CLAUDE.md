@@ -18,7 +18,8 @@ tenant identity/RBAC (`identity/`), control-plane/portal (`control-plane/`,
 ## Commands
 
 ```bash
-make verify   # gate of record: shell syntax + YAML + JSON + docs + secrets
+make verify   # evidence of record (lane venue = code-only; box-state -> make master-attestation)
+scripts/check-squash-message.sh --pr <N> && gh pr merge <N> --squash   # landing (single-dev method 2026-09-21)
 make help     # list all targets
 bash -n <file>.sh
 ```

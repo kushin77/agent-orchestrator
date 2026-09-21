@@ -18,7 +18,8 @@ contradict `AGENTS.md`; `CLAUDE.md`/`.cursorrules` are thin mirrors.
    one lane, no shared files per `docs/EXECUTION-PLAN.md`).
 2. Touch only your lane's files; smallest focused diff; match style; no
    unfinished markers or debug leftovers.
-3. Run the issue's `Verify:` command **and** `make verify` (gate of record).
+3. Run the issue's `Verify:` command **and** `make verify` (code-only lane
+   venue; box-state reds belong to `make master-attestation`, not the PR).
    Report actual command + output as evidence — never an unverified "done".
 4. Declare AI-assistance + runtime on the PR.
 

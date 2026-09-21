@@ -1,5 +1,7 @@
 # Release plan — the v1.0.0 commitment
 
+> **Superseded 2026-09-21 (single-developer method).** `ao/gate-of-record` is no longer a required status check on `master` and merge trains / the PR runner are retired. A PR lands with `scripts/check-squash-message.sh --pr N` then `gh pr merge N --squash`; `make verify` on a PR branch is code-only and advisory, box-state checks live in `make master-attestation` (#1673, #1676). See `AGENTS.md` "Landing a PR". The text below is kept as history.
+
 ## 1. Purpose
 
 This document names the v1.0.0 commitment this product makes to its consumers,

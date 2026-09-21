@@ -192,10 +192,16 @@ starts choosing issues ad hoc is violating the repo's execution contract.
 
 ## 7. Gate of record
 
-`make verify` is the repo's gate of record until CI lands (issue #6). It is an
-**honest composite gate** (shell syntax, YAML, JSON, docs, secrets) — every
-check can genuinely fail (no-false-green doctrine). A red gate blocks the next
-dispatch wave.
+`make verify` is the repo's evidence of record. It is an **honest composite
+gate** — every check can genuinely fail (no-false-green doctrine). Since
+2026-09-21 (single-developer method) the lane venue is code-only: box-state
+checks (real-tree drift, board-snapshot age, gate-lock, orphan census,
+worktree-cap crontab, board-gate conformance, repo-settings,
+branch-protection) run in the attestation venue on `master`
+(`make master-attestation`) and never block a PR (#1673, #1676). `master` has
+no required status check and no reviewer requirement; a PR lands with
+`scripts/check-squash-message.sh --pr N` then `gh pr merge N --squash`. Merge
+trains are retired.
 
 ## 8. Fan-out capacity (epic #707, lane F3 / issue #718)
 

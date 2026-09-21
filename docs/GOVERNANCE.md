@@ -120,10 +120,13 @@ AI-originated issues, PRs, commits, and doc sections declare their source:
 ## 3. Review & merge doctrine
 
 - Every change lands via a PR. No self-approval ceremony is required under the
-  **owner autonomous-merge mandate (2026-09-07)**: an agent merges its own PR
-  **only after** green verification evidence (GR-12). **Never merge failing
-  work.** Verification replaces the human reviewer in this fleet.
-- Merging without green `make verify` is forbidden in all cases.
+  **owner autonomous-merge mandate (2026-09-07)** and the **single-developer
+  method (2026-09-21)**: an agent merges its own PR once the code-only lane
+  checks are green (`scripts/check-squash-message.sh --pr N`, then
+  `gh pr merge N --squash`). Verification replaces the human reviewer.
+- Box-state reds (real-tree drift, snapshot age, gate-lock, crontab, board
+  labels) never block a PR; they are owned by `make master-attestation`.
+  `master` carries no required status check.
 
 ## 4. Review checklist (every PR)
 
