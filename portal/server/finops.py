@@ -1,20 +1,5 @@
 """portal.server.finops — the FinOps single-pane report adapter (issue #341).
 
----knowledge---
-module_id: portal.server.finops
-system: portal
-app: server
-solution_class: pattern
-patterns: [cross-domain-aggregator, join-not-own]
-derives_from: null
-owner_sme: sync-sme
-tier: L1
-interfaces: [FinOpsReports]
-invariants: ""
-gotchas: ""
-related: ["#341"]
-do_not_duplicate: null
----knowledge---
 
 WHY this exists: the metering lane (``telemetry/metering``) knows what was
 spent and on what tiers, and the budgets lane (``telemetry/budgets``) knows the
@@ -57,6 +42,23 @@ The surface ships **feature-flag-gated OFF** (GR-5): the flag is declared in
 ``infra/feature-flags/registry.yaml`` under ``surfaces`` and read here through
 the same reader the fleet projection uses (``portal.server.fleet``); while it
 is off the app refuses every ``/api/finops/*`` route.
+
+
+---knowledge---
+module_id: portal.server.finops
+system: portal
+app: server
+solution_class: pattern
+patterns: [read-model, cannibalize-not-duplicate, no-data-is-not-zero]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [FinOpsReports]
+invariants: "no data is not zero - an unmetered tenant reports costUsd null and NO_DATA, never a fabricated 0.0; an incomplete cost is never a total"
+gotchas: "every figure is read through the metering/budgets lane that owns it; nothing re-implements a reader or a threshold"
+related: ["#341"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -1,20 +1,5 @@
 """portal.server.auditlog — per-tenant tamper-evident audit chain.
 
----knowledge---
-module_id: portal.server.auditlog
-system: portal
-app: server
-solution_class: enterprise
-patterns: [hash-chained-ledger, append-only]
-derives_from: null
-owner_sme: security-sme
-tier: L1
-interfaces: [AuditRecord, AuditLedger]
-invariants: ""
-gotchas: ""
-related: []
-do_not_duplicate: null
----knowledge---
 
 The Audit view and every mutation use this append-only, hash-chained ledger.
 The record shape and the verify semantics consume the frozen telemetry/ledger
@@ -27,6 +12,23 @@ field, deleting a record or reordering records is detected.
 This is the offline console's own chain (stdlib sha256) so the whole portal is
 self-contained; a production deployment maps the same seam onto the real
 ``telemetry/ledger`` store.
+
+
+---knowledge---
+module_id: portal.server.auditlog
+system: portal
+app: server
+solution_class: enterprise
+patterns: [append-only, hash-chain, tamper-evident, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AuditLedger, AuditRecord]
+invariants: "the chain is append-only; verify recomputes every link and reports the first broken record"
+gotchas: "the offline console's own stdlib sha256 chain; a production deployment maps the same seam onto telemetry/ledger"
+related: ["#31"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

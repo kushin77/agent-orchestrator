@@ -1,20 +1,5 @@
 """portal.server.fleet — the fleet-state projection adapter (issue #331).
 
----knowledge---
-module_id: portal.server.fleet
-system: portal
-app: server
-solution_class: pattern
-patterns: [cross-engine-adapter, join-not-own]
-derives_from: null
-owner_sme: sync-sme
-tier: L1
-interfaces: [read_registry_surfaces, declares_on, read_live_state_doc, read_surface_default, surface_enabled, load_fleet_console, FleetProjection]
-invariants: ""
-gotchas: ""
-related: ["#331"]
-do_not_duplicate: null
----knowledge---
 
 WHY this exists: the terminal dashboard (``fleet/console.py``) renders the
 fleet's live state into one tmux pane. A remote operator cannot open that pane,
@@ -36,6 +21,23 @@ failure), so the surface boots and serves with no terminal and no network
 egress. The surface ships **feature-flag-gated OFF** (GR-5): the flag is
 declared in ``infra/feature-flags/registry.yaml`` under ``surfaces`` and read
 here, and while it is off every ``/api/fleet/*`` route is refused by the app.
+
+
+---knowledge---
+module_id: portal.server.fleet
+system: portal
+app: server
+solution_class: pattern
+patterns: [read-model, delegate-never-re-derive, feature-flag-gated-off]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [FleetProjection, surface_enabled, read_surface_default, load_fleet_console]
+invariants: "the projection is fleet/console.py snapshot() itself, never a second reader; while the flag is off every /api/fleet/* route is refused"
+gotchas: "the surface declaration is read fail-closed through surface_state's runtime rollback overlay before the registry"
+related: ["#331"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

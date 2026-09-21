@@ -1,20 +1,5 @@
 """portal.server.task_board — the tenant task-board adapter (issue #642, workbook-11).
 
----knowledge---
-module_id: portal.server.task_board
-system: portal
-app: server
-solution_class: pattern
-patterns: [cross-domain-aggregator, join-not-own]
-derives_from: null
-owner_sme: sync-sme
-tier: L1
-interfaces: [TaskBoardError, TaskBoardSurface]
-invariants: ""
-gotchas: ""
-related: ["#642"]
-do_not_duplicate: null
----knowledge---
 
 WHY this exists: the workbook-3 lane ships the tenant ticket lifecycle as a
 durable library (``engine.core.tickets.TicketRuntime``) — a ticket is *created →
@@ -51,6 +36,23 @@ The surface ships **feature-flag-gated OFF** (GR-5): the flag is declared in the
 portal's own ``portal/config/feature-flags.yaml`` and read here through
 ``portal.server.config_flags``; while it is off the app refuses every
 ``/api/taskboard/*`` route before authentication.
+
+
+---knowledge---
+module_id: portal.server.task_board
+system: portal
+app: server
+solution_class: pattern
+patterns: [replay-not-store, delegate-never-re-derive, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TaskBoardSurface, TaskBoardError]
+invariants: "the adapter holds no ticket state - every read is a replay of the engine's own event log; an unknown ticket is absent (404), never an empty shell"
+gotchas: "a corrupt engine log fails closed and surfaces as an error, never a plausible-looking row"
+related: ["#642"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

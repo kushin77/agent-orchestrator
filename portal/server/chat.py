@@ -1,20 +1,5 @@
 """portal.server.chat — the conversational surface (issue #508, ADR-0023).
 
----knowledge---
-module_id: portal.server.chat
-system: portal
-app: server
-solution_class: pattern
-patterns: [cross-engine-adapter, join-not-own]
-derives_from: null
-owner_sme: sync-sme
-tier: L1
-interfaces: [tiers, ChatError, parse_turn_request, CancelToken, BudgetState, sse_frame, render_source, unsupported_label]
-invariants: ""
-gotchas: ""
-related: ["#508"]
-do_not_duplicate: null
----knowledge---
 
 WHY this exists: the console could *show* the control plane but not *talk* to
 it. This module is the experience half of EPIC #500 — the conversational
@@ -63,6 +48,23 @@ fail-closed reader the fleet projection already uses. While it is off the whole
 ``/api/chat/*`` family *and* the view's own static assets are absent — checked
 before AuthN, so an unpromoted surface is invisible rather than distinguishable
 by an authentication probe.
+
+
+---knowledge---
+module_id: portal.server.chat
+system: portal
+app: server
+solution_class: enterprise
+patterns: [client-half, gateway-authoritative, honest-degradation, state-machine, consumed-over-http]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ChatSurface, parse_turn_request, ChatError, sse_frame, tiers]
+invariants: "the gateway is the authority - the surface owns no model, no price and no verdict; a turn whose envelope backs no fragment is NO_DATA, never an empty success"
+gotchas: "nothing under gateway/ identity/ telemetry/ guardrails/ registry/ is imported - the surface is consumed over HTTP only"
+related: ["#508", "#500"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

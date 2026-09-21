@@ -4,18 +4,16 @@
  * system: portal
  * app: static
  * solution_class: pattern
- * patterns: [accessibility-enhancement]
- * derives_from: null
+ * patterns: [progressive-enhancement, additive-only, defensive-no-op]
+ * derives_from: portal/static/js/chat.js
  * owner_sme: frontend-sme
- * tier: L1
- * interfaces: []
- * invariants: ""
+ * tier: L0
+ * interfaces: [portal/static/views/chat.html]
+ * invariants: "it observes the state chat.js already publishes and never modifies it; a missing element is a no-op, not an error"
  * gotchas: ""
- * related: ["#500", "#514"]
+ * related: ["#514", "#500"]
  * do_not_duplicate: null
  * ---knowledge---
- */
-/*
  * Chat surface — accessibility enhancements (EPIC #500, issue #514)
  * =====================================================================
  * Progressive enhancement layered ON TOP of js/chat.js, which this file does

@@ -1,20 +1,5 @@
 """portal.server.authz — console RBAC (super-admin vs tenant-admin).
 
----knowledge---
-module_id: portal.server.authz
-system: portal
-app: server
-solution_class: enterprise
-patterns: [rbac, declared-authority]
-derives_from: null
-owner_sme: security-sme
-tier: L1
-interfaces: [Principal, Authorizer]
-invariants: ""
-gotchas: ""
-related: []
-do_not_duplicate: null
----knowledge---
 
 The permission vocabulary is *consumed* from the merged identity/rbac
 platform role pack (issue #12, ``identity/rbac/presets/platform.yaml``):
@@ -29,6 +14,23 @@ Authorization follows the two-gate shape of the control plane (issue #38):
 a scope gate (can this subject act in this tenant at all?) runs before the
 permission gate (does its role grant ``resource:action``?). There is no
 cross-tenant fallback.
+
+
+---knowledge---
+module_id: portal.server.authz
+system: portal
+app: server
+solution_class: enterprise
+patterns: [two-gate-authorization, consumed-vocabulary, no-cross-tenant-fallback]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [Authorizer, Principal, RBAC_ROLE_PERMISSIONS]
+invariants: "a scope gate runs before the permission gate; there is no cross-tenant fallback"
+gotchas: "the role vocabulary is consumed from identity/rbac, never redefined here"
+related: ["#12", "#38", "#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

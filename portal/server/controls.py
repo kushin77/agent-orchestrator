@@ -1,20 +1,5 @@
 """portal.server.controls — console policy controls (no UI-only state).
 
----knowledge---
-module_id: portal.server.controls
-system: portal
-app: server
-solution_class: pattern
-patterns: [cross-domain-aggregator, join-not-own]
-derives_from: null
-owner_sme: sync-sme
-tier: L1
-interfaces: [PolicyControl, ControlCatalog, build_control_policy_map, PolicyStateStore, PolicyEnforcer]
-invariants: ""
-gotchas: ""
-related: []
-do_not_duplicate: null
----knowledge---
 
 Every toggle in the Policies/Controls view is bound, server-side, to a
 :class:`PolicyControl` through the :data:`CONTROL_POLICY_MAP` mapping table.
@@ -32,6 +17,23 @@ whose enforcement lives in :class:`PolicyEnforcer`; each entry's
 State lives in :class:`PolicyStateStore` (per-tenant, server-side), never in
 the browser. :class:`PolicyEnforcer.evaluate` turns that state into an
 enforcement decision, so a toggled control demonstrably changes policy state.
+
+
+---knowledge---
+module_id: portal.server.controls
+system: portal
+app: server
+solution_class: pattern
+patterns: [flag-gated-off, single-source-vocabulary, server-side-state]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ControlCatalog, PolicyControl, build_control_policy_map, PolicyStateStore, PolicyEnforcer]
+invariants: "control state lives server-side, never in the browser; every control ships enabled:false until deliberately flipped"
+gotchas: "consumes the guardrails controls registry vocabulary, never redefines it"
+related: ["#26"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

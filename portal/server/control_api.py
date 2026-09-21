@@ -1,20 +1,5 @@
 """portal.server.control_api — the remote control API (issue #554, RC-3 of #551).
 
----knowledge---
-module_id: portal.server.control_api
-system: portal
-app: server
-solution_class: enterprise
-patterns: [remote-control, exactly-once]
-derives_from: null
-owner_sme: security-sme
-tier: L1
-interfaces: [VocabularyUnavailable, LeverUnreachable, VerbRow, Vocabulary, Command, EffectRecord, CommandLedger, InFlightCommands]
-invariants: ""
-gotchas: ""
-related: ["#554", "#551"]
-do_not_duplicate: null
----knowledge---
 
 WHY this exists. EPIC #551 exists because the fleet can be commanded only from
 its own keyboard: ``docs/REMOTE-CONTROL-GAP-ANALYSIS.md`` §2.6 measures eighteen
@@ -107,6 +92,23 @@ operator-requested — it arrives on this authenticated, POST-only family — an
 the record names the principal it is attributed to (D2.5). A monitoring export,
 a cron or a watchdog holds no console session and therefore cannot reach this
 path at all.
+
+
+---knowledge---
+module_id: portal.server.control_api
+system: portal
+app: server
+solution_class: enterprise
+patterns: [closed-vocabulary, delegate-never-re-derive, single-choke-point, refuse-unknown-verb]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [RemoteControl, Vocabulary, VerbRow, install, permitted_verb_ids]
+invariants: "every mutating request passes through RemoteControl.apply_command and nothing else; a verb the registry does not declare is refused"
+gotchas: "levers run as subprocesses because their sibling-module imports and argparse exits must not escape into an HTTP request"
+related: ["#554", "#551", "#555"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

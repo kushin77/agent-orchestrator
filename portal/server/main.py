@@ -1,21 +1,6 @@
 #!/usr/bin/env python3
 """portal.server.main — run the offline console server.
 
----knowledge---
-module_id: portal.server.main
-system: portal
-app: server
-solution_class: class
-patterns: [entrypoint]
-derives_from: null
-owner_sme: platform-sme
-tier: L1
-interfaces: [main]
-invariants: ""
-gotchas: ""
-related: []
-do_not_duplicate: null
----knowledge---
 
 The console is a self-contained static app (design-token CSS/JSON twins +
 vanilla JS views) served by this stdlib-only Python HTTP layer with the console
@@ -38,6 +23,23 @@ set the console allowlist before starting it:
 With no JWKS mirror configured the console trusts no key and refuses every
 session (fail closed). The offline seed directory (portal/README.md) still
 supplies the org bindings those identities are authorized with.
+
+
+---knowledge---
+module_id: portal.server.main
+system: portal
+app: server
+solution_class: class
+patterns: [cli-entry, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [main]
+invariants: "with no JWKS mirror configured the console trusts no key and refuses every session"
+gotchas: "the console has no login of its own - unauthenticated visitors are redirected to the shared-frontend auth gate"
+related: ["#39"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

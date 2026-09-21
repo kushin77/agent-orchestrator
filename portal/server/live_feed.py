@@ -1,20 +1,5 @@
 """portal.server.live_feed — the live telemetry event feed adapter (issue #345).
 
----knowledge---
-module_id: portal.server.live_feed
-system: portal
-app: server
-solution_class: pattern
-patterns: [cross-engine-adapter, join-not-own]
-derives_from: null
-owner_sme: sync-sme
-tier: L1
-interfaces: [StoreTail, LiveFeed]
-invariants: ""
-gotchas: ""
-related: ["#345"]
-do_not_duplicate: null
----knowledge---
 
 WHY this exists: every model call the platform routes already leaves a durable
 record — the gateway proxy appends one full call record per dispatch (the
@@ -73,6 +58,23 @@ The surface ships **feature-flag-gated OFF** (GR-5): the flag is declared in
 ``infra/feature-flags/registry.yaml`` under ``surfaces`` and read here through
 the same reader the fleet projection uses (``portal.server.fleet``); while it
 is off the app refuses every ``/api/telemetry/*`` route before authN.
+
+
+---knowledge---
+module_id: portal.server.live_feed
+system: portal
+app: server
+solution_class: pattern
+patterns: [tail-cursor, server-sent-events, honest-absence, no-invented-correlation]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [LiveFeed, StoreTail]
+invariants: "an empty feed is not no-traffic - only LIVE claims telemetry; a malformed line is counted and reported, never silently dropped"
+gotchas: "a verdict and its call share an identifier only when the deployment threads one (verdict.callId)"
+related: ["#345"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

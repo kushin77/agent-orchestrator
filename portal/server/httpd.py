@@ -1,20 +1,5 @@
 """portal.server.httpd — stdlib http.server binding for the console app.
 
----knowledge---
-module_id: portal.server.httpd
-system: portal
-app: server
-solution_class: enterprise
-patterns: [thin-transport]
-derives_from: null
-owner_sme: platform-sme
-tier: L1
-interfaces: [ConsoleRequestHandler, ConsoleServer, serve]
-invariants: ""
-gotchas: ""
-related: []
-do_not_duplicate: null
----knowledge---
 
 Thin transport: decodes the request (path, query, JSON body, ``Cookie``
 header) into the :class:`ConsoleApplication` pipeline and writes the returned
@@ -22,6 +7,23 @@ header) into the :class:`ConsoleApplication` pipeline and writes the returned
 No framework, no sockets in the tests — the pytest suite drives
 ``ConsoleApplication.handle`` directly; this module exists so
 ``python -m portal.server.main`` can serve the static console offline.
+
+
+---knowledge---
+module_id: portal.server.httpd
+system: portal
+app: server
+solution_class: class
+patterns: [thin-transport]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [serve, ConsoleServer, ConsoleRequestHandler]
+invariants: "no framework and no sockets in tests - the suite drives ConsoleApplication.handle directly"
+gotchas: ""
+related: ["#39"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

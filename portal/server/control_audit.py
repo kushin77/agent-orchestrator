@@ -1,20 +1,5 @@
 """portal.server.control_audit — exactly-once control: one effect, one record.
 
----knowledge---
-module_id: portal.server.control_audit
-system: portal
-app: server
-solution_class: enterprise
-patterns: [exactly-once, audit-record]
-derives_from: null
-owner_sme: security-sme
-tier: L1
-interfaces: [AuditUnavailable, CommandLike, EffectRecordLike, utc_now, mint_command_id, mint_record_id, canonical, command_binding]
-invariants: ""
-gotchas: ""
-related: []
-do_not_duplicate: null
----knowledge---
 
 WHY this exists (issue #555, RC-4 of EPIC #551). RC-3 shipped the control
 channel and its refusals; it records nothing. Its ledger, ``InFlightCommands``,
@@ -80,6 +65,23 @@ command the rail already remembers — reporting the receipt as *unavailable*
 rather than inventing one, because the rail's evidence field, not its payload,
 is what the recovery reads (a payload would need the tenant's encryption key,
 and a console holds none).
+
+
+---knowledge---
+module_id: portal.server.control_audit
+system: portal
+app: server
+solution_class: enterprise
+patterns: [exactly-once, append-only, receipt-preserving, no-silent-no-op]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ControlAudit, mint_command_id, mint_record_id, RecordedCommand]
+invariants: "one effect, one record; a replay is refused and handed the original receipt; a command that had no effect writes no record"
+gotchas: "the transport changes in exactly one line - the collaborator built in RemoteControl.__init__"
+related: ["#555", "#551"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

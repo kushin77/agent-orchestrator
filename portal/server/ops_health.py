@@ -1,20 +1,5 @@
 """portal.server.ops_health — the ops/health/SLO serving surface (issue #342).
 
----knowledge---
-module_id: portal.server.ops_health
-system: portal
-app: server
-solution_class: pattern
-patterns: [cross-domain-aggregator, join-not-own]
-derives_from: null
-owner_sme: sync-sme
-tier: L1
-interfaces: [OpsHealthReports]
-invariants: ""
-gotchas: ""
-related: ["#342"]
-do_not_duplicate: null
----knowledge---
 
 WHY this exists: the observability lane (``telemetry/observability``) already
 computes everything an operator needs — per-tenant SLO verdicts over the real
@@ -71,6 +56,23 @@ The surface ships **feature-flag-gated OFF** (GR-5): the flag is declared in
 the same reader the fleet and FinOps surfaces use
 (``portal.server.fleet.surface_enabled``); while it is off the app refuses every
 ``/api/ops/*`` route before authentication.
+
+
+---knowledge---
+module_id: portal.server.ops_health
+system: portal
+app: server
+solution_class: pattern
+patterns: [read-model, delegate-never-re-derive, no-data-is-not-ok, single-window]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [OpsHealthReports]
+invariants: "no data is not OK - a subject with nothing to evaluate is NO_DATA, never healthy; an unmeasured figure is null, never a fabricated 0"
+gotchas: "figures and verdicts describe the same window the SLO evaluator judged"
+related: ["#342"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

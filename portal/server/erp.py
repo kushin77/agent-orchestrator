@@ -1,20 +1,5 @@
 """portal.server.erp — the ERP module's portal surface (ERP-07, issue #652).
 
----knowledge---
-module_id: portal.server.erp
-system: portal
-app: server
-solution_class: pattern
-patterns: [cross-engine-adapter, join-not-own]
-derives_from: null
-owner_sme: sync-sme
-tier: L1
-interfaces: [ErpModuleError, ErpApi, build_erp_api, ErpModuleSurface]
-invariants: ""
-gotchas: ""
-related: ["#652"]
-do_not_duplicate: null
----knowledge---
 
 WHY this exists. EPIC #645's module is indexer-fed by construction: ERP-01
 declares it, ERP-02 owns the document model, ERP-06 serves it as a REST
@@ -68,6 +53,23 @@ the portal's own ``portal/config/feature-flags.yaml`` and read here through
 ``/api/erp/*`` route and the module's own documents **before authentication** —
 an unpromoted surface is absent, not merely unauthorised (the ``chat`` /
 ``live_bridge`` / ``operator_terminal`` precedent).
+
+
+---knowledge---
+module_id: portal.server.erp
+system: portal
+app: server
+solution_class: pattern
+patterns: [delegate-never-re-derive, verbatim-proxy, no-second-declaration]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ErpModuleSurface, ErpApi, build_erp_api, ErpModuleError]
+invariants: "every document verb proxies ERP-06's Surface.handle and returns its envelope verbatim; the adapter holds no ERP knowledge of its own"
+gotchas: "the ERP authorization decision is ERP-08's, taken inside the mounted surface - one contract, not two dialects"
+related: ["#652", "#645"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

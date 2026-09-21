@@ -1,20 +1,5 @@
 """portal.server.app — console route table + request pipeline (offline).
 
----knowledge---
-module_id: portal.server.app
-system: portal
-app: server
-solution_class: enterprise
-patterns: [route-table, transport-free]
-derives_from: null
-owner_sme: platform-sme
-tier: L1
-interfaces: [ApiError, Response, StreamResponse, ConsoleApplication, build_app]
-invariants: ""
-gotchas: ""
-related: []
-do_not_duplicate: null
----knowledge---
 
 Transport-free: :meth:`ConsoleApplication.handle` takes a method/path/query/
 body/cookie-map and returns a :class:`Response`. ``httpd.py`` binds it to
@@ -28,6 +13,23 @@ is redirected there (``/auth/login``). The session pipeline mirrors the control
 plane (issue #38): authN first (a verified auth-gate RS256 ``os-session-token``
 via ``sso``), then the scope gate, then the permission gate (issue #12 role
 vocabulary via ``authz``).
+
+
+---knowledge---
+module_id: portal.server.app
+system: portal
+app: server
+solution_class: enterprise
+patterns: [route-table, request-pipeline, control-plane-envelope, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ConsoleApplication, build_app, Response, StreamResponse, ApiError]
+invariants: "every mutation appends to the tenant audit chain; an unauthenticated document request is redirected to the auth gate, never served"
+gotchas: "transport-free - httpd.py binds it to http.server and the tests drive ConsoleApplication.handle directly"
+related: ["#39", "#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

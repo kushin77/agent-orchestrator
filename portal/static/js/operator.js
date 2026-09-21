@@ -1,21 +1,19 @@
-/*
+/* agent-orchestrator console — operator terminal (issue #774)
  * ---knowledge---
  * module_id: portal.static.js.operator
  * system: portal
  * app: static
  * solution_class: pattern
- * patterns: [client-adapter, no-own-authority]
+ * patterns: [render-only, closed-vocabulary-steer, feature-disabled-honesty]
  * derives_from: null
  * owner_sme: frontend-sme
  * tier: L1
- * interfaces: []
- * invariants: ""
- * gotchas: ""
- * related: ["#774"]
+ * interfaces: [portal/static/views/console.html]
+ * invariants: "the steer panel is narrowed to the caller and never offers a raw command or a shell; a feature_disabled answer renders as a visible disabled state, never fake data"
+ * gotchas: "both halves ship feature-flag-gated OFF, so a read projection that answers feature_disabled must not look like an idle fleet"
+ * related: ["#774", "#1523"]
  * do_not_duplicate: null
  * ---knowledge---
- */
-/* agent-orchestrator console — operator terminal (issue #774)
  *
  * The browser IT-terminal behind the SSO session. It invents nothing: the read
  * half is the fleet single-pane-of-glass projection already served by the

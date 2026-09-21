@@ -1,21 +1,19 @@
-/*
+/* ERP module — the portal frame's client (ERP-07, issue #652).
  * ---knowledge---
  * module_id: portal.static.erp.module
  * system: portal
  * app: static
  * solution_class: pattern
- * patterns: [client-adapter, no-own-authority]
+ * patterns: [client-half, no-second-declaration, feature-flag-gated]
  * derives_from: null
  * owner_sme: frontend-sme
  * tier: L1
- * interfaces: []
- * invariants: ""
- * gotchas: ""
+ * interfaces: [portal/static/erp/module.html]
+ * invariants: "no family, state or field name is typed here - every vocabulary is read from /api/erp/module"
+ * gotchas: "with erp_module off the app answers 404 feature_disabled for this file and the API alike"
  * related: ["#652"]
  * do_not_duplicate: null
  * ---knowledge---
- */
-/* ERP module — the portal frame's client (ERP-07, issue #652).
  *
  * WHAT THIS FILE IS ALLOWED TO KNOW. Nothing about the ERP module's domain. The
  * family vocabulary, each family's states and legal moves, and the fields a form

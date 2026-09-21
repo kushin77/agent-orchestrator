@@ -1,20 +1,5 @@
 """portal.server.surface_state — the runtime surface rollback overlay (#802).
 
----knowledge---
-module_id: portal.server.surface_state
-system: portal
-app: server
-solution_class: pattern
-patterns: [rollback-overlay, join-not-own]
-derives_from: null
-owner_sme: sync-sme
-tier: L1
-interfaces: [overlay_path, read_rollbacks, is_rolled_back, rollback_record, record_rollback, clear_rollback]
-invariants: ""
-gotchas: ""
-related: ["#802"]
-do_not_duplicate: null
----knowledge---
 
 WHY this exists. Every console surface is gated by its declaration in
 ``infra/feature-flags/registry.yaml`` (``surfaces.<name>.default``), read
@@ -63,6 +48,23 @@ Runtime state, never committed: the document lives under ``.rollout/`` (the
 explicit-argument -> environment-variable -> repo-local default resolution
 ``portal/server/control_audit.py`` uses for its rails), so a test points it at a
 scratch document and the deployment at a durable one.
+
+
+---knowledge---
+module_id: portal.server.surface_state
+system: portal
+app: server
+solution_class: pattern
+patterns: [runtime-overlay, fail-closed, atomic-kill-switch]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [read_rollbacks, is_rolled_back, record_rollback, clear_rollback, overlay_path]
+invariants: "a document that cannot be read is not assumed disengaged - read_rollbacks returns None and the reader refuses the surface"
+gotchas: "an absent document is the healthy case; the overlay is consulted by portal.server.fleet.read_surface_default before the registry"
+related: ["#802"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
