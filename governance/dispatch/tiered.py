@@ -325,7 +325,7 @@ def run(
         files = named_files
     else:
         files = peers._caller_files_from_live(live, agent, issue_number)
-        peer_issue = next((number for number, ev in live.items() if ev.agent == agent), issue_number)
+        peer_issue = next((number for number in sorted(live) if live[number].agent == agent), issue_number)
     if files:
         report = peers.peer_check(files, live, caller_agent=agent, caller_issue=peer_issue)
         if report.verdict == "OVERLAP":

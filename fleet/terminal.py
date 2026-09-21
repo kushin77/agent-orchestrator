@@ -548,7 +548,7 @@ def peer_check_cadence(agent_id: str, *, ledger: Path | str | None = None) -> st
         # is recorded holding one. The matching issue is carried too so
         # `peer_check` excludes that record as the caller's OWN claim rather
         # than judging it a sibling of itself.
-        own_issue = next((number for number, ev in live.items() if ev.agent == agent_id), None)
+        own_issue = next((number for number in sorted(live) if live[number].agent == agent_id), None)
         caller_files = peers._caller_files_from_live(live, agent_id, own_issue)
         report = peers.peer_check(caller_files, live, caller_agent=agent_id, caller_issue=own_issue)
     except Exception as exc:  # noqa: BLE001 — never fatal, same contract as beat_runtime
