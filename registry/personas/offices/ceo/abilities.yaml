@@ -1,0 +1,20 @@
+# CEO Office abilities (purebliss single-tenant org). Mirrors
+# registry/personas/cards/purebliss/ceo.yaml capabilitySet/toolAllowlist —
+# extends, never redefines, that vocabulary.
+office: ceo
+schema: ceo-office-abilities/v1
+version: 1.0.0
+abilities:
+  - id: goal-decomposition
+    description: "Decompose a strategic goal into board tickets before any execution starts (GR-2)."
+    consumes: [registry/personas/org-charts/purebliss.yaml]
+  - id: multi-repo-oversight
+    description: "Track delivery across agent-orchestrator, shared-services, shared-frontend, shared-governance, purebliss."
+  - id: board-escalation
+    description: "Escalate to the board when a decomposition or a cross-office conflict exceeds delegated authority."
+  - id: orchestration
+    description: "Route work across the CTO/CFO/PMO offices via the purebliss-team fleet (registry/packs/releases/purebliss-team.1.0.0.yaml)."
+    tool: shell_exec
+provenance:
+  - "registry/personas/cards/purebliss/ceo.yaml (capabilitySet, toolAllowlist)"
+toolAllowlistExtends: registry/personas/cards/purebliss/ceo.yaml#toolAllowlist

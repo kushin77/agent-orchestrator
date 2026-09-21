@@ -329,6 +329,7 @@
         "cfo",
         "cmo",
         "orchestrator",
+        "pmo",
         "pmo-sme",
         "architecture-sme",
         "iac-sme",

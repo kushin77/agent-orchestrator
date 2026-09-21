@@ -1,0 +1,80 @@
+# Proposed change set — harness-injected prompt audit, 2026-09-20
+#
+# Scope: ~/.claude/CLAUDE.md only (the change with every rule preserved and
+# a measured >=30% size drop, per docs/cfo/proposed-global-CLAUDE.md).
+# No other ~/.claude file or any settings.json is touched by this patch —
+# the settings.json/skill-listing/deferred-tool-catalog recommendations in
+# HARNESS-AUDIT-2026-09-20.md require disabling plugins/skills via the
+# plugin manager (no diffable file for those; see that doc's table).
+#
+# Apply (from anywhere, with a backup first):
+#   cp ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak-2026-09-20
+#   patch ~/.claude/CLAUDE.md < docs/cfo/harness-audit-2026-09-20.patch
+#
+# Verify:
+#   diff ~/.claude/CLAUDE.md docs/cfo/proposed-global-CLAUDE.md   # should be empty
+#   wc -c ~/.claude/CLAUDE.md   # expect 2710 (was 4248)
+#
+# Rollback:
+#   cp ~/.claude/CLAUDE.md.bak-2026-09-20 ~/.claude/CLAUDE.md
+#
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -2,41 +2,34 @@
+ 
+ ## Subagent-first execution
+ 
+-Delegate essentially all work to subagents via the Agent tool rather than doing it inline in the main thread — including small edits and single questions, not just multi-step tasks. Default reasoning:
++Delegate essentially all work to subagents via the Agent tool, not inline — small edits and single questions too.
+ 
+-- **Fork yourself** (`subagent_type: "fork"`) when the work needs this conversation's context (an in-progress investigation, a decision already made this session) but its tool output/noise isn't worth keeping in the main thread.
+-- **Fresh subagent** (`general-purpose` or a more specific type) for self-contained work that doesn't need prior context — brief it like a new hire, per the Agent tool's own guidance.
+-- Only skip delegation when the action is a single trivial tool call that IS the answer (e.g. reading one file to answer "what does X say") — even then, prefer a fork if a subagent is already natural for the surrounding task.
+-- Launch independent subagents in parallel (single message, multiple Agent calls) rather than sequentially.
++- **Fork** (`subagent_type: "fork"`) when the work needs this conversation's context but the tool noise isn't worth keeping.
++- **Fresh subagent** for self-contained work with no prior context — brief it like a new hire.
++- Skip delegation only for a single trivial tool call that IS the answer; even then prefer a fork if one's already natural.
++- Launch independent subagents in parallel (one message, multiple Agent calls).
+ 
+ ## FinOps: model selection for subagents
+ 
+-Default every spawned subagent to the cheapest model that can plausibly do the job, and escalate only when the task specifically calls for more reasoning. The ladder is three tiers (canonical table in `docs/MODEL-PROFILES.md` of `shared-frontend`):
++Default to the cheapest model that can plausibly do the job; escalate only on observed difficulty, never pre-emptively. Ladder (full table: `docs/MODEL-PROFILES.md` in `shared-frontend`):
+ 
+-- **L0 haiku / DeepSeek (default):** locating code, running lookups, mechanical edits, running verification commands, simple research questions, drafting routine docs/comments, anything with a narrow well-defined answer.
+-- **L1 sonnet:** multi-file implementation, non-trivial debugging, code review with judgment calls, anything requiring holding several constraints at once. Security/secrets/auth/IaC work never drops below L1.
+-- **L2 opus:** only for genuinely hard reasoning — architecture tradeoffs, adversarial verification, ambiguous specs needing real judgment — and only when L1 has already been tried or is clearly insufficient.
++- **L0 haiku/DeepSeek (default):** lookups, mechanical edits, verification runs, simple research, routine drafting — narrow well-defined answers.
++- **L1 sonnet:** multi-file implementation, non-trivial debugging, judgment-call review, multiple held constraints. Security/secrets/auth/IaC never drops below L1.
++- **L2 opus:** genuinely hard reasoning (architecture tradeoffs, adversarial verification, ambiguous specs) only after L1 is tried or clearly insufficient.
+ 
+-When dispatching, state which tier you picked and why in one line if it's not L0 (so cost tradeoffs stay visible). Don't escalate by default "to be safe" — escalate on observed difficulty (a lower-tier subagent failing or looping) rather than pre-emptively.
++State the tier and why in one line whenever it's not L0.
+ 
+ ### SME profiles
+ 
+-Dispatch via a named subject-matter-expert profile when one fits (installed in `~/.copilot/agents/`; persona spec in the repo's `docs/SME-PROFILES.md`): `frontend-sme`, `security-sme`, `iac-sme`, `sync-sme`, `qa-sme`, `architecture-sme` (L2, decisions only), `platform-sme`. Each card names its default tier, owned lanes, and guardrails. Solution quality is tagged against `docs/SOLUTION-CLASSES.md` (template → class → pattern → enterprise → faang → elite, with IaC as a cross-cutting mandate). Parallel execution lanes live in `docs/EXECUTION-PLAN.md` — one issue = one subagent = one lane, no two lanes sharing a file.
++Dispatch via a named SME when one fits (`~/.copilot/agents/`; spec in `docs/SME-PROFILES.md`): `frontend-sme`, `security-sme`, `iac-sme`, `sync-sme`, `qa-sme`, `architecture-sme` (L2, decisions only), `platform-sme`. Each card names its tier, lanes, guardrails. Quality tags against `docs/SOLUTION-CLASSES.md` (template→class→pattern→enterprise→faang→elite, IaC cross-cutting). Lanes: `docs/EXECUTION-PLAN.md` — one issue = one subagent = one lane, no shared files.
+ 
+ ## Caveman + loop + advisor compatibility
+ 
+-Caveman mode governs *user-facing text only*. It must never suppress or shortcut:
+-- **`/loop`**: keep scheduling wakeups and following the loop's own instructions normally; only the text shown to the user gets compressed.
+-- **`advisor()`**: always call it at the points its own tool guidance specifies (before substantive work, before declaring done, when stuck) regardless of caveman level. Give the advisor's advice full consideration — caveman brevity applies to how you report the outcome, not whether you sought or weighed it.
+-- Code, commit messages, PR descriptions, and security-relevant explanations stay in normal (non-caveman) prose per caveman's own stated boundaries.
++Caveman compresses *user-facing text only* — never:
++- `/loop`: keep scheduling/following its own instructions; only displayed text compresses.
++- `advisor()`: call at its own specified points regardless of caveman level; weigh advice fully — brevity applies to reporting the outcome, not to seeking/weighing it.
++- Code, commit messages, PR descriptions, security explanations stay normal prose (caveman's own stated boundary).
+ 
+ ## `/focus` prompt construction
+ 
+-When building a `/focus` prompt (or any prompt handed to a subagent/skill that will run somewhat autonomously), **frontload the goal**: state the concrete objective and success criteria in the first sentence or two, before any background/context/constraints. Structure:
+-
+-1. Goal (what done looks like, one line)
+-2. Constraints/non-negotiables (safety boundaries, scope limits)
+-3. Context (what's already known, what's already been tried)
+-4. Any specific steps or preferences
+-
+-This ordering lets a subagent (or the future self resuming after compaction) act correctly even if it only reads the first line.
++Frontload the goal in any prompt handed to a subagent/skill: objective + success criteria in the first 1-2 sentences, before background. Order: (1) goal, (2) constraints/non-negotiables, (3) context/what's tried, (4) specific steps/preferences. Lets a subagent (or a post-compaction future self) act correctly from sentence 1.

@@ -1,0 +1,90 @@
+# PersonaOffices: purebliss single-tenant org — CEO/CTO/CFO/PMO offices
+# (declarative IaC seed; no human hand at runtime).
+#
+# Each office's monthlyBudgetUsd equals its head role's cap as declared in
+# registry/personas/org-charts/purebliss.yaml (verified, not redefined, by
+# registry/personas/tests/test_offices.py::test_office_budgets_match_caps).
+#
+# agentProfiles come from registry/packs/releases/purebliss-team.1.0.0.yaml
+# (ollama, paperclip, hermes, deepseek, claude). Mapping (EPIC #253 frozen
+# provider pin + this office layer):
+#   claude    -> CEO (orchestration) and CTO (senior authoring/review)
+#   deepseek  -> CFO (analysis, SQL, FinOps reasoning)
+#   hermes    -> CTO (coding worker)
+#   ollama    -> CTO (local inference worker)
+#   paperclip -> PMO (docs authoring)
+officesSchema: persona-offices/v1
+id: purebliss-offices
+tenant: purebliss
+version: 1.0.0
+orgChartRef: registry/personas/org-charts/purebliss.yaml
+offices:
+  - id: ceo
+    title: Office of the CEO
+    headPersona: ceo
+    memberPersonas:
+      - orchestrator
+    agentProfiles:
+      - claude
+    promptRefs:
+      - ceo/primary@v1
+    monthlyBudgetUsd: 300
+    budgetSource: "registry/personas/org-charts/purebliss.yaml + gateway/finops/budgets.yaml roles.capSource"
+    fleetPack: purebliss-team@1.0.0
+    routingGroup: purebliss-team
+    moduleDir: registry/personas/offices/ceo
+
+  - id: cto
+    title: Office of the CTO
+    headPersona: cto
+    memberPersonas:
+      - architecture-sme
+      - iac-sme
+      - security-sme
+      - platform-sme
+      - frontend-sme
+      - qa-sme
+      - sync-sme
+      - debugging-sme
+      - mechanical-sme
+    agentProfiles:
+      - claude
+      - hermes
+      - ollama
+    promptRefs:
+      - cto/primary@v1
+    monthlyBudgetUsd: 250
+    budgetSource: "registry/personas/org-charts/purebliss.yaml + gateway/finops/budgets.yaml roles.capSource"
+    fleetPack: purebliss-team@1.0.0
+    routingGroup: purebliss-team
+    moduleDir: registry/personas/offices/cto
+
+  - id: cfo
+    title: Office of the CFO
+    headPersona: cfo
+    memberPersonas: []
+    agentProfiles:
+      - deepseek
+    promptRefs:
+      - cfo/primary@v1
+    monthlyBudgetUsd: 50
+    budgetSource: "registry/personas/org-charts/purebliss.yaml + gateway/finops/budgets.yaml roles.capSource"
+    fleetPack: purebliss-team@1.0.0
+    routingGroup: purebliss-team
+    moduleDir: registry/personas/offices/cfo
+
+  - id: pmo
+    title: Office of the PMO
+    headPersona: pmo
+    memberPersonas:
+      - pmo-sme
+      - docs-sme
+    agentProfiles:
+      - paperclip
+    promptRefs:
+      - pmo/primary@v1
+    monthlyBudgetUsd: 100
+    budgetSource: "registry/personas/org-charts/purebliss.yaml + gateway/finops/budgets.yaml roles.capSource"
+    fleetPack: purebliss-team@1.0.0
+    routingGroup: purebliss-team
+    moduleDir: registry/personas/offices/pmo

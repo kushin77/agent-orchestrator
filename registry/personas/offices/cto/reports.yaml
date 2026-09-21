@@ -1,0 +1,61 @@
+# CTO Office members (issue #1573)
+#
+# Every id below must resolve to a real persona card in
+# registry/personas/cards/*.yaml. Tier defaults are copied from the card's
+# defaultModelTier at the time of writing (drift is the card's business, not
+# this file's — this file names membership, not tier truth).
+office: cto
+schema: cto-office-reports/v1
+version: 1.0.0
+members:
+  - id: architecture-sme
+    card: registry/personas/cards/architecture-sme.yaml
+    lane: architecture
+    defaultTierAtWriting: HIGH
+  - id: iac-sme
+    card: registry/personas/cards/iac-sme.yaml
+    lane: gov-iac
+    defaultTierAtWriting: HIGH
+  - id: security-sme
+    card: registry/personas/cards/security-sme.yaml
+    lane: security
+    defaultTierAtWriting: HIGH
+  - id: platform-sme
+    card: registry/personas/cards/platform-sme.yaml
+    lane: standards
+    defaultTierAtWriting: MED
+  - id: frontend-sme
+    card: registry/personas/cards/frontend-sme.yaml
+    lane: pilot-frontend
+    defaultTierAtWriting: MED
+  - id: qa-sme
+    card: registry/personas/cards/qa-sme.yaml
+    lane: gates
+    defaultTierAtWriting: MED
+  - id: sync-sme
+    card: registry/personas/cards/sync-sme.yaml
+    lane: sync-engine
+    defaultTierAtWriting: MED
+  - id: debugging-sme
+    card: registry/personas/cards/debugging-sme.yaml
+    lane: hygiene
+    defaultTierAtWriting: MED
+  - id: mechanical-sme
+    card: registry/personas/cards/mechanical-sme.yaml
+    lane: hygiene
+    defaultTierAtWriting: LOW
+  - id: docs-sme
+    card: registry/personas/cards/docs-sme.yaml
+    lane: dx
+    defaultTierAtWriting: LOW
+  - id: gcp-gatekeeper-sme
+    card: registry/personas/cards/gcp-gatekeeper-sme.yaml
+    lane: gates
+    defaultTierAtWriting: MED
+  - id: hermes
+    card: registry/personas/cards/hermes.yaml
+    lane: hermes
+    defaultTierAtWriting: MED
+    note: "default executor/router in the delivery chain (see
+      delivery-lifecycle.yaml); not a review posture — hermes routes and
+      authors, the CTO office gates merge/apply."

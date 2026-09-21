@@ -154,7 +154,15 @@ is recorded `admission: "independent"`.
 Reasoning: paperclip is consumed as an **external serving layer** — the
 paperclip.ing adapters (`docs/decision-records/ADR-0013-paperclip-ing-integration.md`
 and the shipped paperclip integration) sit on the other side of the seam and are
-integrations, not children. `kushin77/paperclip#10` asks the relationship question and
+integrations, not children.
+
+*Shipped* above means shipped **in this repository** and gated offline — not
+running. The upstream runtime is **not** deployed: `enable_paperclip` defaults
+`false` and no runtime resource is planned today
+([`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md), section
+*Current status*).
+
+`kushin77/paperclip#10` asks the relationship question and
 `kushin77/CMR#794` raises the same doubt from the hub side ("appears to be an
 independent product"), so the parent answers explicitly rather than leaving a
 register entry undecided. The gate refuses this answer the moment a paperclip

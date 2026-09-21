@@ -19,6 +19,14 @@
 #
 # Nothing here decides WHO may call a verb; that is identity/rbac. This file
 # declares WHAT a verb is, what it costs to call it, and what it records.
+#
+# WHERE an invocation is recorded -- the canonical rail for each act, the row
+# each rail actually writes, and the measured fact that the `audit:` value below
+# is a label on that row and not a field in it -- is stated once, in
+# control-plane/control/README.md ("Where an invocation is recorded"). Read it
+# before assuming a control act is unlogged, or that
+# .board/dispatch-audit.jsonl is a ledger of these verbs: it is the
+# dispatch-arbitration rail, not this one (issue #1548).
 
 schema: cmr.control-verbs/v1
 
@@ -885,3 +893,22 @@ verbs:
       .fleet/done/ and stamps it with the retirement reason and the
       superseding issue(s); nothing here reopens it. Idempotent: retiring an
       already-retired directive is a no-op, not a refusal.
+
+  - id: board.try-loop
+    source: governance/dispatch/cli.py
+    local: try-loop
+    effect_class: irreversible
+    allowed_runtimes: [claude-session, claude-subagent]
+    capability: board:admin
+    audit: board.try-loop
+    idempotent: false
+    exposed: false
+    why_not_exposed: >-
+      The tiered try-loop dispatcher (L0 -> L1 -> L2 escalation, #1524) drives
+      a live model invocation, an acceptance run and gh label/comment writes
+      for one issue; it is a local escalation tool run from an operator's own
+      session, not a lever a remote caller should trigger. Irreversible: each
+      attempt appends to the escalation ledger and can post gh comments/labels
+      that nothing here retracts. Not idempotent: a repeat call is a new
+      attempt, not a no-op.
+    refusals: [401, 403, 503]
