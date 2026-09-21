@@ -235,7 +235,8 @@
 #   bash scripts/check-pr-contract.sh --selftest         # build mutants, prove it fails
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 # GIT_DIR and friends are neutralised (issue #1642, SP-11): the selftest
 # below seeds a scratch repo with `git -C`, which does not override an
 # exported GIT_DIR — an exported one would write into the real repo instead.

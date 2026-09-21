@@ -776,7 +776,8 @@ PY
   return 0
 }
 
-own_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+own_root="$(find_repo_root)"
 root="$own_root"
 if [ -n "$root_override" ]; then
   root="$(cd "$root_override" 2>/dev/null && pwd)" || {

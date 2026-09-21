@@ -77,7 +77,8 @@
 # Usage: bash scripts/check-fleet-cron-dev-run.sh
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 fail=0
