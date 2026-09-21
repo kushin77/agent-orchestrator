@@ -181,6 +181,71 @@ def resolve(snapshot: Snapshot, pinned: int | None = None) -> Issue | None:
     return candidates[0] if candidates else None
 
 
+#: The committed ``.board/focus.json`` can rot the same way the committed
+#: ``.board/snapshot.json`` does (issue #1717, mirroring #1692/#1189): its pin
+#: is a point-in-time GitHub write nobody commits. 72h matches the tolerance
+#: this repo already declares for the sibling artifact (queue_freshness.py /
+#: ticket/freshness.py DEFAULT_MAX_AGE_HOURS) — same artifact class, same bound.
+STALE_TOLERANCE_HOURS = 72.0
+
+#: The ONE refresh verb this self-heal names (RCA-0014: the remedy travels
+#: with the finding).
+REFRESH_COMMAND = "python3 governance/dispatch/cli.py focus --from-github"
+
+
+def _pin_stale(loaded: Focus, snapshot: Snapshot, now: datetime | None) -> bool:
+    """The committed pin is stale: its epic closed, or its stamp is too old."""
+    if loaded.active_epic is None:
+        return False
+    epic = snapshot.get(loaded.active_epic)
+    if epic is None or epic.closed or not epic.is_epic:
+        return True
+    try:
+        stamp = datetime.strptime(loaded.activated_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return True
+    moment = now or datetime.now(timezone.utc)
+    age_hours = (moment - stamp).total_seconds() / 3600.0
+    return age_hours > STALE_TOLERANCE_HOURS
+
+
+def _refresh(path: Path | str) -> tuple[bool, str]:
+    """Run the ONE refresh verb as a subprocess (shared shape with #1692)."""
+    import subprocess
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from governance import board_selfheal
+
+    cli_path = Path(__file__).resolve().parent / "cli.py"
+    return board_selfheal.refresh(command=[sys.executable, str(cli_path), "focus", "--from-github"])
+
+
+def self_heal(snapshot: Snapshot, path: Path | str = DEFAULT_PATH, *, now: datetime | None = None) -> tuple[bool, str]:
+    """Refresh the committed ``.board/focus.json`` in place when its pin is stale
+    (issue #1717, mirroring the ``.board/snapshot.json`` self-heal, #1692).
+
+    A caller runs this ONCE, before reading the focus for a real decision (the
+    CLI entry points do, right after loading the board snapshot). A fresh, or
+    unpinned, focus is untouched: ``(True, "")``. A stale pin runs the ONE
+    refresh verb and overwrites ``path`` with the live active epic on success:
+    ``(True, detail)``. When refresh is impossible (offline, no ``gh`` auth,
+    ...) this fails closed, by name: ``(False, detail)`` — the caller decides
+    how to surface that as CANNOT-ASSESS, never silently falls through to
+    "no focus, everything pooled".
+    """
+    loaded = load(path)
+    if loaded is None or not _pin_stale(loaded, snapshot, now):
+        return True, ""
+    ok, detail = _refresh(path)
+    if not ok:
+        return False, (
+            f"pinned epic #{loaded.active_epic} is stale and could not be refreshed "
+            f"({detail}); refresh it with: {REFRESH_COMMAND}"
+        )
+    return True, detail
+
+
 def active(snapshot: Snapshot, path: Path | str = DEFAULT_PATH, *, pinned: int | None = None) -> Issue | None:
     """Resolve the active epic from the pinned focus at ``path`` (or ``pinned``)."""
     if pinned is None:

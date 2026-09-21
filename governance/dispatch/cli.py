@@ -209,11 +209,28 @@ def cmd_audit(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _selfheal_focus(verb: str, snapshot: snapshot_mod.Snapshot) -> int | None:
+    """Self-heal a stale committed ``.board/focus.json`` before a verb reads it
+    (issue #1717): a pin stuck on a closed epic, or older than
+    ``focus.STALE_TOLERANCE_HOURS``, is refreshed in place from the live board
+    before anything downstream resolves against it. ``None`` on success (fresh,
+    healed, or unpinned); an exit code when refresh was needed and failed.
+    """
+    ok, detail = focus_mod.self_heal(snapshot, focus_mod.DEFAULT_PATH)
+    if not ok:
+        print(f"{verb}: CANNOT-ASSESS — {detail}", file=sys.stderr)
+        return EXIT_CANNOT_ASSESS
+    return None
+
+
 def cmd_eligible(args: argparse.Namespace) -> int:
     assessed = _board_verdict("eligible", args)
     if assessed is None:
         return EXIT_CANNOT_ASSESS
     snapshot, _age = assessed
+    failure = _selfheal_focus("eligible", snapshot)
+    if failure is not None:
+        return failure
     events = claims.read_ledger(args.ledger)
     live = claims.active_claims(events)
     held_by_self = frozenset(number for number, claim in live.items() if claim.agent == args.agent)
@@ -235,6 +252,9 @@ def cmd_claim(args: argparse.Namespace) -> int:
     if assessed is None:
         return EXIT_CANNOT_ASSESS
     snapshot, _age = assessed
+    failure = _selfheal_focus("claim", snapshot)
+    if failure is not None:
+        return failure
     snapshot_path = Path(args.snapshot)
     # The digest is taken AFTER the staleness handling: a successful in-band
     # refresh (#1179) rewrites the file, and a digest of the pre-refresh bytes
@@ -295,6 +315,9 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
     if assessed is None:
         return EXIT_CANNOT_ASSESS
     snapshot, _age = assessed
+    failure = _selfheal_focus("dispatch", snapshot)
+    if failure is not None:
+        return failure
     snapshot_path = Path(args.snapshot)
     try:
         arbitration = claims.arbitrate(
@@ -344,10 +367,13 @@ def cmd_status(args: argparse.Namespace) -> int:
     if assessed is None:
         return EXIT_CANNOT_ASSESS
     snapshot, age = assessed
+    focus_path = Path(getattr(args, "focus", focus_mod.DEFAULT_PATH))
+    failure = _selfheal_focus("status", snapshot)
+    if failure is not None:
+        return failure
     events = claims.read_ledger(args.ledger)
     live = claims.active_claims(events)
     held = frozenset(live)
-    focus_path = Path(getattr(args, "focus", focus_mod.DEFAULT_PATH))
     milestone = order.active_milestone(snapshot, frozenset())
     print(f"active milestone: {milestone or '<none>'}")
     if milestone:
@@ -471,8 +497,28 @@ def cmd_focus(args: argparse.Namespace) -> int:
     """Print the active epic, its open children and the pooled set (epic #707, F1).
 
     With ``--self-control`` it first runs the resolver/schema mutants: a resolver
-    that cannot fail is a formality, so the gate drives this mode.
+    that cannot fail is a formality, so the gate drives this mode. With
+    ``--from-github`` it is instead the ONE refresh verb the committed
+    ``.board/focus.json`` self-heal names (issue #1717, mirroring the snapshot's
+    ``snapshot --from-github``): it refreshes the board from GitHub, re-derives
+    the live active epic (the pinned-epic-still-open-else-lowest-open-epic rule,
+    ignoring the stale committed pin), and commits a fresh focus pointing at it.
     """
+    if args.from_github:
+        refreshed, detail = snapshot_mod.refresh(args.snapshot, repo=args.repo)
+        if not refreshed:
+            print(f"focus: CANNOT-ASSESS — {detail}", file=sys.stderr)
+            return EXIT_CANNOT_ASSESS
+        fresh_snapshot = snapshot_mod.load(args.snapshot)
+        epic = focus_mod.resolve(fresh_snapshot, pinned=None)
+        new_focus = focus_mod.Focus.pinned(epic.number if epic is not None else None)
+        focus_mod.save(new_focus, args.focus)
+        if epic is None:
+            print(f"focus: wrote {args.focus} (active_epic: <none> — no workable epic on the live board)")
+        else:
+            print(f"focus: wrote {args.focus} (active_epic: #{epic.number} {epic.title})")
+        return EXIT_OK
+
     if args.self_control:
         problems = focus_mod.self_control()
         # The capacity gate is the fan-out half of the focus contract (#718):
@@ -1112,6 +1158,10 @@ def build_parser() -> argparse.ArgumentParser:
     focus_cmd.add_argument("--focus", default=str(focus_mod.DEFAULT_PATH))
     focus_cmd.add_argument(
         "--self-control", action="store_true", help="also prove the resolver and schema can fail"
+    )
+    focus_cmd.add_argument(
+        "--from-github", action="store_true",
+        help="the one refresh verb: refresh the snapshot and commit a fresh focus pointing at the live active epic",
     )
     focus_cmd.set_defaults(func=cmd_focus)
 
