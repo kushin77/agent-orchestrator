@@ -1,0 +1,42 @@
+# The git policy domain (issue #1765).
+#
+# Git policy in this repository is fragmented across FOUR sources, none of which
+# was declared in-repo as *the* git policy. This domain registers the declared
+# capture of that policy; the four sources are cross-referenced below, and each
+# was verified to exist before being cited.
+#
+#   (a) GitHub branch-protection API config for master — captured live in
+#       `.github/BRANCH-PROTECTION.md` (read 2026-09-21T20:29:03Z; applied
+#       manually today under the AO-GR-5 console-click exception, not yet IaC).
+#       Observed: required_linear_history, allow_force_pushes=false,
+#       allow_deletions=false; no required_pull_request_reviews and no
+#       required_status_checks key present.
+#   (b) `docs/GOLDEN-RULES.md` prose — AO-GR-3 (verify before done),
+#       AO-GR-8 (SemVer is law), AO-GR-9 (guardrails on every governed surface),
+#       AO-GR-11 (merge governance: evidence-gated; no direct push to master).
+#   (c) `.github/CODEOWNERS` — the declared reviewer-ownership map (one rule per
+#       pillar/cross-cutting directory), held to the tree by
+#       `scripts/check-codeowners.sh`.
+#   (d) `scripts/check-squash-message.sh` — the composed-message gate with a
+#       hardcoded trailer regex (`ref_re`, `Refs <slug>#<n>`) plus the
+#       trailing-trailer-block rule; it delegates the commit-level predicate to
+#       `governance/isolation/trailer.py`.
+#
+# `source_file` names the ONE declared source of truth for this domain — the
+# in-repo capture (a). The other three are cross-referenced here in the comments
+# so the registry row stays a single, checkable path while the fragmentation is
+# still recorded where a reader of the declaration will see it.
+#
+# The real enforcement points are: the GitHub branch-protection API (server-side
+# force-push/deletion block + required linear history), the repo gate
+# `make verify` (which runs `scripts/check-squash-message.sh`, the isolation
+# check and the codeowners check), the local commit-time hooks in
+# `.pre-commit-config.yaml`, and `.github/CODEOWNERS` reviewer routing. There is
+# NO pre-push hook installed today — the pre-commit config is pre-commit stage
+# only — so this domain does not claim one.
+#
+# Schema: governance/policy/README.md.
+domain: git
+source_file: .github/BRANCH-PROTECTION.md
+enforcement_point: "GitHub branch-protection API on master (force-push/deletion block + required linear history) plus the repo gate (make verify runs scripts/check-squash-message.sh, the isolation check and scripts/check-codeowners.sh) and the commit-time hooks in .pre-commit-config.yaml"
+control_plane_visible: true
