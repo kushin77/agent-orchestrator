@@ -25,8 +25,16 @@
 #        DECLARED table (PP-2..), never both and never zero.
 #     4. python-patterns-no-scan-script — the doc's own claim ("no
 #        scripts/check-python-patterns.sh ships") stays true: no OTHER checker
-#        in scripts/ claims to be a PP-1..PP-4 source scan. This checker's own
-#        name is exempted (it is not that scan; see the file's own header).
+#        in scripts/ CLAIMS TO BE a PP-1..PP-4 source scan. A claim is a
+#        DECLARATION — the refused artifact's own name, or a PP-N id inside the
+#        checker's machine-readable `# ---knowledge---` identity header (the
+#        block where a gate declares what it is). A prose CITATION of the
+#        doctrine inside an unrelated gate's body (e.g. check-peer-check.sh's
+#        comment naming the date-bomb pattern) is a cross-reference, not a
+#        claim, and must NOT fire. The former whole-file grep could not tell a
+#        citation from a claim, so it fired on the unmutated tree and proved
+#        nothing — #1862. This checker's own name is exempted (it is not that
+#        scan; see the file's own header).
 #
 # WHY IT IS SHAPED LIKE THIS (self-test, provoked both ways)
 #   A gate that cannot fail is a formality, so `--self-test` plants a mutated
@@ -36,6 +44,13 @@
 #     - the unmutated, real doc produces NO finding for that same rule
 #       (vacuity — a rule that fires on the real doc is not a check, it is
 #       noise).
+#   Rule 4 is provoked in a scratch scripts/ venue (its scan dir is a
+#   parameter, so nothing is written into the repository tree) with BOTH halves:
+#   a checker that CLAIMS the scan (the refused artifact name, or a PP-N id in
+#   its knowledge header) must RED, while a mere CITATION of the doctrine in a
+#   body comment, and an empty venue, must stay silent. The real tree is covered
+#   by the run's own rule-4 pass, which refuses BY NAME. That citation/claim
+#   discrimination is the property #1862 restores.
 #   `--self-test` runs before the repository is examined, on every invocation.
 #
 # EXIT CONTRACT (the repo's honesty tri-state)
@@ -158,15 +173,34 @@ rule_ids_unique() {
   return "$rc"
 }
 
-# rule 4: no OTHER checker in scripts/ claims to be a PP-1..PP-4 python source scan.
+# rule 4: no checker in <scan_dir> CLAIMS TO BE a PP-1..PP-4 python source
+# scan. A claim is a DECLARATION, not a citation: either the refused artifact's
+# own name, or a PP-N id inside the checker's `# ---knowledge---` identity
+# header — the machine-readable block where a gate declares what it is. A
+# doctrine reference in an unrelated gate's body is a cross-reference, not a
+# claim, and does not fire (#1862: the former whole-file grep could not tell the
+# two apart, so it fired on the unmutated tree and proved nothing).
+# The scan dir is a parameter so the self-test can plant in its own scratch
+# venue and never write into the repository tree.
 rule_no_scan_script() {
+  local dir="$1"
   local rc=0
-  local f
-  for f in "$ROOT"/scripts/check-*.sh; do
+  local f base header
+  for f in "$dir"/check-*.sh; do
     [ -f "$f" ] || continue
     [ "$f" = "$SELF" ] && continue
-    if grep -qE 'PP-[0-9]' "$f"; then
-      echo "REFUSED PP-1 no-scan-script: $f references a PP-N id — docs/PYTHON-PATTERNS.md says no source scan ships"
+    base="${f##*/}"
+    # (i) the exact artifact the doc refuses to ship, by name.
+    if [ "$base" = "check-python-patterns.sh" ]; then
+      echo "REFUSED PP-1 no-scan-script: $f is the very source scan docs/PYTHON-PATTERNS.md refuses to ship"
+      rc=1
+      continue
+    fi
+    # (ii) a checker that DECLARES itself the scan: a PP-N id in its identity
+    #      header. Body prose is a citation of the doctrine, never a claim.
+    header="$(awk 'c==2{exit} /^# ---knowledge---/{c++} c>=1{print}' "$f")"
+    if printf '%s\n' "$header" | grep -qE 'PP-[0-9]'; then
+      echo "REFUSED PP-1 no-scan-script: $f declares a PP-N id in its knowledge header — docs/PYTHON-PATTERNS.md says no source scan ships"
       rc=1
     fi
   done
@@ -179,7 +213,7 @@ run_rules() {
   out="$(rule_enforcement_live "$doc" "$verify" "$finops")"; [ -n "$out" ] && { echo "$out"; rc=1; }
   out="$(rule_declared_has_owner "$doc")"; [ -n "$out" ] && { echo "$out"; rc=1; }
   out="$(rule_ids_unique "$doc")"; [ -n "$out" ] && { echo "$out"; rc=1; }
-  out="$(rule_no_scan_script)"; [ -n "$out" ] && { echo "$out"; rc=1; }
+  out="$(rule_no_scan_script "$ROOT/scripts")"; [ -n "$out" ] && { echo "$out"; rc=1; }
   return "$rc"
 }
 
@@ -246,22 +280,53 @@ self_test() {
     fail=1
   fi
 
-  # --- probe D: a scratch checker that claims to scan PP-1 -> rule 4 must fire;
-  #     with no such file, rule 4 must be silent (checked against the real tree
-  #     inline, since rule 4 scans $ROOT/scripts by design).
-  local planted="$ROOT/scripts/check-python-patterns-doctrine-selftest-plant.sh"
-  printf '#!/usr/bin/env bash\n# would refuse PP-1 by name\n' > "$planted"
-  if rule_no_scan_script >/dev/null; then
-    rm -f "$planted"
-    echo "check-python-patterns-doctrine: SELF-TEST FAILED — no-scan-script did not fire on a planted PP-1 scanner" >&2
+  # --- probe D: rule 4 must fire ONLY on a checker that CLAIMS TO BE the
+  #     PP-1..PP-4 scan, and stay silent on a mere citation and on an empty
+  #     venue (#1862). The plant venue is a scratch scripts/ dir, so the arm
+  #     never writes into the repository tree — an earlier shape planted in
+  #     $ROOT/scripts and its cleanup deleted an externally planted
+  #     check-python-patterns.sh before tree mode could see it.
+  local sdir="$scratch/scripts"
+  mkdir -p "$sdir"
+
+  # D1: the refused artifact, by name -> must fire.
+  printf '#!/usr/bin/env bash\n# the source scan #1028 asked for\n' > "$sdir/check-python-patterns.sh"
+  if rule_no_scan_script "$sdir" >/dev/null; then
+    echo "check-python-patterns-doctrine: SELF-TEST FAILED — no-scan-script did not fire on the refused artifact check-python-patterns.sh" >&2
     fail=1
-  else
-    rm -f "$planted"
   fi
-  if ! rule_no_scan_script >/dev/null; then
+  rm -f "$sdir/check-python-patterns.sh"
+
+  # D2: a checker declaring the scan in its identity header -> must fire, under
+  #     a name the refused-name arm cannot catch (the header arm alone).
+  printf '#!/usr/bin/env bash\n# check-pp-claim.sh\n#\n# ---knowledge---\n# module_id: scripts.check-python-patterns\n# system: governance\n# app: gates\n# patterns: [source-scan]\n# related: ["PP-1"]\n# ---knowledge---\n' > "$sdir/check-pp-claim.sh"
+  if rule_no_scan_script "$sdir" >/dev/null; then
+    echo "check-python-patterns-doctrine: SELF-TEST FAILED — no-scan-script did not fire on a checker declaring the PP-N scan in its knowledge header" >&2
+    fail=1
+  fi
+  rm -f "$sdir/check-pp-claim.sh"
+
+  # D3: a mere CITATION of the doctrine in a body comment -> must stay silent
+  #     (the property #1862 restores: a claim is not a citation).
+  printf '#!/usr/bin/env bash\n# a hardcoded day collapses to a false green (docs/PYTHON-PATTERNS.md PP-1)\n' > "$sdir/check-pp-citation.sh"
+  if ! rule_no_scan_script "$sdir" >/dev/null; then
+    echo "check-python-patterns-doctrine: SELF-TEST FAILED — no-scan-script fired on a mere citation of the doctrine (it cannot tell a claim from a citation)" >&2
+    fail=1
+  fi
+  rm -f "$sdir/check-pp-citation.sh"
+
+  # D4: an empty venue -> must stay silent (rule 4 is not "matches everything").
+  if ! rule_no_scan_script "$sdir" >/dev/null; then
     echo "check-python-patterns-doctrine: SELF-TEST FAILED — no-scan-script fired with no plant present (vacuity)" >&2
     fail=1
   fi
+
+  # The REAL tree is asserted silent by this run's own rule-4 pass (run_rules),
+  # which refuses BY NAME if any checker in scripts/ claims the scan. Keeping the
+  # self-test inside the scratch venue stops it racing a plant — and stops it
+  # deleting one: an earlier shape wrote its plant into $ROOT/scripts and cleaned
+  # it up, so it destroyed an externally planted check-python-patterns.sh before
+  # tree mode could see it (measured: a planted refused artifact read as rc=0).
 
   [ "$fail" -eq 0 ]
 }
