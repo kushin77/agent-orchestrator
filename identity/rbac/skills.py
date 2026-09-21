@@ -32,6 +32,23 @@ Scope identifiers
 An Org is the tenant (``model.Org``), so a skill's ``owner_org`` is an Org id
 and ``PLATFORM_ORG`` is the reserved platform owner - mirroring the persona
 registry's ``tenant: platform`` convention, and never a real Org id.
+
+
+---knowledge---
+module_id: identity.rbac.skills
+system: identity
+app: rbac
+solution_class: enterprise
+patterns: [tenant-isolation, fail-closed, named-refusal]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [SkillShareRegistry, partition_by_visibility, Skill]
+invariants: "cross-tenant invisibility is the default: a tenant skill is never visible to another tenant, not by a wildcard, not by an org-scoped share"
+gotchas: "a tenant may not shadow a platform skill with a declaration of its own id"
+related: ["#638"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

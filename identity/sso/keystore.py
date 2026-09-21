@@ -14,6 +14,23 @@ Aliases held here:
   session signing; current + retained verification keys).
 - ``sec:<alias>``   - opaque bytes secrets (HS256 session HMAC secret,
   OIDC client secret, relay-state HMAC secret).
+
+
+---knowledge---
+module_id: identity.sso.keystore
+system: identity
+app: sso
+solution_class: pattern
+patterns: [explicit-alias, secrets-not-in-repo, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [KeyStore]
+invariants: "configs reference aliases, never raw material, and key material is injected at runtime — never stored in the repo and never written to disk by this module"
+gotchas: ""
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

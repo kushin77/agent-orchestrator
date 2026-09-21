@@ -12,6 +12,23 @@ Fail-closed is a property of this taxonomy, not a convention: there is no
 ``allow`` member and no ``fallback`` member, and every subclass is raised on a
 boundary that would otherwise *widen* access (an unmapped identity, a foreign
 tenant id, a mismatched conversation container, an unapproved action).
+
+
+---knowledge---
+module_id: identity.chat.errors
+system: identity
+app: chat
+solution_class: pattern
+patterns: [fail-closed, named-refusal, closed-vocabulary]
+derives_from: identity/cpapi/errors.py
+owner_sme: security-sme
+tier: L1
+interfaces: [ChatError, ChatError.as_api_error]
+invariants: "fail-closed is a property of the taxonomy: there is no allow member and no fallback member"
+gotchas: "the taxonomy mirrors identity.cpapi.errors and converts onto that wire vocabulary rather than duplicating it"
+related: ["#505"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -17,6 +17,23 @@ the session-token claim vocabulary frozen by ``registry/service`` (issue #10)
 and ``identity/sso`` (issue #35); subject kinds mirror ``identity/rbac``
 ``SUBJECT_USER`` / ``SUBJECT_AGENT`` (issue #12); the HTTP/method + traversal
 guard semantics mirror the cannibalized ``saas-rbac`` proxy (see README).
+
+
+---knowledge---
+module_id: identity.edges.model
+system: identity
+app: edges
+solution_class: class
+patterns: [closed-vocabulary, contract-first, consume-never-restate]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [API_VERSION, METHODS, TRACE_HEADER, SUBJECT_TYPES, DEFAULT_SUBJECT_TYPE]
+invariants: "field names are consumed, not redefined; the token claim keys mirror the frozen contracts"
+gotchas: ""
+related: ["#37"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

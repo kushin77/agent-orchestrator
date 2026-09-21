@@ -15,6 +15,23 @@ Harvested from capital-underwriting's support path:
 Fail-closed: impersonation requires an explicit, unexpired, unrevoked grant
 matching operator/tenant/target; a session is only ever scoped to the grant's
 tenant (no cross-tenant fallback).
+
+
+---knowledge---
+module_id: identity.sso.impersonation
+system: identity
+app: sso
+solution_class: enterprise
+patterns: [explicit-grant, audited-override, time-boxed, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [create_impersonation_grant, issue_impersonated_session, revoke_impersonation, audit_operator, audit_grant]
+invariants: "impersonation requires an explicit, unexpired, unrevoked grant, and the impersonated token's jti is the grant's jti so revoking the grant kills the token"
+gotchas: "audit events emitted inside an impersonated session carry the real operator alongside the impersonated subject"
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

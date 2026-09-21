@@ -17,6 +17,23 @@ present. When the persona directory IS present, resolution is fail-closed - an
 expected persona id that cannot be found is an error, never a silent skip.
 
 No network; everything resolves against the local checkout.
+
+
+---knowledge---
+module_id: identity.onboarding.registry_assets
+system: identity
+app: onboarding
+solution_class: pattern
+patterns: [read-only-consumption, registry-asset-resolution, deferred-seed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [resolve, RegistrySeed, profile_catalog, prompt_catalog, persona_registry]
+invariants: "registry assets are read-only: the provisioning pipeline installs seed packs by reading the on-disk platform registries"
+gotchas: "persona references are recorded as deferred seeds when registry/personas/cards is absent, and installed once it appears"
+related: ["#14", "#11", "#9", "#13"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

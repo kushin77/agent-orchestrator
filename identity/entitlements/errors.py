@@ -4,6 +4,23 @@ Mutation operations (``assign_plan``, ``grant_override``, ``revoke_override``)
 raise these on a refusal so a caller surfaces the cause. Pure evaluation
 (``feature_state``, ``evaluate_permission``) never raises for a deny: it
 returns a ``FeatureState`` / ``AccessDecision`` carrying a fail-closed code.
+
+
+---knowledge---
+module_id: identity.entitlements.errors
+system: identity
+app: entitlements
+solution_class: pattern
+patterns: [named-refusal, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [EntitlementError, UnknownPlanError, UnknownFeatureError, OverrideAuthorityError, OverrideExpiryError]
+invariants: "pure evaluation never raises for a deny — it returns a state carrying a fail-closed code"
+gotchas: "mutation operations raise these on a refusal so a caller surfaces the cause"
+related: ["#36"]
+do_not_duplicate: null
+---knowledge---
 """
 
 

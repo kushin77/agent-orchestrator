@@ -15,6 +15,23 @@ This is the enforcement core of the tenant-identity lane (issue #35):
 - **logout / revocation** (jti-keyed) and an append-only SSO audit log;
 - the **console SSO model** (AC #3): auth-hub relay ``state`` JWT (PKCE),
   allowlist, RS256 ``os-session-token`` + JWKS (shared-frontend port).
+
+
+---knowledge---
+module_id: identity.sso.sessions
+system: identity
+app: sso
+solution_class: enterprise
+patterns: [facade, fail-closed, tenant-scoped, email-domain-policy]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [SsoService]
+invariants: "a session is scoped to exactly the tenant the principal authenticated into and refuses use in another tenant — no cross-tenant fallback"
+gotchas: "a valid assertion from tenant A's IdP can still be denied if the identity's email domain is not allowed in tenant A"
+related: ["#35", "#12", "#10"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

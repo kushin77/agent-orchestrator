@@ -16,6 +16,23 @@ Codes are grouped by status so a client can branch mechanically:
 - ``422``  cannot_assess / refused (fail-closed outcome vocabulary)
 - ``503``  unavailable / approval_required (a destructive action needs an
   approver before it can run)
+
+
+---knowledge---
+module_id: identity.cpapi.errors
+system: identity
+app: cpapi
+solution_class: pattern
+patterns: [named-refusal, closed-vocabulary]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ApiError, validation_error, unauthorized, forbidden, not_found, conflict, unavailable]
+invariants: "every failure that crosses the API boundary is an ApiError; no other exception escapes as a 500"
+gotchas: "codes are grouped by HTTP status so a client can branch mechanically"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

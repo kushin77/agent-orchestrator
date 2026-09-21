@@ -12,6 +12,23 @@ Collections (all tenant-scoped, fail closed):
 - revoked session ``jti`` set (logout / impersonation revoke),
 - ``ImpersonationGrant`` records,
 - the append-only SSO audit log (with impersonation operator stamps).
+
+
+---knowledge---
+module_id: identity.sso.store
+system: identity
+app: sso
+solution_class: pattern
+patterns: [persistence-seam, in-memory-default, tenant-scoped]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [InMemoryStore, FileStore, clone_store]
+invariants: "all collections are tenant-scoped and fail closed"
+gotchas: ""
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

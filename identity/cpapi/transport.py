@@ -5,6 +5,23 @@ Bridges the :class:`cpapi.clients.Transport` protocol to a
 way to exercise the full client -> envelope -> authN/authZ -> handler stack
 with no network and no server socket. A deployment replaces this with an HTTP
 transport (the client module is transport-agnostic by design).
+
+
+---knowledge---
+module_id: identity.cpapi.transport
+system: identity
+app: cpapi
+solution_class: pattern
+patterns: [offline-by-construction, dependency-inversion]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [InProcessTransport]
+invariants: "the in-process transport exercises the full client -> envelope -> authN/authZ -> handler stack with no network"
+gotchas: "a deployment replaces this with an HTTP transport; the client is transport-agnostic"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -25,6 +25,23 @@ Two counters make a crossing observable, and both are exposed:
 ``engine_cross_scope_violations`` (the store's own count, read back from
 ``MemoryStore.stats()``). A test that only read the first could pass while the
 engine's guard was bypassed; reading both proves the guard underneath ran.
+
+
+---knowledge---
+module_id: identity.chat.isolation
+system: identity
+app: chat
+solution_class: enterprise
+patterns: [tenant-scoped, fail-closed, consume-never-restate]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ChatIsolation, conversation_container, MemoryRef]
+invariants: "a conversation's memory lives in exactly one container, produced by the merged engine.memory.model and never re-derived here"
+gotchas: "a request naming a container other than the credential's is refused, and the refusal is counted"
+related: ["#505", "#500"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

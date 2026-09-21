@@ -15,6 +15,23 @@ Operator-only, idempotent, all-or-nothing tenant provisioning. Public surface
 - ``registry_assets`` - resolves platform registry seed assets (read-only).
 - ``cli`` - the operator CLI (run as ``python3 -m identity.onboarding.cli``);
   deliberately never an anonymous HTTP endpoint.
+
+
+---knowledge---
+module_id: identity.onboarding
+system: identity
+app: onboarding
+solution_class: class
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [model, store, provisioning, jobs, customization, ready, registry_assets, cli]
+invariants: ""
+gotchas: ""
+related: ["#14"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from identity.onboarding import (

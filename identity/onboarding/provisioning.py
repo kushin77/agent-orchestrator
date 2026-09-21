@@ -33,6 +33,23 @@ Every step is "create if missing, otherwise use/return what is there". A run
 that fails partway (or a re-run over an already-provisioned tenant) converges:
 re-running produces no duplicate roles, bindings or seeds and leaves an
 identical end state.
+
+
+---knowledge---
+module_id: identity.onboarding.provisioning
+system: identity
+app: onboarding
+solution_class: enterprise
+patterns: [idempotent, all-or-nothing, operator-only, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [provision, ProvisionSpec, materialize_rbac, load_default_seed_pack]
+invariants: "provisioning is idempotent and all-or-nothing: a failed run leaves no partial tenant"
+gotchas: "it is an operator action and deliberately not an HTTP endpoint"
+related: ["#14"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

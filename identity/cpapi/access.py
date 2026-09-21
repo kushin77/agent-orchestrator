@@ -37,6 +37,23 @@ holds ``agent:*``/``org:*``/``budget:*``/``audit:read``/``prompt:read``; owner
 holds ``*:*``) plus the documented control-plane additions for registry reads
 and approval/outbox governance, which a tenant grants via custom roles or the
 owner preset.
+
+
+---knowledge---
+module_id: identity.cpapi.access
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [fail-closed, two-gate, delegate-never-re-derive, tenant-scoped]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [AuthenticatedPrincipal, authorize_request, enforce_scope, verify_token]
+invariants: "the control plane authorizes and never trusts the caller to assert its own tenant or permissions; everything fails closed"
+gotchas: "authN delegates to an injected SessionVerifier seam, whose mandatory claim is the session tenant"
+related: ["#38", "#12"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

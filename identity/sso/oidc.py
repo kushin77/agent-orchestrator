@@ -16,6 +16,23 @@ the same way the real RP would:
 
 Discovery metadata (``jwks_uri``, ``token_url``) is parsed but never fetched -
 keys are injected from the keystore/fixtures.
+
+
+---knowledge---
+module_id: identity.sso.oidc
+system: identity
+app: sso
+solution_class: enterprise
+patterns: [algorithm-pinned, fail-closed, offline-fixture]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [verify_id_token, build_authorization_url, principal_from_id_token, discovery_endpoints]
+invariants: "the algorithm is pinned by the config — no algorithm confusion, none is rejected — and iss, aud, exp, iat and nbf are all enforced"
+gotchas: "a token minted for another tenant's IdP or another audience is rejected"
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

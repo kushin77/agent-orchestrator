@@ -17,6 +17,23 @@ The matcher is fail closed:
 
 The allowlist decides **publication only**.  It never decides whether a
 caller *may* perform an action - that is the backend's authorization.
+
+
+---knowledge---
+module_id: identity.edges.allowlist
+system: identity
+app: edges
+solution_class: enterprise
+patterns: [allowlist-not-denylist, fail-closed, named-refusal, traversal-safe]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [PublicRoutes, AllowlistDecision, default_public_routes, load_public_routes_yaml]
+invariants: "a route becomes public only when an operator adds it to this table on purpose; adding an internal route to the backend never publishes it"
+gotchas: "a traversal or malformed path folds into unknown_route so a client cannot tell it apart from a missing route"
+related: ["#37"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

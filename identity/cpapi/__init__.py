@@ -32,6 +32,23 @@ the real merged modules (``wiring.py``).
 
 Public surface (import as ``cpapi`` when ``identity/`` is on ``sys.path``)
 ----------------------------------------------------------------------------
+
+
+---knowledge---
+module_id: identity.cpapi
+system: identity
+app: cpapi
+solution_class: class
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: platform-sme
+tier: L0
+interfaces: [router, control, access, model, ports, outbox, wiring, fakes]
+invariants: ""
+gotchas: ""
+related: ["#38", "#4"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from . import errors, model, outbox  # noqa: F401

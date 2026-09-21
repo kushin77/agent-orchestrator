@@ -28,6 +28,23 @@ and acts as a PEP-420 namespace package, mirroring ``identity/onboarding`` and
 - ``sessions`` - ``SsoService`` orchestrator: login flows, email-domain
   policy, session issue/verify/logout, tenant isolation, console SSO model.
 - ``impersonation`` - explicit impersonation grants + audit stamp (AC #4).
+
+
+---knowledge---
+module_id: identity.sso
+system: identity
+app: sso
+solution_class: class
+patterns: [package-contract, public-surface]
+derives_from: null
+owner_sme: security-sme
+tier: L0
+interfaces: [model, errors, jose, keystore, config, domains, saml, oidc, sessions, tokens, store, impersonation]
+invariants: ""
+gotchas: ""
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from identity.sso import (

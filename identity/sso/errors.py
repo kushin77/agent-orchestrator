@@ -15,6 +15,23 @@ this subtree:
 
 A helper maps each error to its consumed code string (``auth_error_code``) so a
 future middleware can emit the same wire codes the fleet already speaks.
+
+
+---knowledge---
+module_id: identity.sso.errors
+system: identity
+app: sso
+solution_class: pattern
+patterns: [named-refusal, fail-closed, closed-vocabulary]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [SsoError, UnknownTenantError, InvalidAssertionError, SignatureVerificationError, AssertionExpiredError, InvalidIdTokenError]
+invariants: "every failure mode in this lane is a typed, fail-closed error whose name mirrors the contract it consumes"
+gotchas: "the names let a later HTTP or control-plane layer map them to responses without re-reading this subtree"
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -32,6 +32,23 @@ Guarantees (each negative-tested):
 
 In-memory by default (offline tests); ``Outbox`` also supports an append-only
 JSON Lines file backing via ``open_outbox`` for durable single-node use.
+
+
+---knowledge---
+module_id: identity.cpapi.outbox
+system: identity
+app: cpapi
+solution_class: enterprise
+patterns: [append-only, outbox, idempotent-publish, lifecycle-state-machine]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Outbox, OutboxRecord, open_outbox, EVENT_TYPES]
+invariants: "the outbox avoids dual-write: the business change and its domain event are appended in the same control-plane request"
+gotchas: "redelivery increments attempts up to max_attempts, after which the record dead-letters"
+related: ["#38"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

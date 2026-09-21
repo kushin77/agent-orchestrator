@@ -22,6 +22,23 @@ the digest and the signature fails. A production SAML stack would use a vetted
 XML-DSig implementation with exclusive C14N; this offline model exercises the
 same integrity guarantees (tamper detection, cert-bound verification) at the
 message-parsing level.
+
+
+---knowledge---
+module_id: identity.sso.saml
+system: identity
+app: sso
+solution_class: enterprise
+patterns: [signature-verified, fail-closed, offline-fixture, canonicalization]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [build_authn_request, parse_assertion, canonical_xml_bytes]
+invariants: "the assertion signature is verified over a documented canonical form before issuer, audience and time conditions are enforced"
+gotchas: "the SP side is modeled offline over fixtures, and unsafe XML entity expansion is refused by the parser"
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

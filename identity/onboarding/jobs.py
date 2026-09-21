@@ -11,6 +11,23 @@ auditLog, timestamps.
 Because the provision pipeline is all-or-nothing and idempotent, a failed
 attempt leaves no partial tenant, and a retry simply converges - re-running a
 job can only succeed once the underlying inputs are valid.
+
+
+---knowledge---
+module_id: identity.onboarding.jobs
+system: identity
+app: onboarding
+solution_class: pattern
+patterns: [lifecycle-state-machine, retry-bounded, append-only]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [run_job, retry_job, submit_and_run, new_job, UnknownJobError]
+invariants: "a failed attempt leaves no partial tenant, and a retry simply converges"
+gotchas: "the status vocabulary and field shape mirror the harvested TenantProvisioningJob model"
+related: ["#14"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

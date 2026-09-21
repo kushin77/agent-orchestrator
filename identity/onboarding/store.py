@@ -14,6 +14,23 @@ Two implementations:
 - ``FileStore`` - an operator/CLI persistence layer that serializes the same
   records to a JSON file (deterministic ordering), so a provisioning run in
   one process can be inspected/verified by ``ready`` in a later process.
+
+
+---knowledge---
+module_id: identity.onboarding.store
+system: identity
+app: onboarding
+solution_class: pattern
+patterns: [persistence-seam, in-memory-default, all-or-nothing]
+derives_from: identity/rbac/store.py
+owner_sme: platform-sme
+tier: L1
+interfaces: [InMemoryStore, FileStore, resource_snapshot, restore_resources]
+invariants: "the tenant resource collections are transactional (snapshot/restore) while provisioning-job records stay durable"
+gotchas: ""
+related: ["#14"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

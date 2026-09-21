@@ -21,6 +21,23 @@ deterministically - adapted to the platform's existing contracts:
 Disallowed keys, unknown enums, unknown module refs, and system-layer inline
 text are all rejected with ``OverlayValidationError`` - the negative-test
 surface for this lane.
+
+
+---knowledge---
+module_id: identity.onboarding.customization
+system: identity
+app: onboarding
+solution_class: enterprise
+patterns: [allowlist-validation, fail-closed, deterministic-render]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [validate_overlay, apply_customization, render_instruction_manifest, ALLOWED_OVERLAY_FIELDS]
+invariants: "a tenant may customize only inside the allowed-fields allowlist; anything else is rejected before any write"
+gotchas: "the overlay schema is closed (additionalProperties: false) and renders deterministically"
+related: ["#14"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

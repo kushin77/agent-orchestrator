@@ -27,6 +27,23 @@ revocation store (the merged ``identity.sso.store`` jti deny list, probed
 through the merged ``identity.sso.tokens.check_not_revoked``), so there is no
 code path that verifies a credential without consulting the revocation
 authority - a revoked-but-unexpired jti is refused at the front of the call.
+
+
+---knowledge---
+module_id: identity.chat.credential
+system: identity
+app: chat
+solution_class: enterprise
+patterns: [fail-closed, consume-never-restate, tenant-scoped]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [ChatScope, ChatCredential, mint_chat_credential, verify_chat_credential, conversation_of]
+invariants: "no new token format and no new verifier: a chat credential is the gateway's session credential unchanged, with the conversation scope riding a claim the existing verifier already returns"
+gotchas: "every other standard claim is already spoken for, so the conversation scope rides aud=[control-plane, chat:conversation:C]"
+related: ["#505"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

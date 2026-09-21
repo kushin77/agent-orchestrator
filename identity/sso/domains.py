@@ -10,6 +10,23 @@ inference from anything else on the request.
 Deliberately ignored: ``X-Forwarded-Host``. It is attacker-controlled on any
 request that reaches us, and honouring it would let a caller pick whichever
 tenant it liked.
+
+
+---knowledge---
+module_id: identity.sso.domains
+system: identity
+app: sso
+solution_class: pattern
+patterns: [fail-closed, host-resolution, no-default-tenant]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [resolve_tenant_for_host, require_tenant_for_host, normalize_hostname, email_domain]
+invariants: "host resolution fails closed: there is no default tenant and no fallback"
+gotchas: "X-Forwarded-Host is deliberately ignored — it is attacker-controlled and honouring it would let a caller pick any tenant"
+related: ["#35"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

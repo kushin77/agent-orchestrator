@@ -11,6 +11,23 @@ router decodes before matching, so an encoded traversal must be caught here).
 
 Every function here is pure and fails closed (returns ``None`` rather than a
 guess).
+
+
+---knowledge---
+module_id: identity.edges.paths
+system: identity
+app: edges
+solution_class: enterprise
+patterns: [traversal-safe, fail-closed, pure-function-core]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [parse_path_segments, match_template, parse_template, backend_params_in]
+invariants: "the path is split into plain forward segments before matching, and anything else — including percent-encoded traversal — is refused"
+gotchas: "HTTP frameworks do not normalize .. but a backend client does, so an encoded traversal has to be caught here"
+related: ["#37"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

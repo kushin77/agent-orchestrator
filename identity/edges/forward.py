@@ -8,6 +8,23 @@ are set here, so a client can never smuggle ``authorization``,
 ``x-tenant-id`` or any other identity-bearing header into the internal call.
 Only an explicitly allowlisted trace header is forwarded verbatim, and the
 backend treats it as an opaque log field (never as identity).
+
+
+---knowledge---
+module_id: identity.edges.forward
+system: identity
+app: edges
+solution_class: enterprise
+patterns: [built-never-copied, fail-closed, declared-authority]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [build_forwarded_request, forward_headers, render_backend_path, claims_identity]
+invariants: "the outbound request is built, never copied, so a client can never smuggle authorization or x-tenant-id into the internal call"
+gotchas: "only an explicitly allowlisted trace header is forwarded verbatim, and the backend treats it as an opaque log field"
+related: ["#37"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
