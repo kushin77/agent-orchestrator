@@ -52,6 +52,20 @@ policy file rather than passing by construction.
 — named refusals, allowed passes, default-deny, audit-record assertions,
 flag-gated-OFF, and cross-subject scoping).
 
+**Canary (issue #1519):** the gate above and the suite above both build their
+"control ON" registry **in-process, in a fixture** — so until #1519 the policies
+had never been exercised against a committed registry, and a guardrail that has
+never fired anywhere is a declaration, not a control.
+[`policy/canary/controls.canary.yaml`](policy/canary/controls.canary.yaml) is a
+committed, non-production registry with `hermes-head-guardrails` ON, scoped to
+`policy/bundles/platform/hermes-head.yaml` alone. It is the scope in which one
+BLOCK is proven to fire, by name (`block-directive-off-gateway`), through the
+real CLI and the real `policy/audit.py` ledger; the negative control (same
+action, `channel == gateway`) passes. Result, commands and the
+`enable_hermes` boundary: [`policy/canary/README.md`](policy/canary/README.md).
+This is a PROOF, not a promotion — `policy/controls.yaml` still ships the
+control `enabled: false`.
+
 **Not yet wired:** the gateway provider adapters
 (`gateway/providers/hermes.py`, `gateway/providers/paperclip.py`) are
 inference-only (ADR-0012 Context §5) and do not yet call
