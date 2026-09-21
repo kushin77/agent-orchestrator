@@ -30,7 +30,8 @@
 #   bash scripts/check-portal-promotion.sh --root DIR    # analyse another tree
 set -uo pipefail
 
-script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+script_root="$(find_repo_root)"
 root="$script_root"
 mode="full"
 while [ $# -gt 0 ]; do

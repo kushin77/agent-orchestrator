@@ -33,6 +33,7 @@
 #
 # VACUITY: every surface group is stripped from a copy of the access doc, one at
 # a time, and each strip must be DETECTED by that group's own probe — so a group
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # whose probes are wrong (a probe that another section also contains) fails this
 # gate instead of passing silently.
 #
@@ -41,7 +42,7 @@
 # Usage: bash scripts/check-operator-access.sh
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 doc="docs/OPERATOR-ACCESS.md"

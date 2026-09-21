@@ -24,6 +24,7 @@
 #      `toolAllowlist` lists.
 #
 # An item present on one side and absent on the other is fine IFF:
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 #   - JSON (module.json): its `desc` field contains one of the rationale
 #     markers (case-insensitive): "role-only", "provider-specific",
 #     "claude-specific", "deepseek-specific" — matching the convention
@@ -41,7 +42,7 @@
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 if ! command -v python3 >/dev/null 2>&1; then

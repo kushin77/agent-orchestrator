@@ -31,7 +31,8 @@
 #                also suppresses the self-proof so the check cannot recurse).
 set -u
 
-self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+self_root="$(find_repo_root)"
 root="$self_root"
 
 while [ "$#" -gt 0 ]; do

@@ -55,7 +55,8 @@
 set -u
 
 self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 
 # One global scratch variable and one EXIT trap, the shape this doctrine asks
 # for: armed once, fired once, `|| true`-safe so a cleanup failure cannot mask
@@ -280,6 +281,8 @@ self_test() {
   # different one — otherwise the refusal above came from the file existing, or
   # the mutation broke the whole script rather than one rule.
   local mutant="$d/mutant.sh"
+  mkdir -p "$d/lib"
+  cp "$(dirname "$self")/lib/common.sh" "$d/lib/common.sh"
   for k in $(seq 1 "$np"); do
     other=$((k == np ? 1 : k + 1))
     sed -e "s|^  p_re\[$k\]=.*|  p_re[$k]='ZZQ_matches_nothing'|" "$self" > "$mutant"

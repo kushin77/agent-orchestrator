@@ -25,7 +25,8 @@
 # Usage: bash scripts/check-cmr-pin.sh
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 # Only the self-invoked negative-control child (CMR_PIN_NEGATIVE_CONTROL=1,

@@ -37,7 +37,8 @@
 #   bash scripts/check-paperclip-openapi.sh --root DIR
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 run_controls=1
 
 while [ "$#" -gt 0 ]; do

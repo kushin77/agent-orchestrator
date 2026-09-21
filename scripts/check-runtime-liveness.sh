@@ -36,7 +36,8 @@
 #   bash scripts/check-runtime-liveness.sh --producers    # the producers stage alone
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -52,12 +53,6 @@ for arg in "$@"; do
   esac
 done
 
-contains() { # contains <haystack> <needle> — bash-native, so it cannot SIGPIPE a producer
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 # judge <root> [extra args...] — the real judge, never a copy of it
 judge() {

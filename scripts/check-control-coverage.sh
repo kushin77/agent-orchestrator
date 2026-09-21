@@ -82,7 +82,8 @@
 #        bash scripts/check-control-coverage.sh --record
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 record=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -99,12 +100,6 @@ DOC="$root/docs/CONTROL-COVERAGE.md"
 VERIFY="$root/scripts/verify.sh"
 MAKEFILE="$root/Makefile"
 
-contains() { # contains <haystack> <needle>
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 for required in "$SPINE" "$MAP"; do
   if [ ! -r "$required" ]; then

@@ -25,7 +25,8 @@
 # record.
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 lane_root="$root/control-plane/fleet-template"
 
 while [ $# -gt 0 ]; do

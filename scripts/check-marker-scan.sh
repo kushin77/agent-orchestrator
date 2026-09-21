@@ -43,7 +43,8 @@
 # Usage: bash scripts/check-marker-scan.sh
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 # Every marker this check plants is assembled here, so this file spells none of
@@ -85,8 +86,9 @@ printf '# %s: planted by check-marker-scan.sh\n' "$M_3" > "$fx/three.sh"
 # The copy under $scratch/scripts/ is the shipped text, unmodified: the rule the
 # gate runs, not a paraphrase of it. `--markers` takes explicit files, so no git
 # repository is needed for the rule to be exercised.
-mkdir -p "$scratch/scripts" || exit 2
+mkdir -p "$scratch/scripts/lib" || exit 2
 cp scripts/check-docs.sh "$scratch/scripts/check-docs.sh" || exit 2
+cp scripts/lib/common.sh "$scratch/scripts/lib/common.sh" || exit 2
 
 if bash "$scratch/scripts/check-docs.sh" --markers "$fx/template.sh" > "$scratch/ship-template.out" 2>&1; then
   echo "  OK  the SHIPPED rule accepts a canonical six-X template"

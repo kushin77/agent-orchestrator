@@ -34,7 +34,8 @@ set -uo pipefail
 # The gate of record must not leave bytecode caches in the tree it is judging.
 export PYTHONDONTWRITEBYTECODE=1
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 required_files=(

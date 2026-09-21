@@ -58,7 +58,8 @@
 #   bash scripts/check-paperclip-canonical-module.sh --no-controls
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 scan_root="$root"
 mode="check"
 controls=1

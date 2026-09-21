@@ -58,7 +58,8 @@
 # Usage: bash scripts/check-gate-publish.sh
 set -u
 
-own_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+own_root="$(find_repo_root)" || exit 2
 
 # --- the one shape, assembled from fragments --------------------------------
 fx_name="gate-status"".sh"
@@ -87,8 +88,8 @@ producer_in() {
 }
 
 producer_fx=""
-producer_verify="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/verify.sh"
-producer_merge="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/merge-pr.sh"
+producer_verify="$(find_repo_root)/scripts/verify.sh"
+producer_merge="$(find_repo_root)/scripts/merge-pr.sh"
 for producer_file in "$producer_verify" "$producer_merge"; do
   if [ ! -f "$producer_file" ]; then
     echo "check-gate-publish: CANNOT-ASSESS — ${producer_file##*/} is missing, so whether the REQUIRED context has a producer on that path cannot be asked" >&2

@@ -16,6 +16,7 @@
 # A rule in a doc is advisory (the spine says so explicitly). This check is the
 # mechanical half: it asserts that each rule EXISTS in both the spine and the
 # canonical doctrine, that each names the failure it prevents, and that the
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # codebase still contains the CONTROL the rule depends on. If a rule is deleted,
 # renamed, or its control is ripped out, this exits 1 by name.
 #
@@ -32,14 +33,8 @@ set -uo pipefail
 # that 141 to the status of the whole pipeline — so a *large* body reports ABSENT
 # for text that is PRESENT. Negated, that is a false red; positive, the control
 # silently stops controlling and the check fails OPEN.
-contains() { # contains <haystack> <needle>
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+ROOT="$(find_repo_root)" || exit 2
 
 SPINE="$ROOT/docs/GOLDEN-RULES.md"
 DOCTRINE="$ROOT/AGENTS.md"

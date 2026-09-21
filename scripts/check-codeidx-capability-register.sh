@@ -50,7 +50,8 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 exec python3 - "$root" "$@" <<'PY'
 import os
 import re

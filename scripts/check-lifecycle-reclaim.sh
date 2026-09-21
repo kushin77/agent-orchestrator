@@ -43,7 +43,8 @@
 # Usage: bash scripts/check-lifecycle-reclaim.sh
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 lifecycle_cli="governance/lifecycle/cli.py"
@@ -68,12 +69,6 @@ done
 fail=0
 cannot=0
 
-contains() { # contains <haystack> <needle>
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 ok() { # ok <label>
   echo "  OK    $1"

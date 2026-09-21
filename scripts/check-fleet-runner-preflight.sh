@@ -47,7 +47,8 @@
 # Usage: bash scripts/check-fleet-runner-preflight.sh
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 terminal="fleet/terminal.py"
@@ -121,12 +122,6 @@ repo_beats_before="$(beats_files "$root")"
 fail=0
 note_fail() { printf '  FAIL  %s\n' "$1" >&2; fail=$((fail + 1)); }
 
-contains() { # contains <haystack> <needle> — bash-native, so it cannot SIGPIPE a producer
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 # --- 1. the declarations -----------------------------------------------------
 # Each name is the mechanism, not the wording: removing it fails this gate.

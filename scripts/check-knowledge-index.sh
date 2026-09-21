@@ -59,7 +59,8 @@
 #   bash scripts/check-knowledge-index.sh --root DIR     assess exactly DIR, no self-test
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 scratch=""
 LAST_OUT=""
 EFFECTIVE_DROP=""

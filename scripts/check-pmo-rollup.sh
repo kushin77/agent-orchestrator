@@ -33,7 +33,8 @@
 # Usage: bash scripts/check-pmo-rollup.sh
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -62,12 +63,6 @@ json_ok() {
   python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$1" >/dev/null 2>&1
 }
 
-contains() { # contains <haystack> <needle> — the bash-native containment test (#852)
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 # --- the real graph: every view runs, tri-state, never a pass on CANNOT-ASSESS
 echo "== views over the committed graph =="

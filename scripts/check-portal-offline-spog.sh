@@ -54,7 +54,8 @@
 set -uo pipefail
 
 self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 
 #: Per-request budget. Generous because the snapshot composes the console's own
 #: projection (which one-shot reads the issue board); normally well under a second.

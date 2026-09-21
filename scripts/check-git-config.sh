@@ -95,7 +95,8 @@ for arg in "$@"; do
   esac
 done
 
-script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+script_root="$(find_repo_root)"
 root="$script_root"
 overridden=0
 if [ -n "${AO_GIT_CONFIG_ROOT:-}" ]; then

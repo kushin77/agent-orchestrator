@@ -73,7 +73,8 @@
 # Usage: bash scripts/check-isolation-landed.sh [--range <git-range>]
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 # `GIT_IDENTITY_VARS` in governance/isolation/identity.py is the same four
@@ -131,12 +132,6 @@ trap 'rm -rf "$work"' EXIT
 # not hypothetical: this file's own line below produced one in the gate of record,
 # where the check printed the output as evidence with the name it claimed was
 # missing visible in it twice.
-contains() { # contains <haystack> <needle>
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 expect_rc() { # expect_rc <label> <want-rc> <cmd...>
   local label="$1" want="$2" out rc

@@ -85,7 +85,8 @@
 #   `check-isolation-landed`.
 set -uo pipefail
 
-script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+script_root="$(find_repo_root)"
 root="$script_root"
 baseline=""
 mode="full"

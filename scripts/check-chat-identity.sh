@@ -35,7 +35,8 @@
 # Usage: bash scripts/check-chat-identity.sh
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 # Pinned expectations: a change to the probe table must change this gate too.

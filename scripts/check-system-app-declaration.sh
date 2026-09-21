@@ -67,7 +67,8 @@
 # Usage: bash scripts/check-system-app-declaration.sh [--root DIR] [--no-controls]
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 controls="controls"
 
 while [ "$#" -gt 0 ]; do

@@ -62,7 +62,8 @@
 set -u
 
 self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 
 # One global scratch variable and one EXIT trap, the shape this repo's gates
 # use: armed once, fired once, `|| true`-safe so a cleanup failure cannot mask
@@ -281,6 +282,8 @@ self_test() {
   # script with that one declaration neutralised must accept the very tree the
   # gate refuses, and must still be a working script.
   local mutant="$d/mutant.sh"
+  mkdir -p "$d/lib"
+  cp "$(dirname "$self")/lib/common.sh" "$d/lib/common.sh"
   sed -e 's|^protected_names=(.*)$|protected_names=()|' "$self" > "$mutant"
   if cmp -s "$self" "$mutant"; then
     echo 'check-duplicates: FAIL — the mutant is byte-identical to this script; the mutation proved nothing' >&2

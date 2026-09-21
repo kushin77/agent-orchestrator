@@ -28,7 +28,8 @@
 #   bash scripts/check-worktree-cap.sh --self-test   # provoke both refusals on scratch repos
 set -uo pipefail
 
-self_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+self_root="$(find_repo_root)"
 
 # #1620: AO_GATE_VENUE distinguishes a per-lane `make verify` (default —
 # box-wide, concurrency-sensitive counts are advisory) from the serial

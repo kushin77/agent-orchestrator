@@ -57,7 +57,8 @@
 # Usage: bash scripts/check-notice-acks.sh
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)" || exit 2
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)" || exit 2
 cd "$root" || exit 2
 
 cli="governance/notices/cli.py"
@@ -103,16 +104,6 @@ run_cli() { # run_cli <root> <fleet> <verb> [args...] -- sets $out and $eval_rc
   eval_rc=$?
 }
 
-contains() { # contains <haystack> <needle> -- bash-native, so it cannot kill its producer
-  # A pipe into a quiet grep (`... | grep -qF`) exits on its first match and
-  # SIGPIPEs the producer while it is still writing, which with pipefail promotes
-  # 141 to the pipeline's status and fails OPEN (scripts/check-verdict-contains.sh).
-  # This gate compares text, so it uses the native test that check itself uses.
-  case "$1" in
-    *"$2"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 expect() { # expect <arm> <wanted-rc> <needle>
   if [ "$eval_rc" -eq "$2" ] && contains "$out" "$3"; then

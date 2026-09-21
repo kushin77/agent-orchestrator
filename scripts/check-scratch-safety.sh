@@ -73,7 +73,8 @@
 #   SCRATCH_GUARD   path to the machine guard       (default ~/laptop-manage/bin)
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 self="$root/scripts/$(basename "${BASH_SOURCE[0]}")"
 

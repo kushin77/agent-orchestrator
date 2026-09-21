@@ -16,6 +16,7 @@
 #      module makes `(?i)` a MODE. Under `grep -E` it is not a mode and not an
 #      error either: grep warns `? at start of expression`, compiles anyway,
 #      and then requires a LITERAL `?i` in the text. So the exemption matched
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 #      nothing a placeholder ever contains, and every generic assignment with
 #      an >=8-char value was refused even when the value said `placeholder`.
 #      A lane was blocked by it on a fixture that was obviously fake.
@@ -60,7 +61,7 @@
 #   bash scripts/check-secrets.sh --self-test  the provocation alone
 set -u
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root="$(find_repo_root)"
 cd "$root" || exit 2
 
 failed=0
