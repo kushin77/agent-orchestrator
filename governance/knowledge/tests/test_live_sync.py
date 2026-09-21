@@ -14,8 +14,8 @@ REAL_PIN = live_sync.REPO_ROOT / "cmr-pin.yaml"
 
 
 def _require_vendor_cmr():
-    if not live_sync.VENDOR_CMR.is_dir():
-        pytest.skip("vendor/CMR submodule not checked out")
+    if not live_sync.VALIDATOR_PATH.is_file():
+        pytest.skip("vendor/CMR submodule not checked out (validator missing)")
 
 
 def test_live_vendor_head_matches_git():

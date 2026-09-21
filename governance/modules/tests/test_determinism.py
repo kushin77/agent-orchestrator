@@ -101,7 +101,10 @@ def test_a_default_hub_root_is_recorded_portably(tmp_path) -> None:
     assert str(tmp_path) not in text
 
 
-@pytest.mark.skipif(not REAL_HUB.is_dir(), reason="hub submodule not initialised")
+@pytest.mark.skipif(
+    not (REAL_HUB / "catalog").is_dir(),
+    reason="hub submodule not initialised (vendor/CMR is an empty gitlink placeholder)",
+)
 class TestAgainstThePinnedHub:
     """The measured inventory, reproduced from the authority — not from prose."""
 

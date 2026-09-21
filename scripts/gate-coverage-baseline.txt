@@ -99,18 +99,65 @@
 # exactly what it promises. A second, independent half landed
 # with it: the closed/unknown-tracker rule now covers EVERY live row, so the
 # nine rows that remain cannot be deferred to a closed issue either.
-# THE NINE LANE-VENUE ROWS ARE OWNED, NOT EXCUSED. Each is a declared suite that
-# fails, hangs, or cannot run in a lane venue (each measured ALONE, its own
-# pytest process): portal (rc 124 after 240s, 3 failures), scripts (18 failed),
-# governance/knowledge (4 failed), governance/conformance (1 failed),
-# governance/ticket (1 failed), governance/cto-overlay (4 failed),
-# governance/authority (2 failed), integrations/paperclip/reporting (7 failed +
-# 57 errors), governance/modules (3 errors: no vendor/CMR in a worktree).
-# Wiring any of them would red the gate of record for every lane — worse than
-# the honest deferral, because a gate that is red on master is ignored. They
-# carry tracker #1501 (OPEN), which owns fixing them; that issue also has to be
-# in the committed board snapshot for this rule to read its state OFFLINE, so
-# this lane spliced an entry into `.board/snapshot.json` for it.
+# THE NINE LANE-VENUE ROWS WERE OWNED, NOT EXCUSED, BY #1501 (now CLOSED).
+# FOUR of the five it still carried were retired by #1725 the same way the
+# forty-two before them were — by NAMING the suite in
+# `scripts/check-pytest-suites.sh`, which makes the row STALE and this rule
+# removes it in the same edit:
+#   scripts                           root cause: two liveness classes judge
+#                                      THIS BOX's shared state rather than the
+#                                      code under test — the worktree-reaper's
+#                                      own worktrees/processes
+#                                      (test_prune_worktrees.py), and a live
+#                                      GitHub tracker read
+#                                      (test_the_committed_record_names_only_
+#                                      trackers_that_are_open_today). Both now
+#                                      skip BY NAME (module-level pytestmark /
+#                                      per-test skip) unless
+#                                      AO_GATE_VENUE=attestation, the same
+#                                      convention scripts/check-worktree-cap.sh
+#                                      already uses (#1620) — still blocking in
+#                                      that venue, where box-state is
+#                                      authoritative.
+#   governance/knowledge              root cause, not async fixtures: a `git
+#                                      worktree add` checkout leaves
+#                                      `vendor/CMR` as an EMPTY gitlink
+#                                      placeholder directory, so
+#                                      `VENDOR_CMR.is_dir()` reads true while
+#                                      the validator file inside it is absent.
+#                                      The skip guard now checks the file the
+#                                      code actually needs
+#                                      (`VALIDATOR_PATH.is_file()`), matching
+#                                      the pattern every sibling test in the
+#                                      file already used.
+#   governance/modules                same root cause: `REAL_HUB.is_dir()`
+#                                      passed on the empty placeholder while
+#                                      `REAL_HUB/catalog` did not exist. The
+#                                      `TestAgainstThePinnedHub` skipif now
+#                                      checks the catalog subdirectory.
+#   integrations/paperclip/reporting  same root cause again, not the
+#                                      previously-guessed async-fixture/schema
+#                                      drift: every fixture and CLI-level test
+#                                      that reads the real `vendor/CMR/catalog`
+#                                      now skips by name
+#                                      (`require_real_hub()`/conftest guard)
+#                                      when the catalog subdirectory is
+#                                      absent, instead of raising
+#                                      `FileNotFoundError` out of `shutil.copy`.
+# Each is exercised, real, in a venue where the placeholder is a real
+# submodule (attestation / any checkout with `git submodule update --init`).
+#
+# portal REMAINS, RE-POINTED to #1737 (OPEN; #1501 closed 2026-09-21 without
+# portal being fixed). Measured in this lane worktree with pytest-timeout
+# available (`--timeout=30`): the suite does NOT hang here — 579 passed, 8
+# failed, in 164s. The previously-reported "rc 124 after 240s, 3 failures" did
+# not reproduce. The 8 failures are real portal findings (the surface's
+# feature-flag registry declares `default: true`; the tests, and GR-5, expect
+# gated-off), owned by whoever owns `portal/` (out of scope for #1725, which
+# does not edit files under `portal/`). #1737 also has to be in the committed
+# board snapshot for this rule to read its state OFFLINE, so this lane spliced
+# an entry into `.board/snapshot.json` for it (and corrected #1501's stale
+# OPEN state to CLOSED there too).
 #
 # THE THREE CI-VENUE ROWS THAT STOOD HERE ARE GONE (#1509, 2026-09-20), and they
 # were retired the same way the thirty-nine before them were: naming each suite
@@ -141,8 +188,4 @@
 #   governance/lifecycle     no repair: green in the venue (258 passed, 1 skipped,
 #                            its own named arm). Its five apparent CI failures were
 #                            the MEASURING harness's, not the suite's.
-suite	portal	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	governance/knowledge	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	scripts	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	integrations/paperclip/reporting	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
-suite	governance/modules	swept-only	#1501	a9f63bf497554ecd1bd0a4c1904dc03a989e623b
+suite	portal	swept-only	#1737	a9f63bf497554ecd1bd0a4c1904dc03a989e623b

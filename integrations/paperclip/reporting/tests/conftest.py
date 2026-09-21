@@ -57,6 +57,8 @@ def build_tree(target: Path, *, hub: bool = True) -> Path:
         if source.exists():
             _copy(source, target / relative)
     if hub:
+        if not (REPO_ROOT / HUB / "catalog").is_dir():
+            pytest.skip("vendor/CMR submodule not checked out (catalog missing)")
         for relative in ("catalog", "templates", "controller"):
             _copy(REPO_ROOT / HUB / relative, target / HUB / relative)
     for cache in target.rglob("__pycache__"):
@@ -67,6 +69,13 @@ def build_tree(target: Path, *, hub: bool = True) -> Path:
 @pytest.fixture(scope="session")
 def repo_root() -> Path:
     return REPO_ROOT
+
+
+def require_real_hub() -> None:
+    """Skip a test that reads the real ``vendor/CMR`` submodule when it is an
+    uninitialised gitlink placeholder (a `git worktree add` checkout, #1725)."""
+    if not (REPO_ROOT / HUB / "catalog").is_dir():
+        pytest.skip("vendor/CMR submodule not checked out (catalog missing)")
 
 
 @pytest.fixture(scope="session")
@@ -88,6 +97,8 @@ def tree(tmp_path: Path, template: Path) -> Path:
 @pytest.fixture(scope="session")
 def registry_document(repo_root: Path) -> dict:
     """The registry document the brief is composed from (built in this checkout)."""
+    if not (repo_root / HUB / "catalog").is_dir():
+        pytest.skip("vendor/CMR submodule not checked out (catalog missing)")
     from governance.modules import registry
 
     return registry.build(repo_root, repo_root / HUB)
