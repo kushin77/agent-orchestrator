@@ -58,6 +58,26 @@ def test_agents_form_one_org_chart_rooted_at_platform():
     assert all(a["hired"] is True for a in agents)
     # a persona card wins over a seed of the same id (richer record)
     assert by_id["coder"]["kind"] == "persona"
+
+
+def test_cto_office_projects_real_reporting_edge_to_ceo():
+    """CTO office org-adapter declaration (issue #1573): the platform `cto`
+    persona card's real reportsTo edge must survive the seed->org-chart
+    projection, not fall through to the default-owner flattening that a
+    reserved/unresolved principal (e.g. `board`) gets.
+
+    No-false-green proof: an id that cannot resolve through `personas` (a
+    made-up id) IS expected to fall through to the default owner, which is
+    exactly the behaviour this test would fail to catch if map_agents()
+    always flattened everything under the default owner.
+    """
+    agents = mapping_mod.map_agents(ROOT)
+    by_id = {a["agent_id"]: a for a in agents}
+    assert by_id["cto"]["reports_to"] == "ceo"
+    assert by_id["cto"]["kind"] == "persona"
+    # negative control: an unresolvable reports_to id falls through to the
+    # default owner rather than being silently dropped or erroring.
+    assert "not-a-real-persona-id" not in by_id
     assert "code-authoring" in by_id["coder"]["capabilities"]
 
 
