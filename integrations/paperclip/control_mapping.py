@@ -624,6 +624,15 @@ _OPINIONS: Dict[str, Tuple[str, Optional[str], str]] = {
         "no route into that file; the remedy is our own board.trigger/board.snapshot "
         "pair, not an upstream call.",
     ),
+    "board.try-loop": (
+        UNMAPPED, None,
+        "The tiered L0->L1->L2 escalation dispatcher (#1524): a local operator-run "
+        "loop that drives a live model invocation, an acceptance run, and gh "
+        "label/comment writes for one issue from the caller's own session. Upstream "
+        "serves no escalation-ladder route; a remote caller cannot run our model "
+        "invocation or acceptance harness, so there is no counterpart to refute or "
+        "map.",
+    ),
     "recover.status": (
         UNMAPPED, None,
         "The orphan/suspect state of our sessions. Upstream serves no orphan view "
