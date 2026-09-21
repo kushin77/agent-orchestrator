@@ -57,6 +57,22 @@
 #   (--self-test is accepted and is a no-op beyond the default run: the
 #    provocations ALWAYS run, because a gate whose self-test is optional is a
 #    gate that can be green without proving it can fail.)
+#
+# ---knowledge---
+# module_id: scripts.check-prompt-intake-declaration
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [self-proving-gate, no-false-green]
+# derives_from: null
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: "the provocations always run -- --self-test is a no-op beyond the default"
+# gotchas: ""
+# related: ["#1516"]
+# do_not_duplicate: null
+# ---knowledge---
 
 set -u
 
