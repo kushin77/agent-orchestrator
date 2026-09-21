@@ -14,6 +14,22 @@ Forces ON, purely in this process's env (local runtime override only):
 
 Session auth is minted offline by the existing scripts/portal-dev-session.py
 (issue #732) — this script does not reimplement that.
+
+---knowledge---
+module_id: scripts.portal-demo
+system: scripts
+app: scripts
+solution_class: pattern
+patterns: [local-override-only, never-writes-the-declaration]
+derives_from: scripts/portal-dev-session.py
+owner_sme: frontend-sme
+tier: L1
+interfaces: [promote_registry, wait_for, main]
+invariants: "flags are forced ON only inside THIS process's env: the committed registry and every terraform file are never written"
+gotchas: "`portal/config/feature-flags.yaml` is read only when AO_PORTAL_DEMO is unset — the override wins over the declaration, deliberately"
+related: ["#1771"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
