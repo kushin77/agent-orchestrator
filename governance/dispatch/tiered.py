@@ -315,11 +315,19 @@ def run(
     calls — escalating per this module's own protocol (``TieredRefusal``).
     """
     live = claims_mod.active_claims(claims_mod.read_ledger(ledger))
-    files = tuple(peers.FileClaim(path=str(p)) for p in caller_files) or peers._caller_files_from_live(
-        live, agent, issue_number
-    )
+    named_files = tuple(peers.FileClaim(path=str(p)) for p in caller_files)
+    # The fallback lookup can fall through to a DIFFERENT issue than the one
+    # being dispatched (the agent's live claim is on #42, not #701): the
+    # matched issue is carried as `peer_issue` so that record is excluded as
+    # the caller's own, never judged a sibling of itself.
+    peer_issue = issue_number
+    if named_files:
+        files = named_files
+    else:
+        files = peers._caller_files_from_live(live, agent, issue_number)
+        peer_issue = next((number for number, ev in live.items() if ev.agent == agent), issue_number)
     if files:
-        report = peers.peer_check(files, live, caller_agent=agent, caller_issue=issue_number)
+        report = peers.peer_check(files, live, caller_agent=agent, caller_issue=peer_issue)
         if report.verdict == "OVERLAP":
             raise TieredRefusal("peer-check-overlap", report.refusal())
 

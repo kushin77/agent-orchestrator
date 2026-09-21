@@ -141,6 +141,31 @@ def test_tiered_run_proceeds_past_disjoint_files(tmp_path):
     assert outcome["dry_run"] is True
 
 
+def test_tiered_run_fallback_does_not_self_overlap_a_different_issue(tmp_path):
+    """The agent's live claim can be on a DIFFERENT issue than the one being
+    dispatched (``_caller_files_from_live`` falls through to it when the
+    dispatched issue itself carries no claim). That record must still be
+    excluded as the caller's own — not judged a sibling of itself.
+    """
+    ledger = _ledger_with_sibling(tmp_path, path="a.sh")
+    own = {
+        "event": "claim", "issue": 42, "agent": "agent-b", "at": snapshot_mod.now_iso(),
+        "lane": "lane-b", "reason": "next-in-milestone", "ttl_hours": 24,
+        "files": [{"path": "c.py", "regions": None}],
+    }
+    (ledger / "0002-00042-agent-b-claim.json").write_text(json.dumps(own), encoding="utf-8")
+
+    outcome = tiered.run(
+        701,
+        "## Acceptance\n\n```bash\ntrue\n```\n",
+        ["tier:L0"],
+        agent="agent-b",
+        ledger=ledger,
+        dry_run=True,
+    )
+    assert outcome["dry_run"] is True
+
+
 def test_tiered_run_falls_back_to_the_agents_own_live_claim(tmp_path):
     """No call site names ``caller_files`` (cli.py's try-loop call passes none):
     the pre-dispatch check must still be live, so it falls back to the caller's
