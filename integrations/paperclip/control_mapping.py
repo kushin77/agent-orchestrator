@@ -50,6 +50,22 @@ because the served OpenAPI document is what :func:`probe_routes` checks.
 
 Import direction obeys ADR-0016: this is the seam (``integrations/paperclip/``),
 so it imports its siblings and may never import ``adapters/**``.
+
+---knowledge---
+module_id: integrations.paperclip.control_mapping
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [UpstreamRoute, MappingRow, Mismatch, UnclassifiedControlVerb, route, route_keys, normalize, load_verbs, (+8 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

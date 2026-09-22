@@ -22,6 +22,22 @@ carries money as a non-negative number, so "undo this debit" can only mean
 "credit the same account by the same amount". :meth:`GeneralLedger.verify`
 therefore checks each voucher's net to zero, which is what makes a cancelled
 invoice demonstrably reversed rather than merely marked.
+
+---knowledge---
+module_id: integrations.erp.tx.ledger
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [PostingPolicy, Entry, GeneralLedger, line_totals, posting_entries, posting_lines, invert, reversal_is_exact]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

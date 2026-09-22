@@ -9,6 +9,22 @@ The registry mirrors the agent-registry discipline (``registry/profiles/``,
 ``registry/personas/``): one declaration, one owner, one gate. It stores no
 behaviour — the declaration lives in the ``SKILL.md`` itself, and the registry
 only says which declarations are loadable.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.skills.registry
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [package_dir, registry_path, load_registry, declared_entries, discover_declarations, load_declarations, registry_findings, resolve]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

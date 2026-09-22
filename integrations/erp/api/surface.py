@@ -46,6 +46,22 @@ carries a value. The field policy is a function of ``(kind, field, roles)`` and 
 of the document, so for a collection one decision yields the visible field set and
 each item is projected to it; that is using the auth layer's own answer, not
 re-implementing its rule.
+
+---knowledge---
+module_id: integrations.erp.api.surface
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Call, Surface]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

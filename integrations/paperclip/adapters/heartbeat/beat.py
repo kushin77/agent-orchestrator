@@ -16,6 +16,22 @@ check is reading concurrently.
 Fail-closed: a beat for an id `fleet/runtimes.yaml` does not list is REFUSED at
 write time (`BeatRefused`), never silently accepted — an unregistered runtime is
 a finding (`runtime-unregistered:<id>`), not a beat.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.heartbeat.beat
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [BeatRefused, registry_path, load_registry, beats_dir, beat_path, write_beat, read_beat, read_all_beats]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

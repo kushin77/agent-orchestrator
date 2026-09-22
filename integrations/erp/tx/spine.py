@@ -30,6 +30,22 @@ cancel it are all read off the resolved definition set
 (:class:`~.definitions.DefinitionSet`), which derives them from the ERP-02
 schemas and workflows. The scenario supplies *data* — ids, parties, items,
 quantities, and the chart of accounts — and the flows supply only the shape.
+
+---knowledge---
+module_id: integrations.erp.tx.spine
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Workspace, draft, submit, raise_document, deliver, invoice, cancel, complete, (+6 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -36,6 +36,22 @@ union (hermes's flow-mapping support, which paperclip's copy lacked).
 
 Every name below is re-exported, so the seam reads as one module: import from
 ``integrations._seam``, never from a submodule.
+
+---knowledge---
+module_id: integrations._seam.__init__
+system: integrations
+app: seam
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

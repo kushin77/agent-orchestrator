@@ -22,6 +22,22 @@ dependency is unreachable) → the surface answers ``503`` through its own
 ``unavailable`` refusal. **A non-ok dependency is never reported as ok** — and
 :func:`check_report` re-runs the probes and refuses a report that claims
 otherwise, so the honesty of the read is itself measurable rather than trusted.
+
+---knowledge---
+module_id: integrations.erp.api.health
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [DependencyState, HealthReport, probe_model, probe_declarations, probe_artifact, health, check_report]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

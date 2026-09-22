@@ -39,6 +39,22 @@ claims ``status: drift`` while its attributes agree (naming the ``status``).
 Exit contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. CANNOT-ASSESS is never a pass.
 
 Usage: ``python3 integrations/paperclip/diagrams.py check --fixture F --company C``
+
+---knowledge---
+module_id: integrations.paperclip.diagrams
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [diagrams_path, transport_of, read_blueprint, open_fixture_client, Report, project, project_fixture, to_dict, (+5 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

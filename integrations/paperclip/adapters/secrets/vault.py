@@ -27,6 +27,22 @@ and the projection and reads neither.
 
 Exit-code contract used by the CLI and the gate: 0 OK / 1 NOT-OK /
 2 CANNOT-ASSESS.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.secrets.vault
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [validate, load_schema, load_catalog, iter_declarations, document_store, refs_from, build_view, value_findings, (+10 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

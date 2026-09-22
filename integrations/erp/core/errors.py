@@ -22,6 +22,22 @@ structurally invalid body, ``404`` an unknown document kind or workflow,
 ``409`` a conflict with the document's current state, ``422`` a fail-closed
 refusal (the data itself is unusable, so no verdict about the document can be
 issued), ``503`` a missing capability rather than a bad request.
+
+---knowledge---
+module_id: integrations.erp.core.errors
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ErpError, invalid_body, schema_violation, unknown_document_kind, unknown_workflow, unknown_state, unknown_action, state_jumped, (+5 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

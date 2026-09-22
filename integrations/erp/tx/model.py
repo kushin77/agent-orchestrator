@@ -25,6 +25,22 @@ not a condition of the input — and it fails here, at the raise, rather than
 silently reaching a consumer. ``negative_control.py`` provokes every code in the
 set and ``tests/test_negative_control.py`` fails when the provoked set and this
 set diverge.
+
+---knowledge---
+module_id: integrations.erp.tx.model
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Refused, Finding, TxDocument]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

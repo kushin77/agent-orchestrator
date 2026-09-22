@@ -24,6 +24,22 @@ more than a list of assertions:
 
 Run it with ``python3 -m integrations.erp.ops.negative_control``; it exits 0
 only when every declared refusal is provoked, by name.
+
+---knowledge---
+module_id: integrations.erp.ops.negative_control
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Provocation, provocations, Result, Report, run, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

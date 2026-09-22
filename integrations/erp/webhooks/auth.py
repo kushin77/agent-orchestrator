@@ -13,6 +13,22 @@ senders (Stripe, GitHub, and CRM vendors alike) use, chosen because it needs
 no shared library beyond :mod:`hmac`/:mod:`hashlib` from the stdlib. This is a
 generic HMAC pattern, not anything harvested from ERPNext or any CRM vendor's
 source.
+
+---knowledge---
+module_id: integrations.erp.webhooks.auth
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [sign, verify]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

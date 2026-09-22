@@ -17,6 +17,22 @@ Three seams this type owns:
 * **posting is the only thing that moves stock.** :meth:`Workspace.post` adopts
   the ledger the posting layer returns, so a stock movement and its ledger row
   are written together or not at all.
+
+---knowledge---
+module_id: integrations.erp.ops.workspace
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Workspace]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

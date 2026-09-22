@@ -13,6 +13,22 @@ from ``AO_APPROVALS_HMAC_KEY`` (declared in ``infra/env/registry.yaml``,
 ``secret: true``) or an explicit key injected by tests/CLI. No embedded or
 fallback key ships in this module (GR-6) — a misconfigured deployment cannot
 silently sign with a known key.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.record
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [ApprovalKeyError, ApprovalRefused, parse_scope, ApprovalRecord, default_store, grant, check, list_records]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

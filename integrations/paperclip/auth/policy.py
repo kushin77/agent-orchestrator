@@ -11,6 +11,22 @@ upstream surface has no fleet RBAC bindings.
 An agent's permissions are **derived from its registry record**, not stored in
 its token: the record is the single source of truth, so a capability removed
 from ``registry/profiles/seeds`` stops granting authority on the next request.
+
+---knowledge---
+module_id: integrations.paperclip.auth.policy
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [is_permission, permissions_for_agent, permissions_for_operator]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

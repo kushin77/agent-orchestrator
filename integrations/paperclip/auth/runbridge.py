@@ -14,6 +14,22 @@ authoritative fleet-side value; this is a join, not a second correlation store.
 
 A run id is consumed **once**: a second bind of the same run id is a replay and
 is refused ``409 replayed_run_id`` (an agent run id names exactly one run).
+
+---knowledge---
+module_id: integrations.paperclip.auth.runbridge
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [validate_run_id, validate_correlation_id, RunLedger, InMemoryRunLedger, JsonFileRunLedger, RunBridge, epoch_now]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

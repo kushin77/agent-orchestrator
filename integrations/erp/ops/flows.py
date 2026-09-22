@@ -16,6 +16,22 @@ Two properties make this evidence rather than a demonstration:
   payable; manufacturing moves that value through Work In Process and back. The
   transcript carries every account's balance, and the balances sum to zero —
   which is the ledger's own statement that nothing was invented, only moved.
+
+---knowledge---
+module_id: integrations.erp.ops.flows
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [workspace, golden_path, digest, render]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

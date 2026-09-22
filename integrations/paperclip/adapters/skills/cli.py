@@ -15,6 +15,22 @@ Usage (from the repo root):
     python3 -m integrations.paperclip.adapters.skills.cli check
     python3 -m integrations.paperclip.adapters.skills.cli project --check
     python3 -m integrations.paperclip.adapters.skills.cli load --skill ticket-contract-read --profile paperclip
+
+---knowledge---
+module_id: integrations.paperclip.adapters.skills.cli
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [cmd_check, cmd_project, cmd_list, cmd_show, cmd_load, cmd_status, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

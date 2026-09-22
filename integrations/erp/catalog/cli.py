@@ -19,6 +19,22 @@ Examples::
 
     python3 integrations/erp/catalog/cli.py verify
     python3 integrations/erp/catalog/cli.py vocabulary
+
+---knowledge---
+module_id: integrations.erp.catalog.cli
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [cmd_verify, cmd_vocabulary, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

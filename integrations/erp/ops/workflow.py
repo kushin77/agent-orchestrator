@@ -10,6 +10,22 @@ record.
 
 ``docstatus`` is derived from the workflow rather than passed in. The two cannot
 disagree, because there is only one of them.
+
+---knowledge---
+module_id: integrations.erp.ops.workflow
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [docstatus_for, targets, advance]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

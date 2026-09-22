@@ -5,6 +5,22 @@ pending for the three kinds; the gate, the negative controls and the pytest
 suite all build from it, so the fixture is the single description of the shape
 the projector reads. Nothing here writes to the repository — the trees are built
 under a caller-supplied root (a tmpdir).
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.fixtures
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [build_tree, write_record, remove_record]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

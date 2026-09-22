@@ -27,6 +27,22 @@ Two things this module adds, and nothing else:
 
 The guard runs **before** any sink is written (see :mod:`.meter`), so a stopped
 operation leaves nothing behind: no ledger record, no usage record, no cost.
+
+---knowledge---
+module_id: integrations.erp.finops.budget
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [spend_ledger, load_policies, ErpBudgetGuard]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -11,6 +11,22 @@ couple the runtime).
 The claim carries the **company/tenant scope** (``company``) alongside the
 subject; it carries no permissions — those are re-derived from the record on
 every verify, so the record, not the token, decides what an agent may do.
+
+---knowledge---
+module_id: integrations.paperclip.auth.registry
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [AgentRecord, registered_agents, get_registered_agent, mint_agent_key, verify_agent_key]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -21,6 +21,22 @@ Three properties, all of them testable and all of them the point:
 The default trail lives under ``.verify/`` (gitignored runtime state, the
 repository's existing home for generated evidence), so composing never dirties
 the working tree; a caller may point ``--audit`` anywhere.
+
+---knowledge---
+module_id: integrations.paperclip.reporting.audit
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [record_for, append, read, Trail, trail_path]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

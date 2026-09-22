@@ -34,6 +34,22 @@ Every one is refused by name when violated, and each has a negative control in
 * ``docstatus`` never decreases along a transition — a document cannot go from
   submitted back to draft by a declared action; cancellation is the only way
   out of ``submitted``, and it is forward.
+
+---knowledge---
+module_id: integrations.erp.core.workflow
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [State, Transition, Workflow, WorkflowSet, load_workflow_file, load_workflows]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

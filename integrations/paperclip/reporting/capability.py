@@ -17,6 +17,22 @@ only its own artifact. It cannot reach the board (``gh_issue``), the
 repository's history (``shell_exec``) or a remote (only ``web_fetch`` for
 research, as before) — the declaration grants what the capability uses and
 nothing it does not.
+
+---knowledge---
+module_id: integrations.paperclip.reporting.capability
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [Source, load_card, check, as_dict]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

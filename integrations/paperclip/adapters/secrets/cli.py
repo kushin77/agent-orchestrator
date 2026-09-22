@@ -17,6 +17,22 @@ Usage::
     python3 -m integrations.paperclip.adapters.secrets.cli orphans
     python3 -m integrations.paperclip.adapters.secrets.cli read --path GSM_PATH \\
         --principal ID [--scope SCOPE ...]
+
+---knowledge---
+module_id: integrations.paperclip.adapters.secrets.cli
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [cmd_validate, cmd_view, cmd_catalog, cmd_rotation, cmd_orphans, cmd_read, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

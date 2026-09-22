@@ -21,6 +21,22 @@ Three properties make the freeze worth having:
 * **no silent coercion.** ``True`` is not an integer and ``1`` is not ``"1"``:
   ``bool`` is a subclass of ``int`` in Python, and that is the classic way a
   type check quietly stops measuring.
+
+---knowledge---
+module_id: integrations.erp.finops.schema
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [check_schema, assert_supported, load, load_and_refuse, validate]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

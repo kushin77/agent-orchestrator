@@ -27,6 +27,22 @@ list of assertions:
 
 Run it directly with ``python3 integrations/erp/tx/negative_control.py``; it exits
 0 only when every provocation is refused by name.
+
+---knowledge---
+module_id: integrations.erp.tx.negative_control
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Provocation, provocations, run]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

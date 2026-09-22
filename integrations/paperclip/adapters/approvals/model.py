@@ -4,6 +4,22 @@ Everything here is stdlib-only, offline and deterministic. There is deliberately
 **no store, no schema-migration and no write helper**: an approval is a value
 derived from an authoritative record, and the only way to change its state is to
 change the authority it points at.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.model
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [ApprovalRefused, Authority, authority_for, Request, Decision, Approval, Finding, Projection]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

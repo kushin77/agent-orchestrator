@@ -23,6 +23,22 @@ validate the shipped catalogue. Deriving them is also what keeps this a *fixture
 in the honest sense: change ERP-02 and the declarations follow, with no second
 list to update. When the indexer-fed catalogue lands for ERP-08, the source of
 these declarations changes and none of this code does.
+
+---knowledge---
+module_id: integrations.erp.api.fixtures
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [repository_root, model, documents, seeded_store, role_map, field_policies, Declarations, declarations]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

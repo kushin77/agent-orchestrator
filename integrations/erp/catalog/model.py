@@ -15,6 +15,22 @@ Two conventions are load-bearing here:
   not parse has not been judged; reporting it as a failure would be a claim the
   check cannot support. :class:`CannotAssess` is that honest third state, and it
   leaves on exit code 2.
+
+---knowledge---
+module_id: integrations.erp.catalog.model
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [CannotAssess, Finding, Report, load_manifest, load_json, document_files, vocabulary]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

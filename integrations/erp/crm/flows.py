@@ -30,6 +30,22 @@ The flows are the three acceptance criteria of issue #650, written once each:
 Reads are pure and writes are audited, on purpose: :func:`project_costs` and
 :func:`age_issue` change nothing, so a dashboard can be rendered without
 polluting the trail an auditor reads.
+
+---knowledge---
+module_id: integrations.erp.crm.flows
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Workspace, workspace, create_document, advance, patch, convert_lead, win_opportunity, start_project, (+18 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

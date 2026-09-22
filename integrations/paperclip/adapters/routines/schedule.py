@@ -20,6 +20,22 @@ Two consequences the acceptance criteria demand, and where they are enforced:
 The reader is offline and deterministic: the only clock or path in the output is
 normalised to ``<ROOT>`` / ``<FLEET_DIR>``, so the same revision renders the same
 bytes from any checkout.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.routines.schedule
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [ScheduledEntry, Schedule, read_schedule]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

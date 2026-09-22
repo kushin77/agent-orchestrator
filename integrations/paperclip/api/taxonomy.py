@@ -13,6 +13,22 @@ read by *calling* the fleet's existing refusal constructors and reading back
 ``.status`` / ``.code`` (:mod:`integrations.paperclip.auth.model` and
 :mod:`integrations.paperclip.api.errors`). A code that no constructor carries
 would simply not appear — the table cannot drift from the code it describes.
+
+---knowledge---
+module_id: integrations.paperclip.api.taxonomy
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [codes_by_status, entries, responses, statuses]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

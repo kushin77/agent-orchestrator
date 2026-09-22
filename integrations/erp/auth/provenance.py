@@ -19,6 +19,22 @@ The distinction the schema cannot express and this module does is *which* modes
 are legal for *this* upstream: the schema declares the vocabulary
 (``pattern-only`` / ``code-copied``) so an invented mode is a schema violation,
 and this loader refuses ``code-copied`` outright.
+
+---knowledge---
+module_id: integrations.erp.auth.provenance
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Harvest, Provenance, load, load_default]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

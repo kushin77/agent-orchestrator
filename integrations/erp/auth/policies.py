@@ -28,6 +28,22 @@ So a rule is either an enforcement that enforces, or advice that advises; there
 is no third shape, and both mistakes are refused by name. An advisory that fires
 is reported on the :class:`~integrations.erp.auth.model.Decision` — a consulted
 action resolves to allow-with-a-warning rather than passing silently.
+
+---knowledge---
+module_id: integrations.erp.auth.policies
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [FieldRule, FieldPolicySet, load, load_default]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

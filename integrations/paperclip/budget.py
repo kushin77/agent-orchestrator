@@ -30,6 +30,22 @@ without a network or a third-party dependency. Exit contract: 0 OK / 1 NOT-OK /
 2 CANNOT-ASSESS — CANNOT-ASSESS is never reported as a pass.
 
 Usage: ``python3 integrations/paperclip/budget.py check --root .``
+
+---knowledge---
+module_id: integrations.paperclip.budget
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [RailPolicy, Rail, Metering, Charge, load_rail, load_metering, load_project_ids, load_tickets, (+12 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

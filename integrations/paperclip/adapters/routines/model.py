@@ -22,6 +22,22 @@ exactly the fact the code has no field for.
 A routine registry entry that names a schedule the code does not carry is a
 refusal (``routine-orphan-schedule``); a scheduled entry the registry does not
 carry is a reported drift (``schedule-unprojected``). Neither is silent.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.routines.model
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [RoutineRefused, CannotAssess, Trigger, parse_trigger, RoutineSpec, specs_from_records, Finding, Routine, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

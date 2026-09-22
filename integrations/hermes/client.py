@@ -21,6 +21,22 @@ The client is **read-only by construction**: every verb is a ``GET`` against the
 service's declared endpoints (``/health``, ``/api/capabilities``, ``/api/router``,
 ``/api/tiering``), and it decides no routing — it only *projects* what the
 service declares. Routing authority stays with the fleet brain (ADR-0012).
+
+---knowledge---
+module_id: integrations.hermes.client
+system: integrations
+app: hermes
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: hermes
+tier: L1
+interfaces: [HttpTransport, FixtureTransport, HermesClient]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

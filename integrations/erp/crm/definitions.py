@@ -31,6 +31,22 @@ Two disciplines hold the seam honest:
 The declaration set a document was built under travels with the document
 (``flows.Workspace``), so a workspace cannot be read with a different
 declaration set than the one that licensed its transitions.
+
+---knowledge---
+module_id: integrations.erp.crm.definitions
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SLAPolicy, KindDefinition, DefinitionSet, load]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

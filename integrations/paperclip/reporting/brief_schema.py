@@ -17,6 +17,22 @@ Two properties this module holds, both of them the point rather than a nicety:
   one :class:`~governance.modules.model.Refusal` per violation, subject = the
   JSON path, so ``BRIEF-SCHEMA-INVALID`` names where the document stopped being
   the document this package froze.
+
+---knowledge---
+module_id: integrations.paperclip.reporting.brief_schema
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [schema_path, load, unsupported_keywords, validate]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

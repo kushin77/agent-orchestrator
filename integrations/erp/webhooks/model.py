@@ -20,6 +20,22 @@ code cannot produce. See ``bridge.ConversionBridge.handle`` for the sequence.
 :class:`~integrations.erp.tx.ledger.PostingPolicy`) to post the derived GL
 entries the same way ERP-03 does, and nothing else from a sibling lane. It owns
 no file outside ``integrations/erp/webhooks/**``.
+
+---knowledge---
+module_id: integrations.erp.webhooks.model
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Refused, ConversionEvent, BridgeResult]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -26,6 +26,22 @@ Two refusals carry the cycle's own invariants, and both are provoked in
 * **an order cannot be over-received.** What has already been received against
   the order is *derived* from the receipts themselves rather than tracked in a
   counter, so there is no second copy of the fact to drift.
+
+---knowledge---
+module_id: integrations.erp.ops.procurement
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [received, raise_rfq, convert_rfq, receive_order, invoice_order, purchase_cycle]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

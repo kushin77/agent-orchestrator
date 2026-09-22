@@ -11,6 +11,22 @@ Two families of shapes live here, deliberately kept apart:
 
 Stdlib-only by construction (frozen dataclasses + typing), so neither the tests
 nor the gate pull a third-party dependency in.
+
+---knowledge---
+module_id: integrations.hermes.model
+system: integrations
+app: hermes
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: hermes
+tier: L1
+interfaces: [HermesError, UnavailableError, error_for_status, Persona, Profile]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

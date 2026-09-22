@@ -28,6 +28,22 @@ names a policy the declaration set does not have — an undeclared policy is
 never defaulted to a safest-case window) and ``clock-regression`` (``now`` is
 earlier than the instant the clock started, which means one of the two
 timestamps is wrong and the ageing cannot be trusted).
+
+---knowledge---
+module_id: integrations.erp.crm.sla
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [parse_timestamp, format_timestamp, add_minutes, minutes_between, Clock, SLAState, worst, policy_for, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

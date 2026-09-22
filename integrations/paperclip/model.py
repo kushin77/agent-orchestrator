@@ -11,6 +11,22 @@ Two families of shapes live here, deliberately kept apart:
 
 Stdlib-only by construction (frozen dataclasses + typing), so neither the tests
 nor the gate pull a third-party dependency in.
+
+---knowledge---
+module_id: integrations.paperclip.model
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [PaperclipError, ValidationError, AuthError, ForbiddenError, NotFoundError, ConflictError, UnprocessableError, ServiceUnavailableError, (+10 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

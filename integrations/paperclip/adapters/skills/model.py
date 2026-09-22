@@ -8,6 +8,22 @@ The vocabulary is deliberately small and closed:
   ``gateway/mcp/``, never a second allowlist;
 * every refusal raises a :class:`SkillRefused` subclass whose message names the
   offender, so a gate can quote it instead of a bare exit code.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.skills.model
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [SkillAdapterError, CannotAssess, SkillRefused, UndeclaredSkillError, MissingProvenanceError, VendoredImplementationError, CapabilityNotGrantedError, ToolNotGrantedError, (+7 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

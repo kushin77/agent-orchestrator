@@ -14,6 +14,22 @@ parses it with the quote- and depth-aware :func:`_split_flow`, which is what
 keeps a nested or quoted element from being cut in half. For every input either
 adapter actually reads the two agree — proven by the adapters' own suites, whose
 frozen outputs are byte-identical across the extraction.
+
+---knowledge---
+module_id: integrations._seam.yaml_subset
+system: integrations
+app: seam
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [load_yaml, load_yaml_file]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

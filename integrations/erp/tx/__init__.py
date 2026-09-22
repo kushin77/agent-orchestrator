@@ -24,6 +24,22 @@ Nothing here is tenant-visible and nothing here runs on its own: the module ship
 the loop, the REST surface is ERP-06 (#651), the portal mount is ERP-07 (#652)
 and the feature flag that gates the whole module is ``erp-module``, declared
 ``off`` in ``integrations/erp/module.yaml`` (GR-5).
+
+---knowledge---
+module_id: integrations.erp.tx.__init__
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

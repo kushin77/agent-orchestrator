@@ -30,6 +30,22 @@ Exit contract, the repository's tri-state convention (``guardrails/honesty``):
 ``demo`` runs the golden path twice and prints both transcripts, so
 determinism is visible rather than asserted; ``routes`` prints the route table;
 ``emit`` writes (or prints) the document; ``controls`` reports the refusals alone.
+
+---knowledge---
+module_id: integrations.erp.api.cli
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [golden_path, command_check, command_emit, command_routes, command_demo, command_controls, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

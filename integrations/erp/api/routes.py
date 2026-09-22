@@ -20,6 +20,22 @@ Two things are therefore *derived* and two are declared:
 :func:`problems` re-derives the first group and reports a divergence by name, so
 a table that stops matching the model fails a gate instead of shipping a
 contract that describes something else.
+
+---knowledge---
+module_id: integrations.erp.api.routes
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [permission_for, Route, Match, RouteTable, match, allowed_methods, transitions, problems]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

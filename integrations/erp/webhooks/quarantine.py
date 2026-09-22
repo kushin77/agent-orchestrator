@@ -9,6 +9,22 @@ every event this lane refused, the code it was refused under, and the detail.
 Like :mod:`idempotency`, this is the simplest store that is still correct; a
 real deployment swaps it for a durable dead-letter queue behind the same
 ``add`` / ``all`` seam.
+
+---knowledge---
+module_id: integrations.erp.webhooks.quarantine
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [QuarantinedEvent, QuarantineStore]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

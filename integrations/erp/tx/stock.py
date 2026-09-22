@@ -25,6 +25,22 @@ The item master and the warehouse set are both *inputs* (scenario data held by
 so is validated by ERP-02; the warehouse set is supplied because ERP-02 declares
 no warehouse family — the indexer's catalogue does, but a declared document with
 no schema cannot be validated, and this lane will not invent one.
+
+---knowledge---
+module_id: integrations.erp.tx.stock
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [money, quantity, Movement, StockLedger, movements_for, invert, reversal_is_exact]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

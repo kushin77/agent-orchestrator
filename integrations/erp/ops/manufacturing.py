@@ -24,6 +24,22 @@ is exploded, issued or posted — because a work order consumes its bill of
 materials exactly once. The state machine would also refuse it (``complete`` is
 not an action available from ``completed``), and the named rule runs first so the
 refusal says which order it was and what state it is in.
+
+---knowledge---
+module_id: integrations.erp.ops.manufacturing
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [bom_for, define_bom, activate_bom, explode, components_of, raise_work_order, complete_work_order, plan_production, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

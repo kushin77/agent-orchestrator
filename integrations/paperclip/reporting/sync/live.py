@@ -37,6 +37,22 @@ Code                      Refused
 ``SYNC-SCHEMA-FROZEN``    ``sync.schema.json`` is missing, unreadable or not
                           the frozen ``$id`` (CANNOT-ASSESS, not a pass)
 ======================== =========================================
+
+---knowledge---
+module_id: integrations.paperclip.reporting.sync.live
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [SyncRefusal, schema_path, load_schema, SyncRecord, authenticate, run_sync]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

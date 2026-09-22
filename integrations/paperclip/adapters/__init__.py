@@ -16,4 +16,20 @@ the parity tree under the canonical module ``integrations/paperclip/``. The
 This subpackage is layered **over** the seam (``client``, ``mapping``,
 ``model``): ``adapters/**`` may import the seam, and the seam must never import
 ``adapters/**``.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.__init__
+system: integrations
+app: paperclip
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """

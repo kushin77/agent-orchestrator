@@ -35,6 +35,22 @@ Public surface
 
 ``python3 -m integrations.erp.finops.cli check`` is the lane's own tri-state
 check; ``bash scripts/check-erp-finops.sh`` is the gate that names it.
+
+---knowledge---
+module_id: integrations.erp.finops.__init__
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

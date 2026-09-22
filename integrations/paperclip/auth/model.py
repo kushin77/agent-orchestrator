@@ -18,6 +18,22 @@ so a caller branches on one vocabulary rather than a forked one:
 
 ``token_expired`` and ``replayed_run_id`` are the two additive codes this seam
 contributes; every other code is the merged identity vocabulary verbatim.
+
+---knowledge---
+module_id: integrations.paperclip.auth.model
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [AuthError, validation_error, unauthorized, invalid_token, token_expired, session_revoked, cross_company, permission_denied, (+4 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

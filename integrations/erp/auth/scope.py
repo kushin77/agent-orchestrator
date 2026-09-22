@@ -33,6 +33,22 @@ CANNOT-ASSESS — refusing to *decide* is not the same answer as deciding "no", 
 collapsing them is the defect the tri-state contract exists to prevent. A request
 that names an unknown kind, action or role is *decided* — the answer is denial
 with a reason, because the request is well-formed enough to answer.
+
+---knowledge---
+module_id: integrations.erp.auth.scope
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [authorize]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

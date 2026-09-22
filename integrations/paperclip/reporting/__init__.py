@@ -18,6 +18,22 @@ files that registry cites — never by re-deriving mandatory status here.
 
 The frozen artifact is ``docs/MODULE-BRIEF.md``; the gate that regenerates it
 and refuses a stale or unsupported one is ``scripts/check-module-brief.sh``.
+
+---knowledge---
+module_id: integrations.paperclip.reporting.__init__
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

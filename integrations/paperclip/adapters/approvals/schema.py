@@ -6,6 +6,22 @@ It covers the keywords that schema uses — ``type``, ``required``,
 ``properties``, ``additionalProperties``, ``enum``, ``minLength`` — and reports
 each violation naming the field. It is deliberately small: a schema the adapter
 does not use is a schema the adapter does not need.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.schema
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [load_schema, validate]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -20,6 +20,22 @@ Two design decisions carry the weight:
   is ever invented for it (:mod:`.rollup` refuses to bill it). An entry that is
   simply **absent** is a different thing and is refused by name
   (``rate-missing``) — silence is not a price.
+
+---knowledge---
+module_id: integrations.erp.finops.rates
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Rate, RateCard, load, load_and_validate]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

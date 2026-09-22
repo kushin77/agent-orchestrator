@@ -20,6 +20,22 @@ The shipped assets live beside the code: ``schemas/*.json`` (the document
 families and the workflow meta-schema) and ``workflows/*.yaml`` (each lifecycle
 as data). ``provenance.json`` records the harvest the doctrine requires, and
 ``README.md`` states the contract the asset gate enforces.
+
+---knowledge---
+module_id: integrations.erp.core.__init__
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

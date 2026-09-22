@@ -24,6 +24,22 @@ schema fixes the shape (a posting rule has an account, a side and a basis);
 purpose outside the declared stock vocabulary, a voucher the ledger cannot
 cite). Both run, and each names itself when it fails, so a reader can tell a
 malformed declaration from a contradictory one.
+
+---knowledge---
+module_id: integrations.erp.ops.catalog
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [assert_supported_schema, Kind, Posting, Catalog, load]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

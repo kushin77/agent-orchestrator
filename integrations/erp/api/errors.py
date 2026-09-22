@@ -32,6 +32,22 @@ to describe; this one is derived, so it cannot.
 
 **No secret is ever carried (GR-6).** A refusal names a route, a document id, a
 kind or a reason — never a credential, and never a value that was refused.
+
+---knowledge---
+module_id: integrations.erp.api.errors
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SurfaceError, unauthorized, forbidden, not_found, document_not_found, method_not_allowed, conflict, unavailable, (+3 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

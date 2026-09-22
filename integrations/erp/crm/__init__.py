@@ -19,6 +19,22 @@ Read ``README.md`` for the surface, the flows and the lane boundary. In short:
 This package imports nothing from ``integrations/erp/core`` or
 ``integrations/erp/catalog``: those were concurrent sibling lanes, so the one
 shape this lane needed is declared locally and the seam is named.
+
+---knowledge---
+module_id: integrations.erp.crm.__init__
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

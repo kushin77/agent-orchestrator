@@ -25,6 +25,22 @@ is declared locally under ``catalog/`` and loaded through the single seam
 ``definitions.load``, which is where the indexer-fed definitions of EPIC #645
 will arrive. Replacing the local declaration with the indexer's is a change of
 source, not of code.
+
+---knowledge---
+module_id: integrations.erp.crm.model
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Refused, Finding, Document]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

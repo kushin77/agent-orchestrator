@@ -38,6 +38,22 @@ Fail-closed (never fabricate a cause it cannot source):
 * a beat that carries no ``wake.delta``, an unknown ``wake.cause``, or a
   ``blocked`` outcome with no ``owner`` is refused by name by
   :func:`validate_heartbeat`.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.heartbeat.adapter
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [HeartbeatRefused, Rung, parse_iso, format_iso, read_int_constant, cadence_seconds, staleness_ceiling_seconds, policy, (+12 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

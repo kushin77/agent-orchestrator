@@ -14,6 +14,22 @@ Verbs an operator (or the gate) needs:
 
 No secret is read, written or echoed here (GR-6): the surface describes routes
 and reads local state.
+
+---knowledge---
+module_id: integrations.paperclip.api.cli
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

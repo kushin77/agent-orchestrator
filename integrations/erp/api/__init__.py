@@ -33,6 +33,22 @@ Three properties the lane is built on, each measured rather than promised:
 
 Nothing here opens a socket, reads a clock or touches the network: the module is
 offline, deterministic and exercised entirely by its own gate.
+
+---knowledge---
+module_id: integrations.erp.api.__init__
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

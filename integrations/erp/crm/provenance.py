@@ -19,6 +19,22 @@ record is machine-readable (:``catalog/provenance.json``) and *enforced*:
 * a record with no harvests at all is refused (``provenance-invalid``): an empty
   provenance file is an unfilled form, and it would let a lane harvest silently
   by simply not recording anything.
+
+---knowledge---
+module_id: integrations.erp.crm.provenance
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Harvest, Provenance, load]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

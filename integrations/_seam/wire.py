@@ -7,6 +7,22 @@ status→typed-error table it looks the class up in. Those two are data, so they
 are the seam's :class:`WireBoundary` argument — the message shape and the
 constructor call are single-sourced here, which is the half that had already
 started to drift.
+
+---knowledge---
+module_id: integrations._seam.wire
+system: integrations
+app: seam
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Response, decode, WireBoundary, error_for_status]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

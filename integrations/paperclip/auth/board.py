@@ -11,6 +11,22 @@ there is no third login and no parallel human-identity store.
 
 The token carries the operator's session id and company scope; its permissions
 are re-derived from the session roles on every verify.
+
+---knowledge---
+module_id: integrations.paperclip.auth.board
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [BoardSession, load_operator_session, mint_board_token, verify_board_token]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

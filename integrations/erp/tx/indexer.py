@@ -26,6 +26,22 @@ Two properties are deliberate:
   (``id``, ``family``, ``owning_issue``). The index is not asked to duplicate a
   catalogue entry's body, and a mismatch between the two is reported rather than
   resolved in favour of one of them.
+
+---knowledge---
+module_id: integrations.erp.tx.indexer
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [IndexItem, LaneDocument, index_path, load_index, query, read_lane_document, catalogue_documents, catalogue_families]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -20,6 +20,22 @@ Nothing here writes: the PMO is a set of derived views over committed ledgers,
 and the routine projection only reads it. A PMO that cannot be built is not
 silently ignored — the caller renders it as ``pmo-unavailable`` and the gate
 asserts the real root never degrades to that.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.routines.pmo
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [PmoUnavailable, PmoView, load]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

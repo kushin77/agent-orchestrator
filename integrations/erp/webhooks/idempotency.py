@@ -10,6 +10,22 @@ The store is a plain in-memory mapping keyed by
 sender supplies its own key). It is intentionally the simplest thing that is
 still correct: a real deployment swaps this for a durable store behind the same
 two-method seam (``seen`` / ``record``) without touching :mod:`bridge`.
+
+---knowledge---
+module_id: integrations.erp.webhooks.idempotency
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [IdempotencyStore]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
