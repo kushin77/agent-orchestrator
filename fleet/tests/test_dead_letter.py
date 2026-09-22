@@ -59,6 +59,13 @@ def wire_scratch(tmp_path: Path, monkeypatch, *, cap: int | None = None) -> Path
     monkeypatch.setattr(channel, "INBOX", tmp_path / "inbox")
     monkeypatch.setattr(channel, "DONE", tmp_path / "done")
     monkeypatch.setattr(terminal, "stream_run_event", lambda *a, **k: None)
+    # `report_once` shells out to `channel.py` as a SUBPROCESS (not an
+    # in-process call), so the monkeypatches above never reach it — it
+    # re-resolves FLEET_DIR from the environment and writes escalate
+    # mailboxes (outbox/inbox/sent) into the real repo `.fleet/` (#1985).
+    # `AO_FLEET_DIR` is the seam `fleet/runtime.py` already reads for
+    # exactly this; inherited subprocess env picks it up.
+    monkeypatch.setenv("AO_FLEET_DIR", str(tmp_path / "fleet"))
     return tmp_path
 
 
