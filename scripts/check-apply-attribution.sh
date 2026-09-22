@@ -93,14 +93,21 @@ body() { grep -vE '^[[:space:]]*#' "$1" 2>/dev/null | sed 's/ #.*//'; }
 
 # can_apply <file> — a terraform/apply token pair on a line that can BE a command.
 can_apply() {
-  local txt
+  local txt hits
   txt="$(body "$1")"
-  printf '%s\n' "$txt" \
+  # The containment test is `[ -n "$hits" ]`, never a quiet grep at the end of a
+  # pipe: `grep -q` exits at its first match, so it can SIGPIPE a producer that is
+  # still writing — the defect `check-verdict-contains` exists to refuse (#2017).
+  # Only the *quiet* grep is gone; the filtering greps and their case-insensitivity
+  # are unchanged, so `hits` holds exactly what the old pipeline would have matched.
+  hits="$(printf '%s\n' "$txt" \
     | grep -vE '^[[:space:]]*[A-Za-z_][A-Za-z0-9_-]*:[[:space:]]' \
-    | grep -qiE 'terraform[^#]*\bapply\b|\bapply\b[^#]*\bterraform\b' && return 0
-  printf '%s\n' "$txt" \
+    | grep -iE 'terraform[^#]*\bapply\b|\bapply\b[^#]*\bterraform\b')"
+  [ -n "$hits" ] && return 0
+  hits="$(printf '%s\n' "$txt" \
     | grep -iE '^[[:space:]]*("?args"?|"?entrypoint"?|"?script"?|"?command"?):' \
-    | grep -qiE 'terraform[^#]*\bapply\b|\bapply\b[^#]*\bterraform\b'
+    | grep -iE 'terraform[^#]*\bapply\b|\bapply\b[^#]*\bterraform\b')"
+  [ -n "$hits" ]
 }
 
 # apply_routes <cloudbuild-dir> — one path per apply-capable build config.
@@ -178,7 +185,10 @@ provoke() {
     return 0
   fi
   got="$(analyse "$scratch/cb")"
-  if printf '%s\n' "$got" | grep -qx "$want"; then
+  # Exact-line match, bash-native (`contains` from scripts/lib/common.sh, already
+  # sourced): wrapping both sides in newlines makes a substring test an exact LINE
+  # test. No quiet grep sits at the end of a pipe (#2017).
+  if contains $'\n'"$got"$'\n' $'\n'"$want"$'\n'; then
     printf '  OK    arm   %-42s expect=%-28s actual=%s\n' "$label" "$want" "$got"
   else
     not_ok=$((not_ok + 1))
