@@ -254,5 +254,85 @@ else
   exit 1
 fi
 
-echo "check-cross-reference: OK — relationships valid, markers resolved, builds deterministic, negative control refused"
+# --- the gate's own scratch must not decide the verdict (#2013) -----------
+# `make verify` rewrites `.board/snapshot.json` IN PLACE before this check runs:
+# scripts/check-dispatch-queue.sh self-heals it through board_selfheal ->
+# snapshot.refresh, which truncates at `gh issue list --limit 1000`. Reading that
+# working-tree file made this check's verdict a function of whether an earlier
+# check had already run -- a refreshed snapshot dropped the closed `issue-4` that
+# `catalog.json` still references, and the spine reddened on a tree whose own
+# commit was sound. Resolution now reads the COMMITTED revision, so both halves
+# are provoked here:
+#   * a working-tree refresh that loses a referenced issue must NOT change the
+#     verdict (this is the defect),
+#   * a COMMITTED snapshot that genuinely lost it must STILL be refused (this is
+#     what stops the first half from being vacuous).
+scratch_out="$(python3 - "$root" "$work" <<'PY' 2>&1
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+repo = Path(sys.argv[1]).resolve()
+scratch = Path(sys.argv[2]).resolve()
+sys.path.insert(0, str(repo / "governance" / "knowledge"))
+
+import crossref  # noqa: E402
+
+
+def build(directory, committed, working):
+    """A scratch git root whose COMMIT and whose WORKING TREE can differ."""
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / ".board").mkdir(exist_ok=True)
+    target = directory / ".board" / "snapshot.json"
+
+    def payload(numbers):
+        return {"schema": "fixture", "issues": [{"number": n} for n in numbers]}
+
+    target.write_text(json.dumps(payload(committed)), encoding="utf-8")
+    for argv in (
+        ["init", "-q"],
+        ["add", "-A"],
+        ["-c", "user.email=gate@example.invalid", "-c", "user.name=gate",
+         "commit", "-qm", "base"],
+    ):
+        subprocess.run(["git", "-C", str(directory)] + argv,
+                       capture_output=True, check=True)
+    # the gate's in-place refresh, reproduced: the WORKING TREE loses an issue
+    target.write_text(json.dumps(payload(working)), encoding="utf-8")
+    return directory
+
+
+good = build(scratch / "committed-good", [4, 645], [645])
+bad = build(scratch / "committed-bad", [645], [645])
+
+on_disk = json.loads((good / ".board" / "snapshot.json").read_text(encoding="utf-8"))
+on_disk_numbers = {issue["number"] for issue in on_disk["issues"]}
+ok_good, why_good = crossref.resolve_target(good, "issue-4")
+ok_bad, why_bad = crossref.resolve_target(bad, "issue-4")
+
+print("PROVOKED_WORKING_TREE_LOST_4=%d" % (0 if 4 in on_disk_numbers else 1))
+print("FIX_WORKTREE_LOSS_IGNORED=%d" % (1 if ok_good else 0))
+print("TRUTH_COMMITTED_LOSS_REFUSED=%d" % (1 if not ok_bad else 0))
+print("WHY_GOOD=%s" % why_good)
+print("WHY_BAD=%s" % why_bad)
+PY
+)"
+if [ $? -ne 0 ]; then
+  printf '%s\n' "$scratch_out" | sed 's/^/    /' >&2
+  echo "check-cross-reference: CANNOT-ASSESS — could not provoke the gate-scratch control" >&2
+  exit 2
+fi
+unproven=""
+for flag in PROVOKED_WORKING_TREE_LOST_4 FIX_WORKTREE_LOSS_IGNORED TRUTH_COMMITTED_LOSS_REFUSED; do
+  printf '%s\n' "$scratch_out" | grep -q "^${flag}=1$" || unproven="$unproven $flag"
+done
+if [ -n "$unproven" ]; then
+  printf '%s\n' "$scratch_out" | sed 's/^/    /' >&2
+  echo "check-cross-reference: FAIL — the gate-scratch control did not hold:$unproven" >&2
+  exit 1
+fi
+echo "  OK    gate-scratch control: a working-tree refresh that loses a referenced issue is ignored, and a committed loss is still refused"
+
+echo "check-cross-reference: OK — relationships valid, markers resolved, builds deterministic, negative controls refused"
 exit 0

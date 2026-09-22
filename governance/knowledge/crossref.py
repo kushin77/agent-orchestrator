@@ -111,6 +111,42 @@ def _read_json(path: Path) -> Optional[Any]:
         return None
 
 
+def _read_committed_json(root: Path, relpath: str) -> Optional[Any]:
+    """Read a tracked artefact from the committed revision, never the tree.
+
+    A read-only gate must judge the tree under test, not its own scratch. The
+    board snapshot is a tracked artefact that ``make verify`` **itself rewrites
+    in place**: ``scripts/check-dispatch-queue.sh`` self-heals it through
+    ``board_selfheal`` -> ``snapshot.refresh``, which writes
+    ``.board/snapshot.json`` with a non-atomic ``write_text``. A working-tree
+    read therefore makes this module's answer depend on whether an earlier
+    check has already run, and on how lossy that refresh was -- issue #2013,
+    where a refreshed snapshot dropped the closed ``issue-4`` that
+    ``catalog.json`` still references and reddened the spine on a tree whose own
+    commit was sound.
+
+    ``HEAD`` is the committed tree of whatever checkout is under test, so a
+    genuinely committed bad snapshot still fails legitimately; only the gate's
+    own uncommitted scratch stops being able to change the verdict. A root that
+    is not a git checkout (a fixture, a test tree) falls back to the
+    working-tree file, which is the only source it has.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(root), "show", "HEAD:%s" % relpath],
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return _read_json(root / relpath)
+    if out.returncode != 0:
+        return _read_json(root / relpath)
+    try:
+        return json.loads(out.stdout.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return _read_json(root / relpath)
+
+
 def _read_ledger_lines(path: Path) -> List[Dict[str, Any]]:
     records: List[Dict[str, Any]] = []
     try:
@@ -131,7 +167,7 @@ def _read_ledger_lines(path: Path) -> List[Dict[str, Any]]:
 
 
 def board_issue_numbers(root: Path) -> Set[int]:
-    payload = _read_json(root / SNAPSHOT_RELPATH)
+    payload = _read_committed_json(root, SNAPSHOT_RELPATH)
     issues = payload.get("issues") if isinstance(payload, dict) else None
     if not isinstance(issues, list):
         return set()
