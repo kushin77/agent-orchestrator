@@ -27,7 +27,10 @@
 # fleet_board, sessions and settings default OFF — they have no registry.yaml
 # `surfaces:` counterpart to promote against, so they are governed here
 # alone. `scripts/check-feature-flags.py` cross-validates every surface
-# declared in both files against drift (issue #1941).
+# declared in both files against drift (issue #1941). nous (issue #1561)
+# also defaults OFF and is governed here alone: its live probe reaches a
+# billed external provider, so the surface is promoted only after the
+# operator step #1748 (the secret) is done.
 schema_version: 1
 
 default_policy: off
@@ -125,3 +128,21 @@ surfaces:
       dispatch_tier_policy, gate_skip_budget, provider_flags, nous_secret)
       grouped by domain. Served read-only at GET /api/settings/rows. Every
       row is editable:false — settings here are IaC-declared, never clicked.
+  nous:
+    default: off
+    phase: 11
+    description: >
+      Nous provider surface (issue #1561): the console's view over the
+      gateway's Nous integration, served read-only at GET /api/nous/overview.
+      Four sections — provider status/heartbeat, model catalog with per-model
+      cost, credits plus burn rate, and tool-gateway usage. The declared
+      catalog/rates/plans come from gateway/finops/provider-credits.yaml
+      through its own reader; metered debits and per-model usage come from the
+      durable usage store. The provider's published contract declares NO
+      balance endpoint, so remainingUsd is null unless a plan is pinned and the
+      payload says why — never a fabricated balance. The live half is ONE free
+      unauthenticated GET {baseUrl}/models (never the billed chat path), gated
+      on the credential #1748 declares and cached under both a TTL and a
+      minimum probe interval so reloads cannot hammer a billed provider; a
+      failed probe serves the last reading labelled stale with its measured
+      age, never as a current value.

@@ -70,6 +70,7 @@ from portal.server.fleet_authz import FleetAuthorizer, FleetDenied
 from portal.server.erp import ErpModuleError, ErpModuleSurface
 from portal.server.livestore import BoardSurface, TelemetryUnavailableError
 from portal.server import sessions as sessions_module
+from portal.server.nous import NousSurface
 from portal.server.sessions import SessionsView
 from portal.server.settings import SettingsView
 from portal.server.org_chart import OrgChartView
@@ -195,6 +196,7 @@ class ConsoleApplication:
         board_surface: Optional[BoardSurface] = None,
         sessions_view: Optional[SessionsView] = None,
         settings_view: Optional[SettingsView] = None,
+        nous_surface: Optional[NousSurface] = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.static_dir = Path(static_dir) if static_dir else (
@@ -309,6 +311,14 @@ class ConsoleApplication:
             settings_view
             if settings_view is not None
             else SettingsView(repo_root=self.repo_root)
+        )
+        # The Nous provider surface (issue #1561) — feature-flag-gated OFF,
+        # declared beside the other portal-only views for the same reason: a
+        # view inside the portal service, no service or terraform variable.
+        self.nous = (
+            nous_surface
+            if nous_surface is not None
+            else NousSurface(repo_root=self.repo_root)
         )
         # The operator terminal (issue #774) — feature-flag-gated OFF. It
         # composes the fleet projection (read) and the remote control family
@@ -716,6 +726,17 @@ class ConsoleApplication:
                 "(portal/config/feature-flags.yaml surfaces.settings)",
             )
 
+        # The Nous provider surface (issue #1561) ships the same way, gated
+        # before authN: an unpromoted provider surface is absent, not merely
+        # unauthorised.
+        if parts[0] == "nous" and not self.nous.enabled:
+            raise ApiError(
+                404,
+                "feature_disabled",
+                "the Nous provider surface is feature-flag-gated OFF "
+                "(portal/config/feature-flags.yaml surfaces.nous)",
+            )
+
         # authenticated surface
         principal, claims = self._require_session(cookies)
         try:
@@ -747,6 +768,8 @@ class ConsoleApplication:
                 return self._route_sessions(parts, method, body, cookies, now_iso)
             if parts[0] == "settings":
                 return self._route_settings(parts, method)
+            if parts[0] == "nous":
+                return self._route_nous(parts, method)
             if parts[:2] == ["console", "logout"] and method == "POST":
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
@@ -1039,6 +1062,24 @@ class ConsoleApplication:
             return self._ok(self.settings_view.rows())
         raise ApiError(
             404, "not_found", f"no such settings read: {'/'.join(surface)}"
+        )
+
+    def _route_nous(self, parts: list[str], method: str) -> Response:
+        """The Nous provider surface (issue #1561).
+
+        Reads: ``GET /api/nous/overview`` — the four sections the view renders
+        (provider status/heartbeat, declared catalog with per-model cost,
+        credits plus burn rate, tool-gateway usage), joined from the
+        declarations and metered records ``portal.server.nous.NousSurface``
+        reads. Observe-only: the view has no write side, so this route has one
+        verb and one path — an account action is a link-out to the provider,
+        never a control here.
+        """
+        surface = parts[1:]
+        if method == "GET" and surface == ["overview"]:
+            return self._ok(self.nous.overview())
+        raise ApiError(
+            404, "not_found", f"no such nous read: {'/'.join(surface)}"
         )
 
     def _route_erp(

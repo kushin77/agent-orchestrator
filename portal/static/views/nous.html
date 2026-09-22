@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nous — provider</title>
+  <link rel="stylesheet" href="/design-tokens/tokens.css">
+  <link rel="stylesheet" href="/css/console.css">
+</head>
+<body>
+  <header class="view-topbar">
+    <a class="mono" href="/views/shell.html">← console</a>
+    <h1 style="font-size:var(--os-font-size-lg)">Nous</h1>
+    <span class="hint" style="font-size:var(--os-font-size-xs)">
+      provider status, catalog, credits, usage
+    </span>
+    <span class="grow"></span>
+    <span id="manageAccountSlot"></span>
+    <span id="stateBadge" class="badge" data-state="">—</span>
+  </header>
+
+  <main class="view-main" id="app"><div class="empty">loading…</div></main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    /* The Nous provider surface (issue #1561). Renders
+     * portal.server.nous.NousSurface.overview() via GET /api/nous/overview:
+     * provider status/heartbeat, the declared model catalog with per-model
+     * cost, the declared credits meter with metered burn, and tool-gateway
+     * usage per model.
+     *
+     * It is org-wide (the provider is not tenant-scoped), so it takes no
+     * ?tenant= — the shell registers it in NAV_GLOBAL.
+     *
+     * Two honesty rules this view must keep:
+     *
+     *  * the provider's contract declares NO balance endpoint, so wherever the
+     *    payload carries a null with a `remainingReason`, the view prints that
+     *    reason — never a number it does not have;
+     *  * a stale reading is rendered AS stale, with its age. It is never shown
+     *    as if it were current, and the unreachable/not-configured states are
+     *    shown explicitly rather than as a blank page.
+     *
+     * Account actions the console does not replicate (billing changes, top-ups)
+     * stay with the provider: the header's "Manage account" link-out is the
+     * only path to them, and no control here mutates anything. The link-out's
+     * URL comes from the payload (`links.manageAccount`) rather than being
+     * baked into this file, because the console is self-hosted end to end and
+     * no static asset may carry an external reference
+     * (portal/tests/test_assets.py).
+     */
+    (async function () {
+      "use strict";
+      var app = document.getElementById("app");
+      var badge = document.getElementById("stateBadge");
+      var accountSlot = document.getElementById("manageAccountSlot");
+
+      function manageAccount(links) {
+        var url = (links || {}).manageAccount;
+        if (!url) return;
+        accountSlot.appendChild(CP.el("a", {
+          class: "hint mono",
+          href: url,
+          target: "_blank",
+          rel: "noopener noreferrer"
+        }, "Manage account ↗"));
+      }
+
+      function fail(err) {
+        if (err.status === 401) { window.location.href = "/auth/login"; return; }
+        badge.textContent = "—";
+        var card = CP.el("div", { class: "card", "data-nous-error": err.code || "error" },
+          CP.el("div", { class: "empty error-text", text: err.message }));
+        if (err.code === "feature_disabled") {
+          card.appendChild(CP.el("div", { class: "hint", text:
+            "The Nous provider surface ships feature-flag-gated OFF " +
+            "(portal/config/feature-flags.yaml surfaces.nous)." }));
+        }
+        CP.clear(app).appendChild(card);
+      }
+
+      function money(value) {
+        return (value === null || value === undefined) ? "—" : CP.money(value);
+      }
+
+      function num(value) {
+        return (value === null || value === undefined) ? "—" : CP.num(value);
+      }
+
+      function stateClass(state) {
+        if (state === "live") return "ok";
+        if (state === "stale") return "warn";
+        if (state === "unreachable") return "err";
+        return "dim";
+      }
+
+      function statusCard(data) {
+        var status = data.status || {};
+        var credential = status.credential || {};
+        var gate = status.gate || {};
+        var probe = status.probe || {};
+        var card = CP.el("div", { class: "card", "data-nous-status": status.state || "unknown" });
+        card.appendChild(CP.el("div", { class: "spread" },
+          CP.el("h3", { text: "Provider status" }),
+          CP.el("span", { class: "badge " + stateClass(status.state), text: status.state || "unknown" })));
+        card.appendChild(CP.el("div", { class: "hint", text: status.detail || "" }));
+
+        var rows = [
+          ["credential", credential.secretId
+            ? (credential.secretId + " → " + (credential.env || "?") +
+               (credential.configured ? " (present)" : " (not set)"))
+            : "not declared"],
+          ["gate", gate.name
+            ? (gate.name + " — declared " + (gate.state || "unknown") +
+               (gate.promoted === false ? ", not promoted" : ""))
+            : "not declared"],
+          ["reading", status.valueAt
+            ? (status.valueAt + " (" + num(status.ageSeconds) + "s old" +
+               (status.cached ? ", cached" : "") + ")")
+            : "none"],
+          ["checked", status.checkedAt || "—"],
+          ["probe", probe.endpoint
+            ? (probe.endpoint + " — " + probe.callsMade + " call(s) this render")
+            : "not attempted"]
+        ];
+        var table = CP.el("table", { class: "tbl" });
+        table.appendChild(CP.el("thead", {}, CP.el("tr", {},
+          CP.el("th", { text: "Signal" }), CP.el("th", { text: "Value" }))));
+        var body = CP.el("tbody");
+        rows.forEach(function (pair) {
+          body.appendChild(CP.el("tr", {},
+            CP.el("td", { class: "mono dim", text: pair[0] }),
+            CP.el("td", { class: "mono", text: String(pair[1]) })));
+        });
+        table.appendChild(body);
+        card.appendChild(table);
+        return card;
+      }
+
+      function catalogCard(data) {
+        var catalog = data.catalog || {};
+        var models = catalog.models || [];
+        var card = CP.el("div", { class: "card", "data-nous-catalog": "models" });
+        card.appendChild(CP.el("div", { class: "spread" },
+          CP.el("h3", { text: "Model catalog and per-model cost" }),
+          CP.el("span", { class: "hint mono", text: catalog.declaration || "" })));
+        if (!models.length) {
+          card.appendChild(CP.el("div", { class: "empty dim",
+            text: "No priced model is declared in this checkout." }));
+          return card;
+        }
+        var table = CP.el("table", { class: "tbl" });
+        table.appendChild(CP.el("thead", {}, CP.el("tr", {},
+          CP.el("th", { text: "Model" }),
+          CP.el("th", { class: "num", text: "Context" }),
+          CP.el("th", { class: "num", text: "In $/MTok" }),
+          CP.el("th", { class: "num", text: "Out $/MTok" }))));
+        var body = CP.el("tbody");
+        models.forEach(function (model) {
+          body.appendChild(CP.el("tr", { "data-model": model.id },
+            CP.el("td", { class: "mono", text: model.id }),
+            CP.el("td", { class: "num mono", text: model.contextWindow ? CP.num(model.contextWindow) : "—" }),
+            CP.el("td", { class: "num mono", text: model.pricePublished ? money(model.inputUsdPerMTok) : "unpriced" }),
+            CP.el("td", { class: "num mono", text: model.pricePublished ? money(model.outputUsdPerMTok) : "unpriced" })));
+        });
+        table.appendChild(body);
+        card.appendChild(table);
+
+        var plans = catalog.plans || [];
+        if (plans.length) {
+          var planTable = CP.el("table", { class: "tbl", "data-nous-plans": "1" });
+          planTable.appendChild(CP.el("thead", {}, CP.el("tr", {},
+            CP.el("th", { text: "Plan" }),
+            CP.el("th", { class: "num", text: "$/month" }),
+            CP.el("th", { class: "num", text: "Granted credits" }),
+            CP.el("th", { class: "num", text: "Rollover cap" }))));
+          var planBody = CP.el("tbody");
+          plans.forEach(function (plan) {
+            planBody.appendChild(CP.el("tr", {},
+              CP.el("td", { class: "mono", text: plan.name }),
+              CP.el("td", { class: "num mono", text: money(plan.priceUsdPerMonth) }),
+              CP.el("td", { class: "num mono", text: money(plan.grantedCreditsUsd) }),
+              CP.el("td", { class: "num mono", text: money(plan.rolloverCapUsd) })));
+          });
+          planTable.appendChild(planBody);
+          card.appendChild(CP.el("div", { class: "hint", text: "Declared plans and top-up amounts" }));
+          card.appendChild(planTable);
+          card.appendChild(CP.el("div", { class: "hint mono",
+            text: "top-ups sold: " + ((catalog.topUpsUsd || []).join(", ") || "none declared") }));
+        }
+
+        var tier = data.tierFeature;
+        if (tier) {
+          card.appendChild(CP.el("div", { class: "hint", "data-nous-tier": tier.id,
+            text: "tier routing (declared: " + tier.id + ") — " + (tier.description || "") }));
+        }
+        return card;
+      }
+
+      function creditsCard(data) {
+        var credits = data.credits || {};
+        var card = CP.el("div", { class: "card", "data-nous-credits": "1" });
+        card.appendChild(CP.el("div", { class: "spread" },
+          CP.el("h3", { text: "Credits and burn" }),
+          CP.el("span", { class: "hint mono",
+            text: "tracking: " + (credits.balanceTracking || "unknown") })));
+        card.appendChild(CP.el("div", { class: "spread", style: "margin:6px 0" },
+          CP.el("span", { class: "mono", text: "metered debits " + money(credits.debitedUsd) }),
+          CP.el("span", { class: "mono", text: "remaining " + money(credits.remainingUsd) }),
+          CP.el("span", { class: "hint",
+            text: "24h " + money((data.usage || {}).window ? data.usage.window.last24hCostUsd : null) }));
+        if (credits.remainingReason) {
+          card.appendChild(CP.el("div", { class: "hint", "data-nous-remaining-reason": "1",
+            text: credits.remainingReason }));
+        }
+        if (credits.balanceTrackingNote) {
+          card.appendChild(CP.el("div", { class: "hint", "data-nous-balance-note": "1",
+            text: credits.balanceTrackingNote }));
+        }
+        if (!credits.balanceEndpoint) {
+          card.appendChild(CP.el("div", { class: "hint mono",
+            text: "the provider's published contract declares no balance endpoint" }));
+        }
+        return card;
+      }
+
+      function usageCard(data) {
+        var usage = data.usage || {};
+        var rows = usage.byModel || [];
+        var card = CP.el("div", { class: "card", "data-nous-usage": "1" });
+        card.appendChild(CP.el("div", { class: "spread" },
+          CP.el("h3", { text: "Tool-gateway usage" }),
+          CP.el("span", { class: "hint mono",
+            text: num(usage.calls) + " calls · " + num(usage.totalTokens) + " tokens" })));
+        if (!rows.length) {
+          card.appendChild(CP.el("div", { class: "empty dim",
+            text: "No metered Nous call is recorded in this checkout's usage store." }));
+        } else {
+          var table = CP.el("table", { class: "tbl" });
+          table.appendChild(CP.el("thead", {}, CP.el("tr", {},
+            CP.el("th", { text: "Model" }),
+            CP.el("th", { class: "num", text: "Calls" }),
+            CP.el("th", { class: "num", text: "Tokens" }),
+            CP.el("th", { class: "num", text: "Cost" }))));
+          var body = CP.el("tbody");
+          rows.forEach(function (row) {
+            body.appendChild(CP.el("tr", {},
+              CP.el("td", { class: "mono", text: row.model || "(unknown)" }),
+              CP.el("td", { class: "num mono", text: num(row.calls) }),
+              CP.el("td", { class: "num mono", text: num(row.inputTokens + row.outputTokens) }),
+              CP.el("td", { class: "num mono", text: money(row.costUsd) })));
+          });
+          table.appendChild(body);
+          card.appendChild(table);
+        }
+        (data.missing || []).forEach(function (path) {
+          card.appendChild(CP.el("div", { class: "hint mono", "data-nous-missing": path,
+            text: "not readable in this checkout: " + path }));
+        });
+        return card;
+      }
+
+      var payload;
+      try {
+        payload = await CP.get("/api/nous/overview");
+      } catch (err) { fail(err); return; }
+
+      var data = payload.data || {};
+      var status = data.status || {};
+      manageAccount(data.links);
+      badge.textContent = status.state || "unknown";
+      badge.setAttribute("data-state", status.state || "unknown");
+      badge.className = "badge " + stateClass(status.state);
+
+      CP.clear(app);
+      app.appendChild(statusCard(data));
+      app.appendChild(catalogCard(data));
+      app.appendChild(creditsCard(data));
+      app.appendChild(usageCard(data));
+
+      var notes = data.notes || [];
+      if (notes.length) {
+        var noteCard = CP.el("div", { class: "card", "data-nous-notes": "1" },
+          CP.el("h3", { text: "Declared, not assumed" }));
+        notes.forEach(function (note) {
+          noteCard.appendChild(CP.el("div", { class: "hint", text: note }));
+        });
+        app.appendChild(noteCard);
+      }
+    })();
+  </script>
+</body>
+</html>

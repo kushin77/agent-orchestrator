@@ -90,6 +90,11 @@ SESSIONS_SURFACE = "sessions"
 #: The Settings view (issue #1757) — renders
 #: `portal.server.settings.SettingsAggregator`'s row join.
 SETTINGS_SURFACE = "settings"
+#: The Nous provider surface (issue #1561) — the console's view over the
+#: gateway's Nous integration (`portal.server.nous.NousSurface`): the declared
+#: catalog and rates, the declared credits meter, metered usage, and a bounded
+#: free probe of the provider's own catalog endpoint.
+NOUS_SURFACE = "nous"
 
 #: Every surface this module knows about, so a test can assert the set is closed.
 DECLARED_SURFACES = frozenset(
@@ -101,6 +106,7 @@ DECLARED_SURFACES = frozenset(
         FLEET_BOARD_SURFACE,
         SESSIONS_SURFACE,
         SETTINGS_SURFACE,
+        NOUS_SURFACE,
     }
 )
 
