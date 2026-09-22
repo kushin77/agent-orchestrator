@@ -63,9 +63,20 @@ So this module now separates the two cases by name and bounds every remedy:
 
 * **`drifted`** — the running commit is *not* the local HEAD: respawn loads HEAD.
 * **`checkout-behind`** — the running commit *is* the local HEAD while
-  `origin/master` is ahead: the rung is current relative to the checkout and the
-  **checkout** is stale, so the remedy is a **fast-forward** (`git fetch` +
-  `git merge --ff-only`), never a blind respawn.
+  `origin/master` is ahead **and a fast-forward is available** (the checkout is on
+  the default branch and its HEAD is an ancestor of `origin/master`): the rung is
+  current relative to the checkout and the **checkout** is stale, so the remedy is
+  a **fast-forward** (`git fetch` + `git merge --ff-only`), never a blind respawn.
+* **`stranded-venue`** — the running commit *is* the local HEAD but the *venue*
+  cannot be fast-forwarded: the checkout is on a branch other than the default — a
+  closed epic's stranded branch, measured 2026-09-21 at HEAD `629f22f5` on
+  `issue-708-wire-runaway-guard`, **203 behind** `origin/master`, its epic closed
+  and no worktree owning it — or its HEAD is not an ancestor of the baseline.
+  There is no fast-forward to apply, and a respawn re-executes the same stranded
+  tree, so the case is **refused by name**: it names the branch and the
+  behind-count and never reads `healthy` (#1790, AO-GR-25 + AO-GR-21). Without it
+  the predicate failed open exactly here — the running loop logged
+  `watchdog=healthy` while it executed 203-commits-old code.
 
 Every remedy is recorded per rung under `.fleet/watchdog/` and is bounded by an
 attempt cap with exponential backoff (the same harvested contract as
@@ -186,6 +197,21 @@ DRIFTED = "drifted"
 #: must be fast-forwarded first. Reporting this as `drifted` is what made the
 #: watchdog a runaway: 132 respawn decisions in one night, zero work done.
 CHECKOUT_BEHIND = "checkout-behind"
+#: The FOURTH drift case (#1790). `CHECKOUT_BEHIND` presumes the checkout is on
+#: the default branch and merely behind, so `git merge --ff-only` can move it. A
+#: checkout on a DIFFERENT branch has no fast-forward available — measured
+#: 2026-09-21: the live loop running `issue-708-wire-runaway-guard` at `629f22f5`,
+#: **203 behind** `origin/master`, its epic closed and no worktree owning it — so
+#: the `checkout-behind` remedy cannot apply. Before this state existed the
+#: predicate failed OPEN here, logging `watchdog=healthy` over 203-commits-old
+#: code: exactly the shape #739 wrote its remedy to eliminate. It names the branch
+#: and the behind-count, can never be reported healthy, and its remedy is refused
+#: by name (bounded by the same attempt cap, escalate-once and park, AO-GR-21).
+STRANDED_VENUE = "stranded-venue"
+#: The repository's default branch. A venue on any OTHER branch — or a detached
+#: HEAD — cannot be moved to the drift baseline by a fast-forward, which is what
+#: makes `stranded-venue` distinct from `checkout-behind` (#1790).
+DEFAULT_BRANCH = "master"
 #: The fail-closed state (#739, AO-GR-25): the drift comparison could not be
 #: made — an unreadable `origin/master` baseline, or a loop that reports no
 #: commit. Distinct from `HEALTHY` on purpose: "I cannot see the baseline" is not
@@ -193,10 +219,21 @@ CHECKOUT_BEHIND = "checkout-behind"
 #: a drifted rung needs a respawn, an unassessable one needs the remote ref
 #: looked at first. It maps to the repo's exit-code 2 (CANNOT-ASSESS).
 CANNOT_ASSESS = "cannot-assess"
-RUNG_STATES = (MISSING, STALE, DRIFTED, CHECKOUT_BEHIND, CANNOT_ASSESS, HEALTHY)
+RUNG_STATES = (
+    MISSING,
+    STALE,
+    DRIFTED,
+    CHECKOUT_BEHIND,
+    STRANDED_VENUE,
+    CANNOT_ASSESS,
+    HEALTHY,
+)
 #: Rung states that mean the rung is NOT healthy. `CANNOT_ASSESS` belongs here:
 #: the watchdog still acts (it cannot certify the rung), it just says so.
-UNHEALTHY_STATES = (MISSING, STALE, DRIFTED, CHECKOUT_BEHIND, CANNOT_ASSESS)
+#: `STRANDED_VENUE` belongs here too, and for a stronger reason: it is a definite
+#: finding (the venue cannot be moved) that a principal must act on, never a quiet
+#: one (#1790).
+UNHEALTHY_STATES = (MISSING, STALE, DRIFTED, CHECKOUT_BEHIND, STRANDED_VENUE, CANNOT_ASSESS)
 
 # ── the bounded remedy (issue #773, AO-GR-21) ───────────────────────────────
 # A remedy that cannot change the value it compares must not be repeated without
@@ -896,14 +933,132 @@ def flight_evidence() -> str:
     return note if held else "a run is in flight"
 
 
+def head_branch(target: Path) -> str | None:
+    """The branch a checkout is on, or `None` when it cannot be read (#1790).
+
+    `git rev-parse --abbrev-ref HEAD` answers `HEAD` for a DETACHED checkout — a
+    real answer (there is no branch) that is returned as-is, so a caller can tell
+    it apart from "could not read" (`None`).
+    """
+    return _git_read(target, ["rev-parse", "--abbrev-ref", "HEAD"])
+
+
+def _head_matches(target: Path, local_head: str | None) -> bool:
+    """True when `local_head` resolves to THIS checkout's actual HEAD (#1790).
+
+    The venue is only meaningful for the commit the drift comparison judged, so the
+    measurement is REFUSED (False) when the two disagree: a caller that INJECTS a
+    local HEAD — every gate probe and unit test does — is not asking about this
+    tree's venue, and must keep the pre-#1790 verdict rather than be handed a
+    stranded-branch finding about a tree it never named.
+    """
+    if not local_head or local_head in ("", "unknown"):
+        return False
+    resolved = _git_read(target, ["rev-parse", "--verify", "--quiet", f"{local_head}^{{commit}}"])
+    actual = _git_read(target, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"])
+    return bool(resolved and actual and resolved == actual)
+
+
+def checkout_venue(
+    local_head: str | None,
+    root: Path | None = None,
+    *,
+    baseline: str | None = None,
+) -> dict:
+    """Measure the VENUE of `local_head`: its branch, behind-count, forwardability.
+
+    `{}` — nothing measured — when the head cannot be resolved or is not this
+    checkout's actual HEAD (`_head_matches`), because a venue that is not the one
+    the drift comparison judged must not produce a venue verdict. Otherwise:
+
+      * ``branch``      — the branch name, or `HEAD` when detached.
+      * ``behind``      — commits in ``{baseline}..{local_head}``, or `None` when
+                          the count cannot be read.
+      * ``forwardable`` — whether `local_head` is an ancestor of `baseline`, i.e.
+                          whether `git merge --ff-only` can move the checkout
+                          (the precondition `checkout-behind` presumes, #773).
+                          `None` when it cannot be measured.
+    """
+    target = Path(root) if root is not None else ROOT
+    if not _head_matches(target, local_head):
+        return {}
+    branch = head_branch(target) or "unknown"
+    behind: int | None = None
+    forwardable: bool | None = None
+    if baseline and baseline not in ("", "unknown") and baseline != local_head:
+        # The ancestor answer is only a MEASUREMENT when the baseline actually
+        # resolves: `_is_ancestor` folds an unreadable repository into False, and a
+        # False that came from a failed read would make `venue_is_stranded` claim a
+        # stranded branch it never measured. An unresolvable baseline therefore
+        # leaves both fields `None` — unmeasured — and the pre-#1790 verdict stands.
+        resolved_baseline = _git_read(target, ["rev-parse", "--verify", "--quiet", f"{baseline}^{{commit}}"])
+        if resolved_baseline:
+            count = _git_read(target, ["rev-list", "--count", f"{local_head}..{baseline}"])
+            behind = int(count) if count and count.isdigit() else None
+            forwardable = _is_ancestor(target, local_head, baseline)
+    return {"branch": branch, "behind": behind, "forwardable": forwardable}
+
+
+def venue_is_stranded(venue: dict | None) -> bool:
+    """True when the venue cannot be moved to the baseline by a fast-forward (#1790).
+
+    Two shapes, and each one alone makes `checkout-behind`'s remedy inapplicable:
+
+      * the venue's HEAD is demonstrably NOT an ancestor of the baseline
+        (`forwardable is False`) — moving it would have to discard its own
+        commits; or
+      * the venue is on a branch that is not the default branch, so it is not the
+        branch the baseline tracks (the measured stranded-branch case).
+
+    A venue that was never measured — `None`/empty, or a `None` forwardability on
+    the default branch — is deliberately NOT stranded, so the caller that supplied
+    neither input keeps the pre-#1790 `checkout-behind` verdict: this is strictly
+    additive and cannot regress #773.
+    """
+    if not venue:
+        return False
+    if venue.get("forwardable") is False:
+        return True
+    branch = venue.get("branch")
+    return bool(branch) and branch not in ("HEAD", DEFAULT_BRANCH)
+
+
+def stranded_venue_reason(
+    venue: dict,
+    running: str,
+    baseline: str,
+    baseline_name: str,
+) -> str:
+    """The `stranded-venue` sentence: the branch, the behind-count, and WHY (#1790).
+
+    A principal must be able to see from this line why `git merge --ff-only`
+    cannot apply, so it names the branch, how far behind the baseline the venue is,
+    and the fact that the venue is not an ancestor of the baseline.
+    """
+    branch = venue.get("branch") or "unknown"
+    behind = venue.get("behind")
+    if isinstance(behind, int):
+        where = f"the checkout is on branch {branch!r}, {behind} behind {baseline_name} {baseline}"
+    else:
+        where = f"the checkout is on branch {branch!r} while {baseline_name} is {baseline}"
+    return (
+        f"stranded venue: {where}, and the rung runs {running} = local HEAD, so the venue is not "
+        f"an ancestor of {baseline_name} — no fast-forward is available (git merge --ff-only "
+        f"cannot apply); an operator must move the checkout onto the default branch {DEFAULT_BRANCH}"
+    )
+
+
 def decide(
     pid: int | None,
     beat: dict | None,
     baseline: str,
     baseline_name: str = "origin/master",
     local_head: str | None = None,
+    *,
+    venue: dict | None = None,
 ) -> tuple[str, str]:
-    """Classify a rung: missing / stale / cannot-assess / drifted / checkout-behind / healthy.
+    """Classify a rung: missing / stale / cannot-assess / drifted / checkout-behind /
+    stranded-venue / healthy.
 
     `baseline` is the **remote** commit (`origin/master`), never the local
     checkout's HEAD. The local checkout is routinely the stale side in this
@@ -917,6 +1072,13 @@ def decide(
     on the checkout's HEAD either) or a fast-forward (`checkout-behind`: the rung
     IS the checkout's HEAD, so only the checkout can move) depends on it. A caller
     that does not know the local HEAD passes nothing and gets the pre-#773 verdict.
+
+    `venue` is the checkout's measured venue (`checkout_venue`) for that same
+    `local_head`: its branch, behind-count and whether a fast-forward is available
+    (#1790). It is used ONLY to split `checkout-behind` — whose remedy is a
+    fast-forward — from `stranded-venue`, where no fast-forward exists. A caller
+    that does not supply it (or supplies one that did not resolve to this tree's
+    HEAD) keeps the pre-#1790 verdict.
 
     Fail-closed by construction: an unreadable baseline is CANNOT-ASSESS, never
     healthy. The previous rule — `if head != "unknown" and running != head` —
@@ -937,6 +1099,13 @@ def decide(
     if drift_state == channel.DRIFT_DRIFTED:
         return DRIFTED, reason
     if drift_state == channel.DRIFT_CHECKOUT_BEHIND:
+        # #1790: `checkout-behind`'s remedy is a FAST-FORWARD, which exists only
+        # when the venue is on the default branch and its HEAD is an ancestor of
+        # the baseline. A venue that cannot be fast-forwarded is a NAMED, distinct
+        # case — never `healthy`, and never `checkout-behind` (whose remedy would
+        # then be attempted and would fail to move anything, forever, silently).
+        if venue_is_stranded(venue):
+            return STRANDED_VENUE, stranded_venue_reason(venue or {}, running, baseline, baseline_name)
         return CHECKOUT_BEHIND, reason
     if drift_state == channel.DRIFT_CANNOT_ASSESS:
         return CANNOT_ASSESS, reason
@@ -1178,7 +1347,22 @@ def bounded_remedy(
             True,
         )
 
-    if state == CHECKOUT_BEHIND:
+    if state == STRANDED_VENUE:
+        # #1790: there is NO mechanical remedy from here, and the two obvious ones
+        # are the measured defects. `git merge --ff-only` cannot apply — the venue
+        # is not an ancestor of the baseline — and a respawn re-executes the SAME
+        # stranded checkout, which is exactly the runaway #773 measured (132
+        # decisions, zero work done). So the remedy is REFUSED by name, and the
+        # attempt is still COUNTED: that is what lets the cap escalate ONCE and
+        # PARK (AO-GR-21) instead of retrying forever. `ok` is False because the
+        # finding is unresolved — a stranded venue is a principal action, and this
+        # pass must not read as a quiet fleet.
+        ok = False
+        outcome = (
+            f"REFUSED, no fast-forward available and a respawn would re-run the same stranded "
+            f"checkout — an operator must move it (attempt {attempts}/{cap})"
+        )
+    elif state == CHECKOUT_BEHIND:
         changed, new_head, detail = fast_forward_checkout(checkout_root)
         if changed:
             try:
@@ -1324,6 +1508,11 @@ def rung_action(
     repeated indefinitely, and the `checkout-behind` case is repaired by moving
     the CHECKOUT rather than by respawning a rung that is already on its HEAD.
 
+    Issue #1790: the venue of the judged commit is measured (`checkout_venue`) and
+    passed to `decide`, so a checkout that CANNOT be fast-forwarded — a closed
+    epic's stranded branch — is reported as `stranded-venue` and refused by name
+    instead of being misread as `checkout-behind` or, worse, `healthy`.
+
     Issue #366: the hold itself is bounded. "Never restart a run just to update
     code" is enforced by asking `run_in_flight`, and a rung whose runs die before
     they can report answers True on every tick — so the hold was re-taken forever
@@ -1336,9 +1525,14 @@ def rung_action(
     moment = time.time() if when is None else when
     if local_head is None:
         local_head = channel.head_commit()
+    # The VENUE of the commit about to be judged (#1790): its branch, behind-count
+    # and whether a fast-forward is available. `checkout_venue` returns {} unless
+    # `local_head` IS this checkout's HEAD, so an injected local HEAD (gate probes,
+    # unit tests) leaves the pre-#1790 verdict untouched.
+    venue = checkout_venue(local_head, checkout_root, baseline=baseline)
     pid = loop_pid(pattern)
     beat = read_beat(beat_path)
-    state, reason = decide(pid, beat, baseline, baseline_name, local_head)
+    state, reason = decide(pid, beat, baseline, baseline_name, local_head, venue=venue)
     running = str((beat or {}).get("commit", "unknown"))
     verbatim = f"running {running}, {baseline_name} {baseline}"
     if force:
@@ -1541,6 +1735,11 @@ def _watchdog_once_locked(force: bool) -> int:
             failed = True
         if f": {CANNOT_ASSESS} (" in line:
             unassessable = True
+        if f": {STRANDED_VENUE} (" in line:
+            # A stranded venue is a DEFINITE finding the remedy cannot repair
+            # (#1790): the checkout must be moved by a principal, so the pass is
+            # NOT-OK rather than merely unassessable.
+            failed = True
     # Third rung: the monitor is a resident poller with no run-in-flight concern
     # and no code-drift concept, so a missing process is always restarted and a
     # present one is left alone.

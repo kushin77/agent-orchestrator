@@ -338,6 +338,151 @@ def test_a_genuinely_drifted_rung_is_still_respawned(monkeypatch):
     assert "drifted" in line and "respawned" in line
 
 
+# --- the stranded venue (#1790: AO-GR-25 fail-closed + AO-GR-21 bounded) -------
+#
+# Measured 2026-09-21 ~20:30Z on the live fleet: the running loop's cwd was the
+# shared checkout, which was NOT on master — `issue-708-wire-runaway-guard`, HEAD
+# `629f22f5`, 203 behind `origin/master`, its epic (#708) closed and no worktree or
+# process owning the branch. Its own log said `watchdog=healthy` while the loop
+# executed 203-commits-old code, because the drift predicate compared the running
+# rung against a commit and a wrong-branch checkout is not one of its cases: it
+# failed OPEN, which is the shape #739's remedy was written to eliminate.
+#
+# #773's `checkout-behind` remedy is a FAST-FORWARD, and a stranded branch has none
+# available (`merge --ff-only` cannot move it), so this is a distinct NAMED case —
+# never `healthy`, and never silently repaired. These tests drive it through the
+# real classifier (`decide`) and the real bounded remedy (`rung_action`).
+
+
+def _stranded_checkout(tmp_path):
+    """A real clone checked out on a branch that is NOT an ancestor of the baseline.
+
+    Returns `(checkout, head_sha, baseline_sha)`. `head` carries a commit the
+    baseline does not have and the baseline carries one `head` does not, so the
+    checkout is a genuine DIVERGENCE on a non-default branch — `git merge --ff-only`
+    cannot move it, which is the measured stranded-venue shape (#1790).
+    """
+    origin = tmp_path / "origin.git"
+    assert _run("git", "init", "--bare", "-q", str(origin)).returncode == 0
+    assert _run("git", "-C", str(origin), "symbolic-ref", "HEAD", "refs/heads/master").returncode == 0
+    seed = tmp_path / "seed"
+    assert _run("git", "clone", "-q", str(origin), str(seed)).returncode == 0
+    (seed / "base.txt").write_text("base\n", encoding="utf-8")
+    _commit_all(seed, "base")
+    assert _run("git", "-C", str(seed), "push", "-q", "origin", "HEAD:master").returncode == 0
+    assert _run("git", "-C", str(seed), "checkout", "-q", "-b", "issue-stranded").returncode == 0
+    (seed / "work.txt").write_text("the branch's own unmerged work\n", encoding="utf-8")
+    _commit_all(seed, "the branch's own work")
+    head = _rev(seed)
+    assert _run("git", "-C", str(seed), "push", "-q", "origin", "HEAD:issue-stranded").returncode == 0
+    assert _run("git", "-C", str(seed), "checkout", "-q", "master").returncode == 0
+    (seed / "merged.txt").write_text("work that landed on master\n", encoding="utf-8")
+    _commit_all(seed, "work that landed on master")
+    assert _run("git", "-C", str(seed), "push", "-q", "origin", "HEAD:master").returncode == 0
+
+    checkout = tmp_path / "stranded"
+    assert _run("git", "clone", "-q", str(origin), str(checkout)).returncode == 0
+    assert _run("git", "-C", str(checkout), "checkout", "-q", "issue-stranded").returncode == 0
+    baseline = _rev(checkout, "origin/master")
+    assert _rev(checkout) == head, "the checkout is not on the stranded branch's commit"
+    assert head != baseline
+    return checkout, head, baseline
+
+
+def test_a_stranded_venue_is_not_healthy_and_names_the_branch_and_the_gap(tmp_path, monkeypatch):
+    """THE regression test for #1790: a non-default branch has no fast-forward.
+
+    `checkout-behind`'s remedy is a fast-forward, so this shape must not be read as
+    `checkout-behind` (whose remedy cannot apply) — and must never be `healthy`.
+    """
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    checkout, head, baseline = _stranded_checkout(tmp_path)
+    short = head[:12]
+    venue = watchdog.checkout_venue(short, checkout, baseline=baseline)
+    # The premise, asserted rather than assumed: the venue IS measured, and stranded.
+    assert venue == {"branch": "issue-stranded", "behind": 1, "forwardable": False}, venue
+
+    state, reason = watchdog.decide(111, _beat(commit=short), baseline, local_head=short, venue=venue)
+    assert state == watchdog.STRANDED_VENUE
+    assert state != watchdog.HEALTHY
+    assert state in watchdog.UNHEALTHY_STATES
+    assert "issue-stranded" in reason, "the branch must be named"
+    assert "1 behind" in reason, "the behind-count must be named"
+    assert "no fast-forward" in reason, "and WHY the remedy cannot apply"
+
+
+def test_the_stranded_venue_check_is_what_produces_the_finding(tmp_path, monkeypatch):
+    """Differential: neuter the ONE thing #1790 added and the verdict reverts.
+
+    A provoke that passes for any reason proves nothing, so the hardening is removed
+    and the SAME input must read `checkout-behind` — the state whose remedy cannot
+    apply here.
+    """
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    checkout, head, baseline = _stranded_checkout(tmp_path)
+    short = head[:12]
+    venue = watchdog.checkout_venue(short, checkout, baseline=baseline)
+    before = watchdog.decide(111, _beat(commit=short), baseline, local_head=short, venue=venue)[0]
+    assert before == watchdog.STRANDED_VENUE
+    monkeypatch.setattr(watchdog, "venue_is_stranded", lambda venue: False)
+    after = watchdog.decide(111, _beat(commit=short), baseline, local_head=short, venue=venue)[0]
+    assert after == watchdog.CHECKOUT_BEHIND, "without the hardening the venue reads as fast-forwardable"
+
+
+def test_a_merely_behind_checkout_on_master_is_still_checkout_behind(tmp_path, monkeypatch):
+    """The control: #773 must not regress — a forwardable venue keeps its remedy."""
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    _seed, stale, behind, remote = _stale_checkout(tmp_path)
+    short = behind[:12]
+    venue = watchdog.checkout_venue(short, stale, baseline=remote)
+    assert venue == {"branch": "master", "behind": 1, "forwardable": True}, venue
+    state, _reason = watchdog.decide(111, _beat(commit=short), remote, local_head=short, venue=venue)
+    assert state == watchdog.CHECKOUT_BEHIND, "a behind-but-forwardable checkout keeps its fast-forward"
+    assert state != watchdog.STRANDED_VENUE
+
+
+def test_a_stranded_venue_refuses_the_remedy_then_escalates_once_and_parks(monkeypatch):
+    """#1790's remedy: no fast-forward and no respawn exist, so REFUSE by name — bounded."""
+    _drift_env(monkeypatch, attempts=2, backoff=1)
+    calls = {"respawn": [], "ff": []}
+    monkeypatch.setattr(watchdog.channel, "heartbeat_age_seconds", lambda beat, moment=None: 10)
+    monkeypatch.setattr(watchdog, "loop_pid", lambda pattern: 111)
+    monkeypatch.setattr(watchdog, "read_beat", lambda path: _beat(commit=LOCAL))
+    monkeypatch.setattr(watchdog, "run_in_flight", lambda: False)
+    monkeypatch.setattr(
+        watchdog.channel, "capability_line", lambda finding: f"{finding.rung}: {finding.case}"
+    )
+    monkeypatch.setattr(watchdog, "respawn", lambda *a, **k: calls["respawn"].append(a) or True)
+    monkeypatch.setattr(
+        watchdog, "fast_forward_checkout", lambda *a, **k: calls["ff"].append(a) or (False, LOCAL, "refused")
+    )
+    monkeypatch.setattr(
+        watchdog,
+        "checkout_venue",
+        lambda *a, **k: {"branch": "issue-stranded", "behind": 203, "forwardable": False},
+    )
+    lines = [
+        watchdog.rung_action(
+            "sister",
+            "fleet/terminal.py",
+            "fleet/terminal.sh",
+            Path("/tmp/x"),
+            False,
+            REMOTE,
+            local_head=LOCAL,
+            when=step * 1000,
+        )
+        for step in range(4)
+    ]
+    assert calls["respawn"] == [], "a respawn would re-execute the same stranded checkout"
+    assert calls["ff"] == [], "there is no fast-forward to attempt"
+    assert lines[0].startswith("sister: stranded-venue ("), lines[0]
+    assert "REFUSED" in lines[0]
+    assert "issue-stranded" in lines[0] and "203 behind" in lines[0], "the venue is named with its gap"
+    assert sum("ESCALATED ONCE" in line for line in lines) == 1, "bounded: escalate exactly once"
+    assert "PARKED" in lines[-1], "and then it stops retrying (AO-GR-21)"
+
+
 def test_a_busy_drifted_rung_is_recorded_pending_and_acted_on_when_the_run_ends(monkeypatch):
     """Case (d): a drifted-but-busy rung is not dropped every tick."""
     _drift_env(monkeypatch)
