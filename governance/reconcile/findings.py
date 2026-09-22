@@ -104,6 +104,11 @@ from governance.lifecycle.report import BoardReporter
 #: general shape is ``<kind>:<subject>``, and the kind is ``lifecycle:<CODE>``.
 LIFECYCLE_PREFIX = "lifecycle:"
 
+#: The prefix ``board_report_action`` gives every suspect-session fingerprint
+#: (``reconcile:suspect:<session>``). Unlike a lifecycle finding, a suspect
+#: finding is re-measured against the LOCAL heartbeat, not the board audit.
+SUSPECT_PREFIX = "reconcile:suspect:"
+
 #: What one pass did with one filed finding.
 RESOLVED = "resolved"
 WOULD_RESOLVE = "would-resolve"
@@ -239,6 +244,30 @@ def lifecycle_entries(ledger: dict) -> tuple[list[Entry], list[str]]:
     return entries, unreadable
 
 
+def suspect_entries(ledger: dict) -> tuple[list[Entry], list[str]]:
+    """Split a ledger into suspect-session findings and keys that cannot be read.
+
+    The subject is a session id, so the same safety rule as
+    ``heartbeat.path_for`` applies: a path separator would escape the sessions
+    dir, and such a key is reported as unreadable rather than acted on.
+    """
+    entries: list[Entry] = []
+    unreadable: list[str] = []
+    for key in sorted(ledger):
+        if not str(key).startswith(SUSPECT_PREFIX):
+            continue
+        subject = str(key)[len(SUSPECT_PREFIX):]
+        if not subject or "/" in subject or "\\" in subject or subject.startswith("."):
+            unreadable.append(str(key))
+            continue
+        payload = ledger.get(key) or {}
+        number = payload.get("number") if isinstance(payload, dict) else None
+        entries.append(
+            Entry(key=str(key), code="suspect", subject=subject, number=int(number) if number else None)
+        )
+    return entries, unreadable
+
+
 def resolve_key(reporter: BoardReporter, key: str, *, comment: str, apply: bool) -> bool:
     """Retire one dedupe entry — **only** under ``apply``.
 
@@ -347,6 +376,118 @@ def _resolved_comment(entry: Entry, record: dict, findings: Sequence) -> str:
     )
 
 
+def _beat_exists(subject: str, root: Path | str) -> bool:
+    """Whether the named session still has a heartbeat on disk."""
+    from governance.reconcile.heartbeat import path_for  # noqa: PLC0415 - optional at import time
+
+    try:
+        return path_for(subject, root).exists()
+    except ValueError:
+        return False
+
+
+def _resolved_suspect_comment(entry: Entry) -> str:
+    """The evidence a suspect resolution carries: the named session no longer beats."""
+    return (
+        "Resolved: the suspect session this finding names no longer beats.\n\n"
+        f"- fingerprint: `{entry.key}`\n"
+        f"- session: `{entry.subject}`\n"
+        "A `suspect` finding says a fresh beat sits behind a dead process. The "
+        "session's heartbeat is gone, so that no longer describes anything true, "
+        "and the fingerprint is retired from the dedupe ledger. A genuine "
+        "recurrence on this session now files as a new finding rather than being "
+        "swallowed by this one.\n\n"
+        "Reported by `governance/reconcile` (issue #1966).\n"
+    )
+
+
+def _recheck_suspects(
+    reporter: BoardReporter,
+    suspects: Sequence[Entry],
+    *,
+    root: Path | str,
+    apply: bool,
+    closer: FindingCloser | None,
+) -> list[FindingState]:
+    """Re-measure every filed suspect finding against the local heartbeat.
+
+    A suspect finding is about a *session*, not a lifecycle invariant, so the
+    re-measurement is a local file read (``path_for(...).exists()``), never the
+    board collection: a beat that still exists keeps the finding, a beat that is
+    gone resolves it.
+    """
+    states: list[FindingState] = []
+    for entry in suspects:
+        if _beat_exists(entry.subject, root):
+            states.append(
+                FindingState(
+                    key=entry.key,
+                    outcome=STILL_OWED,
+                    code="suspect",
+                    subject=entry.subject,
+                    number=entry.number,
+                    detail=(
+                        f"the session {entry.subject} still has a heartbeat, so 'a fresh beat "
+                        "behind a dead process' may still hold"
+                    ),
+                )
+            )
+            continue
+        comment = _resolved_suspect_comment(entry)
+        if not apply:
+            states.append(
+                FindingState(
+                    key=entry.key,
+                    outcome=WOULD_RESOLVE,
+                    code="suspect",
+                    subject=entry.subject,
+                    number=entry.number,
+                    detail=(
+                        f"the session {entry.subject} no longer beats; a pass with --apply closes "
+                        f"#{entry.number} and retires the fingerprint"
+                    ),
+                )
+            )
+            continue
+        try:
+            if entry.number:
+                # Guarded by the caller: a resolve without a closer would retire
+                # the fingerprint while leaving the board artifact open.
+                assert closer is not None
+                closer.close(entry.number, comment)
+            resolve_key(reporter, entry.key, comment="", apply=True)
+        except Exception as exc:  # noqa: BLE001 - a lost board write is data, not a crash
+            states.append(
+                FindingState(
+                    key=entry.key,
+                    outcome=FAILED,
+                    code="suspect",
+                    subject=entry.subject,
+                    number=entry.number,
+                    detail=(
+                        f"{type(exc).__name__}: {exc}; the fingerprint is kept, so the next pass "
+                        "retries it rather than leaving an open issue nobody would look at again"
+                    )[:300],
+                )
+            )
+            continue
+        states.append(
+            FindingState(
+                key=entry.key,
+                outcome=RESOLVED,
+                code="suspect",
+                subject=entry.subject,
+                number=entry.number,
+                detail=(
+                    f"the session {entry.subject} no longer beats"
+                    + (f"; closed #{entry.number}" if entry.number else "")
+                    + " and the fingerprint is retired"
+                ),
+            )
+        )
+    return states
+
+
 def recheck_findings(
     reporter: BoardReporter,
     *,
@@ -357,15 +498,19 @@ def recheck_findings(
     closer: FindingCloser | None = None,
     measure: Callable[[Path | str], tuple[list, dict] | None] | None = None,
 ) -> list[FindingState]:
-    """Re-measure every filed lifecycle finding and drive it to a terminal state.
+    """Re-measure every filed finding and drive it to a terminal state.
 
-    ``record`` / ``quarantine`` / ``measure`` are injection seams: a test supplies
-    the board it wants audited instead of reading the real one, exactly as ``sweep``
-    takes an operations port. With no lifecycle finding in the ledger this is a
-    local file read and nothing else — no board, no network — so a scratch fixture
-    and the cron's own dry run pay nothing for it.
+    Lifecycle findings are re-measured against the board audit; suspect findings
+    are re-measured against the local heartbeat. ``record`` / ``quarantine`` /
+    ``measure`` are injection seams for the lifecycle half: a test supplies the
+    board it wants audited instead of reading the real one, exactly as ``sweep``
+    takes an operations port. With no lifecycle finding in the ledger the board
+    is never read — a suspect finding is a local file read and nothing else — so
+    a scratch fixture and the cron's own dry run pay nothing for it.
     """
-    entries, unreadable = lifecycle_entries(read_ledger(reporter))
+    ledger = read_ledger(reporter)
+    entries, unreadable = lifecycle_entries(ledger)
+    suspects, suspect_unreadable = suspect_entries(ledger)
     states = [
         FindingState(
             key=key,
@@ -374,10 +519,23 @@ def recheck_findings(
         )
         for key in unreadable
     ]
+    states.extend(
+        FindingState(
+            key=key,
+            outcome=UNMEASURED,
+            detail="the suspect fingerprint could not be split into a session id",
+        )
+        for key in suspect_unreadable
+    )
+    if apply and closer is None and (entries or suspects):
+        raise ValueError("recheck_findings requires a closer when apply is true (see GhCloser)")
+
+    # A suspect finding is about a session, not a lifecycle invariant: re-measure
+    # it against the local heartbeat (a file read, never the board collection).
+    states.extend(_recheck_suspects(reporter, suspects, root=root, apply=apply, closer=closer))
+
     if not entries:
         return states
-    if apply and closer is None:
-        raise ValueError("recheck_findings requires a closer when apply is true (see GhCloser)")
 
     measured: tuple[list, dict] | None
     if record is not None:

@@ -185,10 +185,18 @@ def stamp(
     note: str = "",
     at: float | None = None,
 ) -> Session:
-    """Write (or refresh) a session's heartbeat, atomically."""
+    """Write (or refresh) a session's heartbeat, atomically.
+
+    ``pid`` is the durable identity of the process being watched and is recorded
+    exactly as given — ``stamp`` never substitutes ``os.getpid()``. The old
+    default silently recorded the *ticking* process, so a per-beat subprocess (a
+    ``setsid`` loop that re-stamps every 45 s) left a pid that was dead by the
+    next sweep and manufactured a ``suspect`` finding on every pass (#1966). A
+    caller that wants a live verdict passes the long-lived loop's pid; one that
+    omits it records no pid at all, and the sweep reads that as it would any
+    unverifiable process.
+    """
     moment = now_epoch() if at is None else at
-    if pid is None:
-        pid = os.getpid()
     session = Session(
         session_id=session_id,
         issue=int(issue),

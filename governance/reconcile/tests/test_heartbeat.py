@@ -50,13 +50,32 @@ make_session = _conftest.make_session
 
 
 def test_a_stamp_writes_a_readable_heartbeat(root: Path):
-    stamp(SESSION, issue=304, agent="copilot-brain", root=root, worktree="/lanes/x", branch="issue-304")
+    stamp(
+        SESSION, issue=304, agent="copilot-brain", root=root, worktree="/lanes/x", branch="issue-304", pid=4242
+    )
     session = read(SESSION, root)
     assert session is not None
     assert session.session_id == SESSION
     assert session.issue == 304
     assert session.branch == "issue-304"
-    assert session.pid  # defaults to the writing process
+    assert session.pid == 4242  # the caller's durable pid, recorded exactly
+
+
+def test_stamp_records_no_process_when_no_pid_is_given(root: Path):
+    """#1966: `stamp` must not silently record the ticking process's pid.
+
+    The old default ``os.getpid()`` made a per-beat subprocess (a `setsid` loop
+    that re-stamps every 45 s) leave a pid that was dead by the next sweep, so the
+    sweep manufactured a `suspect` finding on every pass. Omitted now means no pid
+    is claimed at all — never a fabricated one.
+    """
+    session = stamp(SESSION, issue=304, agent="a", root=root)
+    assert session.pid is None
+
+
+def test_stamp_records_an_explicit_pid_exactly(root: Path):
+    session = stamp(SESSION, issue=304, agent="a", root=root, pid=4242)
+    assert session.pid == 4242
 
 
 def test_the_heartbeat_carries_both_a_human_and_a_machine_timestamp(root: Path):

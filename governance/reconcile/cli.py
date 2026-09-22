@@ -108,8 +108,15 @@ RECONCILE_LEASE_TTL_SECONDS = 900.0  # 2x reconcile's own nominal execution budg
 
 def _reporter(root: str) -> BoardReporter:
     """The board-reporting seam for this repo (issue #321), dry-run gated by
-    the command's own ``--apply`` flag."""
-    return BoardReporter(GhFiler(), ledger=Path(root) / ".fleet" / "board-reports.json")
+    the command's own ``--apply`` flag.
+
+    The dedupe ledger is the board's, not a checkout's (#1966): it lives beside
+    the MAIN checkout's git dir (``orphans.fleet_root``), so the same fingerprint
+    filed from a linked worktree dedupes against the filing from the main
+    checkout instead of re-filing beside it — a per-``root`` ledger was how one
+    fingerprint produced two issues (#1894/#1896).
+    """
+    return BoardReporter(GhFiler(), ledger=orphans.fleet_root(root) / ".fleet" / "board-reports.json")
 
 
 def _print_board_reports(reports: list) -> None:
