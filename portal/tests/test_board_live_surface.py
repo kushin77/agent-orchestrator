@@ -47,24 +47,24 @@ def _write_claims(path, lines):
 # --------------------------------------------------------------------------- #
 # The flag gate (GR-5: a new surface ships OFF)
 # --------------------------------------------------------------------------- #
-def test_config_declares_the_board_off():
+def test_config_declares_the_board_on():
     document = yaml.safe_load(
         (REPO_ROOT / "portal" / "config" / "feature-flags.yaml").read_text(
             encoding="utf-8"
         )
     )
     entry = document["surfaces"][FLEET_BOARD_SURFACE]
-    assert entry["default"] in (False, "off"), "the fleet board must ship OFF (GR-5)"
-    assert surface_enabled(REPO_ROOT, surface=FLEET_BOARD_SURFACE) is False
+    assert entry["default"] in (True, "on"), "the fleet board must ship ON (GR-5 reversal)"
+    assert surface_enabled(REPO_ROOT, surface=FLEET_BOARD_SURFACE) is True
 
 
-def test_surface_is_refused_while_the_flag_is_off():
+def test_the_default_app_requires_authn_not_hidden_by_flag():
     app = build_app(sso=console_sso())
-    api = login_as(app, "root@platform.example.com", TENANT)
-    status, payload = api.get("/api/board/rows")
-    assert status == 404
-    assert payload["error"]["code"] == "feature_disabled"
-    assert "portal/config/feature-flags.yaml" in payload["error"]["message"]
+    anonymous = login_as(app, "root@platform.example.com", TENANT)
+    anonymous.cookies.clear()
+    status, payload = anonymous.get("/api/board/rows")
+    assert status == 401
+    assert payload["error"]["code"] == "unauthorized"
 
 
 # --------------------------------------------------------------------------- #
