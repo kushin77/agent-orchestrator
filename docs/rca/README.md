@@ -35,6 +35,13 @@ Filename: `docs/rca/<yyyy-mm-dd>-<slug>.md`.
   capabilities ship enabled by default instead of flag-gated off. Full flip
   list, the CloudBuild and paperclip exceptions, and hardcoded-old-default
   test fixes.
+- Epic #1908 (codebase hygiene: headers, tagging, wrappers, env-vars,
+  templates) closed 2026-09-21: 6 of 7 children closed; #1915 (route
+  undeclared plain-config env reads through the flags/config aggregators,
+  155 sites) left open as documented backlog. The header-debt ledger
+  (`scripts/code-headers-baseline.tsv`) remains 288 recorded rows (270
+  excused, 18 drifted, advisory at tier 0) — organizational P2 debt tracked,
+  not cleared; not a gate blocker.
 - [`2026-09-21-reconcile-orphan-triage.md`](2026-09-21-reconcile-orphan-triage.md) —
   #1602's 40 `closeout-blocked` lanes, re-measured: none is reclaimable (0
   return `"ok": true`), the `pr-merged` group carries **closed-unmerged** PRs
