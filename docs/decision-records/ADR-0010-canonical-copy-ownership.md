@@ -115,3 +115,25 @@ assets once, from `git-rca-workspace` — needs a decision-record home.
   `make verify` lands under the `scripts/` lane; (4) when the phase-8
   autonomous-ops ADR-0009 lands, record the shared-governance reference pin in
   a consumption manifest.
+
+## Addendum: commit-message rule ownership (issue #1891, 2026-09-22)
+
+The commit-message rule was enforced twice with different rules, a third
+mechanism differed again, and one repo enforced nothing. Decision: **option
+(b)** — each repo keeps its own decided-obligation rule (the Conventional-
+Commits obligation and the trailer-rule obligation are legitimately
+repo-local, not required fleet-wide identically), but every repo must have at
+least one enforced, blocking rule. One sentence per repo:
+
+| repo | mechanism | rule | blocking? | decision |
+|---|---|---|---|---|
+| shared-services | `.githooks/commit-msg` → `scripts/validate-conventional-commit.sh` (canonical home) | session prefix + Conventional Commits | yes | keep as-is |
+| agent-orchestrator | `scripts/check-pr-contract.sh` + `scripts/check-squash-message.sh` (PR/CI layer) | trailer block `Refs <slug>#<n>` + `AI-assistance:` | yes | keep as-is |
+| capital-underwriting | `.githooks/commit-msg` → `.githooks/guard-verified-tag` | `[#NNNN] <what> — verified: <evidence>` | no (report-only) | leave as-is — low-priority/retiring repo, not worth making blocking |
+| shared-frontend | `.githooks/commit-msg` → `scripts/validate-conventional-commit.sh` (copied from shared-services per this ADR's canonical-copy-ownership pattern, comment cites the source) | session prefix + Conventional Commits | yes | **new** — closed the coverage gap (kushin77/shared-frontend#516) |
+
+`scripts/check-duplicates.sh` is not extended to detect a repo silently
+dropping its rule: this repo's CI cannot see the other three checkouts, so a
+detector here can't verify their hooks exist without cross-repo credentials
+it doesn't have. This table is the declaration registry until a fleet-wide
+detector is scoped; follow-up, not built here.
