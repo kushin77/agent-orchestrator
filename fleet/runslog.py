@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Per-run telemetry record schema + JSONL append helper (issue #232, micro-task 0 of #219).
 
+---knowledge---
+module_id: fleet.runslog
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [TelemetryError, build_record, validate_record, append_record, read_records]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 A "run" is one executor's pass at one issue. This module defines the record
 shape and a single append primitive; it does not decide when a run starts or
 ends — callers (the sister/brain loop) own that.

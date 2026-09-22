@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Fleet console — the live dashboard for the `fleet` tmux session.
 
+---knowledge---
+module_id: fleet.console
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [enable_color, paint, state_color, waves_dir, watchdog_log, monitor_heartbeat, rung_log, now_iso, (+36 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY it exists: the director, dispatcher and monitor rungs run DETACHED (the watchdog and
 cron own their lifecycle) and each writes its stream to `.fleet/<rung>.log`. The
 principal's view of "is the fleet doing what I asked?" was therefore spread across

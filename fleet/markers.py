@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The dispatch-marker state machine, reconciled against reality (issue #796).
 
+---knowledge---
+module_id: fleet.markers
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [now_iso, parse_epoch, age_seconds, safe_reference, path_for, Marker, read, write, (+14 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY THIS EXISTS (measured, 2026-09-15)
 --------------------------------------
 ``fleet/brain.py::dispatch`` refused on marker *existence*::

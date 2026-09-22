@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The director loop — the middle rung of the hierarchy (M26, issue #160).
 
+---knowledge---
+module_id: fleet.brain
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [current_master_head, master_health_refusal, suppressed, load_profile, kb_sources, now_iso, write_heartbeat, OrderBeater, (+46 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
     principal  →  DIRECTOR  →  dispatcher  →  executors
     (orders)     (this)    (executes)  (build)
 

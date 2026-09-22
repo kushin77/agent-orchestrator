@@ -1,5 +1,21 @@
 """The runner capability contract (#841): four things must agree before a dispatch.
 
+---knowledge---
+module_id: fleet.runners
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [RunnerProfile, profile_for, capability_gap, describe, capability, unhonourable]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY THIS FILE EXISTS
 --------------------
 Measured 2026-09-15 on ``master`` @ ``dd8cbfc``: **every executor run the fleet

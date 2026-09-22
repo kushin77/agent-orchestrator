@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Brain-side control plane — the human-override terminal.
 
+---knowledge---
+module_id: fleet.control
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [cmd_refresh, cmd_update, cmd_poke, cmd_start, cmd_status, cmd_pause, cmd_resume, cmd_stop, (+17 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Run these from the brain/human terminal to steer and maintain the fleet without
 stopping it:
 

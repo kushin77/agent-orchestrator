@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Per-run telemetry summary — the readable report over the run log (issue #234).
 
+---knowledge---
+module_id: fleet.summary
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [summarize, render_report, build_parser, main]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY it exists: `fleet/terminal.py` appends one JSONL record per run (issue,
 agent, lane, tier, thinking, runner, rc, duration, worktree, directive id — the
 vocabulary issue #219 names), but nothing can look at that log as a whole.

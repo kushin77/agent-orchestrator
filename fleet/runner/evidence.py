@@ -1,5 +1,21 @@
 """evidence.py — ranked, per-(pr, sha) evidence for the PR runner (issue #1343).
 
+---knowledge---
+module_id: fleet.runner.evidence
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [state_of_check_run, state_of_commit_status, state_of_cloud_build, state_of_verify_rc, Verdict, EvidenceTable, from_check_runs, from_commit_status, (+3 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 THREE SOURCES, ONE RANK ORDER
     cloud-build   the `control-plane-verify` check-run for the exact head sha
     gate-status   the `ao/gate-of-record` commit status read back for the sha

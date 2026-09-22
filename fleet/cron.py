@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The fleet's cron jobs — installed, managed and respawned from this terminal.
 
+---knowledge---
+module_id: fleet.cron
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [interpreter, load_manifest, manifest_jobs, job_enabled, enabled_jobs, ambient_env, validate_manifest, declared_markers, (+29 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The crontab is generated from a tracked manifest, ``config/fleet-jobs.json``
 (issue #241 — the later adaptation of the leaderboard's generated crontab,
 parent #160; the pattern is harvested, never copied — docs/CANNIBALIZATION.md

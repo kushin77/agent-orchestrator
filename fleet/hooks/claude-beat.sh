@@ -50,6 +50,23 @@
 #   bash fleet/hooks/claude-beat.sh --runtime claude-subagent
 #   bash fleet/hooks/claude-beat.sh --print-install       the one-line install
 #   bash fleet/hooks/claude-beat.sh --root DIR --cwd DIR --force --verbose
+#
+# ---knowledge---
+# module_id: fleet.hooks.claude_beat
+# system: fleet
+# app: fleet
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
+#
 set -u
 
 self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"

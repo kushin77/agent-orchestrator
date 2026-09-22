@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """cli.py — the PR runner's entrypoint (issue #1343, parent #1295).
 
+---knowledge---
+module_id: fleet.runner.cli
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [runner_dir, Transports, holds_path, read_holds, write_holds, gh_ready, list_open_prs, read_status_evidence, (+21 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
     python3 fleet/runner/cli.py plan                 # the actions, nothing done
     python3 fleet/runner/cli.py run --once [--apply] # one cycle (dry-run by default)
     python3 fleet/runner/cli.py run --loop [--apply] [--interval 120]

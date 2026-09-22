@@ -1,5 +1,21 @@
 """capacity.py — the runner's fan-out width, declared and backed off (issue #1343).
 
+---knowledge---
+module_id: fleet.runner.capacity
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [default_capacity, declared_capacity, declared_mem_floor_gb, Width, effective_capacity, probe_host]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The width is never a literal: it is `AO_RUNNER_CAPACITY` from the env contract
 (default `min(8, nproc // 2)`, never below 1), and before each fan-out it is
 reduced — never below 1 — when the box is already busy:

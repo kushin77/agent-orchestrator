@@ -1,5 +1,21 @@
 """fleet/beats.py — the producer side of the runtime-liveness contract (issue #1412).
 
+---knowledge---
+module_id: fleet.beats
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [beats_dir, read, running_commit, Posting, post, best_effort, cmd_post, cmd_show, (+2 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 `fleet/runtime_liveness.py` is the JUDGE: it reads `.fleet/runtime-beats/<id>.json`
 and reports `runtime-stale:<id>`, `runtime-drift:<id>`, `runtime-unregistered:<id>`.
 Until #1412 nothing WROTE those files, so on the real tree the judge could only

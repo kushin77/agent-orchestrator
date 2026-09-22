@@ -14,6 +14,23 @@
 #     run in flight. Each window tails `.fleet/<rung>.log`.
 #
 # Usage: bash fleet/run-fleet.sh        (equivalent: python3 fleet/control.py live)
+#
+# ---knowledge---
+# module_id: fleet.run_fleet
+# system: fleet
+# app: fleet
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
+#
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

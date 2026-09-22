@@ -1,5 +1,21 @@
 """fleet/runtimes.py — the ONE runtime vocabulary (issue #1412, from #1301/#1271/#1385).
 
+---knowledge---
+module_id: fleet.runtimes
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [RegistryRefused, RuntimeRow, registry_path, source, rows, ids, identity_of, carries]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 `fleet/runtimes.yaml` is the **contract**: one row per runtime, `{id, kind,
 transport, identity, token_scope}`. This module is the only reader of it, and
 every surface that needs the vocabulary asks HERE rather than carrying a copy:

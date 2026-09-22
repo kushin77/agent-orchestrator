@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Fleet status report — the planning-first surface paperclip owns (issue #302).
 
+---knowledge---
+module_id: fleet.report
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [repo_root, fleet_dir, waves_dir, runs_dir, runs_log, slog_path, board_snapshot_path, focus_path, (+39 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY it exists: the fleet already produces every fact a status report needs, but
 they are spread across five surfaces — the wave plans, the claim ledger, the run
 markers, the event log and the board snapshot — and each one answers a different

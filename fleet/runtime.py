@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Namespaced fleet runtime — the single source of runtime state location + identity.
 
+---knowledge---
+module_id: fleet.runtime
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [runner_search_path, runner_env]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists (EPIC #360, issue #361): every fleet module used to build its own
 ``ROOT / ".fleet"`` paths, so two fleets on one checkout could only share one
 runtime directory — their locks, mailboxes and heartbeats collided, and a second
