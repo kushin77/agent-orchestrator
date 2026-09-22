@@ -59,6 +59,11 @@
 set -u
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+# `git -C` does NOT override an exported GIT_DIR, and this gate runs
+# `git submodule update --init` below; without this guard a caller that exports one
+# makes the gate act on another repository (scripts/lib/unset-git-env.sh, #1642).
+# shellcheck source=scripts/lib/unset-git-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/unset-git-env.sh"
 root="$(find_repo_root)"
 cd "$root" || exit 2
 
@@ -438,7 +443,29 @@ scratch="$work/repo-submodule"
 mkdir -p "$scratch"
 printf '[submodule "vendor/CMR"]\n\tpath = vendor/CMR\n[submodule "hermes"]\n\tpath = third_party/hermes\n' \
   > "$scratch/.gitmodules"
-expect_vendor_refusal "an extra vendored submodule path" "VENDOR-EXTRA-SUBMODULE: third_party/hermes" "$scratch"
+out="$($cli vendoring --repo "$scratch" --hub "$hub_abs" 2>&1)"
+rc=$?
+if [ "$rc" -eq 0 ]; then
+  echo "  OK    a pinned second submodule is admitted (it is a reference, not a carried module)"
+  ok=$((ok + 1))
+else
+  echo "  FAIL  a pinned second submodule was refused (rc=$rc)" >&2
+  printf '%s\n' "$out" | sed 's/^/        /' >&2
+  fail=$((fail + 1))
+fi
+
+scratch="$work/repo-submodule-unpinned"
+mkdir -p "$scratch"
+printf '[submodule "vendor/CMR"]\n\tpath = vendor/CMR\n[submodule "hermes"]\n\tpath = third_party/hermes\n\tbranch = main\n' \
+  > "$scratch/.gitmodules"
+expect_vendor_refusal "an extra vendored submodule that tracks a branch (the pin is what makes it safe)" \
+  "VENDOR-EXTRA-SUBMODULE: third_party/hermes" "$scratch"
+
+scratch="$work/repo-submodule-orphan-path"
+mkdir -p "$scratch"
+printf 'path = stray/thing\n[submodule "vendor/CMR"]\n\tpath = vendor/CMR\n' > "$scratch/.gitmodules"
+expect_vendor_refusal "a path line outside any submodule section (git ignores it, so it is no reference)" \
+  "VENDOR-EXTRA-SUBMODULE: stray/thing" "$scratch"
 
 if python3 - "$work/a.json" "$work/registry-outside.json" <<'PY'
 import json

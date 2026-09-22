@@ -132,7 +132,10 @@ conditions:
     statement: >-
       Module source is referenced, never carried: no in-tree copy of a hub
       manifest, no module distribution package in this tree, no registry
-      reference pointing outside the hub, and no additional vendored submodule.
+      reference pointing outside the hub, and no vendored submodule that is not
+      SHA-pinned — a submodule section carrying `branch =` lets `git submodule
+      update --remote` walk it to that branch's tip and destroy the pin, and a
+      `path` outside any `[submodule "..."]` section is not a declaration at all.
     codes:
       - VENDOR-SOURCE-IN-TREE
       - VENDOR-IN-TREE-PACKAGE

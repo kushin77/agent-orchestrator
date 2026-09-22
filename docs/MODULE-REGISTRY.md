@@ -34,7 +34,12 @@ the module list:
   or a submodule vendoring a module directly.
 - `VENDOR-IN-TREE-PACKAGE` — a module's declared distribution package present
   in-tree (`codeidx/`, `node_modules/@kushin77/saas-rbac`).
-- `VENDOR-EXTRA-SUBMODULE` — any vendored submodule path other than `vendor/CMR`.
+- `VENDOR-EXTRA-SUBMODULE` — a vendored submodule that is not SHA-pinned: it
+  carries a `branch =` key (which `git submodule update --remote` walks to that
+  branch's tip, destroying the pin), or a `path` line outside any
+  `[submodule "..."]` section. A second submodule declared **and pinned**, with
+  no `branch` key like `vendor/CMR`, is admitted — it is a reference, not a
+  carried module.
 - `VENDOR-PATH-OUTSIDE-HUB` — a registry reference that resolves outside the hub.
 
 ## The inventory this page records (measured 2026-09-14)

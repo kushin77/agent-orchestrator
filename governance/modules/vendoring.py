@@ -28,7 +28,10 @@ Four rules, each mechanically provokable in a scratch copy:
 * ``VENDOR-SOURCE-IN-TREE`` — no ``module.json`` outside ``vendor/`` may
   declare a hub-catalog module id, and no ``.gitmodules`` entry may vendor a
   module anywhere but through the hub;
-* ``VENDOR-EXTRA-SUBMODULE`` — the hub is the only vendored submodule;
+ * ``VENDOR-EXTRA-SUBMODULE`` — every vendored submodule must be SHA-pinned: an
+   extra submodule carrying a ``branch =`` key (which ``git submodule update
+   --remote`` walks to that branch's tip, destroying the pin) is refused, as is a
+   ``path`` line outside any ``[submodule "..."]`` section;
 * ``VENDOR-IN-TREE-PACKAGE`` — a module's declared distribution package must
   not exist in-tree (``codeidx/``, ``node_modules/@kushin77/saas-rbac``).
 """
@@ -83,19 +86,32 @@ def _manifest_ids(repo_root: Path, hub_ids: frozenset) -> List[Refusal]:
 
 
 def _gitmodules(repo_root: Path, hub_ids: frozenset) -> List[Refusal]:
-    """Rules: the hub is the only vendored submodule, and it names no module."""
+    """Rules: every vendored submodule must be SHA-pinned, and name no module.
+
+    The hub is the only submodule that may be vendored *for a module*. A second
+    submodule is admitted when it is **pinned** — no ``branch`` key — because that
+    is the property the vendoring contract actually depends on: a section carrying
+    ``branch =`` lets ``git submodule update --remote`` walk the submodule to that
+    branch's tip and destroys the pin, which is the hazard this repo's own
+    ``.gitmodules`` header comment documents. So an *unpinned* extra submodule is
+    refused by name, and a submodule that vendors a hub module stays refused as
+    ``VENDOR-SOURCE-IN-TREE``.
+
+    The file is parsed **by section** so a ``branch`` key is attributable to the
+    submodule it belongs to; the flat line scan this replaced could not see one.
+    """
     path = Path(repo_root) / GITMODULES
     if not path.is_file():
         return []
     refusals: List[Refusal] = []
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        stripped = line.strip()
-        if not stripped.startswith("path"):
-            continue
-        _, _, value = stripped.partition("=")
-        submodule_path = value.strip().strip('"')
-        if not submodule_path or submodule_path == HUB_SUBMODULE_PATH:
-            continue
+    in_section = False
+    submodule_path: Optional[str] = None
+    branch_tracked = False
+
+    def flush() -> None:
+        """Judge one completed ``[submodule "..."]`` section."""
+        if submodule_path is None or submodule_path == HUB_SUBMODULE_PATH:
+            return
         if submodule_path in hub_ids or os.path.basename(submodule_path) in hub_ids:
             refusals.append(
                 Refusal(
@@ -106,16 +122,56 @@ def _gitmodules(repo_root: Path, hub_ids: frozenset) -> List[Refusal]:
                     GITMODULES,
                 )
             )
-            continue
-        refusals.append(
-            Refusal(
-                "VENDOR-EXTRA-SUBMODULE",
-                submodule_path,
-                "the hub ({}) is the only vendored submodule; {} is an extra "
-                "vendor path".format(HUB_SUBMODULE_PATH, submodule_path),
-                GITMODULES,
+            return
+        if branch_tracked:
+            refusals.append(
+                Refusal(
+                    "VENDOR-EXTRA-SUBMODULE",
+                    submodule_path,
+                    "submodule {} carries a `branch =` key, so `git submodule "
+                    "update --remote` walks it to that branch's tip and destroys "
+                    "the pin; every vendored submodule must be SHA-pinned like "
+                    "{}".format(submodule_path, HUB_SUBMODULE_PATH),
+                    GITMODULES,
+                )
             )
-        )
+
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("[submodule"):
+            flush()
+            in_section = True
+            submodule_path = None
+            branch_tracked = False
+            continue
+        key, sep, value = stripped.partition("=")
+        if not sep:
+            continue
+        key = key.strip()
+        if key == "path":
+            candidate = value.strip().strip('"')
+            if not in_section:
+                # A `path` outside any section is not a submodule declaration at
+                # all: git ignores it, so it can never be the reference a vendored
+                # submodule is supposed to be. Strictly worse than the old scan,
+                # which judged such a line as if it were one.
+                refusals.append(
+                    Refusal(
+                        "VENDOR-EXTRA-SUBMODULE",
+                        candidate or "(empty)",
+                        "a `path =` outside any `[submodule \"...\"]` section is not "
+                        "a submodule declaration; git ignores it, so it cannot be a "
+                        "vendoring reference",
+                        GITMODULES,
+                    )
+                )
+                continue
+            submodule_path = candidate or None
+        elif key == "branch":
+            branch_tracked = True
+    flush()
     return refusals
 
 

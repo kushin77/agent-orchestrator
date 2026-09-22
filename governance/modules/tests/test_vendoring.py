@@ -52,14 +52,47 @@ def test_the_repos_own_root_manifest_is_not_a_module_copy(hub: Path, consumer: P
     assert vendoring.scan(consumer, _catalog(hub, consumer)) == []
 
 
-def test_an_extra_submodule_path_is_refused(hub: Path, consumer: Path) -> None:
+def test_an_extra_submodule_path_without_a_branch_key_is_admitted(hub: Path, consumer: Path) -> None:
+    """A pinned second submodule is a reference, not a carried module (#2042).
+
+    Mutation that reds it: restore the blanket "the hub is the only vendored
+    submodule" refusal, and this lists VENDOR-EXTRA-SUBMODULE instead of [].
+    """
     (consumer / ".gitmodules").write_text(
         '[submodule "vendor/CMR"]\n\tpath = vendor/CMR\n'
         '[submodule "third-party"]\n\tpath = third_party/widget\n',
         encoding="utf-8",
     )
+    assert codes(vendoring.scan(consumer, _catalog(hub, consumer))) == []
+
+
+def test_an_extra_submodule_that_tracks_a_branch_is_refused(hub: Path, consumer: Path) -> None:
+    """The pin is what makes a reference safe; `branch =` destroys it.
+
+    Mutation that reds it: drop the `branch_tracked` refusal, and this is admitted.
+    """
+    (consumer / ".gitmodules").write_text(
+        '[submodule "vendor/CMR"]\n\tpath = vendor/CMR\n'
+        '[submodule "third-party"]\n\tpath = third_party/widget\n\tbranch = main\n',
+        encoding="utf-8",
+    )
+    findings = vendoring.scan(consumer, _catalog(hub, consumer))
+    assert codes(findings) == ["VENDOR-EXTRA-SUBMODULE: third_party/widget"]
+    assert "branch =" in findings[0].detail
+
+
+def test_a_path_outside_any_section_is_refused(hub: Path, consumer: Path) -> None:
+    """Stricter than the flat scan, which judged such a line as a declaration.
+
+    Mutation that reds it: ignore a `path` seen outside a section, and this is [].
+    """
+    (consumer / ".gitmodules").write_text(
+        'path = stray/thing\n'
+        '[submodule "vendor/CMR"]\n\tpath = vendor/CMR\n',
+        encoding="utf-8",
+    )
     assert codes(vendoring.scan(consumer, _catalog(hub, consumer))) == [
-        "VENDOR-EXTRA-SUBMODULE: third_party/widget"
+        "VENDOR-EXTRA-SUBMODULE: stray/thing"
     ]
 
 
