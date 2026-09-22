@@ -62,6 +62,10 @@ class HmacSigner:
 
     def __init__(self, key: Optional[bytes] = None) -> None:
         if key is None:
+            # ponytail: exempt from #1915's flags-module routing on purpose —
+            # this is secret material (HMAC signing key), not plain config;
+            # reading it directly at the fail-closed check keeps the key off
+            # any shared config object it would otherwise have to pass through.
             raw = os.environ.get(_ENV_KEY)
             if raw is None:
                 raise HmacKeyError(

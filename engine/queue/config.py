@@ -32,6 +32,17 @@ import yaml
 _HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG_PATH = os.path.join(_HERE, "queue.yaml")
 
+ENV_STORE_PATH = "AO_QUEUE_STORE"
+
+
+def env_store_path() -> str:
+    """Return the CLI's state-file path: ``$AO_QUEUE_STORE`` or ``<cwd>/.ao-queue.json``.
+
+    Declared here (issue #1915) so the raw env read lives in the queue's
+    config module rather than inline in ``cli.py``.
+    """
+    return os.environ.get(ENV_STORE_PATH) or os.path.join(os.getcwd(), ".ao-queue.json")
+
 _DEFAULTS = None  # set below once the frozen dataclass exists
 
 
