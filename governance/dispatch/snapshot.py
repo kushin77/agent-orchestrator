@@ -10,7 +10,7 @@ derives_from: null
 owner_sme: platform-sme
 tier: L1
 interfaces: [parse_files, parse_edges, now_iso, parse_iso, age_minutes, is_stale, build_snapshot, github_records, save, load, (+10 more)]
-invariants: ""
+invariants: "the board fetch pages to exhaustion, and the tracked board is written by rename only"
 gotchas: ""
 related: ["#128", "#152", "#170", "#322", "#708", "#727"]
 do_not_duplicate: null
@@ -287,10 +287,25 @@ def github_records(
     #   * it names the closed timestamp ``closed_at``, while ``build_snapshot``
     #     reads ``closedAt``.
     records: list[dict[str, Any]] = []
-    for row in rows:
-        if not isinstance(row, dict) or row.get("pull_request") is not None:
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            # The old code raised on a non-list payload; it must not fail OPEN on
+            # a malformed line either -- a silently skipped row is a silently
+            # incomplete board, which is the defect this function exists to stop.
+            raise RuntimeError(
+                f"gh api returned a non-object line at row {index}: {str(row)[:80]!r}"
+            )
+        if row.get("pull_request") is not None:
             continue
         row.setdefault("closedAt", row.get("closed_at") or "")
+        # The REST endpoint returns lowercase ``open``/``closed``; the committed
+        # artefact and every ``scripts/check-*.sh`` fixture carry the UPPERCASE
+        # GraphQL vocabulary. Consumers do normalise case, but shipping a board
+        # whose 863 closed rows silently changed spelling is a behavioural change
+        # in a tracked artefact, so it is normalised here at the owning seam.
+        state = row.get("state")
+        if isinstance(state, str):
+            row["state"] = state.upper()
         records.append(row)
     return records
 
@@ -309,7 +324,9 @@ def save(snapshot: Snapshot, path: Path | str = DEFAULT_PATH) -> Path:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(snapshot.to_json(), indent=2, sort_keys=False) + "\n"
-    tmp = target.with_name(".%s.tmp-%d" % (target.name, os.getpid()))
+    tmp = target.with_name(
+        ".%s.tmp-%d-%s" % (target.name, os.getpid(), os.urandom(4).hex())
+    )
     tmp.write_text(payload, encoding="utf-8")
     tmp.replace(target)
     return target
