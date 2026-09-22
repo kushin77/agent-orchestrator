@@ -68,7 +68,7 @@ pre-promotion state, not a gap.
 
 - **#1941** (P1) — org_chart/skill_studio/task_board dark despite GR-5 default-on policy
 - **#1942** (P1) — 3 control-plane Cloud Build triggers still enabled (re-files #1465's unactioned fix)
-- **#1935** (P1) — governance/gateway pytest module-basename collisions cause false failures outside the sanctioned per-suite runner (filed by a parallel lane pass over this same review; kept as a distinct, non-duplicate finding under this epic)
+- **#1935** (P1, cross-ref only, Parent: #1932, not a child of this epic) — governance/gateway pytest module-basename collisions cause false failures outside the sanctioned per-suite runner; filed independently by a concurrent lane covering the same root cause this review flagged as backlog above
 
 ## Backlog (not filed individually, capped at 10 children)
 
