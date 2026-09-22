@@ -8,6 +8,7 @@ filed-issue assertion fails.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from governance.lifecycle.report import BoardReporter
@@ -141,3 +142,54 @@ def test_a_resolved_shelved_lane_files_again_if_shelved_anew(root: Path):
     beat(root, at=OLD, state=SHELVED, note="unmerged work again")
     sweep(root, at=NOW, apply=True, ops=FakeOps(on_main=False, remotely=False), reporter=rep)
     assert len(filer.created) == 2
+
+
+# --- the dedupe ledger is the board's, not a checkout's (#1966) ----------------
+
+
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    assert result.returncode == 0, f"git {args} failed: {result.stderr}"
+    return result.stdout
+
+
+def _scratch_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "main"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "master")
+    _git(repo, "config", "user.email", "gate@example.com")
+    _git(repo, "config", "user.name", "Gate")
+    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "seed")
+    return repo
+
+
+def test_the_board_ledger_is_shared_across_checkouts(tmp_path: Path):
+    """#1966: the dedupe ledger is the board's, not a checkout's.
+
+    ``_reporter`` derived the ledger from ``Path(root)``, so the same fingerprint
+    filed from a linked worktree (which has no ledger of its own) re-filed beside
+    the filing from the main checkout — one fingerprint, two issues (#1894/#1896).
+    The ledger must resolve to the main checkout for every checkout of the repo.
+    """
+    from governance.reconcile.cli import _reporter
+
+    repo = _scratch_repo(tmp_path)
+    lane = tmp_path / "lane"
+    _git(repo, "worktree", "add", "-q", "-b", "issue-1966", str(lane))
+
+    main_rep = _reporter(str(repo))
+    lane_rep = _reporter(str(lane))
+    assert main_rep.ledger == lane_rep.ledger, "the dedupe ledger is one, not one per checkout"
+    assert main_rep.ledger == repo / ".fleet" / "board-reports.json"
+
+    filer = FakeFiler()
+    main_rep.filer = filer
+    lane_rep.filer = filer
+    key = "reconcile:suspect:641eef6a4837"
+    first = main_rep.report(key, title="[reconcile] suspect session #304", body="b", apply=True)
+    second = lane_rep.report(key, title="[reconcile] suspect session #304", body="b", apply=True)
+    assert first.action == "filed"
+    assert second.action == "deduped"
+    assert len(filer.created) == 1

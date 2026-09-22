@@ -374,6 +374,67 @@ def test_a_shelved_lane_still_keeps_its_work_and_its_finding(root: Path):
     assert "reconcile:shelved:#304" in leftover(rep), "the shelved finding stays on the board"
 
 
+# --- reconcile-owned suspect findings resolve against the local heartbeat (#1966) -
+
+
+def suspect_reporter(filer: FakeFiler, root: Path) -> BoardReporter:
+    """A reporter with an EMPTY ledger — the sweep files into it below."""
+    return BoardReporter(filer, ledger=root / ".fleet" / "board-reports.json")
+
+
+def test_a_suspect_finding_resolves_once_the_session_stops_beating(root: Path):
+    """#1966: a `reconcile:suspect:<session>` finding reaches `resolved` when the
+    session it names no longer has a heartbeat — not only through a later reclaim.
+
+    The recheck used to re-measure only `lifecycle:` keys, so a suspect finding
+    whose session simply stopped (beat cleared, never reclaimed) stayed open for
+    ever. The falsification: file the finding, remove the beat, assert it resolves.
+    """
+    from governance.reconcile.heartbeat import clear, stamp
+
+    filer = FakeFiler()
+    rep = suspect_reporter(filer, root)
+    # provoke: a session with a fresh beat behind a dead pid files a suspect finding
+    stamp("deadbeef0001", issue=304, agent="subagent-dead", root=root, pid=4242, at=1_000_010.0)
+    sweep(root, at=1_000_011.0, alive={"deadbeef0001": False}, apply=True, ops=FakeOps(), reporter=rep)
+    assert "suspect" in filer.created[0]["title"].lower()
+    assert "reconcile:suspect:deadbeef0001" in leftover(rep)
+
+    # the session ends cleanly: the beat is gone, but the finding outlives it
+    clear("deadbeef0001", root)
+
+    closer = FakeCloser()
+    states = recheck_findings(rep, root=root, apply=True, closer=closer)
+
+    assert [state.outcome for state in states] == [RESOLVED]
+    assert closer.closed and "deadbeef0001" in closer.closed[0]["comment"]
+    assert "reconcile:suspect:deadbeef0001" not in leftover(rep), (
+        "a resolved suspect finding is retired, so a genuine recurrence files afresh"
+    )
+
+
+def test_a_suspect_finding_survives_while_the_session_still_beats(root: Path):
+    """The negative control: a session that still beats keeps its suspect finding.
+
+    The recheck must not read "beat present, pid gone" as resolved — the finding
+    is exactly the signal that something is wrong with that session.
+    """
+    from governance.reconcile.heartbeat import stamp
+
+    filer = FakeFiler()
+    rep = suspect_reporter(filer, root)
+    stamp("deadbeef0001", issue=304, agent="subagent-dead", root=root, pid=4242, at=1_000_010.0)
+    sweep(root, at=1_000_011.0, alive={"deadbeef0001": False}, apply=True, ops=FakeOps(), reporter=rep)
+    assert "reconcile:suspect:deadbeef0001" in leftover(rep)
+
+    closer = FakeCloser()
+    states = recheck_findings(rep, root=root, apply=True, closer=closer)
+
+    assert [state.outcome for state in states] == [STILL_OWED]
+    assert closer.closed == [], "a live suspect finding must never be closed"
+    assert "reconcile:suspect:deadbeef0001" in leftover(rep)
+
+
 def test_counts_names_every_outcome_even_at_zero():
     assert counts([]) == {
         RESOLVED: 0,
