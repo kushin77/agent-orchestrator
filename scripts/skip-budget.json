@@ -28,6 +28,7 @@
       },
       {
         "check": "chronological-dispatch",
+        "decision": "re-point",
         "was": "unnamed",
         "now": "#1295",
         "basis": "NEW entry from issue #2056 (2026-09-22): this check was never named in the #1361 migration, so it carries no prior tracker -- `was` records that honestly rather than borrowing #1361's lease. `now` is #1295, the venue umbrella that still owns the Cloud Build container's missing preconditions. The row exists because the ratchet requires a decision row for EVERY committed entry."
@@ -62,6 +63,7 @@
       },
       {
         "check": "dispatch-entrypoint",
+        "decision": "re-point",
         "was": "unnamed",
         "now": "#1295",
         "basis": "NEW entry from issue #2056 (2026-09-22): this check was never named in the #1361 migration, so it carries no prior tracker -- `was` records that honestly rather than borrowing #1361's lease. `now` is #1295, the venue umbrella that still owns the Cloud Build container's missing preconditions. The row exists because the ratchet requires a decision row for EVERY committed entry."

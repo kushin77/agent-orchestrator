@@ -300,7 +300,7 @@ def test_the_committed_record_loads_with_no_shape_finding() -> None:
     module = _load_budget_module()
     entries, findings = module.load_budget(BUDGET)
     assert findings == [], findings
-    assert len(entries) == 13, [e["check"] for e in entries]
+    assert len(entries) == 15, [e["check"] for e in entries]
 
 
 def test_the_tracker_is_parsed_once_and_the_helper_is_what_reads_it() -> None:
@@ -341,7 +341,7 @@ def test_the_committed_record_declares_its_per_entry_decision() -> None:
     doc = json.loads(BUDGET.read_text(encoding="utf-8"))
     entries = {e["check"]: e for e in doc["entries"]}
     rows = doc["tracking-repoint-2026-09-20"]["rows"]
-    assert len(rows) == len(entries) == 13
+    assert len(rows) == len(entries) == 15
     for row in rows:
         entry = entries[row["check"]]
         assert row["decision"] == "re-point", row
