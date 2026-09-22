@@ -83,9 +83,14 @@ def test_control_state_status_codes():
 
 
 def test_control_set_is_default_off(control_set):
+    # #1953: the shipped registry now has one proven-ON control
+    # (hermes-head-guardrails, #1519); every other control is still OFF.
     assert control_set.all_default_off()
-    assert control_set.enabled_ids() == ()
-    assert all(not state.enabled for state in control_set.states())
+    assert control_set.enabled_ids() == ("hermes-head-guardrails",)
+    assert all(
+        state.enabled == (state.control.id == "hermes-head-guardrails")
+        for state in control_set.states()
+    )
 
 
 def test_toggle_writes_exactly_one_audit_record(control_set, audit_log):

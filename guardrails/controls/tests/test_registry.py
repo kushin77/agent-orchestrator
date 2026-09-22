@@ -17,8 +17,16 @@ from controls.registry import (
 
 
 def test_controls_load_and_default_off(controls):
+    # #1953 (owner decision 2026-09-21): hermes-head-guardrails is proven ON
+    # by a closed canary (#1519), paired with its enabled-by-default
+    # capability flag. Every other control still ships default OFF.
     assert controls, "the shipped registry must declare at least one control"
-    assert all(control.default_enabled is False for control in controls)
+    for control in controls:
+        if control.id == "hermes-head-guardrails":
+            assert control.default_enabled is True
+            assert control.proven_by == "#1519"
+        else:
+            assert control.default_enabled is False
 
 
 def test_every_control_is_in_the_reused_policy_map(controls):
@@ -62,7 +70,9 @@ def test_unknown_control_id_in_state_is_ignored(tmp_path):
     save_state(path, {"ghost-control": True})
     control_set = build_control_set(state_path=path)
     assert "ghost-control" not in control_set
-    assert control_set.enabled_ids() == ()
+    # #1953: hermes-head-guardrails ships proven-ON (#1519); every other
+    # control, including the ignored unknown id, stays OFF.
+    assert control_set.enabled_ids() == ("hermes-head-guardrails",)
 
 
 def test_a_control_that_ships_on_in_the_registry_is_refused(tmp_path):

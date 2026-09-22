@@ -144,23 +144,29 @@ def test_canary_entry_mirrors_the_shipped_control(canary_document, shipped_docum
         assert canary_entry[field] == shipped_entry[field], (
             f"the canary entry drifted from the shipped control on {field!r}"
         )
-    # the two deliberate differences, and only those two plus `notes`
-    assert shipped_entry["enabled"] is False
+    # #1953 (owner decision 2026-09-21): the control's production promotion
+    # is now recorded — shipped and canary both ship `enabled: true` with
+    # their own `on_since_rationale`; only `notes` (and the rationale text
+    # itself) still differ.
+    assert shipped_entry["enabled"] is True
     assert canary_entry["enabled"] is True
-    assert "on_since_rationale" not in shipped_entry
-    assert set(canary_entry) - set(shipped_entry) == {"on_since_rationale"}
+    assert str(shipped_entry.get("on_since_rationale", "")).strip()
+    assert set(canary_entry) - set(shipped_entry) == set()
     assert set(shipped_entry) - set(canary_entry) == set()
 
 
-def test_production_registry_still_ships_the_control_off():
+def test_production_registry_promoted_the_control(shipped_document):
+    # #1953 (owner decision 2026-09-21) is the recorded promotion decision
+    # this module's docstring said would come separately: production now
+    # ships hermes-head-guardrails ON, matching the canary's proof.
     shipped = ControlRegistry.load_yaml(default_controls_file())
     control = shipped.get(TARGET)
     assert control is not None, "the shipped registry lost the control"
-    assert control.enabled is False, (
-        "production must not have been promoted by this canary; promotion is a "
-        "separate recorded decision (E1's ADR)"
-    )
-    assert shipped.is_active(TARGET) is False
+    assert control.enabled is True, "production should be promoted per #1953"
+    assert shipped.is_active(TARGET) is True
+    assert "1953" in shipped_document["controls"][
+        [c["id"] for c in shipped_document["controls"]].index(TARGET)
+    ].get("on_since_rationale", "")
 
 
 def test_the_canary_is_not_the_deployed_default():
@@ -290,18 +296,18 @@ def test_without_the_canary_flip_the_named_rule_never_fires(canary_document):
     assert BLOCK_RULE not in {hit.rule_id for hit in result.matched_rules}
 
 
-def test_shipped_registry_does_not_fire_the_named_rule():
-    """The differential against production: with the shipped registry the
-    action is `uncovered`, so the canary registry — not some other policy — is
-    what makes the named rule fire."""
+def test_shipped_registry_now_fires_the_named_rule_too():
+    """#1953: production is promoted, so the shipped registry alone — not
+    only the canary registry — now fires the named BLOCK rule too."""
     shipped = ControlRegistry.load_yaml(default_controls_file())
     bundle = build_bundle([str(HERMES_POLICY_PATH)], controls=shipped)
     engine = PolicyEngine(bundle, controls=shipped)
     result = engine.evaluate(
         "agent.dispatch", subject="hermes", tenant="acme", context=OFF_GATEWAY
     )
-    assert result.uncovered is True
-    assert result.matched_rules == ()
+    assert result.decision is DecisionLevel.BLOCK
+    assert result.uncovered is False
+    assert result.matched_rules[0].rule_id == BLOCK_RULE
 
 
 # --------------------------------------------------------------------------- #

@@ -20,11 +20,13 @@ def _args(tmp_path, *rest):
 
 
 def test_list_reports_default_off(capsys, tmp_path):
+    # #1953: hermes-head-guardrails ships proven-ON (#1519), so it reports
+    # 446/on; every other control still reports 246/off.
     assert cli.main(_args(tmp_path, "list")) == cli.EXIT_OK
     out = capsys.readouterr().out
     assert "246" in out
     assert "off" in out
-    assert out.count("446") == 0
+    assert out.count("446") == 1
 
 
 def test_get_unknown_control_fails(capsys, tmp_path):
@@ -66,9 +68,14 @@ def test_check_report_enabled_control_is_not_ok(capsys, tmp_path):
 
 
 def test_check_report_json(capsys, tmp_path):
+    # #1953: check-report is OK when every control matches its shipped
+    # default, not when every control is literally OFF — hermes-head-
+    # guardrails now defaults to 446/BLOCKED (proven ON, #1519).
     assert cli.main(_args(tmp_path, "check-report", "--json")) == cli.EXIT_OK
     rows = json.loads(capsys.readouterr().out)
-    assert {row["status"] for row in rows} == {246}
+    assert {row["status"] for row in rows} == {246, 446}
+    on_rows = [row for row in rows if row["status"] == 446]
+    assert [row["id"] for row in on_rows] == ["hermes-head-guardrails"]
 
 
 def test_self_test_holds(capsys):

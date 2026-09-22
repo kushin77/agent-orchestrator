@@ -120,8 +120,16 @@ controls:
   # bundles/platform/paperclip-operator.yaml. Inert unless the control is
   # enabled AND the corresponding provider flag is on
   # (infra/feature-flags/registry.yaml: `enable_paperclip` shipped;
-  # `enable_hermes` is added by sibling lane #950 and is read defensively —
-  # tolerating absence — by scripts/check-guardrail-head-policy.sh).
+  # `enable_hermes` is read defensively — tolerating absence — by
+  # scripts/check-guardrail-head-policy.sh).
+  #
+  # Default-OFF rule, re-scoped (issue #1953, owner decision 2026-09-21): a
+  # control stays default-OFF UNLESS its paired provider flag ships
+  # `default: on` (GR-5/AO-GR-6 reversal) AND the control has a closed
+  # canary/promotion issue proving it blocks. hermes-head-guardrails meets
+  # both (enable_hermes: on, canary #1519 closed) -> enabled: true.
+  # paperclip-operator-guardrails' flag also ships `default: on` but it has
+  # no closed canary proof yet, so it stays enabled: false.
   # ------------------------------------------------------------------------ #
   - id: hermes-head-guardrails
     name: Hermes head-of-org guardrails
@@ -130,14 +138,22 @@ controls:
       only through the gateway and under its budget ceiling; hermes is
       refused on self-promotion, approving a full rollout, touching secrets,
       and running IaC apply.
-    enabled: false
+    enabled: true
+    on_since_rationale: >-
+      issue #1953 (owner decision 2026-09-21): the GR-5/AO-GR-6
+      enabled-by-default reversal reached the hermes provider flag
+      (infra/feature-flags/registry.yaml `enable_hermes`) but left this
+      paired blocking control default-OFF, so the capability shipped live
+      while its guard stayed inert. #1519 already proved the control blocks
+      (canary). Flipped to match the capability it gates.
     mode: block
     implemented_by:
       - guardrails/policy/bundles/platform/hermes-head.yaml
     since: "issue #951"
     notes: >
-      (informational) Default OFF; also gated by the platform's hermes
-      provider flag `enable_hermes` (sibling lane #950), read defensively.
+      Enabled since #1953 (was default OFF); gated by the platform's hermes
+      provider flag `enable_hermes` (infra/feature-flags/registry.yaml),
+      read defensively.
   - id: paperclip-operator-guardrails
     name: Paperclip operator-seam guardrails
     description: >-

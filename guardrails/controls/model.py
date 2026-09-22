@@ -7,10 +7,14 @@ model decides and records.
 
 Two invariants are structural, not advisory:
 
-* **Default OFF.**  A :class:`PolicyControl` refuses to be constructed with
-  ``default_enabled=True`` (AO-GR-6, flag-gated-OFF doctrine).  Shipping a
-  control ON is not a policy choice the model will accept, so the gate's
-  self-mutating negative control cannot be satisfied by an ON fixture.
+* **Default OFF, unless proven.**  A :class:`PolicyControl` refuses to be
+  constructed with ``default_enabled=True`` (AO-GR-6, flag-gated-OFF
+  doctrine) *unless* ``proven_by`` names the closed canary/promotion issue
+  that earns the exception (issue #1953, owner decision 2026-09-21: a
+  control paired with an enabled-by-default capability that has a proven
+  canary is expected ON, not OFF). An unproven ON is still refused, so the
+  gate's self-mutating negative control still bites any fixture that lacks
+  ``proven_by``.
 * **Closed guardrail vocabulary.**  Enforcement reports the Portkey-style
   status codes ``PASSED = 246`` / ``BLOCKED = 446``.  The vocabulary is
   ``frozenset``-closed: :func:`status_name` refuses any other code, so a
@@ -105,15 +109,17 @@ class PolicyControl:
     audit_ref: str
     gated_actions: tuple[str, ...] = ()
     default_enabled: bool = False
+    proven_by: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not _ID_RE.match(self.id):
             raise ControlError(f"control id {self.id!r} must match ^[a-z][a-z0-9-]*$")
         if self.mode not in VALID_MODES:
             raise ControlError(f"control {self.id!r}: invalid mode {self.mode!r}")
-        if self.default_enabled:
+        if self.default_enabled and not self.proven_by:
             raise ControlError(
-                f"control {self.id!r} must default OFF (AO-GR-6): refusing a "
+                f"control {self.id!r} must default OFF (AO-GR-6) unless proven "
+                f"ON by a closed canary (proven_by not set): refusing a "
                 f"control that ships ON (default_enabled=True)"
             )
 
@@ -127,6 +133,7 @@ class PolicyControl:
             "audit_ref": self.audit_ref,
             "gated_actions": list(self.gated_actions),
             "default_enabled": bool(self.default_enabled),
+            "proven_by": self.proven_by,
         }
 
 
@@ -219,8 +226,15 @@ class ControlSet:
         return tuple(cid for cid in self._controls if self._enabled[cid])
 
     def all_default_off(self) -> bool:
-        """True when no control is enabled (the shipped posture)."""
-        return not any(self._enabled.values())
+        """True when every control's current state matches its shipped
+        default (the shipped posture) — not literally "all OFF", since
+        issue #1953 lets a proven control (``proven_by`` set) ship
+        ``default_enabled=True``.
+        """
+        return all(
+            self._enabled[cid] == control.default_enabled
+            for cid, control in self._controls.items()
+        )
 
     def state_dict(self) -> dict[str, Any]:
         return {"version": 1, "controls": dict(self._enabled)}

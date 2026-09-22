@@ -7,8 +7,10 @@
 # enforce something:
 #
 #   * both `hermes-head-guardrails` and `paperclip-operator-guardrails`
-#     controls are registered in guardrails/policy/controls.yaml, default OFF
-#     (AO-GR-6 flag-gated rollout);
+#     controls are registered in guardrails/policy/controls.yaml, each
+#     matching its proven-default posture (AO-GR-6 flag-gated-OFF, unless
+#     proven ON by a closed canary per issue #1953, owner decision
+#     2026-09-21 — hermes-head-guardrails is proven ON by #1519);
 #   * with the controls ON, every forbidden action for each provider is
 #     refused BY NAME (the matched rule id names the forbidden action);
 #   * every allowed action for each provider passes;
@@ -39,7 +41,7 @@
 # interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
 # invariants: ""
 # gotchas: ""
-# related: ["#878", "#950", "#951"]
+# related: ["#878", "#950", "#951", "#1953"]
 # do_not_duplicate: null
 # ---knowledge---
 set -u
@@ -58,7 +60,14 @@ scratch="/tmp/ao-guardrail-head-policy.$(date +%s%N).$$"
 mkdir "$scratch" || exit 2
 trap 'rm -rf "$scratch"' EXIT
 
-echo "== both head-of-org controls are registered, default OFF =="
+# Re-scoped 2026-09-21 (issue #1953, owner decision): a control ships
+# enabled: true, without being a doctrine violation, only when it is BOTH
+# paired with a capability flag that itself ships `default: on`
+# (GR-5/AO-GR-6 reversal) AND has a closed canary/promotion issue proving it
+# blocks. hermes-head-guardrails meets both (enable_hermes: on, #1519
+# closed) so it is now expected ON; every other head-of-org control is
+# still expected OFF.
+echo "== both head-of-org controls are registered; each matches its proven-default posture =="
 if python3 - <<'PY'
 import sys
 sys.path.insert(0, "guardrails")
@@ -66,18 +75,26 @@ from policy.controls import ControlRegistry
 from policy.startup import default_controls_file
 
 reg = ControlRegistry.load_yaml(default_controls_file())
+# issue #1953: control id -> closed canary/promotion issue proving it, for
+# controls expected to ship enabled: true.
+proven_on = {"hermes-head-guardrails": "#1519"}
 for cid in ("hermes-head-guardrails", "paperclip-operator-guardrails"):
     ctrl = reg.get(cid)
     if ctrl is None:
         raise SystemExit(f"missing control: {cid}")
-    if ctrl.enabled:
-        raise SystemExit(f"control {cid} ships enabled (must default OFF)")
-print("  OK    both controls registered, enabled: false")
+    expect_on = cid in proven_on
+    if ctrl.enabled != expect_on:
+        state = "enabled" if ctrl.enabled else "disabled"
+        want = "enabled (proven ON, #1953)" if expect_on else "default OFF"
+        raise SystemExit(f"control {cid} ships {state} (must be {want})")
+    if expect_on and not ctrl.on_since_rationale.strip():
+        raise SystemExit(f"control {cid} ships enabled without on_since_rationale")
+print("  OK    hermes/paperclip guardrails present; hermes proven-ON (#1519), paperclip default-OFF")
 PY
 then
   :
 else
-  echo "  FAIL  control registration/default-OFF invariant broken" >&2
+  echo "  FAIL  control registration/proven-default invariant broken" >&2
   fail=$((fail + 1))
 fi
 
@@ -239,5 +256,5 @@ if [ "$fail" -gt 0 ]; then
   echo "check-guardrail-head-policy: FAIL — $fail finding(s)" >&2
   exit 1
 fi
-echo "check-guardrail-head-policy: OK — hermes/paperclip guardrails present, default-OFF, default-deny, negative control fires"
+echo "check-guardrail-head-policy: OK — hermes/paperclip guardrails present, proven-default posture (hermes ON/#1519, paperclip OFF), default-deny, negative control fires"
 exit 0
