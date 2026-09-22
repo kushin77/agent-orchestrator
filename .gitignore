@@ -1,6 +1,9 @@
 # Local research/cannibalization scratch (never commit cloned fleet repos)
 .research/
 
+# portal runtime scratch (chat store, error log) — never committed
+.portal/
+
 # Editors / OS
 .vscode/
 .idea/
