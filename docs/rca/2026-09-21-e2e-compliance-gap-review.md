@@ -1,6 +1,6 @@
 # 2026-09-21 — end-to-end compliance gap review
 
-Epic: kushin77/agent-orchestrator#1940
+Epic: kushin77/agent-orchestrator#1940 (PR #1939)
 
 ## Scope
 
@@ -68,7 +68,9 @@ pre-promotion state, not a gap.
 
 - **#1941** (P1) — org_chart/skill_studio/task_board dark despite GR-5 default-on policy
 - **#1942** (P1) — 3 control-plane Cloud Build triggers still enabled (re-files #1465's unactioned fix)
-- **#1935** (P1, cross-ref only, Parent: #1932, not a child of this epic) — governance/gateway pytest module-basename collisions cause false failures outside the sanctioned per-suite runner; filed independently by a concurrent lane covering the same root cause this review flagged as backlog above
+- **#1935** (P1) — governance/gateway pytest module-basename collisions cause false failures outside the sanctioned per-suite runner; filed independently by a concurrent lane covering the same root cause this review flagged, now retargeted to Parent: #1940
+
+Note: this review raced with a concurrent lane running the identical task. #1932/#1933 were early duplicates of #1940/#1941, now closed out via comment. PR #1939 Refs #1940 as the canonical epic.
 
 ## Backlog (not filed individually, capped at 10 children)
 
