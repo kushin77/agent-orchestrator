@@ -1,0 +1,55 @@
+# Roots the verify gate GENERATES inside its own worktree.
+#
+# ONE declaration, read by every consumer that needs it -- never re-typed:
+#   * scripts/check-gitignore.sh   declares them `wholly_generated` and proves,
+#                                  by name, that no tracked file lives under one
+#   * scripts/check-secrets.sh     prunes them from the tree it scans
+#   * scripts/check-yaml.py        skips them when it walks for *.yaml/*.yml
+#
+# WHY A WALK-BASED CHECK NEEDS THIS (measured, issue #1983)
+# `check-secrets.sh` walked the worktree with `find`, so a SECOND `make verify`
+# in the SAME venue read the FIRST run's own output. The gate records every
+# check's transcript in `.verify/.check-out/<name>.txt` and its verdict in
+# `.verify/attestation.json`, so the record of a finding became a new finding.
+# MEASURED, one lane worktree, back to back:
+#
+#   run 1  secrets: OK (3241 file(s) scanned)
+#   run 2  secrets: OK (3416 file(s) scanned)   <- 175 files of the gate's OWN output
+#   yaml   OK (296 file(s)) -> OK (299 file(s)) <- 3 files of the gate's OWN output
+#
+# ...and with a finding anywhere in the venue's record, the second pass REDS on
+# that record while the tree is clean. Measured in the same worktree, tree-level:
+#
+#   control (record emptied)              rc=0  secrets: OK (3419 file(s) scanned)
+#   run A (real sk- credential planted
+#          in a TRACKED file)             rc=1  FAIL ./zz-...-control.txt:1 ... (possible secret: high-signal-shape)
+#   run B (credential REMOVED from the
+#          tree; only the record changed) rc=1  FAIL ./.verify/.check-out/secrets.txt:16:  FAIL ./zz-...-control.txt:1 ... (possible secret: high-signal-shape) (possible secret: high-signal-shape)
+#
+# Run B is the defect in one line: the tree is clean, the credential exists
+# nowhere in it, and the gate is red anyway -- because it is judging its own
+# transcript of the previous judgement. A lane that re-gates after a rebase
+# (the DOCUMENTED practice: a squash lands `current_master_tip + PR_diff`, so a
+# verdict reached at an old base is inadmissible) therefore earns a red that has
+# nothing to do with its diff.
+#
+# THE PRECONDITION THAT MAKES AN EXCLUSION SAFE -- asserted, not hoped
+# A root may be excluded from a tree walk ONLY while it holds NO TRACKED FILE.
+# Then the exclusion cannot hide anything that could ever reach a commit, and
+# `check-gitignore.sh` check 3 refuses BY NAME the moment one appears under a
+# root named here. `check-secrets.sh` re-measures the same two preconditions at
+# the point of use (gitignored, no tracked file) and refuses by name, because an
+# exclusion that can hide a tracked file is a blind spot rather than a scope.
+#
+# STATED RATHER THAN IMPLIED: a secret planted INSIDE a declared root is OUT OF
+# SCOPE BY DESIGN. That content is gitignored gate output -- it never reaches a
+# commit, so it is not a repository leak, and the scan says so instead of
+# pretending to judge it. `check-secrets.sh --self-test` provokes all three
+# directions of that claim: the declared root is not walked, the exclusion is
+# LOAD-BEARING (with no declaration the same secret IS walked), and a genuine
+# credential on an ordinary path is still refused by name.
+#
+# Format: one repo-relative path per line, no trailing slash, no glob. Blank
+# lines and `#` comments are ignored. A path listed here that does not exist is
+# harmless: nothing is excluded that was not going to be walked anyway.
+.verify

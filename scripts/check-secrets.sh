@@ -70,6 +70,39 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # VERDICT VOCABULARY -- a finding names the DETECTOR that fired, so "refused"
 # is a refusal BY NAME: high-signal-shape / generic-assignment.
 #
+# THE GATE'S OWN OUTPUT IS NOT THE TREE (issue #1983). `make verify` records
+# every check's transcript in `.verify/.check-out/<name>.txt` and its verdict in
+# `.verify/attestation.json`. This scan walked the worktree with `find`, so a
+# SECOND run in the SAME venue read the FIRST run's own record -- and a record of
+# a finding quotes the detector verbatim, so the record became a new finding.
+# MEASURED in one lane worktree, back to back: run 1 `secrets: OK (3241 file(s)
+# scanned)`, run 2 `secrets: OK (3416 file(s) scanned)` with the extra 175 files
+# ALL the gate's own output. And a red is one prior finding away -- measured in
+# the same venue: control (record emptied) rc=0; run A (a real `sk-` credential
+# planted in a TRACKED file) rc=1 refused BY NAME; run B (that credential
+# REMOVED from the tree, only the record changed) rc=1 with its one finding being
+#   ./.verify/.check-out/secrets.txt:16:  FAIL ./zz-...-control.txt:1 ... (possible secret: high-signal-shape) (possible secret: high-signal-shape)
+# -- a clean tree, red anyway. So the gate was not idempotent, and a lane that
+# re-gated after a rebase (the DOCUMENTED practice: a squash lands on a newer
+# master, so a verdict reached at an old base is inadmissible) earned a red that
+# had nothing to do with its diff.
+#
+# The declared generated roots (scripts/gate-generated-roots.txt -- the ONE
+# declaration, read here and by check-gitignore.sh / check-yaml.py) are therefore
+# pruned from the walk, and the exclusion is MEASURED rather than assumed: a root
+# is pruned only while git ignores it AND it holds no tracked file, and both
+# halves are refused BY NAME below (check-gitignore check 3 asserts the second
+# half on the same declaration). An exclusion that could hide a tracked file is a
+# blind spot, not a scope.
+#
+# STATED, NOT IMPLIED: a secret planted INSIDE a declared generated root is OUT
+# OF SCOPE BY DESIGN. That content is gitignored gate output -- it never reaches
+# a commit, so it is not a repository leak, and this scan says so rather than
+# pretending to judge it. The self-test provokes all three directions: the
+# declared root is not walked, the exclusion is LOAD-BEARING (with no declaration
+# the same secret IS walked), and a genuine credential on an ordinary path is
+# still refused by name.
+#
 # Exit contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 #
 # Usage:
@@ -124,16 +157,73 @@ RE_GEN="(api[_-]?key|secret|password|token|access[_-]?key|client[_-]?secret)[\"'
 # provokes exactly that). Case-blindness comes from `grep -i` in is_placeholder.
 RE_PLACE='(example|sample|placeholder|dummy|fake|changeme|replace[-_ ]?me|xxxxx|your[-_ ]?key|<[^>]{1,60}>|redacted|not[-_ ]?a[-_ ]?real)'
 
-text_files() {
-  find . -type f \( \
+# --- the gate's own generated roots (issue #1983) ---------------------------
+# ONE declaration, read here as well as by `check-gitignore.sh` and
+# `check-yaml.py` -- never re-typed. Two copies could disagree, and the half that
+# would then be wrong is the half that believes an exclusion is safe.
+ROOTS_FILE="$root/scripts/gate-generated-roots.txt"
+
+# The declared roots: comments and blank lines dropped. rc 1 when the file is
+# unreadable -- never an empty list read as "declares nothing", which is the
+# defect this fixes wearing a different coat.
+generated_roots() { # [declaration-file] -> one repo-relative root per line
+  local f="${1:-${SECRETS_ROOTS_FILE:-$ROOTS_FILE}}"
+  [ -r "$f" ] || return 1
+  sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$f" |
+    grep -v '^$' || true
+}
+
+# The declared roots, VALIDATED before any walk. Both halves are measured
+# against git's own matcher instead of asserted, because an exclusion is exactly
+# the kind of fix that quietly becomes a blind spot: a root git does not ignore
+# could hide untracked work, and a root holding a tracked file could hide that
+# file. Either is refused BY NAME.
+declared_roots() { # -> validated roots on stdout; rc 1 + named refusal on stderr
+  local roots r f="${SECRETS_ROOTS_FILE:-$ROOTS_FILE}"
+  if [ "$(git -C "$root" rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
+    printf 'check-secrets: CANNOT-ASSESS -- %s is not a git work tree, so the declared generated roots cannot be measured (issue #1983)\n' "$root" >&2
+    return 1
+  fi
+  roots="$(generated_roots "$f")" || {
+    printf 'check-secrets: CANNOT-ASSESS -- the gate-generated-roots declaration is unreadable: %s\n' "$f" >&2
+    return 1
+  }
+  if [ -z "$roots" ]; then
+    printf 'check-secrets: CANNOT-ASSESS -- %s declares NO generated root; a tree walk with no exclusion list cannot be judged idempotent (issue #1983)\n' "$f" >&2
+    return 1
+  fi
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    if ! git check-ignore -q --no-index -- "$r/ao-generated-root-probe" 2>/dev/null; then
+      printf 'check-secrets: FAIL -- declared generated root %s is NOT gitignored; excluding it would be a blind spot, not a scope (issue #1983)\n' "$r" >&2
+      return 1
+    fi
+    if [ -n "$(git ls-files -- "$r" 2>/dev/null)" ]; then
+      printf 'check-secrets: FAIL -- declared generated root %s holds a TRACKED file; excluding it would hide it (issue #1983)\n' "$r" >&2
+      return 1
+    fi
+  done <<<"$roots"
+  printf '%s\n' "$roots"
+}
+
+# The judged set: the tree, MINUS the gate's own declared generated roots. The
+# prune list is READ, never spelled out here (issue #1983). `[base]` exists so
+# the self-test can drive a fixture root through the same code path.
+text_files() { # [base-dir, default '.']
+  local base="${1:-.}" prune=() r
+  while IFS= read -r r; do
+    prune+=( -not -path "$base/$r" -not -path "$base/$r/*" )
+  done < <(generated_roots)
+  find "$base" -type f \( \
     -name '*.md' -o -name '*.sh' -o -name '*.py' -o -name '*.go' -o \
     -name '*.yaml' -o -name '*.yml' -o -name '*.toml' -o -name '*.json' -o \
     -name '*.txt' -o -name '*.tsv' -o -name '*.csv' -o -name 'Makefile' -o \
     -name '.gitmessage' -o -name '.gitignore' -o -name '.gitmodules' -o \
     -name '.gitleaks.toml' -o -name '.cursorrules' \) \
-    -not -path './.git/*' \
-    -not -path './vendor/*' \
-    -not -path './.research/*' \
+    -not -path "$base/.git/*" \
+    -not -path "$base/vendor/*" \
+    -not -path "$base/.research/*" \
+    "${prune[@]}" \
     | LC_ALL=C sort
 }
 
@@ -204,6 +294,16 @@ scan_file() { # scan_file <file> [exemption-pattern]
 
 scan_tree() {
   echo "== secrets (mechanical scan) =="
+  # The declared generated roots are resolved AND validated before a single file
+  # is read: a walk that cannot say what it excludes cannot be judged idempotent
+  # (issue #1983). An unreadable or empty declaration is CANNOT-ASSESS, never a
+  # silent "exclude nothing" -- that silent behaviour IS the defect.
+  local roots
+  if ! roots="$(declared_roots)"; then
+    return 2
+  fi
+  printf '  scope: walk of %s pruning the declared generated root(s): %s\n' \
+    "$root" "$(printf '%s' "$roots" | tr '\n' ',')"
   while IFS= read -r f; do
     count=$((count + 1))
     scan_file "$f"
@@ -358,6 +458,80 @@ self_test() {
     st_bad "a clean file produced $scan_findings finding(s) -- a detector matches everything"
   fi
 
+  # (e) THE GATE'S OWN OUTPUT IS NOT THE TREE (issue #1983). All three directions
+  #     are provoked, because an exclusion is exactly the kind of fix that quietly
+  #     becomes a blind spot: the declared root is NOT walked, the exclusion is
+  #     LOAD-BEARING (with no declaration the same secret IS walked), and a
+  #     genuine credential on an ordinary path is still refused BY NAME.
+  local fx_repo="$d/repo"
+  mkdir -p "$fx_repo/.verify"
+  printf '%s\n' 'a clean file on an ordinary path' > "$fx_repo/tracked.txt"
+  printf '%s\n' "$fx_sk_p$fx_sk_body" > "$fx_repo/leak.txt"
+  printf '%s\n' "$fx_sk_p$fx_sk_body" > "$fx_repo/.verify/attestation.json"
+  printf '# a declaration that names no root (the mutant)\n' > "$d/roots-none.txt"
+
+  if st_has "$(generated_roots)" '.verify'; then
+    st_ok "the shipped declaration names .verify, the gate's own scratch root"
+  else
+    st_bad "the shipped declaration does not name .verify: $(generated_roots | tr '\n' ' ')"
+  fi
+
+  out="$(text_files "$fx_repo")"
+  if st_has "$out" 'tracked.txt' && st_has "$out" 'leak.txt' &&
+    ! st_has "$out" '.verify/'; then
+    st_ok "text_files prunes the declared generated root and still walks the tree"
+  else
+    st_bad "text_files did not honour the declaration: $(printf '%s' "$out" | tr '\n' ' ')"
+  fi
+
+  out="$(SECRETS_ROOTS_FILE="$d/roots-none.txt" text_files "$fx_repo")"
+  if st_has "$out" '.verify/attestation.json'; then
+    st_ok "MUTANT with no declared root the gate's OWN artifact IS walked: the exclusion is load-bearing"
+  else
+    st_bad "MUTANT the undeclared walk still skipped .verify/ -- the exclusion proves nothing"
+  fi
+
+  scan_file "$fx_repo/leak.txt" 2>"$d/e.err"
+  if [ "$scan_findings" -eq 1 ] && st_has "$(cat "$d/e.err")" 'high-signal-shape'; then
+    st_ok "a planted credential on an ordinary path is STILL refused BY NAME (the exclusion is not a blind spot)"
+  else
+    st_bad "a planted credential outside the generated root was not refused: $(cat "$d/e.err")"
+  fi
+
+  # (f) THE EXCLUSION'S PRECONDITION, MEASURED. A root may be pruned only while
+  #     git really ignores it AND it holds no tracked file. Both refusals are
+  #     driven against a real miniature repository, so neither is narration.
+  local fx_git="$d/gitrepo"
+  mkdir -p "$fx_git/.verify"
+  if git init -q "$fx_git" >/dev/null 2>&1; then
+    git -C "$fx_git" config user.email 'check-secrets-selftest@example.invalid'
+    git -C "$fx_git" config user.name 'check-secrets self-test'
+    printf '.verify/\n' > "$fx_git/.gitignore"
+    printf 'x\n' > "$fx_git/keep.txt"
+    printf 'x\n' > "$fx_git/.verify/inside.txt"
+    git -C "$fx_git" add .gitignore keep.txt >/dev/null 2>&1
+    git -C "$fx_git" add -f .verify/inside.txt >/dev/null 2>&1
+    git -C "$fx_git" commit -qm selftest >/dev/null 2>&1
+    printf '# c\n.verify\n' > "$d/roots-tracked.txt"
+    printf '# c\nkeep.txt\n' > "$d/roots-unignored.txt"
+    out="$(cd "$fx_git" && SECRETS_ROOTS_FILE="$d/roots-tracked.txt" declared_roots 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ] && st_has "$out" 'holds a TRACKED file'; then
+      st_ok "REFUSES a declared root holding a tracked file: the exclusion cannot hide one"
+    else
+      st_bad "the tracked-file refusal did not fire (rc=$rc): $out"
+    fi
+    out="$(cd "$fx_git" && SECRETS_ROOTS_FILE="$d/roots-unignored.txt" declared_roots 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ] && st_has "$out" 'NOT gitignored'; then
+      st_ok "REFUSES a declared root git does not ignore: the exclusion cannot be a blind spot"
+    else
+      st_bad "the not-gitignored refusal did not fire (rc=$rc): $out"
+    fi
+  else
+    st_bad "could not build the exclusion-precondition fixture (git init failed)"
+  fi
+
   printf 'check-secrets self-test: %s control(s) passed, %s failed\n' "$st_passed" "$st_failed"
   [ "$st_failed" -eq 0 ]
 }
@@ -388,5 +562,6 @@ if [ "$st_rc" -ne 0 ]; then
   exit "$st_rc"
 fi
 
-scan_tree || exit 1
-exit 0
+scan_rc=0
+scan_tree || scan_rc=$?
+exit "$scan_rc"

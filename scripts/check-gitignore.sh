@@ -111,7 +111,16 @@ runtime_roots=(.board .fleet .verify)
 
 # Roots whose entire content is generated, so a tracked file under one is
 # runtime state that already reached history.
-wholly_generated=(.verify)
+#
+# READ, never re-typed (issue #1983): the list lives in the ONE declaration at
+# `scripts/gate-generated-roots.txt`, because `check-secrets.sh` and
+# `check-yaml.py` prune the SAME roots from the tree they judge -- and check 3
+# below is what makes such an exclusion SAFE: a root may be excluded from a walk
+# only while it holds no tracked file. Two copies of the list could disagree, and
+# the copy that would then be wrong is the one that believes an exclusion is
+# safe. Populated below, once the repo root is known; empty here is a placeholder
+# that the fail-closed read replaces.
+wholly_generated=()
 
 # Named exceptions: NONE, deliberately (issue #1146).
 #
@@ -144,6 +153,28 @@ wholly_generated=(.verify)
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 script_root="$(find_repo_root)"
 root="$script_root"
+
+# --- the gate's own generated roots, from the ONE declaration (issue #1983) ---
+# Read from THIS script's repo rather than from `$root`, so an
+# `AO_GITIGNORE_ROOT` fixture still declares its roots in the repo under test.
+# Fail-closed: a missing or empty declaration is CANNOT-ASSESS, never "no root
+# is wholly generated", which would make check 3 vacuous in silence.
+generated_roots_file="$script_root/scripts/gate-generated-roots.txt"
+if [ ! -r "$generated_roots_file" ]; then
+  echo "check-gitignore: CANNOT-ASSESS — the generated-roots declaration is unreadable: $generated_roots_file" >&2
+  exit 2
+fi
+while IFS= read -r _gr_line; do
+  _gr_line="${_gr_line%%#*}"
+  _gr_line="${_gr_line#"${_gr_line%%[![:space:]]*}"}"
+  _gr_line="${_gr_line%"${_gr_line##*[![:space:]]}"}"
+  [ -n "$_gr_line" ] && wholly_generated+=("$_gr_line")
+done < "$generated_roots_file"
+if [ "${#wholly_generated[@]}" -eq 0 ]; then
+  echo "check-gitignore: CANNOT-ASSESS — $generated_roots_file declares no wholly generated root" >&2
+  exit 2
+fi
+
 overridden=0
 if [ -n "${AO_GITIGNORE_ROOT:-}" ]; then
   root="$AO_GITIGNORE_ROOT"
