@@ -66,3 +66,19 @@ pinned in portal/tests/test_settings_aggregator.py.
 Issue 1759's Done line was already met by the same settings aggregator: the
 gate skip-budget domain projects scripts/skip-budget.json rows via the
 standard schema, tests already pin it.
+
+EPIC #1934 (end-to-end compliance closure) closes out: its two real children
+are both fixed. #1936 (portal/config/feature-flags.yaml still gating
+org_chart/skill_studio/task_board off despite the registry's GR-5 reversal)
+was fixed by PR #1954 — `portal/config/feature-flags.yaml` now reads
+`default: on` for all three surfaces, matching
+`infra/feature-flags/registry.yaml`, with a new cross-check rule in
+`scripts/check-feature-flags.py` refusing future drift between the two
+files. #1937 (batched `pytest gateway governance` false-failing on
+basename-collision imports) was fixed by PR #1959 as a collision guard
+rather than a full clean-collection fix: `scripts/check-pytest-basename-collisions.sh`
+now reports `check-pytest-basename-collisions: OK — no new collisions
+beyond baseline`, so the pre-existing collision set is pinned and any new
+one fails the gate, while the sanctioned per-suite runner
+(`scripts/check-pytest-suites.sh`) remains the correct way to run these
+directories.
