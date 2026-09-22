@@ -28,6 +28,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`DISPATCH-LOOP.md`](DISPATCH-LOOP.md) | Internal Dispatch Loop — `fleet/brain.py` + `governance/dispatch/` |
 | [`ENTERPRISE-ROLLUP.md`](ENTERPRISE-ROLLUP.md) | Tenant hierarchy + org aggregate view — a projection over per-repo fleets, never a second source of truth (EPIC #144, issue #151). |
 | [`ENTERPRISE-WORKBOOK-GAP-ANALYSIS.md`](ENTERPRISE-WORKBOOK-GAP-ANALYSIS.md) | Paperclip enterprise-workbook four-pillar gap analysis — measured master mapping, C-suite org-chart → persona mapping, and the delta epic (EPIC #631, children #632–#644) (issue #614). |
+| [`EPIC-1254-CLOSURE.md`](EPIC-1254-CLOSURE.md) | EPIC #1254 closure — mechanical, not doctrinal |
 | [`EPIC-1268-CLOSURE.md`](EPIC-1268-CLOSURE.md) | EPIC #1268 closure — mechanical, not doctrinal, between runtimes |
 | [`ERP-MODULE-GAP-ANALYSIS.md`](ERP-MODULE-GAP-ANALYSIS.md) | Feature-by-feature gap of frappe/erpnext against our pillars — the indexer-fed ERP module plan (issue #612, EPIC #645). |
 | [`EXECUTION-PLAN.md`](EXECUTION-PLAN.md) | One-issue-one-lane parallel dispatch contract, phase/wave sequencing 0–8. |
