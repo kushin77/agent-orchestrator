@@ -170,6 +170,7 @@ SURFACE = (
     "scripts/verify.sh",
     "scripts/gate-lock.sh",
     "scripts/discover-checks.sh",
+    "scripts/lib/common.sh",
     "scripts/lib/skip-ratchet.py",
     "scripts/lib/validate-attestation.py",
     "governance/isolation/attestation.schema.json",
