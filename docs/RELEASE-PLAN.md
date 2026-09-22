@@ -57,7 +57,7 @@ fix). Concretely, against the surfaces in §2:
   architecture; bump MAJOR when one supersedes a prior contract").
 - **MINOR** — a new capability: a new path added to `identity/cpapi/openapi.yaml`
   without removing or changing an existing one, a new pillar subsystem or
-  `module.json` feature flag shipped flag-gated OFF by default (AO-GR-5).
+  `module.json` feature flag shipped enabled by default (AO-GR-6).
 - **PATCH** — a fix, a doc correction, or a gate hardening that does not
   change a defining artifact's observable contract (e.g. `check-cpapi-spec-drift.sh`
   catching a drift the router already had).
