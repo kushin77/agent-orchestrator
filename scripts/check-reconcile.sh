@@ -111,6 +111,7 @@ run_real_tree_step() {
   #      fixture with no `governance/` package of its own)
   local audited="$1" baseline="$2" quarantine="$3" code_root="${4:-$root}"
   python3 - "$audited" "$baseline" "$quarantine" "$code_root" <<'PYREALTREE'
+import os
 import sys
 
 audited, baseline_path, quarantine_path, code_root = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
@@ -121,6 +122,15 @@ sys.path.insert(0, audited)
 sys.path.insert(0, code_root)
 from governance.reconcile.real_tree_baseline import check_real_tree
 
+# #1620/#1879: which venue owns a real-tree DRIFT. Drift here is box-state —
+# every concurrent lane's worktrees and branches, not this checkout's diff — so
+# it swings with unrelated fleet activity and, per AGENTS.md rule 7, never
+# blocks a PR. The default (`lane`) venue still MEASURES it and reports it as a
+# NOTE, never a failure; the master-attestation venue enforces it for real.
+# CANNOT-ASSESS stays fatal in every venue: "the state could not be read" is
+# never a pass.
+venue = os.environ.get("AO_GATE_VENUE", "lane")
+
 verdict = check_real_tree(
     audited, baseline_path, quarantine_path=(quarantine_path or None)
 )
@@ -129,13 +139,20 @@ if not verdict.assessable:
     print("check-reconcile: CANNOT-ASSESS on the real tree", file=sys.stderr)
     raise SystemExit(2)
 if not verdict.ok:
+    drift = (
+        f"real tree drifted from {baseline_path} "
+        f"({len(verdict.new_violations)} new-and-old, {len(verdict.stale_entries)} stale, "
+        f"{len(verdict.stale_quarantine)} stale quarantine exemption(s))"
+    )
+    if venue == "attestation":
+        print(f"check-reconcile: NOT-OK — {drift}", file=sys.stderr)
+        raise SystemExit(1)
     print(
-        f"check-reconcile: FAIL — real tree drifted from {baseline_path} "
-        f"({len(verdict.new_violations)} new-and-old, {len(verdict.stale_entries)} stale, not fatal; "
-        f"{len(verdict.stale_quarantine)} stale quarantine exemption(s))",
+        f"check-reconcile: NOTE — {drift} "
+        f"(advisory in lane venue, #1620/#1879; blocking in AO_GATE_VENUE=attestation)",
         file=sys.stderr,
     )
-    raise SystemExit(1)
+    raise SystemExit(0)
 if verdict.stale_entries:
     print(
         f"check-reconcile: {len(verdict.stale_entries)} stale baseline entr(y/ies) — "
@@ -153,7 +170,10 @@ PYREALTREE
 # arguments, so this branch is never the gate path). This mode exists because a
 # check that can only be provoked from inside itself is hard to believe: a driver
 # outside the repository builds its own scratch tree, baseline and quarantine,
-# runs THIS script, and asserts the exit code and the refusal text.
+# runs THIS script, and asserts the exit code and the refusal text. A driver that
+# wants to assert the DRIFT refusal sets AO_GATE_VENUE=attestation (#1879): drift
+# is a box-state signal the lane venue reports as a NOTE and the attestation
+# venue refuses by name.
 if [ "${1:-}" = "--real-tree-only" ]; then
   real_tree_only_root="${2:-}"
   real_tree_only_baseline="${3:-}"
@@ -652,8 +672,12 @@ fi
 # with one deliberate difference: a STALE entry here (a baselined worktree or
 # branch the audit no longer reports unmatched — it was cleaned up, the
 # DESIRED outcome) is reported and counted but does NOT fail the gate, because
-# disk artifacts are meant to disappear (a landed commit never does). Only a
-# NEW unbaselined artifact older than the age-grace window fails, named.
+# disk artifacts are meant to disappear (a landed commit never does). A NEW
+# unbaselined artifact older than the age-grace window is named as drift — and
+# per AGENTS.md rule 7 this whole step is box-state, so the DRIFT is a NOTE in
+# the default lane venue (still measured, never fatal to a PR) and a NOT-OK only
+# in AO_GATE_VENUE=attestation (#1620/#1879). The §6b provocation below, by
+# contrast, is code-shape and blocks in EVERY venue.
 #
 # Two further sources sit under this step (#1291):
 #
