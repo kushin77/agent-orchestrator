@@ -69,6 +69,32 @@ def test_normalize_strips_volatile_fields():
     assert "<repo>" in normalized
 
 
+def test_normalize_collapses_the_live_orphan_fingerprint():
+    """Reconcile's live session fingerprint is not a persona decision.
+
+    ``reconcile watch --once`` reads the MAIN checkout's shared ``.fleet``
+    (``orphans.fleet_root``, #1436), not this harness's isolated snapshot, so it
+    names LIVE sessions by their own fingerprint. Two dispatches of the same role
+    must normalize to the same text even when that live set differs.
+    """
+    line_a = (
+        "finding: would-resolve  reconcile:suspect:0c4c7806e9d5 — the session "
+        "0c4c7806e9d5 no longer beats; a pass with --apply closes #1952 and "
+        "retires the fingerprint"
+    )
+    line_b = (
+        "finding: would-resolve  reconcile:suspect:adb1892verify — the session "
+        "adb1892verify no longer beats; a pass with --apply closes #1952 and "
+        "retires the fingerprint"
+    )
+    assert "0c4c7806e9d5" not in parity.normalize(line_a)
+    assert "adb1892verify" not in parity.normalize(line_b)
+    assert parity.normalize(line_a) == parity.normalize(line_b)
+    # Non-vacuity: two sessions closing DIFFERENT issues stay distinguished, so a
+    # decision-level difference cannot hide behind the collapsed fingerprint.
+    assert parity.normalize(line_b) != parity.normalize(line_b.replace("#1952", "#1888"))
+
+
 def test_manifest_is_empty_true_for_no_changes():
     manifest = {"fleet": {"added": [], "removed": [], "changed": []}, "board": {"added": [], "removed": [], "changed": []}}
     assert parity.manifest_is_empty(manifest)
@@ -94,7 +120,7 @@ def test_check_role_table_flags_drift():
 # ---------------------------------------------------------------------------
 
 
-def _run_with_roles(monkeypatch, tmp_path, roles, evidence_name="evidence.json"):
+def _run_with_roles(monkeypatch, tmp_path, roles, evidence_name="evidence.json", timeout=30):
     roles = tuple(roles)
     monkeypatch.setattr(parity.dev_run, "ROLES", roles)
     monkeypatch.setattr(parity, "load_markers", lambda: [role.marker for role in roles])
@@ -103,7 +129,7 @@ def _run_with_roles(monkeypatch, tmp_path, roles, evidence_name="evidence.json")
     (tmp_path / "live-fleet").mkdir()
     (tmp_path / "live-board").mkdir()
     evidence_path = tmp_path / evidence_name
-    rc = parity.run(ticks=1, timeout=30, evidence_path=evidence_path)
+    rc = parity.run(ticks=1, timeout=timeout, evidence_path=evidence_path)
     document = json.loads(evidence_path.read_text(encoding="utf-8"))
     return rc, document
 
@@ -233,8 +259,15 @@ def test_real_roles_dry_run_agrees(monkeypatch, tmp_path, module_name):
     """One light real-dispatch check: the actual prune/reconcile dry-run forms must
     produce IDENTICAL normalized decisions across personas on an isolated, empty
     snapshot — asserted, not merely "some rc came back" (a test that cannot fail
-    is the thing this repo's gates refuse by name). Bounded (single tick, small
-    timeout); this is a smoke check, not a substitute for `make fleet-parity`.
+    is the thing this repo's gates refuse by name). Bounded (single tick); this
+    is a smoke check, not a substitute for `make fleet-parity`.
+
+    The bound is 120s, not the 30s the fake-role harnesses use: the real
+    `reconcile watch --once` dispatch MEASURES ~29.5s on an idle box (29.32s and
+    29.62s, two runs), so a 30s bound left ~2% headroom and tipped one persona
+    into a spurious `TIMEOUT` under any parallel gate load — a red whose diff was
+    a BOUND, not a divergence. 120s matches `infra/fleet/parity.py`'s own
+    `--timeout` default and still bounds the smoke check.
     """
     role_by_module = {
         "fleet.prune": parity.dev_run.ROLES[1],
@@ -245,7 +278,9 @@ def test_real_roles_dry_run_agrees(monkeypatch, tmp_path, module_name):
         importlib.import_module(module_name)
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"{module_name} could not be imported in this environment: {exc}")
-    rc, document = _run_with_roles(monkeypatch, tmp_path, [role], evidence_name=f"{role.name}.json")
+    rc, document = _run_with_roles(
+        monkeypatch, tmp_path, [role], evidence_name=f"{role.name}.json", timeout=120
+    )
     assert document["ticks"] == 1
     assert document["diffs"] == [], "local and container personas must agree on the real dry-run decision"
     assert document["idempotency"] == [], "the real dry-run role must be a no-op on its lost-lock re-dispatch"
