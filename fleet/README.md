@@ -590,6 +590,50 @@ and no work done at all.** The detection was right (AO-GR-25); the remedy was an
 action that could not change what was compared, repeated without bound —
 AO-GR-21's own lesson, applied to the watchdog itself.
 
+### The bring-forward is scheduled, and the pairing is asserted (issue #1795)
+
+The `checkout-behind` remedy above is only a fix if something RUNS it. Measured
+2026-09-21: `.fleet/watchdog/escalations/` held 12 artifacts = **6 `checkout-behind`
+incidents in 5 days**, every one ending `phase: "parked"` (`attempts: 3`,
+`respawns: [2]`), and `crontab -l | grep -c bootstrap` was `0` — so the park was
+terminal until a human noticed. Five of the six occurred AFTER #780 was measured,
+which is the point: shipping the verb did not make it run.
+
+The bring-forward is therefore DECLARED, on the rung that owns the shared checkout,
+in the one place the crontab is rendered from (`config/fleet-jobs.json` — the manifest
+`fleet/cron.py` is the single writer of):
+
+```json
+"bring_forward": {
+  "command": "/usr/bin/python3 fleet/watchdog.py bootstrap --no-reexec",
+  "verb": "bootstrap",
+  "reached_from": "run"
+}
+```
+
+`reached_from` is `run` because the rung's scheduled command is `watchdog.py run`, and
+`run` already performs the move: its own preflight (`bootstrap_preflight` →
+`bootstrap_checkout`, #780) fetches and fast-forwards BEFORE the pass, then re-execs
+onto the code that arrived — bounded to one re-exec per invocation (AO-GR-21). So the
+pairing is a property of the scheduled line, not of a second one. A separate
+`ao-fleet-bootstrap` crontab line is deliberately NOT declared: `fleet/cron.py` owns
+the marker set (`MARKERS`), so a fifth rung must be declared in the module, in the
+image inventory (`infra/fleet/inventory.yaml` — `schedule.lines` plus its marker list)
+and in the dev-run role table (`infra/fleet/dev_run.py` — `ROLES`) as well, and those
+are other lanes' files (`docs/FLEET-CRON-PARITY.md`, Scope note). A compound `command`
+is not an alternative either: `fleet/cron.py` prefixes `flock` to the whole command
+string, so `A ; B` would leave `B` — the pass itself — outside the singleton lock.
+
+`bash scripts/check-fleet-bootstrap-scheduled.sh` is what keeps the pairing: it asserts
+the declaration, RUNS the declared command's own argv (parsed by the tool's own parser)
+against a real repository left one commit behind and requires the move, drives the
+declared `reached_from` verb's preflight against another and requires the same move, and
+then falsifies all of it — the declaration's `bring_forward` dropped, the rung disabled,
+the rung dropped, the declared verb repointed at one the tool rejects, the preflight
+neutered, and `main` no longer routing `run` to it — each refused by name with the
+mutation's landing proved by sha256. `scripts/check-checkout-bootstrap.sh` (#780) proves
+the mechanism; this gate proves the mechanism is REACHED from what the box runs.
+
 ### The remedy is bounded (AO-GR-21, issue #773)
 
 Every acting path is recorded per rung under `.fleet/watchdog/` and bounded:

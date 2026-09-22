@@ -12,7 +12,13 @@
       "user": "",
       "log": "watchdog.log",
       "singleton": true,
-      "enabled": true
+      "enabled": true,
+      "bring_forward": {
+        "command": "/usr/bin/python3 fleet/watchdog.py bootstrap --no-reexec",
+        "verb": "bootstrap",
+        "reached_from": "run",
+        "why": "issue #1795. A `checkout-behind` park is terminal until the checkout is brought forward, and the bring-forward is the `bootstrap` verb (#780). It is declared HERE, on the rung that owns the shared checkout, because this rung already reaches it: `run`'s own preflight (`bootstrap_preflight` -> `bootstrap_checkout`) performs the same move, so the pairing is a property of the scheduled line rather than of a second one. A fifth crontab line is deliberately NOT declared: `fleet/cron.py` owns MARKERS, so a new rung must be declared in the module, in the image inventory (infra/fleet/inventory.yaml, `schedule.lines` + its marker list) and in the dev-run role table (infra/fleet/dev_run.py ROLES) as well -- three files outside this lane (docs/FLEET-CRON-PARITY.md, Scope note). scripts/check-fleet-bootstrap-scheduled.sh asserts this declaration and MEASURES that the rung's verb reaches the bring-forward, so the pairing cannot regress to `remedy exists, nothing reaches it` by editing either side alone."
+      }
     },
     {
       "name": "prune",
