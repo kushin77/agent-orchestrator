@@ -344,30 +344,87 @@ class WorkLocationUnreadable(RuntimeError):
     """
 
 
-def gate_in_flight(worktree: str) -> bool | None:
-    """Whether a composite gate holds ``worktree`` right now (#1897).
+def _verify_pid_alive(worktree: str) -> bool:
+    """Direct ``/proc`` scan for a live ``verify.sh``/``gatelock`` process rooted at
+    ``worktree`` (#2001).
 
-    The default implementation of ``sweep``'s ``gate_in_flight`` seam. The gate
-    already records a HELD permit per worktree (``scripts/gate-lock.sh``), so this
-    is a *read* of that record — ``fleet/gatelock.probe`` — not a re-derivation of
-    "is a gate running".
-
-    Tri-state on purpose: ``True`` (a permit is held), ``False`` (free), ``None``
-    (the permit store could not be read). The last is CANNOT-ASSESS: "no permit is
-    held" and "I could not look" must not share a verdict, so a stale-looking lane
-    is never reclaimed on state this worker could not read.
+    ``gate_in_flight``'s store read (below) is the precise signal, but it depends
+    on the acquirer and this worker resolving the *same* permit store — normally
+    true, but not provable from here (``AO_GATE_LOCK_ROOT``/``XDG_RUNTIME_DIR`` are
+    per-process environment, and a daemon's env is not guaranteed to match an
+    agent shell's). This is the redundant, environment-independent half of "make
+    the bound exceed what it guards": walk ``/proc``, and for every live pid whose
+    cmdline names ``verify.sh`` or ``fleet/gatelock.py`` and whose cwd resolves
+    under ``worktree``, the lane has a live owner — no store lookup involved.
+    Best-effort by construction (``/proc`` may be absent, e.g. non-Linux or a
+    sandboxed test): any read failure is treated as "no evidence found", not as
+    "checked and clear", so it can only ever ADD an exemption, never remove one
+    the store-based check already granted.
     """
     if not worktree:
         return False
     try:
+        root = str(Path(worktree).expanduser().resolve())
+    except OSError:
+        return False
+    proc = Path("/proc")
+    if not proc.is_dir():
+        return False
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            cmdline = entry.joinpath("cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+        except OSError:
+            continue
+        if "verify.sh" not in cmdline and "gatelock.py" not in cmdline:
+            continue
+        try:
+            cwd = str(entry.joinpath("cwd").resolve())
+        except OSError:
+            continue
+        if cwd == root or cwd.startswith(root + "/"):
+            return True
+    return False
+
+
+def gate_in_flight(worktree: str) -> bool | None:
+    """Whether a composite gate holds ``worktree`` right now (#1897, #2001).
+
+    The default implementation of ``sweep``'s ``gate_in_flight`` seam. The gate
+    already records a HELD permit per worktree (``scripts/gate-lock.sh``), so this
+    is a *read* of that record — ``fleet/gatelock.probe`` — not a re-derivation of
+    "is a gate running". A direct ``/proc`` scan (``_verify_pid_alive``) backs it
+    up: measured twice (#2001, on issue #1919's lane) a live ``verify.sh`` was
+    reaped anyway with the store read reporting free, so the live-pid check is
+    consulted whenever the store does not already say HELD, and can only turn a
+    ``False``/``None`` into ``True`` — it never contradicts a store read that
+    already found the permit held.
+
+    Tri-state on purpose: ``True`` (a permit is held, or a live verify/gatelock
+    process was found), ``False`` (free), ``None`` (the permit store could not be
+    read AND no live process was found either). The last is CANNOT-ASSESS: "no
+    permit is held" and "I could not look" must not share a verdict, so a
+    stale-looking lane is never reclaimed on state this worker could not read.
+    """
+    if not worktree:
+        return False
+    store_value: bool | None = False
+    try:
         from fleet import gatelock  # noqa: PLC0415 - the seam's own dependency
     except Exception:  # noqa: BLE001 - an unimportable store is unreadable, never "free"
-        return None
-    try:
-        state = gatelock.probe(gatelock.worktree_lock_path(worktree))
-    except Exception:  # noqa: BLE001 - StoreUnusable and friends: unreadable, never "free"
-        return None
-    return bool(state.held)
+        store_value = None
+    else:
+        try:
+            state = gatelock.probe(gatelock.worktree_lock_path(worktree))
+            store_value = bool(state.held)
+        except Exception:  # noqa: BLE001 - StoreUnusable and friends: unreadable, never "free"
+            store_value = None
+    if store_value:
+        return True
+    if _verify_pid_alive(worktree):
+        return True
+    return store_value
 
 
 def _uncommitted_work(ops: ReconcileOps, worktree: str) -> list[str]:
@@ -571,7 +628,8 @@ def sweep(
     ``gate_in_flight`` is the gate seam (#1897): a callable answering, per
     worktree, whether a composite gate holds a permit for it right now. It is
     threaded into ``heartbeat.judge`` so a **held gate outranks a stale beat** — a
-    lane inside its own ~13-minute ``make verify`` is a live lane, not an orphan —
+    lane inside its own 20-35 minute composite ``make verify`` (#2001) is a live
+    lane, not an orphan —
     and ``None`` from it (the permit store could not be read) is CANNOT-ASSESS and
     refuses the reclaim. Omitted, no gating information is consulted and the TTL
     arm applies exactly as it did before the seam existed.

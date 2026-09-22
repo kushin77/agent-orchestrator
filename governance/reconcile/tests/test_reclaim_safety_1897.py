@@ -351,6 +351,51 @@ def test_the_gate_seam_defaults_to_no_information(scratch: Path, tmp_path: Path)
     report = sweep(scratch, ttl_minutes=15, at=NOW, apply=True, ops=RepoOps(scratch))
 
     assert report.actions[0].outcome == RECLAIMED
+
+
+def test_a_live_verify_process_protects_a_lane_even_when_the_lock_store_misses_it(
+    scratch: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """#2001: measured twice — a live ``verify.sh`` was reaped anyway because the
+    reconcile daemon's permit-store read came back free (a store the acquiring
+    process and the reconciler do not provably share, e.g. differing
+    ``AO_GATE_LOCK_ROOT``/``XDG_RUNTIME_DIR``). No gate permit is held here — the
+    store read is genuinely free — but a real process is running inside the lane
+    with ``verify.sh`` on its cmdline. The direct ``/proc`` scan must catch that
+    and outrank the stale beat regardless of what the store says.
+    """
+    store = tmp_path / "gates"
+    monkeypatch.setenv("AO_GATE_LOCK_ROOT", str(store))
+    path = lane(scratch, tmp_path, "live-verify-lane")
+    beat(scratch, "live-verify-1", worktree=str(path), branch="live-verify-lane", issue=11)
+
+    script = path / "verify.sh"
+    script.write_text("#!/usr/bin/env bash\nsleep 30\n", encoding="utf-8")
+    script.chmod(0o755)
+    proc = subprocess.Popen(["bash", "verify.sh"], cwd=str(path))
+    try:
+        assert gate_in_flight(str(path)) is True, "no lock is held; the live pid must still be found"
+        report = sweep(
+            scratch, ttl_minutes=15, at=NOW, apply=True,
+            ops=RepoOps(scratch), gate_in_flight=gate_in_flight,
+        )
+        action = report.actions[0]
+        assert action.outcome == REPORTED, action.steps
+        assert path.exists(), "a lane running verify.sh must not be reclaimed"
+        assert read("live-verify-1", scratch) is not None
+    finally:
+        proc.terminate()
+        proc.wait(timeout=5)
+    script.unlink()  # else the reaper correctly shelves an uncommitted verify.sh
+
+    # Negative control: process is gone, no lock is held — the reaper still works.
+    assert gate_in_flight(str(path)) is False
+    released = sweep(
+        scratch, ttl_minutes=15, at=NOW, apply=True,
+        ops=RepoOps(scratch), gate_in_flight=gate_in_flight,
+    )
+    assert released.actions[0].outcome == RECLAIMED, released.actions[0].steps
+    assert not path.exists()
     assert not path.exists()
 
 

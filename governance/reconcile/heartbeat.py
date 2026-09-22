@@ -331,9 +331,10 @@ def judge(
     * otherwise the session is **live**.
 
     ``gate_in_flight`` is the seam that lets a **held gate permit outrank a stale
-    beat** (issue #1897). ``scripts/verify.sh`` runs for ~13 minutes against a
-    15-minute TTL, so a lane inside its own gate looks orphaned while it is in
-    fact being worked in — and the gate lock already records exactly that state.
+    beat** (issue #1897). A composite ``scripts/verify.sh verify`` run measures
+    20-35 minutes (#2001) against a 15-minute TTL, so a lane inside its own gate
+    looks orphaned while it is in fact being worked in — and the gate lock
+    already records exactly that state.
     Like a refusal and unlike a boolean it is tri-state:
 
     * ``True`` — a permit is HELD for this session's worktree, so the lane is
