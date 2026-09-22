@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
 """The capacity gate — max-agents as the DEFAULT fan-out, bounded by three real
+
+---knowledge---
+module_id: fleet.capacity
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [CapacityConfigError, Bound, Lane, declared_files, Collision, DisjointBound, disjoint_bound, Resources, (+10 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 limits (epic #707, lane F3 / issue #718).
 
 THE CONTRACT

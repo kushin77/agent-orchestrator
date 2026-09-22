@@ -5,6 +5,23 @@
 # It is a loop, not a prompt: the operator's trigger is `channel.py order`, and
 # nothing here needs a human to type into it. Use `fleet/control.py` for the
 # human override (refresh/update/poke/halt/debug/watch).
+#
+# ---knowledge---
+# module_id: fleet.brain
+# system: fleet
+# app: fleet
+# solution_class: pattern
+# patterns: []
+# derives_from: null
+# owner_sme: unassigned
+# tier: L1
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: []
+# do_not_duplicate: null
+# ---knowledge---
+#
 set -u
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

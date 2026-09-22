@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Capability routing — the fleet's single source of dispatch vocabulary (ADR-0012).
 
+---knowledge---
+module_id: fleet.routing
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [RoutingRefusal, RoutingPolicy, load, policy, reset_cache, capability_for, agent_for, tier_for, (+4 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Why this module exists
 ----------------------
 ``vendor/CMR/catalog/modules/hermes-agents`` describes itself as *"agent routing,

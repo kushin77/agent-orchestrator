@@ -1,4 +1,20 @@
 """train.py — the merge train: one fold, one verify, attribution by check
+
+---knowledge---
+module_id: fleet.runner.train
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [Candidate, Skip, Fold, Attribution, TrainVerify, closing_lines, declared_class, highest_class, (+22 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
 (issue #1411, parent #1295).
 
 THE DEFECT THIS EXISTS FOR

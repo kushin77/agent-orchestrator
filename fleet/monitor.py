@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Fleet monitor — the cron-owned, change-only progress watcher (the third rung).
 
+---knowledge---
+module_id: fleet.monitor
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [now_iso, write_heartbeat, sister_state, brain_state, held_claims, wave_dispatch, git_head, snapshot, (+16 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY it exists: the fleet's brain/sister loops are long-running, and their
 observable progress (which rungs are up, which claims are held, what the wave
 dispatch list is, what code is at HEAD) used to be watched only by an ad-hoc,

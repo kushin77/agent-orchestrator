@@ -1,5 +1,21 @@
 """Single-writer lease: one abstraction, two backends, one flag decides.
 
+---knowledge---
+module_id: fleet.lease
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [LeaseError, Lease, fcntl_try_lock, fcntl_flock_nb, FcntlLease, lock_key, keydb_config, KeyDBLease, (+3 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Issue #713 (fleet-cron D5). Two fleet-cron nodes running active-active must
 never both run the same job at the same time. `shared-services/docker/cronrunner`
 (peer clone, read-only, `docker/cronrunner/README.md` lines 127-141) already

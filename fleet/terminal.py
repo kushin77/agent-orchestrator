@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Dumb-terminal loop (dispatcher side) — never idles, always watches, escalates.
 
+---knowledge---
+module_id: fleet.terminal
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [load_standing_body, FinOpsRefusal, finops_policy, resolve_dispatch, finops_line, extract_json, build_envelope, build_prompt, (+80 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 This is the loop the dispatcher runs so the fleet never stops: it watches the
 inbox, runs a code-native executor per directive via the agent CLI, reports
 the result, and escalates any failure to the director. An empty inbox is just

@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Steering channel CLI — the transport between the director and the fleet.
 
+---knowledge---
+module_id: fleet.channel
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [board_snapshot, model_tiers, runtime_ids, reset_runtime_allowlist_cache, role_base, current_role, is_retired_role, is_current_role, (+51 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Operating model (M26, issue #160): the **director** (advisor session) issues
 directives; the **dispatcher** session (a dumb terminal on DeepSeek v4.1 Flash, no
 thinking) executes them by spawning epic-focused executors; executors report

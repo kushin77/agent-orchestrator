@@ -1,5 +1,21 @@
 """Gate admission control: one composite gate per worktree, bounded box-wide.
 
+---knowledge---
+module_id: fleet.gatelock
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [GateLockError, StoreUnusable, Refused, Parked, store_root, max_concurrent, ttl_seconds, worktree_key, (+22 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Principal-measured (2026-09-14): **49 concurrent ``make verify`` runs, 43 of them
 stacked in two worktrees, ~16 hours of duplicated work.** Nothing bounded them —
 every dispatcher could start a gate, and every gate ran to completion.

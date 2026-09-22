@@ -1,5 +1,21 @@
 """fleet.runner — the shared-services PR runner (issue #1343, parent #1295).
 
+---knowledge---
+module_id: fleet.runner.__init__
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Verifies every open PR head that lacks evidence, publishes `ao/gate-of-record`
 for it, and merges the greens through the guarded entrypoint
 (`scripts/merge-pr.sh`) once the merged tree (master + PR) is proven green.

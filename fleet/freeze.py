@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Cutover freeze/drain/thaw — the D7 half of the fleet-cron migration (issue #715).
 
+---knowledge---
+module_id: fleet.freeze
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [live_rungs, is_drained, is_frozen, parity_evidence_present, refuse_if_frozen, cmd_status, cmd_drain, cmd_freeze, (+3 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The owner's cutover policy (issue #706, D7): once the remote container pair
 holds lease capability (D5, issue #713) AND dual-run parity evidence (D6,
 issue #714) is green, any **locally running** job is allowed to finish, **no

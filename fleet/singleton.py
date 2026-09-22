@@ -1,5 +1,21 @@
 """Singleton guard: one loop per rung, or the fleet double-dispatches.
 
+---knowledge---
+module_id: fleet.singleton
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [lock_path, holder_pid, acquire, guard]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Observed live (2026-09-13): two dispatcher loops were running at once — `cmd_watch`
 returns the oldest pending directive without removing it, so both loops picked up
 the same order, both tried to claim the same issue, and the channel logged every

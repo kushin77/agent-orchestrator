@@ -1,5 +1,21 @@
 """verify.py — the PR runner's verify transport (issue #1343).
 
+---knowledge---
+module_id: fleet.runner.verify
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [Result, real_command, now_iso, prune_evidence_logs, parse_verify_evidence, retain_verify_evidence, Ledger, fetch_lock, (+13 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 One head, one verify: fetch under a lock with explicit refspecs, materialise a
 DETACHED scratch worktree and HOLD it for the whole run, run
 `bash scripts/verify.sh verify` inside it, publish `ao/gate-of-record` through
