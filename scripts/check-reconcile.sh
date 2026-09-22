@@ -431,6 +431,226 @@ else
   fail=$((fail + 1))
 fi
 
+# --- 3b. the reclaim reads before it destroys (issue #1897) -----------------
+#
+# Three defects, provoked against a fresh scratch repository with a real bare
+# origin. Every arm asks the same question — not "did the sweep run" but "did it
+# LOOK before it removed anything":
+#
+#   * a lane sitting at `origin/master` with an uncommitted edit is SHELVED, and
+#     the edit is still on disk afterwards (the negative control — the same lane
+#     clean — is still reclaimed, so the fix cannot make reclaim impossible);
+#   * a session whose worktree exists but is not a git repository is NAMED
+#     (cannot-assess, beat kept) and the pass still reconciles the other session;
+#   * a HELD gate permit outranks a stale beat (reported, not reclaimed), an
+#     unreadable permit store refuses rather than reclaims, and a gone worktree
+#     whose branch survives on the remote unmerged is PARKED, never reclaimed.
+#
+# The label arms run as a dry run, exactly as §6's parked proof does, because a
+# scratch repository has no `governance/` of its own for the bookkeeping CLIs to
+# reach; the destructive arms run applied and are judged by the disk.
+if python3 - "$root" "$work" <<'PYSAFETY'
+"""Live proofs: the reclaim reads before it destroys (issue #1897)."""
+import fcntl
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+work = Path(sys.argv[2]) / "safety"
+work.mkdir(parents=True, exist_ok=True)
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from governance.reconcile.heartbeat import read, stamp
+from governance.reconcile.sweep import (
+    PARKED,
+    RECLAIMED,
+    REPORTED,
+    SHELVED_OUTCOME,
+    RepoOps,
+    gate_in_flight,
+    sweep,
+)
+
+problems = []
+
+
+def check(label, condition, detail=""):
+    if condition:
+        print(f"  OK    {label}")
+    else:
+        problems.append(label)
+        print(f"  FAIL  {label}{(' — ' + detail) if detail else ''}", file=sys.stderr)
+
+
+def git(cwd, *args):
+    result = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)}: {result.stderr.strip()[-200:]}")
+    return result.stdout.strip()
+
+
+# A fresh repository of its own: §3's scratch repo above has already had
+# worktrees removed and sessions stamped, so its state is not a clean baseline.
+origin = work / "origin.git"
+repo = work / "repo"
+shutil.rmtree(repo, ignore_errors=True)
+shutil.rmtree(origin, ignore_errors=True)
+repo.mkdir(parents=True)
+subprocess.run(["git", "init", "--bare", "-q", str(origin)], check=True)
+subprocess.run(["git", "init", "-q", "-b", "master", str(repo)], check=True)
+git(repo, "config", "user.name", "Gate Human")
+git(repo, "config", "user.email", "gate-human@example.com")
+(repo / "seed.txt").write_text("seed\n", encoding="utf-8")
+git(repo, "add", "seed.txt")
+git(repo, "commit", "-q", "-m", "seed")
+git(repo, "remote", "add", "origin", str(origin))
+git(repo, "push", "-q", "-u", "origin", "master")
+git(repo, "fetch", "-q", "origin")
+
+ops = RepoOps(repo)
+OLD = time.time() - 20 * 60  # past a 15-minute TTL
+
+
+def add_lane(name):
+    path = work / f"lane-{name}"
+    subprocess.run(
+        ["git", "-C", str(repo), "worktree", "add", "-q", "-b", name, str(path), "origin/master"],
+        check=True,
+    )
+    return path
+
+
+def beat(session_id, path, name, issue, *, at=OLD):
+    stamp(
+        session_id, issue=issue, agent="gate", root=repo, lane=session_id,
+        worktree=str(path), branch=name, pid=None, at=at,
+    )
+
+
+# --- Defect 1: uncommitted work survives, however HEAD reads ----------------
+dirty = add_lane("dirty-lane")
+(dirty / "wip.txt").write_text("uncommitted, nowhere else\n", encoding="utf-8")
+beat("dirty-1", dirty, "dirty-lane", 1897)
+
+dry = sweep(repo, ttl_minutes=15, apply=False, ops=ops)
+check("a lane at origin/master holding uncommitted work decides SHELVED",
+      dry.actions[0].outcome == SHELVED_OUTCOME, str(dry.actions[0]))
+
+applied = sweep(repo, ttl_minutes=15, apply=True, ops=ops)
+check("a lane at origin/master holding uncommitted work is SHELVED, not reclaimed",
+      applied.actions[0].outcome == SHELVED_OUTCOME, str(applied.actions[0].steps))
+check("the worktree holding the only copy of the work still exists", dirty.exists())
+check("the uncommitted edit is still there", (dirty / "wip.txt").exists())
+check("a shelved lane keeps its worktree in the worktree list",
+      "dirty-lane" in git(repo, "worktree", "list"))
+
+clean = add_lane("clean-lane")
+beat("clean-1", clean, "clean-lane", 900)
+clean_dry = sweep(repo, ttl_minutes=15, apply=False, ops=ops)
+clean_action = next(a for a in clean_dry.actions if a.session_id == "clean-1")
+check("the negative control: a CLEAN lane at origin/master is still reclaimed",
+      clean_action.outcome == RECLAIMED, str(clean_action))
+clean_applied = sweep(repo, ttl_minutes=15, apply=True, ops=ops)
+check("…and its worktree is actually removed by an applied pass", not clean.exists())
+
+# --- Defect 2: an unreadable worktree is named, the pass continues ----------
+broken = work / "lane-broken"
+shutil.rmtree(broken, ignore_errors=True)
+(broken / "registry").mkdir(parents=True)
+(broken / "registry" / "extracted.txt").write_text("scratch extraction\n", encoding="utf-8")
+other = add_lane("other-lane")
+beat("broken-1", broken, "broken-lane", 2)
+beat("other-1", other, "other-lane", 3)
+
+wedge = sweep(repo, ttl_minutes=15, apply=True, ops=ops)
+seats = {a.session_id: a for a in wedge.actions}
+check("the pass completes over a worktree that is not a git repository",
+      "broken-1" in seats and "other-1" in seats, str(sorted(seats)))
+if "broken-1" in seats:
+    named = seats["broken-1"]
+    check("the unreadable lane is named cannot-assess", "cannot-assess" in named.reason, named.reason)
+    check("the unreadable lane's venue is named", str(broken) in named.reason, named.reason)
+    check("the unreadable lane's beat is kept", read("broken-1", repo) is not None)
+check("nothing about the unreadable lane was touched", broken.exists())
+check("the other lane was reconciled in the same pass", not other.exists())
+
+# --- Defect 3: a held gate outranks a stale beat ----------------------------
+os.environ["AO_GATE_LOCK_ROOT"] = str(work / "gates")
+gated = add_lane("gated-lane")
+beat("gated-1", gated, "gated-lane", 4)
+permit = gate_in_flight(str(gated))
+check("with no gate running the seam reports no permit", permit is False, str(permit))
+
+lock = gate_in_flight.__module__ and None
+from fleet import gatelock  # noqa: E402
+
+lock_path = gatelock.worktree_lock_path(str(gated))
+lock_path.parent.mkdir(parents=True, exist_ok=True)
+fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o644)
+fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+try:
+    check("a HELD permit is read as a gate in flight", gate_in_flight(str(gated)) is True)
+    held = sweep(repo, ttl_minutes=15, apply=True, ops=ops, gate_in_flight=gate_in_flight)
+    held_action = next(a for a in held.actions if a.session_id == "gated-1")
+    check("a stale beat under a HELD permit is reported, not reclaimed",
+          held_action.outcome == REPORTED, str(held_action.steps))
+    check("…and the gated lane's worktree is left alone", gated.exists())
+finally:
+    os.close(fd)
+
+check("releasing the permit is read as no gate in flight", gate_in_flight(str(gated)) is False)
+released = sweep(repo, ttl_minutes=15, apply=False, ops=ops, gate_in_flight=gate_in_flight)
+released_action = next(a for a in released.actions if a.session_id == "gated-1")
+check("with the permit released the same stale lane decides reclaimed",
+      released_action.outcome == RECLAIMED, str(released_action))
+
+unreadable_store = sweep(
+    repo, ttl_minutes=15, apply=False, ops=ops, gate_in_flight=lambda worktree: None,
+)
+unreadable_action = next(a for a in unreadable_store.actions if a.session_id == "gated-1")
+check("an unreadable permit store refuses rather than reclaims (cannot-assess)",
+      unreadable_action.outcome == REPORTED and "cannot-assess" in unreadable_action.reason,
+      str(unreadable_action))
+
+# --- Defect 3, gone-worktree arm: the branch's remote tip decides -----------
+gone = add_lane("gone-lane")
+(gone / "w.txt").write_text("work that has not landed\n", encoding="utf-8")
+git(gone, "add", "w.txt")
+git(gone, "commit", "-q", "-m", "unmerged work")
+git(gone, "push", "-q", "-u", "origin", "gone-lane")
+subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(gone)], check=True)
+beat("gone-1", gone, "gone-lane", 5)
+
+gone_dry = sweep(repo, ttl_minutes=15, apply=False, ops=ops)
+gone_action = next(a for a in gone_dry.actions if a.session_id == "gone-1")
+check("a gone worktree whose branch is unmerged on the remote decides PARKED",
+      gone_action.outcome == PARKED, str(gone_action))
+check("…and the branch is still on the server, because it is the work",
+      bool(git(repo, "ls-remote", "--heads", "origin", "gone-lane")))
+
+gone_clean = add_lane("gone-clean-lane")
+subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(gone_clean)], check=True)
+beat("gone-clean-1", gone_clean, "gone-clean-lane", 6)
+gone_clean_dry = sweep(repo, ttl_minutes=15, apply=False, ops=ops)
+gone_clean_action = next(a for a in gone_clean_dry.actions if a.session_id == "gone-clean-1")
+check("the negative control: a gone worktree with no remote branch decides RECLAIMED",
+      gone_clean_action.outcome == RECLAIMED, str(gone_clean_action))
+
+if problems:
+    print(f"  ({len(problems)} reclaim-safety proof(s) failed)", file=sys.stderr)
+    raise SystemExit(1)
+PYSAFETY
+then
+  :
+else
+  fail=$((fail + 1))
+fi
+
 # --- 4. the worktree/branch audit, exercised for real (issue #628) ----------
 #
 # The provoke-and-observe shape is deliberate. It is not enough that a matching

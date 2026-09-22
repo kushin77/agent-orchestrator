@@ -90,6 +90,7 @@ from governance.reconcile.sweep import (  # noqa: E402
     RepoOps,
     SHELVED_OUTCOME,
     describe,
+    gate_in_flight,
     sweep,
 )
 
@@ -316,6 +317,9 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         ops=RepoOps(args.root),
         reporter=_reporter(args.root),
         recheck=_recheck(args),
+        # #1897: a lane inside its own composite gate is a *live* lane, and a
+        # permit store that cannot be read is CANNOT-ASSESS — never a reclaim.
+        gate_in_flight=gate_in_flight,
     )
     orphan_report = _orphan_walk(args) if args.orphans else None
     if args.json:
@@ -413,6 +417,9 @@ def cmd_watch(args: argparse.Namespace) -> int:
                 ops=RepoOps(args.root),
                 reporter=_reporter(args.root),
                 recheck=_recheck(args),
+                # #1897 — the gate seam, as in `cmd_sweep`: the daemon must not
+                # reclaim the lane whose own `make verify` is running.
+                gate_in_flight=gate_in_flight,
             )
             counts = ", ".join(
                 f"{name}={len(report.by_outcome(name))}"

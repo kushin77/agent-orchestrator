@@ -69,12 +69,25 @@ class FakeOps:
         on_main: bool = False,
         remotely: bool = False,
         fail: tuple[str, ...] = (),
+        uncommitted: tuple[str, ...] = (),
+        remote_unlanded: bool = False,
     ) -> None:
         self.present = present
         self.on_main = on_main
         self.remotely = remotely
         self.fail = set(fail)
+        #: The lane's own dirty paths (#1897). Non-empty means the *shelved* case,
+        #: whatever ``on_main`` says — the work exists nowhere else.
+        self.uncommitted = tuple(uncommitted)
+        #: The gone-worktree arm's read: True means the branch survives on the
+        #: remote with work that has not landed, so the lane is parked.
+        self.remote_unlanded = remote_unlanded
         self.calls: list[str] = []
+        #: The *reads*, kept apart from ``calls`` on purpose: ``calls`` is the
+        #: asserted effect log ("no step ran"), and a read is not an effect. A
+        #: decision that reads the tree and then refuses must still show
+        #: ``calls == []``.
+        self.reads: list[str] = []
         self.shelved_reason = ""
 
     def _record(self, name: str) -> None:
@@ -90,6 +103,16 @@ class FakeOps:
 
     def preserved_remotely(self, worktree: str, branch: str) -> bool:
         return self.remotely
+
+    def uncommitted_work(self, worktree: str) -> list[str]:
+        """The lane's own dirty paths — a *read*, so it is not in ``calls``."""
+        self.reads.append("uncommitted-work")
+        return list(self.uncommitted)
+
+    def remote_branch_unlanded(self, branch: str) -> bool:
+        """The gone-worktree arm's remote read — likewise not an effect."""
+        self.reads.append("remote-branch-unlanded")
+        return self.remote_unlanded
 
     def remove_worktree(self, path: str) -> str:
         self._record("remove-worktree")
