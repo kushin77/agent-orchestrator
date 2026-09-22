@@ -132,7 +132,9 @@ conditions:
     statement: >-
       Module source is referenced, never carried: no in-tree copy of a hub
       manifest, no module distribution package in this tree, no registry
-      reference pointing outside the hub, and no additional vendored submodule.
+      reference pointing outside the hub, and no vendored submodule beyond the
+      declared set (`VENDOR_SUBMODULES` in vendoring.py — vendor/CMR and
+      vendor/AgenticAutomationFramework).
     codes:
       - VENDOR-SOURCE-IN-TREE
       - VENDOR-IN-TREE-PACKAGE

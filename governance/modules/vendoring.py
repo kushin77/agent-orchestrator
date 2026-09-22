@@ -18,8 +18,11 @@ do_not_duplicate: null
 
 Acceptance 4: the registry stores **references** (id, repo, pin, path), and a
 gate finding fires when a module's *source* is carried in-tree instead of
-referenced. The only vendor path in this repository stays ``vendor/CMR`` — the
-pinned, read-only hub submodule.
+referenced. A vendored submodule is a reference, not a copy: ``vendor/CMR`` is
+the pinned, read-only hub (the authority this package reads) and
+``vendor/AgenticAutomationFramework`` is the pinned, read-only Playwright E2E
+module. The permitted set is declared **once**, in ``VENDOR_SUBMODULES`` below —
+never restated — so a doctrine move stays a one-line change here.
 
 Four rules, each mechanically provokable in a scratch copy:
 
@@ -28,7 +31,8 @@ Four rules, each mechanically provokable in a scratch copy:
 * ``VENDOR-SOURCE-IN-TREE`` — no ``module.json`` outside ``vendor/`` may
   declare a hub-catalog module id, and no ``.gitmodules`` entry may vendor a
   module anywhere but through the hub;
-* ``VENDOR-EXTRA-SUBMODULE`` — the hub is the only vendored submodule;
+* ``VENDOR-EXTRA-SUBMODULE`` — a ``.gitmodules`` path outside
+  ``VENDOR_SUBMODULES`` is an undeclared vendor path;
 * ``VENDOR-IN-TREE-PACKAGE`` — a module's declared distribution package must
   not exist in-tree (``codeidx/``, ``node_modules/@kushin77/saas-rbac``).
 """
@@ -38,7 +42,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from governance.modules.model import Refusal, sorted_refusals
 
@@ -50,6 +54,19 @@ SKIP_DIRS = frozenset({".git", ".research", ".verify", "vendor", "node_modules"}
 MANIFEST_NAME = "module.json"
 GITMODULES = ".gitmodules"
 HUB_SUBMODULE_PATH = "vendor/CMR"
+
+#: The declared vendored submodules this repository permits — the single
+#: authority the ``VENDOR-EXTRA-SUBMODULE`` arm reads, rather than a literal
+#: restated in the rule. Every entry is a pinned, read-only reference (never an
+#: in-tree copy): ``vendor/CMR`` is the governance hub and
+#: ``vendor/AgenticAutomationFramework`` is the Playwright E2E module (#2012).
+#: A path outside this set is refused by name, so vendoring a third submodule is
+#: a red gate until it is declared here in the same commit as its ``.gitmodules``
+#: entry.
+VENDOR_SUBMODULES: Tuple[str, ...] = (
+    HUB_SUBMODULE_PATH,
+    "vendor/AgenticAutomationFramework",
+)
 
 
 def _manifest_ids(repo_root: Path, hub_ids: frozenset) -> List[Refusal]:
@@ -83,7 +100,7 @@ def _manifest_ids(repo_root: Path, hub_ids: frozenset) -> List[Refusal]:
 
 
 def _gitmodules(repo_root: Path, hub_ids: frozenset) -> List[Refusal]:
-    """Rules: the hub is the only vendored submodule, and it names no module."""
+    """Rules: only declared vendor paths, and none of them names a module."""
     path = Path(repo_root) / GITMODULES
     if not path.is_file():
         return []
@@ -94,15 +111,17 @@ def _gitmodules(repo_root: Path, hub_ids: frozenset) -> List[Refusal]:
             continue
         _, _, value = stripped.partition("=")
         submodule_path = value.strip().strip('"')
-        if not submodule_path or submodule_path == HUB_SUBMODULE_PATH:
+        if not submodule_path or submodule_path in VENDOR_SUBMODULES:
             continue
         if submodule_path in hub_ids or os.path.basename(submodule_path) in hub_ids:
             refusals.append(
                 Refusal(
                     "VENDOR-SOURCE-IN-TREE",
                     os.path.basename(submodule_path),
-                    "submodule {} vendors a hub module directly; the only vendor "
-                    "path is {}".format(submodule_path, HUB_SUBMODULE_PATH),
+                    "submodule {} vendors a hub module directly; a hub module is "
+                    "referenced through the hub ({}), never vendored".format(
+                        submodule_path, HUB_SUBMODULE_PATH
+                    ),
                     GITMODULES,
                 )
             )
@@ -111,8 +130,8 @@ def _gitmodules(repo_root: Path, hub_ids: frozenset) -> List[Refusal]:
             Refusal(
                 "VENDOR-EXTRA-SUBMODULE",
                 submodule_path,
-                "the hub ({}) is the only vendored submodule; {} is an extra "
-                "vendor path".format(HUB_SUBMODULE_PATH, submodule_path),
+                "the declared vendored submodules are {}; {} is an undeclared "
+                "vendor path".format(", ".join(VENDOR_SUBMODULES), submodule_path),
                 GITMODULES,
             )
         )
