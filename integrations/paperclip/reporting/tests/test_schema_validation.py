@@ -83,11 +83,13 @@ def test_the_document_carries_every_field_the_issue_freezes(composition):
             assert set(asset) == {"asset", "seed", "seed_present"}
 
 
-def test_a_pending_module_is_recorded_as_unshipped_with_its_blocker(composition):
+def test_a_pending_module_is_recorded_as_unshipped_with_its_blocker(pending_composition):
     pending = [
-        record for record in composition.document["modules"] if record["state"] == TARGET_PENDING
+        record
+        for record in pending_composition.document["modules"]
+        if record["state"] == TARGET_PENDING
     ]
-    assert pending, "the registry carries no pending target to record"
+    assert pending, "the pending venue carries no pending target to record"
     for record in pending:
         assert record["shipped"] is False
         assert record["mandatory"] is None

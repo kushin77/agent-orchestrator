@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import build_pending_document
 from governance.modules import registry as module_registry
 from governance.modules.model import CannotAssess, TARGET_PENDING
 
@@ -123,14 +124,15 @@ def test_the_composer_refuses_under_the_code_the_policy_declares(tree: Path):
     assert "BRIEF-CLAIM-UNRESOLVED:" not in proc.stderr
 
 
-def test_the_composer_refuses_a_pending_module_under_the_policys_code(tree: Path):
+def test_the_composer_refuses_a_pending_module_under_the_policys_code(pending_tree: Path):
+    tree = pending_tree
     _rewrite(
         tree,
         lambda data: data["pending"]["refusals"].__setitem__(
             "rendered_shipped", "BRIEF-PENDING-RENDERED-SHIPPED-MUT"
         ),
     )
-    document = module_registry.build(tree, tree / HUB)
+    document = build_pending_document(tree)
     for entry in document["modules"]:
         if entry["state"] == TARGET_PENDING:
             entry["shipped"] = True

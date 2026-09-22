@@ -143,14 +143,14 @@ def test_an_absent_trail_is_cannot_assess_never_a_pass(repo_root: Path, tmp_path
     assert "CANNOT-ASSESS" in proc.stderr
 
 
-def test_a_pending_module_run_records_no_finding(composition, tmp_path: Path):
+def test_a_pending_module_run_records_no_finding(pending_composition, tmp_path: Path):
     trail = tmp_path / "pending.jsonl"
     policy = claim_policy.load()
-    record = audit.record_for(composition, policy)
+    record = audit.record_for(pending_composition, policy)
     assert record["unresolved"] == 0
     assert any(
         entry["state"] == TARGET_PENDING and entry["shipped"] is False
-        for entry in composition.document["modules"]
+        for entry in pending_composition.document["modules"]
     )
     audit.append(trail, record)
     assert json.loads(trail.read_text(encoding="utf-8").strip()) == record

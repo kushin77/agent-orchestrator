@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from conftest import require_real_hub
+from conftest import null_the_hub_pin, require_real_hub
 
 import hashlib
 import subprocess
@@ -65,12 +65,7 @@ def test_the_composition_really_reads_the_hub_it_names(repo_root: Path):
 def test_a_module_with_no_pin_really_is_refused_from_a_scratch_tree(tree: Path):
     """The same provocation the gate runs, through the CLI and a fresh interpreter."""
     cli = tree / "integrations/paperclip/reporting/cli.py"
-    hub = tree / HUB / "catalog/modules/code-indexing/module.json"
-    before = hub.read_text(encoding="utf-8")
-    hub.write_text(
-        before.replace('"latest": "v0.1.0"', '"latest": null'), encoding="utf-8"
-    )
-    assert hub.read_text(encoding="utf-8") != before, "the mutation did not land"
+    null_the_hub_pin(tree / HUB / "catalog/modules/code-indexing/module.json")
 
     proc = subprocess.run(
         [sys.executable, str(cli), "compose", "--repo", str(tree)],

@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from conftest import require_real_hub
+from conftest import build_pending_document, null_the_hub_pin, require_real_hub
 
 import json
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-
-from governance.modules import registry as module_registry
 
 from integrations.paperclip.reporting.model import ARTIFACT
 
@@ -72,11 +70,7 @@ def test_a_capability_the_allowlist_does_not_grant_is_refused_by_name(tree: Path
 
 
 def test_compose_refuses_to_freeze_a_brief_that_has_findings(tree: Path):
-    hub_manifest = tree / HUB / "catalog/modules/code-indexing/module.json"
-    hub_manifest.write_text(
-        hub_manifest.read_text(encoding="utf-8").replace('"latest": "v0.1.0"', '"latest": null'),
-        encoding="utf-8",
-    )
+    null_the_hub_pin(tree / HUB / "catalog/modules/code-indexing/module.json")
     out = tree / "out/MODULE-BRIEF.md"
     proc = run(cli_of(tree), "compose", "--out", str(out), repo=tree)
     assert proc.returncode == 1
@@ -104,8 +98,9 @@ def test_a_hand_edited_artifact_is_refused_as_stale(tree: Path):
     assert "BRIEF-STALE: {}".format(ARTIFACT) in proc.stderr
 
 
-def test_a_registry_document_that_reports_pending_as_shipped_is_refused(tree: Path):
-    document = module_registry.build(tree, tree / HUB)
+def test_a_registry_document_that_reports_pending_as_shipped_is_refused(pending_tree: Path):
+    tree = pending_tree
+    document = build_pending_document(tree)
     for entry in document["modules"]:
         if entry["state"] == "target-pending":
             entry["shipped"] = True

@@ -72,45 +72,45 @@ def test_every_mandatory_module_names_the_seed_each_asset_comes_from(repo_root: 
             assert asset["seed"] in composition.text
 
 
-def test_pending_is_never_rendered_as_shipped(repo_root: Path, composition):
-    document = module_registry.build(repo_root, repo_root / HUB)
+def test_pending_is_never_rendered_as_shipped(pending_composition):
+    document = pending_composition.document
     pending = _entries(document, TARGET_PENDING)
-    assert pending, "the registry carries no pending target to brief"
+    assert pending, "the pending venue carries no pending target to brief"
     for entry in pending:
         assert entry["shipped"] is False
         assert entry["blocking"], "a pending module must name its blocking hub issue"
-        assert "#### `{}` — {}".format(entry["id"], TARGET_PENDING) in composition.text
+        assert "#### `{}` — {}".format(entry["id"], TARGET_PENDING) in pending_composition.text
         for blocking in entry["blocking"]:
-            assert blocking in composition.text
-    for line in composition.text.splitlines():
+            assert blocking in pending_composition.text
+    for line in pending_composition.text.splitlines():
         if line.startswith("| mandatory status |") and TARGET_PENDING in line:
             assert "not shipped" in line
             assert "shipped: false" in line
-    assert "shipped: true" not in composition.text
+    assert "shipped: true" not in pending_composition.text
 
 
 def test_a_pending_entry_that_reports_itself_shipped_is_refused_by_name(
-    repo_root: Path, registry_document
+    pending_template, pending_document
 ):
-    document = copy.deepcopy(registry_document)
+    document = copy.deepcopy(pending_document)
     for entry in document["modules"]:
         if entry["state"] == TARGET_PENDING:
             entry["shipped"] = True
             break
-    else:  # pragma: no cover - the registry always carries a target
+    else:  # pragma: no cover - the pending venue always carries a target
         pytest.fail("no target-pending entry to doctor")
-    findings = composer.compose(document, repo_root, HUB).findings
+    findings = composer.compose(document, pending_template, HUB).findings
     codes = {finding.code for finding in findings}
     assert "BRIEF-PENDING-RENDERED-SHIPPED" in codes
 
 
-def test_a_pending_entry_without_a_blocker_is_refused_by_name(repo_root: Path, registry_document):
-    document = copy.deepcopy(registry_document)
+def test_a_pending_entry_without_a_blocker_is_refused_by_name(pending_template, pending_document):
+    document = copy.deepcopy(pending_document)
     for entry in document["modules"]:
         if entry["state"] == TARGET_PENDING:
             entry["blocking"] = []
             break
-    findings = composer.compose(document, repo_root, HUB).findings
+    findings = composer.compose(document, pending_template, HUB).findings
     assert "BRIEF-PENDING-NO-BLOCKER" in {finding.code for finding in findings}
 
 

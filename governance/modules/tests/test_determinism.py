@@ -9,8 +9,10 @@ false green this repository forbids.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
+from typing import Dict, List
 
 import pytest
 import importlib.util as _importlib_util  # noqa: E402
@@ -38,20 +40,47 @@ from governance.modules.hub import DEFAULT_HUB
 
 TIMESTAMPISH = re.compile(r'"(generated_at|timestamp|updated_at|built_at|now)"')
 
-#: The inventory this repository measured on 2026-09-14 over the pinned hub.
-MEASURED = {
-    "registered-mandatory": ["code-indexing", "diagrams", "shared-frontend"],
-    "target-pending": ["pmo", "shared-governance", "shared-services"],
-    "catalog-module-not-mandatory": ["erp-crm", "googleworkspace", "saas-rbac"],
-    "not-a-module": [
-        "deepseek",
-        "gcp-gatekeeper",
-        "hermes-agents",
-        "monitoring-stack",
-        "ollama",
-        "paperclip",
-    ],
-}
+
+def _authority_states(repo_root: Path) -> Dict[str, List[str]]:
+    """The four states, DERIVED from the pinned hub's own authority every run.
+
+    A hand-recorded inventory goes stale the moment the pin moves, and the
+    outage this replaced was exactly that: measured 2026-09-22, the pin carried
+    `pmo` and `shared-governance` as mandatory (and four further catalog
+    modules) while the recorded list still named three mandatory modules and a
+    non-empty pending set — so the suite was red in every venue where the hub
+    was materialised and green only where it was absent. The expectation is
+    therefore READ, never restated:
+
+    * ``catalog/mandatory.tsv`` is the machine-readable mandatory set — the
+      hub's own ``catalog/validate.py`` keeps it in lockstep with the
+      ``mandatory`` flags — so it, with the catalog it describes, is the
+      authority on what a module is and what is mandatory;
+    * the repository's declared target/watch set and its sub-module register
+      supply the two name sets the catalog does not carry.
+    """
+    hub = repo_root / "vendor" / "CMR"
+    catalog_ids = {
+        path.parent.name for path in (hub / "catalog" / "modules").glob("*/module.json")
+    }
+    mandatory_ids = set()
+    for line in (hub / "catalog" / "mandatory.tsv").read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#") or line.split("\t", 1)[0] == "id":
+            continue
+        mandatory_ids.add(line.split("\t", 1)[0])
+    declared = json.loads(
+        (repo_root / "governance" / "modules" / "targets.json").read_text(encoding="utf-8")
+    )
+    target_ids = {item["id"] for item in declared.get("targets", [])}
+    watch_ids = {item["id"] for item in declared.get("watch", [])}
+    register = json.loads((repo_root / "module.json").read_text(encoding="utf-8"))
+    register_ids = {item["id"] for item in register.get("submodules", [])}
+    return {
+        "registered-mandatory": sorted(catalog_ids & mandatory_ids),
+        "target-pending": sorted(target_ids - catalog_ids),
+        "catalog-module-not-mandatory": sorted(catalog_ids - mandatory_ids),
+        "not-a-module": sorted((register_ids | watch_ids) - catalog_ids - target_ids),
+    }
 
 
 def _sha(text: str) -> str:
@@ -116,7 +145,7 @@ class TestAgainstThePinnedHub:
         by_state = {}
         for entry in doc["modules"]:
             by_state.setdefault(entry["state"], []).append(entry["id"])
-        for state, expected in MEASURED.items():
+        for state, expected in _authority_states(Path(__file__).resolve().parents[3]).items():
             if state == "not-a-module":
                 assert [entry["id"] for entry in doc["not_modules"]] == expected
                 continue
