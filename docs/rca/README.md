@@ -82,3 +82,18 @@ beyond baseline`, so the pre-existing collision set is pinned and any new
 one fails the gate, while the sanctioned per-suite runner
 (`scripts/check-pytest-suites.sh`) remains the correct way to run these
 directories.
+
+Issue #1738 (live-instance observation of the Sessions operator controls,
+PR #1735/#1564) is confirmed real end to end, no defect found: with
+`scripts/portal-demo.py` running and a seeded `.fleet/claims/*.json` row, a
+real `POST /api/sessions/control/pause` against a live `claude-fleet` row
+delegated through the existing remote-control family to the real
+`fleet/control.py#pause` lever, which wrote a `control:pause` directive to
+`.fleet/inbox/`; the real dispatcher loop (`fleet/terminal.py run`)
+consumed it next cycle, wrote `.fleet/paused`, and its own heartbeat
+(`.fleet/sister.heartbeat.json`) flipped to `"state": "paused"` — the loop
+itself reports paused, not just the control API. The RC-4 audit rail
+(`.fleet/slog.jsonl`) recorded the effect (`fleet.pause applied by
+user:root@platform.example.com`). Resume was verified the same way,
+clearing `.fleet/paused`. Full evidence (API response, inbox directive,
+loop log, heartbeat, audit record) posted as a comment on #1738.
