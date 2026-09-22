@@ -46,6 +46,13 @@ def build_tree(target: Path, *, hub: bool = True) -> Path:
     target.mkdir(parents=True, exist_ok=True)
     for relative in (
         "integrations/paperclip",
+        # `integrations/paperclip/mapping.py` re-exports the shared seam
+        # (`from .._seam.schema import validate`), which issue #1211 extracted to
+        # `integrations/_seam/`. Without it in the scratch tree the CLI dies
+        # `ModuleNotFoundError: integrations._seam` — which no venue measured
+        # while these tests only ever ran where the hub (and so this fixture's
+        # `hub=True` path) was absent. See issue #1981.
+        "integrations/_seam",
         "governance/modules",
         "scripts/check-module-brief.sh",
         "module.json",
@@ -76,6 +83,28 @@ def require_real_hub() -> None:
     uninitialised gitlink placeholder (a `git worktree add` checkout, #1725)."""
     if not (REPO_ROOT / HUB / "catalog").is_dir():
         pytest.skip("vendor/CMR submodule not checked out (catalog missing)")
+
+
+def null_the_hub_pin(manifest: Path) -> Path:
+    """Remove the pin from a vendored module manifest, proving the mutation landed.
+
+    The manifest's own ``versions.latest`` is read and nulled rather than
+    string-replaced against a version literal: the pin moves with the hub (it is
+    ``v0.2.0`` at the current pin, not the ``v0.1.0`` two provocation sites still
+    matched), so a hardcoded literal silently stopped changing anything — and a
+    provocation that does not land makes the refusal it was proving vacuous while
+    the test still reads as a real control (issue #1981).
+    """
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    assert data.get("versions", {}).get("latest"), (
+        "{} carries no pin to remove — the provocation would be vacuous".format(manifest)
+    )
+    data["versions"]["latest"] = None
+    manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    assert json.loads(manifest.read_text(encoding="utf-8"))["versions"]["latest"] is None, (
+        "the mutation did not land"
+    )
+    return manifest
 
 
 @pytest.fixture(scope="session")
@@ -109,6 +138,91 @@ def composition(repo_root: Path, registry_document: dict):
     from integrations.paperclip.reporting import composer
 
     return composer.compose(registry_document, repo_root, HUB)
+
+
+#: A declared target that has NOT landed in the pinned catalog, so a venue built
+#: with it carries a genuine ``target-pending`` entry. The real tree declares no
+#: such target any more — every target it declares has LANDED in the pinned hub,
+#: and the catalog is the authority (``governance/modules/registry.py`` derives a
+#: landed target as ``registered-mandatory``) — so the real venue carries NO
+#: pending entry, and a test whose subject is how pending is *handled* must
+#: supply one rather than assert that the authority happens to still carry a
+#: pending module (issue #1981). The shape is exactly what the registry reads
+#: from ``governance/modules/targets.json``.
+UNLANDED_TARGET_SET: dict = {
+    "schema": "ao.module-targets/v1",
+    "source": "the paperclip/reporting suite's pending-handling venue (issue #1981)",
+    "note": (
+        "one declared target that has not landed in the pinned catalog, so a "
+        "venue built with it carries a genuine target-pending entry"
+    ),
+    "targets": [
+        {
+            "id": "suite-pending-module",
+            "repo": "kushin77/suite-pending-module",
+            "blocking": ["kushin77/CMR#1", "kushin77/suite-pending-module#2"],
+            "onboarding": "CMR:ONBOARD-0000",
+            "note": "never landed in the catalog — the pending specimen",
+        }
+    ],
+    "watch": [],
+}
+
+
+def declare_a_pending_target(tree: Path) -> Path:
+    """Give *tree* one declared target that has not landed, so it carries a pending entry."""
+    (tree / "governance" / "modules" / "targets.json").write_text(
+        json.dumps(UNLANDED_TARGET_SET, indent=2) + "\n", encoding="utf-8"
+    )
+    return tree
+
+
+def build_pending_document(tree: Path) -> dict:
+    """The registry document over *tree*, reading *tree*'s OWN declared target set.
+
+    ``targets_path`` is passed explicitly because ``registry.DEFAULT_TARGETS``
+    resolves next to the *imported* module: this suite imports
+    ``governance.modules`` from the real checkout while pointing the hub and the
+    register at a scratch tree, so an implicit read would take the real
+    repository's declared targets and the scratch venue's pending entry would
+    never appear.
+    """
+    from governance.modules import registry
+
+    return registry.build(
+        tree, tree / HUB, targets_path=tree / "governance" / "modules" / "targets.json"
+    )
+
+
+@pytest.fixture(scope="session")
+def pending_template(tmp_path_factory) -> Path:
+    """Built once, never mutated: a scratch tree carrying a real ``target-pending`` entry."""
+    return declare_a_pending_target(
+        build_tree(tmp_path_factory.mktemp("pending-template") / "repo")
+    )
+
+
+@pytest.fixture()
+def pending_tree(pending_template: Path, tmp_path: Path) -> Path:
+    """A fresh copy of the pending venue, for tests that mutate the tree themselves."""
+    target = tmp_path / "repo"
+    shutil.copytree(pending_template, target, ignore=shutil.ignore_patterns("__pycache__"))
+    assert not list(target.rglob("__pycache__"))
+    return target
+
+
+@pytest.fixture(scope="session")
+def pending_document(pending_template: Path) -> dict:
+    """The registry document over the pending venue: it really carries a pending entry."""
+    return build_pending_document(pending_template)
+
+
+@pytest.fixture(scope="session")
+def pending_composition(pending_template: Path, pending_document: dict):
+    """The brief composed over the pending venue, so a pending row is really rendered."""
+    from integrations.paperclip.reporting import composer
+
+    return composer.compose(pending_document, pending_template, HUB)
 
 
 @pytest.fixture()
