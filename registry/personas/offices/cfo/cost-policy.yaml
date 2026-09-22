@@ -32,17 +32,23 @@ kpi:
     - AGENTS.md
     - CLAUDE.md
     - .cursorrules
-  baselineBytes: 28585
-  measuredOn: "2026-09-20"
+  baselineBytes: 32883
+  measuredOn: "2026-09-21"
   measuredBy: "wc -c AGENTS.md CLAUDE.md .cursorrules"
-  ceilingBytes: 30604
+  ceilingBytes: 32883
   ceilingReason: >-
-    Raised from 28585 to 30604 (2026-09-21): AGENTS.md grew by 1683 bytes from
-    two legitimate, independently-landed additions in the same merge train —
-    #1650 (CTO-office / as-built architecture pointers, ADR-0033 naming
-    resolution) and #1544 (the git-stash-in-shared-checkout invariant). Neither
-    is prompt bloat to trim; the ceiling is raised to the measured total rather
-    than silently, per this gate's own documented remedy.
+    Raised from 30604 to 32883 (2026-09-21): AGENTS.md grew by 2072 bytes
+    (26504 -> 28576) across four independently-landed doctrine changes, none of
+    them prompt bloat to trim — #1698 (adopt the single-developer landing
+    method, +360), #1699 (generate the PR body from the issue, +148), #1731
+    (run-lane chaining PMO->paperclip->route->claim in one command, +765), and
+    #1789 (GR-5: new capabilities ship enabled by default, +799). CLAUDE.md
+    (2335) and .cursorrules (1972) are unchanged. Those bytes are other lanes'
+    merged work, so shrinking AGENTS.md to fit the old ceiling would revert four
+    merged changes; the ceiling is raised to the measured total rather than
+    silently, per this gate's own documented remedy. The ceiling is set equal to
+    the measurement (no headroom) so any further growth fails this gate and must
+    come with its own attributable reason.
   target90PctNote: >-
     The owner's 90%+ prompt-reduction objective is tracked in
     docs/cfo/PROMPT-REDUCTION-PLAN.md against total inbound bytes, most of
