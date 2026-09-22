@@ -8,8 +8,12 @@
 # `Refs #<n>` line as the final line, exactly what the squash guard's
 # `closes_finding`/shared predicate look for.
 #
-# Refuses `epic-target:<n>` (stdout note + exit 1) when the issue carries
-# label `type:epic` — an epic is never closed by a single PR.
+# Renders normally even when the issue carries label `type:epic`: a
+# docs-only closeout PR closing an epic directly is real precedent
+# (#1962/#1963/#1969), and refusing it forced a hand-authored body that
+# silently dropped the AI-assistance/Gate-changing fields check-pr-contract.sh
+# requires (issue #1987). Nothing about the epic label changes what this
+# script renders — the trailer paragraph shape is identical either way.
 #
 # Usage:
 #   scripts/pr-body.sh <issue-number> [--refs] [--repo <owner/repo>]
@@ -25,7 +29,7 @@
 # tier: L1
 # interfaces: [stdout: PR body markdown]
 # invariants: "the trailer line is always the final line, exactly what the squash guard looks for"
-# gotchas: "an issue labeled type:epic is refused — an epic is never closed by a single PR"
+# gotchas: "an issue labeled type:epic renders the same as any other issue (#1987)"
 # related: ["#1674"]
 # do_not_duplicate: null
 # ---knowledge---
@@ -50,12 +54,6 @@ if [ -z "$issue" ]; then
 fi
 
 title="$(gh issue view "$issue" --repo "$repo" --json title -q .title 2>/dev/null || true)"
-labels="$(gh issue view "$issue" --repo "$repo" --json labels -q '.labels[].name' 2>/dev/null || true)"
-
-if printf '%s\n' "$labels" | grep -qx 'type:epic'; then
-  echo "pr-body: epic-target:${issue} — an epic is not closed by a single PR" >&2
-  exit 1
-fi
 
 trailer_line="Closes #${issue}"
 if [ "$mode" = "refs" ]; then
