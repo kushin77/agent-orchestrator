@@ -55,6 +55,7 @@
 # Usage:
 #   bash scripts/check-duplicates.sh                    the gate (self-test, then this repo)
 #   bash scripts/check-duplicates.sh scan [--root DIR]  the detector alone, over DIR
+#   bash scripts/check-duplicates.sh header-values      security-header VALUE drift (#1890)
 #   bash scripts/check-duplicates.sh compare A B        byte-identity (files or dirs)
 #   bash scripts/check-duplicates.sh demo-cases         OPT-IN: scan + the dprs demo
 #   bash scripts/check-duplicates.sh --self-test        the provocation alone
@@ -106,6 +107,7 @@ usage() {
 Usage:
   bash scripts/check-duplicates.sh                     the gate: self-test, then this repo
   bash scripts/check-duplicates.sh scan [--root DIR]   the detector alone, over DIR
+  bash scripts/check-duplicates.sh header-values       security-header VALUE drift across sibling repos (#1890)
   bash scripts/check-duplicates.sh compare <A> <B>     byte-identity of two paths
   bash scripts/check-duplicates.sh demo-cases          OPT-IN: reads .research/ clones
   bash scripts/check-duplicates.sh --self-test         the provocation alone
@@ -157,6 +159,176 @@ scan_root() {
     return 1
   fi
   printf 'dupcheck scan: PASS - no forked copies of protected canonical docs (%s names checked)\n' "${#protected_names[@]}"
+  return 0
+}
+
+# --- the security-header VALUE contract (issue #1890) -----------------------
+# A name-based fork detector cannot see this class of drift: each site below
+# is a DIFFERENT file with a DIFFERENT name (nginx conf, a Cloudflare Worker, a
+# deploy script, an Express middleware...) that all restate the SAME header
+# value. The canonical home is shared-frontend/auth/src/server.mjs (declared
+# SOURCE OF TRUTH, e2e/tests/matchers.ts:156). Sibling repos are sibling
+# checkouts next to this one (SIBLINGS_ROOT, default: this repo's parent dir),
+# and a missing sibling is a SKIP, not a failure — this gate must stay green on
+# a checkout that only has agent-orchestrator (#1890 review note).
+#
+# header_sites <header> — one line per known copy site for that header, as
+# "repo/relative/path:grep-pattern". Kept as a function (not a static array)
+# so each header's site list is easy to read next to the header it belongs to.
+header_sites() {
+  case "$1" in
+    x-frame-options)
+      cat <<'SITES'
+shared-frontend/auth/src/server.mjs:X-Frame-Options
+shared-services/infra/nginx/sites/elevatediq-https.conf:X-Frame-Options
+shared-services/scripts/deploy-cloudflare-security-headers-worker.js:x-frame-options
+capital-underwriting/apps/server/src/middleware/security.ts:X-Frame-Options
+SITES
+      ;;
+    permissions-policy)
+      cat <<'SITES'
+shared-frontend/auth/src/server.mjs:Permissions-Policy
+shared-services/scripts/deploy-cloudflare-security-headers-worker.js:permissions-policy
+capital-underwriting/apps/server/src/middleware/security.ts:Permissions-Policy
+SITES
+      ;;
+    strict-transport-security)
+      cat <<'SITES'
+shared-services/scripts/deploy-cloudflare-security-headers-worker.js:strict-transport-security
+capital-underwriting/apps/server/src/middleware/security.ts:Strict-Transport-Security
+SITES
+      ;;
+  esac
+}
+
+# header_value <file> <pattern> — the quoted literal on the first matching
+# line, whichever quote style that layer uses ('...', "...", or a bare
+# nginx add_header token up to the trailing `always`/`;`).
+# header_value <file> <name> — the effective value, whatever the layer's
+# syntax: a JS `.setHeader("Name", "val" + "val2")` / `.set("name", "val")`
+# call (value may be a multi-line string concatenation — captured up to the
+# first unescaped `)`), or an nginx `add_header Name VAL always;` line.
+header_value() {
+  local file="$1" name="$2"
+  [ -f "$file" ] || return 1
+  python3 - "$file" "$name" <<'PY'
+import re, sys
+file, name = sys.argv[1], sys.argv[2]
+text = open(file, encoding="utf-8", errors="ignore").read()
+esc = re.escape(name)
+m = re.search(r'(?:setHeader|\.set)\(\s*["\']' + esc + r'["\']\s*,\s*(.*?)\);',
+              text, re.IGNORECASE | re.DOTALL)
+if m:
+    parts = re.findall(r'"((?:[^"\\]|\\.)*)"|\'((?:[^\'\\]|\\.)*)\'', m.group(1))
+    print("".join(a or b for a, b in parts).replace('\\"', '"'))
+    sys.exit(0)
+m = re.search(r'add_header\s+' + esc + r'\s+(.*?);', text, re.IGNORECASE)
+if m:
+    val = m.group(1).strip()
+    val = re.sub(r'\s+always\s*$', '', val, flags=re.IGNORECASE)
+    val = val.strip('"\'')
+    print(val)
+    sys.exit(0)
+sys.exit(1)
+PY
+}
+
+# header_values_cmd — compare the actual header VALUE across every known site,
+# per header. Sites in a sibling repo that is not checked out are a named SKIP.
+# The negative control is content-security-policy: it is NOT in header_sites
+# above (CSP legitimately differs per layer/host — enforcing vs report-only,
+# different domains), so it is never compared and never flagged, by
+# construction. `header-values --list-negative-control` names it for a test to
+# assert against.
+# sibling_default_branch <repo_dir> — origin/HEAD's branch, else main, else
+# master. Empty output = cannot resolve (repo present but no recognisable
+# default branch) — callers treat that as a SKIP, not a fork/fail.
+sibling_default_branch() {
+  local repo="$1" b
+  b="$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"
+  if [ -n "$b" ]; then
+    printf '%s\n' "${b#origin/}"
+    return 0
+  fi
+  for b in main master; do
+    if git -C "$repo" show-ref --verify --quiet "refs/heads/$b" 2>/dev/null; then
+      printf '%s\n' "$b"
+      return 0
+    fi
+  done
+  return 1
+}
+
+header_values_cmd() {
+  local siblings="${SIBLINGS_ROOT:-$(dirname "$root")}"
+  local headers=(x-frame-options permissions-policy strict-transport-security)
+  local mismatches=0
+  local h line reponame relpath pattern val branch tmpf
+  local -a vals
+  local -a labels
+  # Read from each sibling's DEFAULT BRANCH (git show), not its working tree:
+  # a fleet checkout can legitimately have a sibling repo sitting on someone
+  # else's in-progress feature branch, and this gate must judge the committed
+  # contract, not transient WIP noise on an unrelated branch (#1890 review).
+  TMPD="${TMPD:-$(mktemp -d 2>/dev/null)}"
+  for h in "${headers[@]}"; do
+    vals=()
+    labels=()
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      reponame="${line%%/*}"
+      relpath="${line#*/}"
+      relpath="${relpath%%:*}"
+      pattern="${line#*:}"
+      if [ ! -d "${siblings}/${reponame}" ]; then
+        printf '  SKIP     %s — sibling repo not checked out under %s\n' "$line" "$siblings" >&2
+        continue
+      fi
+      branch="$(sibling_default_branch "${siblings}/${reponame}")" || {
+        printf '  SKIP     %s — could not resolve a default branch\n' "$line" >&2
+        continue
+      }
+      tmpf="${TMPD}/$(echo "$reponame-$relpath" | tr '/' '_')"
+      if ! git -C "${siblings}/${reponame}" show "${branch}:${relpath}" >"$tmpf" 2>/dev/null; then
+        printf '  SKIP     %s — not present on %s@%s\n' "$line" "$reponame" "$branch" >&2
+        continue
+      fi
+      val="$(header_value "$tmpf" "$pattern")"
+      if [ -z "$val" ]; then
+        printf '  SKIP     %s — header not found in this file (legitimately absent at this layer)\n' "$line" >&2
+        continue
+      fi
+      vals+=("$val")
+      labels+=("${reponame}@${branch}:${relpath}")
+    done < <(header_sites "$h")
+    if [ "${#vals[@]}" -lt 2 ]; then
+      printf '  n/a      %s — fewer than 2 live copies to compare\n' "$h" >&2
+      continue
+    fi
+    local first="${vals[0]}"
+    local mismatch_here=0
+    local i
+    for i in "${!vals[@]}"; do
+      if [ "${vals[$i]}" != "$first" ]; then
+        mismatch_here=1
+      fi
+    done
+    if [ "$mismatch_here" -ne 0 ]; then
+      printf '  REFUSED  %s — copies disagree on the value:\n' "$h" >&2
+      for i in "${!vals[@]}"; do
+        printf '           %-70s %s\n' "${labels[$i]}" "${vals[$i]}" >&2
+      done
+      mismatches=$((mismatches + 1))
+    else
+      printf '  OK       %s — %s live cop%s agree: %s\n' "$h" "${#vals[@]}" \
+        "$([ "${#vals[@]}" -eq 1 ] && echo y || echo ies)" "$first"
+    fi
+  done
+  if [ "$mismatches" -ne 0 ]; then
+    printf 'dupcheck header-values: FAIL - %s header(s) disagree across copy sites\n' "$mismatches" >&2
+    return 1
+  fi
+  printf 'dupcheck header-values: PASS (or SKIP where a sibling repo is absent)\n'
   return 0
 }
 
@@ -337,6 +509,26 @@ self_test() {
     echo '  OK    a bad invocation is CANNOT-ASSESS (rc 2), never a pass'
   fi
 
+  # Half 6 — the header-value contract's negative control (#1890): a header
+  # that legitimately differs per layer (content-security-policy: enforcing on
+  # one host, Report-Only on another, different directives per app) must never
+  # be compared, by construction — it is not in header_sites() for any header
+  # name, so header_values_cmd can never mention it.
+  local hv_headers=(x-frame-options permissions-policy strict-transport-security)
+  local hv_h
+  local control_leaked=0
+  for hv_h in "${hv_headers[@]}"; do
+    if header_sites "$hv_h" | grep -qi 'content-security-policy'; then
+      control_leaked=1
+    fi
+  done
+  if [ "$control_leaked" -ne 0 ]; then
+    echo 'check-duplicates: FAIL — content-security-policy (the negative control) is in a compared header set' >&2
+    rc=1
+  else
+    echo '  OK    content-security-policy (legitimately differs per layer) is never compared — the negative control holds'
+  fi
+
   [ "$rc" -eq 0 ] && echo 'check-duplicates: self-test OK — the rule fires, and only on forks'
   return "$rc"
 }
@@ -355,6 +547,14 @@ gate() {
   fi
   echo '== the tree =='
   scan_root "$root"
+  local scan_rc=$?
+  echo '== the security-header value contract (#1890) =='
+  header_values_cmd
+  local hv_rc=$?
+  if [ "$scan_rc" -ne 0 ]; then
+    return "$scan_rc"
+  fi
+  return "$hv_rc"
 }
 
 # scan_cmd [--root DIR] — the detector alone, over this repo by default.
@@ -384,6 +584,7 @@ rc=0
 case "${1:-}" in
   '') gate; rc=$? ;;
   scan) shift; scan_cmd "$@"; rc=$? ;;
+  header-values) header_values_cmd; rc=$? ;;
   compare) shift; compare "${1:-}" "${2:-}"; rc=$? ;;
   demo-cases) demo_cases; rc=$? ;;
   --self-test) self_test; rc=$? ;;
