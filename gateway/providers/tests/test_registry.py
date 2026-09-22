@@ -490,8 +490,9 @@ def test_nous_is_a_keyed_cloud_provider_not_the_local_hermes_hop() -> None:
     assert nous.fallback == ("ollama",)
     assert nous.tier_model_for("MAX") == "openai/gpt-6-astra-fast"
     # the local hop is untouched: this provider is additive, not a re-point.
-    # hermes is retired-by-default (issue #1518), so check its catalog config
-    # rather than the default (flag-off) registry's active set.
+    # hermes is enabled by default now (issue #1518, policy-gr5-enabled-by-
+    # default), so check its catalog config directly rather than relying on
+    # the active registry set matching by coincidence.
     assert default_provider_configs()["hermes"].requires_key is False
 
 

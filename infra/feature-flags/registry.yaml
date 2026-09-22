@@ -154,10 +154,10 @@ services:
       declaration. The declared
       `enable_hermes` variable is the switch itself, and it is a LIVE gate:
       the provider registry reads it (gateway/providers/flags.py, issue #1518)
-      and, while it is off, drops hermes from the active provider set — hermes
-      is retired by default (gateway/catalog/modules/hermes/module.json status
-      is `retired`) and only a reviewed go-live that flips this flag
-      re-activates it. The dead local endpoint at http://localhost:8080/api/chat
+      and, while it is off, drops hermes from the active provider set. Hermes
+      itself is an active, in-development module (gateway/catalog/modules/
+      hermes/module.json status is `active`, not `retired`) — this flag only
+      gates enablement, not module status. The dead local endpoint at http://localhost:8080/api/chat
       is not re-created here: the namesake `~/hermes-agent` Flask product (port
       9501,
       ADR-0012) is a separate deployable, out of scope for this row. It
