@@ -392,8 +392,9 @@ executing for real.
   (policy-gr5-enabled-by-default, owner decision 2026-09-21 — see GR-5 below).
 - **No merging failing work** — verification evidence is mandatory first.
 - **No unfinished markers (`TODO`/`FIXME`/`HACK`) or debug prints** in code.
-- **No editing `vendor/`** (pinned CMR submodule) and never commit cloned fleet
-  repos under `.research/` (gitignored).
+- **No editing `vendor/`** (pinned submodules — `vendor/CMR`,
+  `vendor/AgenticAutomationFramework`) and never commit cloned fleet repos
+  under `.research/` (gitignored).
 - **Never edit another repo's files** — direction/needs go to that repo's board.
 - **Never `git stash` in the shared main checkout** — stashes are
   repository-global, so it hides other lanes' uncommitted work (rule 15). Commit
