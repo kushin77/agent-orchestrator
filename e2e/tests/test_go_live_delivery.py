@@ -259,29 +259,52 @@ def test_the_promoted_surface_is_served_to_an_authenticated_client_only(delivery
 
 
 # --------------------------------------------------------------------------- #
-# Stage 4.5 — the shipped, promoted posture itself (#1043)
+# Stage 4.5 — the committed declaration's ratified posture (#1043, #1618, #1789)
 # --------------------------------------------------------------------------- #
-def test_the_required_surface_ships_promoted_in_the_committed_registry():
+def test_the_required_surface_ships_enabled_in_the_committed_registry():
     """The premise the fixture above exists BECAUSE of: measured on the real file.
 
     Not delivery-derived, not fixture-derived — read straight off the checkout's
     own ``infra/feature-flags/registry.yaml``, the same file ``dark``'s fixture
-    deliberately does NOT use below. #1027 (commit 32e8c24, the #607 go-live)
-    promoted this surface for real; if that promotion were ever reverted the
-    fixture-based tests below would keep passing on the fixture alone and this
-    is the one assertion that would catch it — the capstone still asserts the
-    promoted posture, just not by making the dark/rollback claims depend on it.
+    deliberately does NOT use below.
+
+    This assertion was RE-PINNED, and the authority that supersedes the old one
+    is named here rather than the claim being silently dropped:
+
+    * ``#1027`` (commit ``32e8c24``, the #607 go-live) promoted this surface for
+      real under the then-current off-by-default policy, and this capstone
+      asserted that ``promoted`` posture — the one assertion that would catch a
+      silent revert.
+    * The owner decision of 2026-09-21 (``policy-gr5-enabled-by-default``,
+      carried into ``registry.yaml`` by ``#1789``) REVERSED the GR-5
+      off-by-default rule: new capabilities ship **ON** by default once merged
+      and tested (``default_policy: on``; ``scripts/check-feature-flags.py``
+      refuses a services/surfaces entry that defaults off). The flag now
+      defaults ``on``, which is what this capstone asserts.
+    * ``#1618`` split the two facts apart: ``promoted`` records the reviewed
+      go-live RECORD — "a separate concern from the flag's boolean value", per
+      the ``registry.yaml`` header. This surface is live by default but not yet
+      promoted: it carries ``posture: hold`` (no promotion owner assigned), so
+      ``promoted: false`` is the RATIFIED value, not a reverted go-live.
+
+    So the capstone asserts the ratified posture of the real file — flag on,
+    go-live record not yet promoted — and the dark/rollback claims below still
+    do not depend on this file's default. If the posture moves again, this test
+    fails and must be re-pinned the same way, naming the new authority.
     """
     committed = Path(REPO_ROOT) / "infra" / "feature-flags" / "registry.yaml"
     document = yaml.safe_load(committed.read_text(encoding="utf-8"))
     entry = document["surfaces"][REQUIRED_SURFACE]
 
     assert registry_declares_on(committed, REQUIRED_SURFACE) is True, (
-        f"{REQUIRED_SURFACE} no longer ships promoted in {committed} — "
-        "the #1027 go-live this suite is named after has been reverted"
+        f"{REQUIRED_SURFACE} no longer ships enabled in {committed} — "
+        "the #1789 policy (new capabilities ship ON by default) has been reverted"
     )
-    assert entry.get("promoted") is True
     assert entry.get("default") in (True, "on")
+    # `promoted` tracks the go-live RECORD (#1618), not the flag value: this
+    # surface is live by default with no promotion owner yet (`posture: hold`),
+    # so `promoted: false` is the ratified posture, never a reverted go-live.
+    assert entry.get("promoted") is False
 
 
 # --------------------------------------------------------------------------- #

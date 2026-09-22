@@ -116,12 +116,24 @@ MANIFEST_SCHEMA = "cmr.gdc-manifest/v1"
 # indexer KB (#464/#475), the diagrams blueprint (#464) and the shared-frontend
 # `--os-` twin (#703). NONE may be removed — the hub catalog's
 # `catalog/mandatory.tsv` declares all three as mandatory consumer assets.
-MANDATORY_PINS: Tuple[str, ...] = (
-    "code-indexing.mcp",
-    "diagrams.blueprint",
-    "shared-frontend.tokens",
-)
-PIN_VERSION = "~0.1"
+#
+# The version each MUST declare is read PER MODULE from the VENDORED template at
+# the pinned rev (`vendor/CMR/templates/module/gdc-manifest.yaml`) — the same
+# authority `scripts/check-diagrams-declaration.sh` already holds the root
+# manifest to, pin for pin. The indexer KB and the diagrams blueprint are pinned
+# EXACT (`0.1.0`); the shared-frontend twin by range (`~0.1`). A single
+# `PIN_VERSION` was wrong: the #1873 vendor-pin bump (issue #1557) aligned the
+# manifest to the vendored template's exact `0.1.0` for the first two and left
+# this file asserting the pre-bump `~0.1`, so the gate refused the very tree the
+# vendored authority REQUIRES.
+PIN_VERSIONS: Dict[str, str] = {
+    "code-indexing.mcp": "0.1.0",
+    "diagrams.blueprint": "0.1.0",
+    "shared-frontend.tokens": "~0.1",
+}
+#: Derived from the map, so a module can never be dropped from one without the
+#: other — they are the same fact, spelled once.
+MANDATORY_PINS: Tuple[str, ...] = tuple(PIN_VERSIONS)
 PIN_UPDATES = "pr"
 
 # The immutable pin ledger for the vendored `--os-` twin. `template.yaml`
@@ -480,10 +492,11 @@ def manifest_findings(text: str, params: Dict[str, str]) -> List[str]:
                 % (MANIFEST_ASSET, module, ", ".join(MANDATORY_PINS))
             )
             continue
-        if pin.get("version") != PIN_VERSION:
+        expected_version = PIN_VERSIONS[module]
+        if pin.get("version") != expected_version:
             errs.append(
                 "%s: modules[%s].version: %r != %r"
-                % (MANIFEST_ASSET, module, pin.get("version"), PIN_VERSION)
+                % (MANIFEST_ASSET, module, pin.get("version"), expected_version)
             )
         if pin.get("updates") != PIN_UPDATES:
             errs.append(
@@ -625,7 +638,7 @@ def check(repo_root: Path) -> Tuple[int, List[str], Dict[str, Any], List[str]]:
     if not (repo_root / VENDORED_GDC_TEMPLATE_REL).is_file():
         notes.append(
             "%s is not initialised in this worktree; the pin values were checked "
-            "against render.py's PIN_VERSION/PIN_UPDATES constants only"
+            "against render.py's PIN_VERSIONS/PIN_UPDATES constants only"
             % VENDORED_GDC_TEMPLATE_REL
         )
 

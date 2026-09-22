@@ -135,6 +135,16 @@ _NORMALIZERS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bpid[=: ]\d+\b", re.IGNORECASE), "pid=<pid>"),
     (re.compile(r"\b\d+\.\d+s\b"), "<duration>s"),
     (re.compile(r"\bsession[-_]?id[=: ][\w-]+", re.IGNORECASE), "session_id=<session>"),
+    # `governance/reconcile/cli.py watch --once` names each expired session by
+    # its own live fingerprint (`reconcile:suspect:0c4c7806e9d5`, and again in
+    # the sentence). Reconcile resolves its fleet root from the MAIN checkout's
+    # git dir (`orphans.fleet_root`, #1436) rather than this harness's isolated
+    # `AO_FLEET_DIR` snapshot, so that text is LIVE box-wide state — a session id,
+    # in the never-evidence list above — and is collapsed here instead of
+    # compared. Collapsing it does NOT make the comparison vacuous: `rc`, every
+    # other captured line, and any decision-level difference are still compared.
+    (re.compile(r"reconcile:suspect:[\w-]+"), "reconcile:suspect:<session>"),
+    (re.compile(r"\bsession [\w-]+ no longer beats\b"), "session <session> no longer beats"),
     (re.compile(re.escape(str(REPO))), "<repo>"),
 )
 
