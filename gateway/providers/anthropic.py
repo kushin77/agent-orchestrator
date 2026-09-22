@@ -13,8 +13,9 @@ Model tiers mirror the harvested gmail-agent Claude client
 (``LOW`` -> haiku, ``MED``/``HIGH`` -> sonnet, ``MAX`` -> opus).
 
 Claude-specific capabilities (claude-anthropic module.json ``features``),
-both flag-gated OFF by default (GR-28) via ``ProviderConfig.provider_options``
-- a config with an empty/absent bag behaves exactly as before:
+both opt-in via ``ProviderConfig.provider_options`` - AO-GR-6 dropped the
+blanket "ships flag-gated OFF" default, so a feature is enabled by naming its
+key, and a config with an empty/absent bag behaves exactly as before:
 
 - ``prompt_caching`` (bool) - marks the system prompt and the trailing
   message content block ``cache_control: {"type": "ephemeral"}`` so a stable

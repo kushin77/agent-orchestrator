@@ -25,7 +25,9 @@ refuses two things mechanically:
 Nothing here is wired into the dev-run compose service by default: the state
 volumes stay read-only and no secret is mounted unless the `state-rw` compose
 profile is opted into explicitly (``docker compose --profile state-rw up``),
-which is the flag-gated-OFF posture GR-5 asks for at this layer (the
+which is the declared-not-mounted posture this layer requires (AO-GR-5:
+declared, never clicked). That is a scope choice about mounting, not a
+capability default, so AO-GR-6's enabled-by-default rule is not in play (the
 Terraform-declared flag for a *deployed* scheduler surface is D4+'s work — see
 `README.md`, "Flag posture").
 

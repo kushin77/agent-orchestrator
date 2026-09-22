@@ -71,8 +71,8 @@ chain:
     ctoGate: REQUIRED
     gateDetail: "CTO-office authorization is required before any
       infrastructure change is applied (charter.yaml mayApprove:
-      terraform-apply-authorization). New infra still ships flag-gated OFF by
-      default regardless of this authorization."
+      terraform-apply-authorization). New infra still ships enabled by default
+      once merged and tested (AO-GR-6) regardless of this authorization."
 
   - stage: attest
     owner: cto-office

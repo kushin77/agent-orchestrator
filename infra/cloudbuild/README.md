@@ -413,7 +413,7 @@ make web-image-dryrun   # gcloud builds submit --dry-run, or a local
    real image.
 
 None of the above runs from this lane; this lane only produces the
-flag-gated-OFF build config and its documentation.
+importable, disabled-by-default build config and its documentation.
 
 ## Apply (go-live only — never run from this task)
 

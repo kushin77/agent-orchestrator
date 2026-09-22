@@ -26,7 +26,7 @@ steps:
       - '-lc'
       - |
         if [ "${_ENABLE_PAPERCLIP}" != "true" ]; then
-          echo "paperclip runtime ships flag-gated OFF; enable_paperclip is not promoted" >&2
+          echo "paperclip deploy is disabled by this pipeline's own trigger flag; enable_paperclip itself defaults on (AO-GR-6) — this is the CI/CD trigger carve-out, not the capability default" >&2
           exit 1
         fi
         echo "enable_paperclip promoted — proceeding"

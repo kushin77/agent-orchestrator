@@ -112,7 +112,7 @@ guardrailPolicies:
     no-secrets:                    { summary: "No secrets in code or git history; env/secret manager only (GR-6).",          source: "AGENTS.md / GOLDEN-RULES.md GR-6" }
     no-direct-push-master:         { summary: "Master is protected; every change lands via a PR (GR-4).",                    source: "AGENTS.md / GOLDEN-RULES.md GR-4" }
     no-unverified-merge:           { summary: "Merge only after green verification evidence (GR-12 / owner merge mandate).", source: "AGENTS.md GR-12" }
-    no-adhoc-iac-apply:            { summary: "Terraform apply is gated; new infra ships flag-gated OFF (GR-5 / GR-28).",     source: "AGENTS.md GR-5 / IaC mandate" }
+    no-adhoc-iac-apply:            { summary: "Terraform apply is gated; new infra ships enabled by default once merged and tested (AO-GR-6).", source: "AGENTS.md GR-5 (IaC) / AO-GR-6 (flag default)" }
     dlp-redact:                    { summary: "DLP: redact sensitive data at every boundary.",                                source: "guardrails pillar (phase 4, issues #26-#30)" }
     prompt-injection-defense:      { summary: "Neutralize prompt-injection at model-call boundaries.",                        source: "guardrails pillar (phase 4)" }
     budget-finops-cap:             { summary: "Enforce token/cost budgets (FinOps metering).",                                source: "observability/telemetry pillar (phase 5, #31)" }

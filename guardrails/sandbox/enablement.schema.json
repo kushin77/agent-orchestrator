@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://agent-orchestrator.internal/schemas/sandbox-enablement.schema.json",
   "title": "agent-orchestrator sandbox runtime enablement flag",
-  "description": "Contract for the single feature flag that governs whether a sandbox runtime (offline / docker / firecracker) may execute. Shares the enum vocabulary of runtime names with the sandbox Runtime protocol; ships enabled:false and may only be turned ON by an explicit activation (issue #636, AO-GR-6 flag-gated-OFF doctrine).",
+  "description": "Contract for the single feature flag that governs whether a sandbox runtime (offline / docker / firecracker) may execute. Shares the enum vocabulary of runtime names with the sandbox Runtime protocol; ships enabled:false and may only be turned ON by an explicit activation (issue #636). That OFF default is a fail-closed safety posture and a named exception to AO-GR-6's enabled-by-default rule, not a copy of the retired blanket default.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "runtime", "enabled"],

@@ -389,7 +389,9 @@ catalog vocabularies are not touched by this surface.
    denied, never widened.
 2. **Unknown tools fail closed** (`-32601`); only declared capabilities run.
 3. **authZ is scope-first then permission** (rbac), with the cause preserved.
-4. **Rate limit on every call** through the injected gate; ships flag-gated OFF
+4. **Rate limit on every call** through the injected gate; opt-in — off until an
+   operator turns it on, the cited owner exception AO-GR-6 requires for an OFF
+   default
    until wired.
 5. **Every call is audited** — allowed or denied, who/what/tenant/result — to
    an append-only hash-chained ledger.

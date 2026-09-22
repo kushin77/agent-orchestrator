@@ -1,8 +1,10 @@
 """Controls-registry tests (issue #26 acceptance #3, AO-GR-6).
 
-Every control is toggleable and ships OFF by default; a control that ships ON
-must document on_since_rationale; the registry is validated against
-schema/controls.schema.json and rejects unsafe states.
+Every control is toggleable and defaults OFF unless it documents the
+canary/promotion that proves it (AO-GR-6's reversal plus the #1953 owner
+decision); a control that ships ON must document on_since_rationale; the
+registry is validated against schema/controls.schema.json and rejects unsafe
+states.
 """
 
 from __future__ import annotations
