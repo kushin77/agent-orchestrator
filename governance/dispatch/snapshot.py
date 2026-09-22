@@ -10,7 +10,7 @@ derives_from: null
 owner_sme: platform-sme
 tier: L1
 interfaces: [parse_files, parse_edges, now_iso, parse_iso, age_minutes, is_stale, build_snapshot, github_records, save, load, (+10 more)]
-invariants: ""
+invariants: "the board fetch pages to exhaustion, and the tracked board is written by rename only"
 gotchas: ""
 related: ["#128", "#152", "#170", "#322", "#708", "#727"]
 do_not_duplicate: null
@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -62,6 +63,11 @@ from model import Issue, Snapshot  # noqa: E402
 import policy as dispatch_policy  # noqa: E402
 
 DEFAULT_PATH = Path(".board/snapshot.json")
+
+#: Issues per page for the paginated board fetch. ``gh api --paginate`` walks the
+#: endpoint's Link headers to exhaustion, so this is a request-size knob and NOT a
+#: truncation bound -- which is the distinction issue #2025 turns on.
+ISSUES_PER_PAGE = 100
 
 #: The repo board a snapshot is refreshed from by default.
 DEFAULT_REPO = "kushin77/agent-orchestrator"
@@ -236,18 +242,24 @@ def github_records(
     call for the callers that pass no window.
     """
     run = runner or subprocess.run
+    # ``gh api --paginate`` follows the endpoint's Link headers TO EXHAUSTION;
+    # ``gh issue list --limit N`` cannot, because that surface is capped and the
+    # cap is what truncated this board (issue #2025: the board held 1000 issues
+    # while 1019 existed, and the 19 dropped ids were the OLDEST -- precisely the
+    # long-lived ids a committed spine still references, e.g. the closed
+    # ``issue-4`` that ``governance/knowledge/catalog.json`` points at).
+    #
+    # ``--jq '.[]'`` -- one JSON object per line -- is the house idiom and not a
+    # style choice: a bare ``--paginate`` with a ``--jq`` that builds an ARRAY
+    # applies that filter PER PAGE and concatenates the results into invalid JSON
+    # (``scripts/fleet-parity/judge.py:847-856`` records that measurement).
     cmd = [
         "gh",
-        "issue",
-        "list",
-        "--repo",
-        repo,
-        "--state",
-        "all",
-        "--limit",
-        "1000",
-        "--json",
-        "number,title,state,milestone,labels,body,closedAt",
+        "api",
+        "--paginate",
+        "repos/%s/issues?state=all&per_page=%d" % (repo, ISSUES_PER_PAGE),
+        "--jq",
+        ".[]",
     ]
     kwargs: dict[str, Any] = {"capture_output": True, "text": True}
     if timeout is not None:
@@ -256,23 +268,67 @@ def github_records(
         result = run(cmd, **kwargs)
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(
-            f"gh issue list exceeded the {timeout}s refresh window (bounded trigger)"
+            f"gh api exceeded the {timeout}s refresh window (bounded trigger)"
         ) from exc
     if result.returncode != 0:
-        raise RuntimeError(f"gh issue list failed ({result.returncode}): {result.stderr.strip()}")
+        raise RuntimeError(f"gh api failed ({result.returncode}): {result.stderr.strip()}")
     try:
-        records = json.loads(result.stdout or "[]")
+        rows = [
+            json.loads(line)
+            for line in (result.stdout or "").splitlines()
+            if line.strip()
+        ]
     except json.JSONDecodeError as exc:  # pragma: no cover - defensive
-        raise RuntimeError(f"gh issue list returned invalid JSON: {exc}") from exc
-    if not isinstance(records, list):  # pragma: no cover - defensive
-        raise RuntimeError("gh issue list returned a non-list payload")
+        raise RuntimeError(f"gh api returned invalid JSON: {exc}") from exc
+    # The REST issues endpoint differs from ``gh issue list`` in two ways every
+    # consumer of this board would otherwise trip over, so both are normalised
+    # here, at the one seam that owns the fetch (issues #2001/#2025):
+    #   * it returns PULL REQUESTS TOO -- they carry a ``pull_request`` key;
+    #   * it names the closed timestamp ``closed_at``, while ``build_snapshot``
+    #     reads ``closedAt``.
+    records: list[dict[str, Any]] = []
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            # The old code raised on a non-list payload; it must not fail OPEN on
+            # a malformed line either -- a silently skipped row is a silently
+            # incomplete board, which is the defect this function exists to stop.
+            raise RuntimeError(
+                f"gh api returned a non-object line at row {index}: {str(row)[:80]!r}"
+            )
+        if row.get("pull_request") is not None:
+            continue
+        row.setdefault("closedAt", row.get("closed_at") or "")
+        # The REST endpoint returns lowercase ``open``/``closed``; the committed
+        # artefact and every ``scripts/check-*.sh`` fixture carry the UPPERCASE
+        # GraphQL vocabulary. Consumers do normalise case, but shipping a board
+        # whose 863 closed rows silently changed spelling is a behavioural change
+        # in a tracked artefact, so it is normalised here at the owning seam.
+        state = row.get("state")
+        if isinstance(state, str):
+            row["state"] = state.upper()
+        records.append(row)
     return records
 
 
 def save(snapshot: Snapshot, path: Path | str = DEFAULT_PATH) -> Path:
+    """Write the snapshot **atomically** (issue #2025).
+
+    ``.board/snapshot.json`` is a TRACKED artefact that ``make verify`` rewrites
+    while ~15 other checks read it, so no reader may ever observe a half-written
+    board. The payload goes to a pid-suffixed temp file in the SAME directory (a
+    rename is only atomic within one filesystem) and is then renamed over the
+    target. ``park()`` in this same module and ``focus.save()`` in this same
+    package already did this; this function did not, and a crash mid-write left a
+    truncated JSON document behind on a tracked path.
+    """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(snapshot.to_json(), indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    payload = json.dumps(snapshot.to_json(), indent=2, sort_keys=False) + "\n"
+    tmp = target.with_name(
+        ".%s.tmp-%d-%s" % (target.name, os.getpid(), os.urandom(4).hex())
+    )
+    tmp.write_text(payload, encoding="utf-8")
+    tmp.replace(target)
     return target
 
 
