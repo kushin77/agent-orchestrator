@@ -45,6 +45,22 @@ IDS, and the only values this module looks for are the ones it must refuse.
 
 CLI: ``python3 infra/portal/auth_env.py check [--root DIR]``
 Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
+
+---knowledge---
+module_id: infra.portal.auth_env
+system: infra
+app: portal
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [AuthEnvError, load_declaration, declaration_entries, entry_for, resolve_mount_path, sso_env_constants, scanned_files, validate_declaration, (+9 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

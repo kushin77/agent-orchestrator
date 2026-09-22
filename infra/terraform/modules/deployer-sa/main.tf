@@ -1,5 +1,20 @@
 # Flag-gated deployer service account (IaC only — no console path).
 
+# ---knowledge---
+# module_id: infra.terraform.modules.deployer-sa.main
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [google_service_account, google_project_iam_member]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 locals {
   create = var.enabled ? 1 : 0
 }

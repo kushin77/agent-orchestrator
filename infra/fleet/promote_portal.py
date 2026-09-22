@@ -58,6 +58,22 @@ Tri-state exit contract (this repository's convention): 0 OK / 1 NOT-OK /
 Usage:
     python3 infra/fleet/promote_portal.py run [--apply]
     python3 infra/fleet/promote_portal.py run --dry-run   # print the decision, act on nothing
+
+---knowledge---
+module_id: infra.fleet.promote_portal
+system: infra
+app: fleet
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [TagRef, Decision, select_newest_master_tag, run_cycle, rc_for, cmd_run, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

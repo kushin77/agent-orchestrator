@@ -6,6 +6,21 @@
 # nothing. Promotion = a reviewed go-live flips the flag and the flag-gated
 # deploy pipeline rolls the runtime out.
 
+# ---knowledge---
+# module_id: infra.paperclip.terraform.variables
+# system: infra
+# app: paperclip
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [enabled, name, project_id, region, image, port, health_path, ingress, (+3 more)]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 variable "enabled" {
   description = "Master flag-gate for the paperclip runtime. When false (default) nothing is created."
   type        = bool

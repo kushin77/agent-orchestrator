@@ -2,6 +2,21 @@
 # OFF (the default) the output is null, so downstream automation cannot read a
 # value for a service that does not exist.
 
+# ---knowledge---
+# module_id: infra.terraform.outputs
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [service_uris, deployer_service_account, web_surface_uri, web_surface_domain, paperclip_runtime_uri, workbook_surface_flags, erp_module_enabled]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 output "service_uris" {
   description = "URI per promoted control-plane service; null until the service flag is ON."
   value = {

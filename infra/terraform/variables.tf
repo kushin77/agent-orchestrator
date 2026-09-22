@@ -7,6 +7,21 @@
 # cannot ship off by accident. Named exceptions (currently: enable_paperclip)
 # are recorded inline and carved out of the mechanical check by name.
 
+# ---knowledge---
+# module_id: infra.terraform.variables
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [project_id, region, env, enable_registry, enable_gateway, enable_engine, enable_guardrails, enable_telemetry, (+29 more)]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 variable "project_id" {
   description = <<-EOT
     GCP project id for the control plane. The placeholder default keeps

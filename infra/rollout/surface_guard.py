@@ -47,6 +47,22 @@ Usage::
     python3 -m infra.rollout.surface_guard operator_terminal
     python3 -m infra.rollout.surface_guard operator_terminal --json
     python3 -m infra.rollout.surface_guard operator_terminal --clear
+
+---knowledge---
+module_id: infra.rollout.surface_guard
+system: infra
+app: rollout
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [Outcome, reconcile, clear, report, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

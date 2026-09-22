@@ -13,6 +13,22 @@ Offline by design: no network, no GCP calls. State transitions are applied to
 an in-memory state seeded from the committed rollout-state.yaml and, where a
 caller asks, persisted atomically to a supplied path (never written into the
 repo tree by the offline CLI/demo).
+
+---knowledge---
+module_id: infra.rollout.engine
+system: infra
+app: rollout
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [audit_record_name, write_audit_record, RolloutError, Approval, ApprovalLedger, AuditLog, RolloutEngine]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

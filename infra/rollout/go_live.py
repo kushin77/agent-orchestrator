@@ -53,6 +53,22 @@ Usage (from the repo root):
         --actor deployer-sa --approvals-dir infra/rollout/approvals
     python3 infra/rollout/go_live.py --phase 7 --canary-health-ok \
         --actor deployer-sa --approvals-dir infra/rollout/approvals
+
+---knowledge---
+module_id: infra.rollout.go_live
+system: infra
+app: rollout
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [GoLiveCannotAssess, GoLiveRefused, Surface, Step, Assessment, GoLiveDriver, surface_stage_key, build_parser, (+2 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
