@@ -337,7 +337,10 @@ def _cmd_vendoring(args: argparse.Namespace) -> int:
     if refusals:
         print("module-registry: NOT-OK — {} vendoring refusal(s)".format(len(refusals)))
         return EXIT_NOT_OK
-    print("module-registry: OK — references only; {} is the only vendor path".format("vendor/CMR"))
+    print(
+        "module-registry: OK — references only; the declared vendor path(s) are "
+        "{}".format(", ".join(vendoring.VENDOR_SUBMODULES))
+    )
     return EXIT_OK
 
 

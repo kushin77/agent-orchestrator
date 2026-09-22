@@ -63,6 +63,42 @@ def test_an_extra_submodule_path_is_refused(hub: Path, consumer: Path) -> None:
     ]
 
 
+def test_the_declared_vendor_submodules_are_not_refused(
+    hub: Path, consumer: Path
+) -> None:
+    """The declared set is the authority: the paths it names are references.
+
+    ``vendor/AgenticAutomationFramework`` was declared a vendored submodule
+    (#2012) after this rule was written, so the rule must read the declaration
+    rather than restate "the hub is the only one" — otherwise a deliberate
+    doctrine move reds the suite in the hub-present venue alone.
+    """
+    assert "vendor/AgenticAutomationFramework" in vendoring.VENDOR_SUBMODULES
+    (consumer / ".gitmodules").write_text(
+        '[submodule "vendor/CMR"]\n\tpath = vendor/CMR\n'
+        '[submodule "vendor/AgenticAutomationFramework"]\n'
+        "\tpath = vendor/AgenticAutomationFramework\n",
+        encoding="utf-8",
+    )
+    assert vendoring.scan(consumer, _catalog(hub, consumer)) == []
+
+
+def test_an_undeclared_submodule_is_refused_while_declared_ones_are_not(
+    hub: Path, consumer: Path
+) -> None:
+    """The negative control: the set accepts its entries and refuses the rest."""
+    (consumer / ".gitmodules").write_text(
+        '[submodule "vendor/CMR"]\n\tpath = vendor/CMR\n'
+        '[submodule "vendor/AgenticAutomationFramework"]\n'
+        "\tpath = vendor/AgenticAutomationFramework\n"
+        '[submodule "third-party"]\n\tpath = third_party/widget\n',
+        encoding="utf-8",
+    )
+    assert codes(vendoring.scan(consumer, _catalog(hub, consumer))) == [
+        "VENDOR-EXTRA-SUBMODULE: third_party/widget"
+    ]
+
+
 def test_a_submodule_that_vendors_a_module_directly_is_refused(hub: Path, consumer: Path) -> None:
     (consumer / ".gitmodules").write_text(
         '[submodule "vendor/CMR"]\n\tpath = vendor/CMR\n'
