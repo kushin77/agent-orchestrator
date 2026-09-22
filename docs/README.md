@@ -8,10 +8,10 @@ Index of the repo's canonical documentation. Agents start at
 | Doc | Purpose |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
-| [`../control-plane/cockpit/README.md`](../control-plane/cockpit/README.md) | The terminal cockpit (AgentConsole) — the operator client of the RC-3 control API and the authenticated SSE streams; keyboard-first, role-tiered, drillable, flag-gated OFF (EPIC #551, issue #566). |
+| [`../control-plane/cockpit/README.md`](../control-plane/cockpit/README.md) | The terminal cockpit (AgentConsole) — the operator client of the RC-3 control API and the authenticated SSE streams; keyboard-first, role-tiered, drillable, enabled by default (AO-GR-6) (EPIC #551, issue #566). |
 | [`ABILITIES.md`](ABILITIES.md) | Ability inventory — every control verb/cockpit function/paperclip API path/MCP surface/gateway module, owner layer, status, proving gate (issue #1650, `Parent: #1510`). |
 | [`AGENTCONSOLE-GOLIVE.md`](AGENTCONSOLE-GOLIVE.md) | The repeatable AgentConsole go-live recipe (build -> transfer -> run -> secrets -> state -> cutover -> verify) with its rollback, and the gate that keeps the hosting contract from regressing (issue #1029, epic #607). |
-| [`AGENTCONSOLE-HOSTING.md`](AGENTCONSOLE-HOSTING.md) | Where the browser operator console (AgentConsole) runs and who makes it run — the source/run two-repo handoff, flag-gated OFF; §11 carries the module/catalog packaging (issue #801, packaged by #813). |
+| [`AGENTCONSOLE-HOSTING.md`](AGENTCONSOLE-HOSTING.md) | Where the browser operator console (AgentConsole) runs and who makes it run — the source/run two-repo handoff, enabled by default (AO-GR-6); §11 carries the module/catalog packaging (issue #801, packaged by #813). |
 | [`ARCHITECTURE-2026-09.md`](ARCHITECTURE-2026-09.md) | **As-built source of truth for the control chain** — Paperclip → PMO → Hermes → agents → lanes/gates/attestation, per-layer implemented/declared-only/missing, corrected against ADR-0033 (issue #1650, `Parent: #1510`). |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Five-pillar control-plane architecture (design reference; EPIC-00 = issue #4). |
 | [`AUTHORITY-MODEL.md`](AUTHORITY-MODEL.md) | Scoped admin rights, repo separation, schema-enforced separation of duties, end-to-end closure (EPIC #144, issue #150). |
@@ -41,7 +41,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`INFRA-LIMITS.md`](INFRA-LIMITS.md) | The sandbox + ephemeral-storage contract — the blocked network, the read-only-except-workspace filesystem, the shared `/tmp` tmpfs, the write-is-not-a-write-until-read-back rule, and the `scripts/check-infra-limits.sh` guard that enforces them (EPIC #708, issue #729). |
 | [`MODULE-ADMISSION.md`](MODULE-ADMISSION.md) | The parent-side sub-module admission contract — what a sub-module is, what each side declares, and what a module must not inherit (EPIC #422, issue #423). |
 | [`MODULE-SCAFFOLD.md`](MODULE-SCAFFOLD.md) | Module scaffold — the de facto shape of a new internal module |
-| [`PAPERCLIP-ING-DEPLOY.md`](PAPERCLIP-ING-DEPLOY.md) | The self-hosted paperclip runtime runbook — declaration-only, flag-gated OFF, pinned upstream release, offline `/api/health` probe (issue #411). |
+| [`PAPERCLIP-ING-DEPLOY.md`](PAPERCLIP-ING-DEPLOY.md) | The self-hosted paperclip runtime runbook — declaration-only, enabled by default (AO-GR-6), pinned upstream release, offline `/api/health` probe (issue #411). |
 | [`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md) | Sourced fork-map of upstream `paperclip.ing` against the fleet's own primitives (issue #368). |
 | [`PAPERCLIP-ING-INTEGRATION.md`](PAPERCLIP-ING-INTEGRATION.md) | Frozen fleet ↔ upstream Paperclip integration seam — heartbeat/ticket/budget contracts (ADR-0013, issue #370). |
 | [`PAPERCLIP-PROMOTION-DECISION.md`](PAPERCLIP-PROMOTION-DECISION.md) | Recorded go/no-go decision on promoting `enable_paperclip`: NO-GO (flag stays `default = false`, documented-inert), with owner sign-off (issue #1515). |

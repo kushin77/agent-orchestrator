@@ -12,7 +12,7 @@ template → class → pattern → enterprise → faang → elite
 
 Declared on an issue as a `class:<rung>` label. The IaC mandate applies at every
 rung: infrastructure is declared, never clicked, and new infrastructure ships
-flag-gated OFF.
+enabled by default (AO-GR-6).
 
 ## What is enforced, and what is only reported
 

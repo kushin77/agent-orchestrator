@@ -7,9 +7,11 @@
 
 ## What this records
 
-`infra/feature-flags/registry.yaml` is the read-only flag registry; every
-control-plane surface ships OFF until a reviewed go-live promotes it. Until
-issue #1618 it declared **38 `default: off` surfaces** and not one carried an
+`infra/feature-flags/registry.yaml` is the read-only flag registry. At the
+time of issue #1618, every control-plane surface shipped OFF until a reviewed
+go-live promoted it (pre-AO-GR-6; that default has since reversed to ON,
+policy-gr5-enabled-by-default, 2026-09-21). Until issue #1618 it declared
+**38 `default: off` surfaces** and not one carried an
 owner, a promotion issue or a target date — so a surface *pending a reviewed
 go-live* was indistinguishable from a surface *drifting with nobody
 responsible* (issue #1540's gap).

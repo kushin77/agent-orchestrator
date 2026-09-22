@@ -189,9 +189,9 @@ delta is closed **e2e across all pillars**:
 
 - **NG4 — all needs are issues on our own board.** Every workbook row maps to
   an issue above (#632–#644); nothing requires work in a foreign repo.
-- **GR-5 — new surfaces ship flag-gated OFF.** #644 owns one flag per new
-  surface (org-chart view, skill studio, task board, outbound MCP, sandbox
-  runtime), all defaulting OFF.
+- **AO-GR-6 — new surfaces ship enabled by default.** #644 owns one flag per
+  new surface (org-chart view, skill studio, task board, outbound MCP, sandbox
+  runtime), each defaulting ON unless a named exception is recorded.
 - **One issue = one lane.** The children's file areas are pairwise disjoint,
   so the whole set can run under the parallel-dispatch contract
   (`docs/EXECUTION-PLAN.md`) without two lanes sharing a file.

@@ -40,7 +40,7 @@ owns the hard parts, mapped by pillar in
 | `identity/rbac`, `guardrails/policy` | Tenant scoping and policy gates the module binds to |
 | `telemetry/ledger`, `telemetry/metering` | Hash-chained audit and per-tenant usage roll-up |
 | `portal/static/`, `portal/server/` | The admin UI shell the module's frontend mounts into |
-| `infra/feature-flags/` | GR-5: every new surface ships flag-gated OFF |
+| `infra/feature-flags/` | AO-GR-6: every new surface ships enabled by default |
 | `e2e/` ([README](../e2e/README.md)) | The enterprise harness: golden path + no-false-green negative controls, fully offline |
 
 ## The module shape
@@ -118,8 +118,8 @@ criteria and `Verify:` commands live on the board — not here.
 - **Vertical industry apps** (Education, Healthcare, Agriculture,
   Non-Profit, Hospitality) are out of the module's first scope; they arrive
   as their own direction issues if ever needed.
-- **No console clicks or ad-hoc infra** — the module ships flag-gated OFF
-  (GR-5), declared, never clicked.
+- **No console clicks or ad-hoc infra** — the module ships enabled by default
+  (AO-GR-6), declared, never clicked.
 - The module consumes `engine/`, `identity/`, `telemetry/`, `portal/`
   through their public contracts — child lanes never edit those pillar
   files except their own additive `portal/static/erp/**` + one
