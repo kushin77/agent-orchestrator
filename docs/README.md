@@ -106,6 +106,7 @@ reachable from this index.
 | [`CODE-HEADER-STANDARD.md`](CODE-HEADER-STANDARD.md) | The machine-parseable knowledge block every source file carries, and the fields the indexer reads (issue #1535, EPIC #1510). |
 | [`DIAGRAMS-CAPABILITY-REGISTER.md`](DIAGRAMS-CAPABILITY-REGISTER.md) | What "fully capable" means for the fleet's diagrams surface (issue #467). |
 | [`VENDOR-COMPLIANCE-GAP-133.md`](VENDOR-COMPLIANCE-GAP-133.md) | Vendor-compliance gap #133 (`kushin77/googleworkspace`) — the measured declaration, its owners, and why it must not be closed on its own gate (issue #133). |
+| [`VENDOR-COMPLIANCE-GAP-132.md`](VENDOR-COMPLIANCE-GAP-132.md) | Vendor-compliance gap #132 (`kushin77/shared-services`) — the measured declaration, its owners, and why it must not be closed on its own gate (issue #1994). |
 | [`erp-finops/compliance-audit.md`](erp-finops/compliance-audit.md) | ERP/FinOps compliance audit — phase-4 validation & governance (issue #676, EPIC #665). |
 | [`erp-finops/current-state.md`](erp-finops/current-state.md) | Current-state money map — subscription flows and the manual reconciliation points (PF-1, issue #666, EPIC #665). |
 | [`erp-finops/saas-metrics-current-state.md`](erp-finops/saas-metrics-current-state.md) | SaaS metrics current state — MRR/ARR, cloud compute burn, invoicing bottlenecks and the silo map (issue #668). |
