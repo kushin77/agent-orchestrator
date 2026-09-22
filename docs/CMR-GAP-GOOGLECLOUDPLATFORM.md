@@ -9,30 +9,45 @@ is a separate repo not checked out here).
 
 ## Stage-by-stage status
 
-### Grade
-- **Exists:** a profile record — `vendor/CMR/onboarding/googlecloudplatform/0001-vendor-onboarding.md`
-  ("research-verified 2026-09-07") and a security snapshot in
-  `vendor/CMR/docs/health-report.tsv` (code-scanning disabled, secret-scanning
-  disabled, dependabot 0, no advisories). Neither is a conformance-suite run —
-  `vendor/CMR/guardrails/check-conformance.sh` has not been pointed at this
-  repo; no grade score is recorded anywhere in `vendor/CMR/catalog/` or
-  `vendor/CMR/docs/health-report.*`.
-- **Missing:** a recorded baseline conformance grade for the target repo.
-- **Smallest fix:** run `check-conformance.sh` against `kushin77/googlecloudplatform`
-  and append the score to `health-report.tsv`/`.json` (one row, matching the
-  existing security-row format).
+### Grade — CLOSED (#1733)
+Landed upstream in `kushin77/CMR` pull request 1022 (merged 2026-09-21T23:48Z),
+"docs(health): record googlecloudplatform baseline conformance grade":
+appended a `conformance` row to `docs/health-report.tsv` and a matching
+`conformance.kushin77/googlecloudplatform` object to `docs/health-report.json`,
+sourced from `guardrails/check-conformance.sh`. Recorded result: **FAIL** —
+3 pass, 11 failed (4 vendor-owned: `module.json`, `release`, `gdc-manifest`,
+`architecture-manifest`; 7 hub-owned via standards-bundle), 2 advisory, 2 skip.
+That satisfies #1733's Done line verbatim (one row, security-row format, both
+files). Because this repo does not check out `kushin77/googlecloudplatform`
+or carry a fresh `vendor/CMR` pin past that merge, the row above is quoted
+from the upstream PR diff rather than visible in this checkout — the submodule
+pointer here predates PR 1022 and its pin bump is tracked separately.
 
-### Govern
-- **Exists:** `vendor/CMR/controller/governance.tsv` row 5:
-  `kushin77/googlecloudplatform / vendor / applied=false / declared — GCP infra
-  module ... applied by Terraform governance (CMR-104/111)`.
-- **Missing:** the guardrails/policy bundle has not been applied (`applied=false`).
-  The onboarding doc also flags two concrete gaps the vendor repo itself must
-  close first: no `.github/dependabot.yml`, no root `.gitleaks.toml`.
-- **Smallest fix:** flip `applied` once the Terraform governance module (already
-  named in the row) runs against the vendor repo; that is vendor-side work
-  gated by NG6 (CMR never writes vendor code), so this repo's part is limited
-  to recording the applied state once the vendor confirms.
+A follow-up, `kushin77/CMR` pull request 1025 (merged 2026-09-21T23:54Z),
+"docs(governance): re-grade kushin77/googlecloudplatform after
+dependabot/gitleaks bundle", re-ran the same grade after the Govern-stage
+bundle below landed: vendor-owned failures unchanged, two hub-owned signals
+(`dependabot`, `gitleaks-config`) flipped from FAIL to PASS, 9 of 17 signals
+remain FAIL overall.
+
+### Govern — IN PROGRESS (#1734 stays open)
+`kushin77/googlecloudplatform` pull request 3 (merged 2026-09-21T23:48Z),
+"chore(governance): add dependabot + gitleaks config", added
+`.github/dependabot.yml` (terraform ecosystem, weekly) and a root
+`.gitleaks.toml` (extends gitleaks default ruleset, narrow allowlist for
+placeholder markers and two portal localStorage keys, `stopwords` for the
+"budgets/FinOps" false positive, path-excludes build dirs and nested
+worktrees). That closes the two vendor-side gaps this doc flagged
+(no dependabot config, no gitleaks config).
+
+**Still missing:** `kushin77/CMR` pull request 1025's own diff records that
+`controller/governance.tsv` row 5 remains `applied=false` — "governance
+bundle merged 2026-09-21 (dependabot+gitleaks now PASS, 9 of 17 signals
+remain FAIL); Terraform apply itself (CMR-104/111) not yet run." The Terraform
+governance module has not been applied, so #1734's Done line (flip row 5 to
+`applied=true`) is not satisfied. GR-5 bans ad-hoc `terraform apply` from an
+agent session, so this cannot be closed by hand either — #1734 stays open,
+tracking only the remaining Terraform-apply step.
 
 ### Catalog
 - **Exists:** `channels/sent/googlecloudplatform-0001-module.md` and the spokes
