@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Feature-flag registry gate for `make verify` (issue #6 / IaC mandate).
 
-Validates `infra/feature-flags/registry.yaml` and keeps it in lock-step with
-`infra/terraform/variables.tf`. Policy reversed by explicit owner decision
+Validates `infra/feature-flags/registry.yaml`, keeps it in lock-step with
+`infra/terraform/variables.tf`, and cross-validates it against the portal's
+own `portal/config/feature-flags.yaml` declaration. Policy reversed by
+explicit owner decision
 (2026-09-21, single-developer environment; policy-gr5-enabled-by-default PR):
 new capabilities ship ENABLED by default once merged and tested — a
 capability is either fully built and ON, or not yet merged. There is no more
@@ -21,7 +23,16 @@ capability is either fully built and ON, or not yet merged. There is no more
   (6) every not-yet-promoted `services:`/`surfaces:` entry still carries a
       promotion owner — a non-empty `promotion_issue:` or `posture: hold`
       (issue #1618) — so a live-but-not-yet-fully-promoted surface cannot
-      drift with nobody responsible.
+      drift with nobody responsible,
+  (7) every surface declared in BOTH this registry's `surfaces:` map and
+      `portal/config/feature-flags.yaml`'s `surfaces:` map carries the same
+      `default` — the two files drifted silently once (issue #1941: three
+      surfaces flipped ON here but stayed OFF in the portal's own reader),
+      so this is an intersection check, refusing by name on any mismatch
+      (a portal-only surface with no registry counterpart is not compared,
+      and a surface in `PORTAL_DRIFT_EXEMPT` — currently only erp_module,
+      which carries its own dedicated promotion gate — is not compared
+      either).
 
 Every branch above can genuinely fail; nothing here is a formality.
 
@@ -37,7 +48,7 @@ tier: L1
 interfaces: [exit 0 OK, exit 1 NOT-OK]
 invariants: ""
 gotchas: ""
-related: ["#6", "#1618"]
+related: ["#6", "#1618", "#1941"]
 do_not_duplicate: null
 ---knowledge---
 """
@@ -57,6 +68,7 @@ except ImportError as exc:  # pragma: no cover
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY = os.path.join(ROOT, "infra", "feature-flags", "registry.yaml")
 TF_VARS = os.path.join(ROOT, "infra", "terraform", "variables.tf")
+PORTAL_FLAGS = os.path.join(ROOT, "portal", "config", "feature-flags.yaml")
 
 # Flags this checker accepts at "off" under policy-gr5-enabled-by-default: the
 # owner's default is ON, not a prohibition on off, so an entry here still
@@ -66,6 +78,19 @@ TF_VARS = os.path.join(ROOT, "infra", "terraform", "variables.tf")
 # infra/feature-flags/registry.yaml) — it defaults on like everything else,
 # so this set is currently empty.
 OFF_BY_EXPLICIT_DECISION: set[str] = set()
+
+# Surfaces exempt from the portal-drift cross-check (issue #1941), because
+# their portal declaration is deliberately NOT the registry's default: the
+# surface carries its own dedicated promotion gate with its own reason to
+# stay off. A name goes here only with a cited gate, never to silence a
+# genuine drift.
+PORTAL_DRIFT_EXEMPT: dict[str, str] = {
+    "erp_module": (
+        "own promotion gate (scripts/check-erp-portal.sh, "
+        "e2e/erp/golden_path.py, e2e/erp/negative_controls.py) requires the "
+        "shipped default stay off; promoted only through a scratch config"
+    ),
+}
 
 CANONICAL_SERVICES = [
     "registry",
@@ -123,6 +148,60 @@ def _owner_errors(reg: dict) -> list[str]:
     return findings
 
 
+def _normalize_default(value) -> Optional[bool]:
+    """PyYAML's `off`/`on` and the string spellings both mean OFF/ON."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        low = value.strip().lower()
+        if low == "on":
+            return True
+        if low == "off":
+            return False
+    return None
+
+
+def _portal_drift_errors(reg: dict, portal_doc) -> list[str]:
+    """Cross-check issue #1941: every surface declared in BOTH
+    `infra/feature-flags/registry.yaml` (surfaces:) and
+    `portal/config/feature-flags.yaml` (surfaces:) must carry the same
+    `default`. A portal-only surface (no registry counterpart — e.g.
+    fleet_board, sessions, settings) is not compared; this is an
+    intersection check, not a "every portal surface must be registered" rule.
+    Pure (never exits, never prints) — returns the error strings.
+    """
+    findings: list[str] = []
+    reg_surfaces = reg.get("surfaces")
+    if not isinstance(reg_surfaces, dict):
+        reg_surfaces = {}
+    portal_surfaces = (portal_doc or {}).get("surfaces")
+    if not isinstance(portal_surfaces, dict):
+        portal_surfaces = {}
+
+    for name in sorted(set(reg_surfaces) & set(portal_surfaces)):
+        if name in PORTAL_DRIFT_EXEMPT:
+            continue
+        reg_entry = reg_surfaces.get(name) or {}
+        portal_entry = portal_surfaces.get(name) or {}
+        reg_default = _normalize_default(reg_entry.get("default"))
+        portal_default = _normalize_default(portal_entry.get("default"))
+        if reg_default is None or portal_default is None:
+            findings.append(
+                f"surfaces.{name}: unparseable default "
+                f"(registry={reg_entry.get('default')!r}, "
+                f"portal={portal_entry.get('default')!r})"
+            )
+            continue
+        if reg_default != portal_default:
+            findings.append(
+                f"surfaces.{name}: registry.yaml default="
+                f"{reg_entry.get('default')!r} but portal/config/"
+                f"feature-flags.yaml default={portal_entry.get('default')!r} "
+                "(drifted — issue #1941)"
+            )
+    return findings
+
+
 def _run_self_test() -> int:
     """Prove both directions of the promotion-owner rule (issue #1618).
 
@@ -176,6 +255,53 @@ def _run_self_test() -> int:
     )
     # (e) the real registry is fully owned or held.
     probe("real registry fully owned/held", False, load_registry())
+
+    # (f)-(i): the portal-drift cross-check (issue #1941).
+    def probe_drift(name: str, want_errors: bool, reg: dict, portal: dict, needle: str = "") -> None:
+        nonlocal failed
+        errs = _portal_drift_errors(reg, portal)
+        ok = bool(errs) if want_errors else not errs
+        if ok and (not want_errors or not needle or any(needle in e for e in errs)):
+            print(f"  OK    {name}")
+        else:
+            print(f"  FAIL  {name}: errors={errs!r} (wanted {'a failure' if want_errors else 'clean'})", file=sys.stderr)
+            failed += 1
+
+    # (f) a mismatched pair is refused, by name.
+    probe_drift(
+        "mismatched surface refused",
+        True,
+        {"surfaces": {"probe_surface": {"default": "on"}}},
+        {"surfaces": {"probe_surface": {"default": "off"}}},
+        needle="surfaces.probe_surface",
+    )
+    # (g) a matched pair (both on) passes.
+    probe_drift(
+        "matched surface (on) accepted",
+        False,
+        {"surfaces": {"probe_surface": {"default": "on"}}},
+        {"surfaces": {"probe_surface": {"default": "on"}}},
+    )
+    # (h) a portal-only surface (no registry counterpart) is not compared.
+    probe_drift(
+        "portal-only surface ignored",
+        False,
+        {"surfaces": {}},
+        {"surfaces": {"portal_only_surface": {"default": "off"}}},
+    )
+    # (j) an exempt surface's mismatch is not flagged.
+    probe_drift(
+        "exempt surface mismatch ignored",
+        False,
+        {"surfaces": {"erp_module": {"default": "on"}}},
+        {"surfaces": {"erp_module": {"default": "off"}}},
+    )
+    # (i) the real registry and the real portal declaration agree.
+    portal_path = PORTAL_FLAGS
+    if os.path.isfile(portal_path):
+        with open(portal_path, encoding="utf-8") as fh:
+            real_portal = yaml.safe_load(fh)
+        probe_drift("real registry/portal surfaces agree", False, load_registry(), real_portal)
 
     if failed:
         print(f"check-feature-flags self-test: {failed} probe(s) failed", file=sys.stderr)
@@ -274,6 +400,14 @@ def main(argv=None) -> int:
     # (6) promotion owners: a declared-off surface with no owner is refused.
     for finding in _owner_errors(reg):
         fail(finding)
+
+    # (7) portal/config/feature-flags.yaml drift (issue #1941): every surface
+    # declared in both files must agree on `default`.
+    if os.path.isfile(PORTAL_FLAGS):
+        with open(PORTAL_FLAGS, encoding="utf-8") as fh:
+            portal_doc = yaml.safe_load(fh)
+        for finding in _portal_drift_errors(reg, portal_doc):
+            fail(finding)
 
     finish()
     return 0

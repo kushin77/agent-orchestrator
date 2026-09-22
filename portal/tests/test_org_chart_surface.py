@@ -12,7 +12,7 @@ prove end to end:
   good");
 * an unreadable or invalid declaration is served as an explicit ``unresolved``
   document, never invented around;
-* the surface is **feature-flag-gated OFF** until promoted, and the refusal
+* the surface is **feature-flag-gated, ON by default** (GR-5 reversal 2026-09-21), and the refusal-when-explicitly-off
   happens *before* authentication (an unpromoted view is invisible, not merely
   protected).
 """
@@ -49,28 +49,32 @@ def _authed(app: ConsoleApplication):
 
 
 # --------------------------------------------------------------------------- #
-# The flag gate (GR-5: a new surface ships OFF)
+# The flag gate (GR-5 reversal 2026-09-21: a new surface ships ON by default)
 # --------------------------------------------------------------------------- #
-def test_config_declares_the_view_off():
-    """The portal's own config declares the view, and declares it OFF."""
+def test_config_declares_the_view_on():
+    """The portal's own config declares the view, on by default (GR-5 reversal)."""
     document = yaml.safe_load(
         (REPO_ROOT / "portal" / "config" / "feature-flags.yaml").read_text(
             encoding="utf-8"
         )
     )
+    # default_policy is the fail-closed fallback for surfaces with no
+    # explicit `default` (unused here: org_chart declares one); unchanged
+    # by this surface's promotion.
     assert document["default_policy"] in (False, "off")
     entry = document["surfaces"][ORG_CHART_SURFACE]
-    # PyYAML reads the bare YAML 1.1 scalar `off` as boolean False — both
-    # spellings mean OFF (same acceptance as scripts/check-feature-flags.py).
-    assert entry["default"] in (False, "off"), (
-        "the org-chart view must ship OFF (GR-5)"
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD
+    # off-by-default policy; updated to assert the new correct default,
+    # matching infra/feature-flags/registry.yaml's surfaces.org_chart entry.
+    assert entry["default"] in (True, "on"), (
+        "the org-chart view must ship ON (GR-5 reversal)"
     )
-    assert surface_enabled(REPO_ROOT, surface=ORG_CHART_SURFACE) is False
+    assert surface_enabled(REPO_ROOT, surface=ORG_CHART_SURFACE) is True
 
 
 def test_surface_is_refused_while_the_flag_is_off():
-    """The default app (config decides) refuses the whole family — before authN."""
-    app = build_app(sso=console_sso())
+    """An explicitly-disabled view refuses the whole family — before authN."""
+    app = _app(_view(enabled=False))
     api = _authed(app)
     status, payload = api.get("/api/orgchart/chart")
     assert status == 404
@@ -82,6 +86,17 @@ def test_surface_is_refused_while_the_flag_is_off():
     anonymous.cookies.clear()
     status, _ = anonymous.get("/api/orgchart/health")
     assert status == 404
+
+
+def test_the_default_app_requires_authn_not_hidden_by_flag():
+    """401, not 404: policy-gr5-enabled-by-default (2026-09-21) ships the view ON,
+    so the default app (config decides) is visible but still requires authentication."""
+    app = build_app(sso=console_sso())
+    anonymous = _authed(app)
+    anonymous.cookies.clear()
+    status, payload = anonymous.get("/api/orgchart/chart")
+    assert status == 401
+    assert payload["error"]["code"] == "unauthorized"
 
 
 def test_the_view_renders_once_its_flag_is_flipped_on():

@@ -5,25 +5,36 @@
 # routes on an endpoint, and it is kept in lock-step with
 # `infra/terraform/variables.tf` by `scripts/check-feature-flags.py` (every
 # `enable_*` variable must have a matching `services.<name>` entry, and vice
-# versa). The three surfaces this file governs are **views inside the portal
+# versa). The surfaces this file governs are **views inside the portal
 # service** — they add no service, no terraform variable and no deploy target,
 # so declaring them in that registry would either need a fabricated `enable_*`
 # variable or break the checker's 1:1 rule. They are declared here instead,
 # beside the code that reads them, and read through the same fail-closed
 # contract the fleet projection uses.
 #
-# Default policy is OFF (GR-5): a surface ships dark until a reviewed go-live
-# flips its `default`. `portal/server/config_flags.py` is the only reader — a
-# missing file, unreadable file, missing `surfaces` section, missing entry, or
-# an entry whose `default` is neither `off`/`false` all read as OFF, so a
-# surface can never be promoted by accident, only by an explicit `on`/`true`.
+# `portal/server/config_flags.py` is the only reader — a missing file,
+# unreadable file, missing `surfaces` section, missing entry, or an entry
+# whose `default` is neither `on`/`true` reads as OFF, so a surface can never
+# be promoted by accident, only by an explicit `on`/`true`.
+#
+# `default_policy: off` below is only the fail-closed fallback for an entry
+# with no explicit `default` (every surface here declares one). Per-surface
+# defaults are independent: org_chart, skill_studio and task_board default
+# ON, matching their `infra/feature-flags/registry.yaml` counterparts (GR-5
+# reversal, owner decision 2026-09-21). erp_module stays OFF — it has its own
+# dedicated promotion gate (scripts/check-erp-portal.sh,
+# e2e/erp/golden_path.py) that requires the shipped default stay off.
+# fleet_board, sessions and settings default OFF — they have no registry.yaml
+# `surfaces:` counterpart to promote against, so they are governed here
+# alone. `scripts/check-feature-flags.py` cross-validates every surface
+# declared in both files against drift (issue #1941).
 schema_version: 1
 
 default_policy: off
 
 surfaces:
   org_chart:
-    default: off
+    default: on
     phase: 11
     description: >
       Org-chart view (issue #642, workbook-11; EPIC #631 Pillar 2): renders the
@@ -35,7 +46,7 @@ surfaces:
       GET /api/orgchart/health. Consumes both declarations verbatim; it
       restates no cap, tier or cadence.
   skill_studio:
-    default: off
+    default: on
     phase: 11
     description: >
       Skill-studio UI (issue #642, workbook-11): the author -> test -> publish
@@ -47,7 +58,7 @@ surfaces:
       GET /api/skillstudio/skills, GET /api/skillstudio/skills/<id> and
       POST /api/skillstudio/author|test|publish. Offline (no network egress).
   task_board:
-    default: off
+    default: on
     phase: 11
     description: >
       Tenant task board (issue #642, workbook-11): the workbook-3 ticket
@@ -57,6 +68,12 @@ surfaces:
       GET /api/taskboard/tickets/<id>. A ticket the log does not contain is
       absent, not invented.
   erp_module:
+    # NOT part of GR-5's default-on reversal (issue #1941): the ERP module
+    # has its own dedicated promotion gate (scripts/check-erp-portal.sh,
+    # e2e/erp/golden_path.py, e2e/erp/negative_controls.py) that asserts this
+    # surface ships OFF and is promoted only through a scratch config, never
+    # the shipped default. Flipping it here would fail that gate's own
+    # contract, so it is out of scope for this lane.
     default: off
     phase: 7
     description: >

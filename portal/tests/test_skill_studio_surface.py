@@ -10,7 +10,7 @@ prove end to end:
   or a failing case) — the refusal is served as a 409 carrying the studio's own
   reason, so the gate cannot become a formality at the transport layer;
 * an unknown revision is **absent** (404), never an invented empty shell;
-* the surface is **feature-flag-gated OFF** until promoted, before authN;
+* the surface is **feature-flag-gated, ON by default** (GR-5 reversal 2026-09-21), before authN;
 * importing the server **borrows** the pillar root for the one import that needs
   it and gives it back — no import-time ``sys.path`` edit survives the import.
 """
@@ -64,7 +64,7 @@ def _author(api, *, skill_id="release-notes", version="1.0.0", category="analysi
 
 
 # --------------------------------------------------------------------------- #
-# The flag gate (GR-5: a new surface ships OFF)
+# The flag gate (GR-5 reversal 2026-09-21: a new surface ships ON by default)
 # --------------------------------------------------------------------------- #
 def _cases_file(tmp_path: Path, *, observed: str) -> Path:
     """A real eval-cases file in the harness's own on-disk shape.
@@ -86,30 +86,41 @@ def _cases_file(tmp_path: Path, *, observed: str) -> Path:
     return cases
 
 
-def test_config_declares_the_surface_off():
+def test_config_declares_the_surface_on():
     document = yaml.safe_load(
         (REPO_ROOT / "portal" / "config" / "feature-flags.yaml").read_text(
             encoding="utf-8"
         )
     )
     entry = document["surfaces"][SKILL_STUDIO_SURFACE]
-    assert entry["default"] in (False, "off"), (
-        "the skill-studio surface must ship OFF (GR-5)"
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD
+    # off-by-default policy; updated to assert the new correct default,
+    # matching infra/feature-flags/registry.yaml's surfaces.skill_studio entry.
+    assert entry["default"] in (True, "on"), (
+        "the skill-studio surface must ship ON (GR-5 reversal)"
     )
-    assert surface_enabled(REPO_ROOT, surface=SKILL_STUDIO_SURFACE) is False
+    assert surface_enabled(REPO_ROOT, surface=SKILL_STUDIO_SURFACE) is True
 
 
 def test_surface_is_refused_while_the_flag_is_off():
-    app = build_app(sso=console_sso())
+    app = _app(_surface(enabled=False))
     api = _authed(app)
     status, payload = api.get("/api/skillstudio/skills")
     assert status == 404
     assert payload["error"]["code"] == "feature_disabled"
     assert "portal/config/feature-flags.yaml" in payload["error"]["message"]
-    # the write edge is refused too, and *before* authN — the surface (and any
-    # hint that it exists) is invisible to an unauthenticated probe.
+    # the write edge is refused too.
     status, _ = api.post("/api/skillstudio/publish", body={"skillId": "x"})
     assert status == 404
+
+
+def test_the_default_app_renders_the_surface_flag_is_on_by_default():
+    """policy-gr5-enabled-by-default (2026-09-21): the default app (config
+    decides) now serves the family, matching infra/feature-flags/registry.yaml."""
+    app = build_app(sso=console_sso())
+    api = _authed(app)
+    status, _ = api.get("/api/skillstudio/skills")
+    assert status == 200
 
 
 def test_the_surface_renders_once_its_flag_is_flipped_on():
