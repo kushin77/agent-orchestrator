@@ -11,6 +11,22 @@ from becoming a way to paper over a malformed event.
 The policy is deliberately pure: :meth:`BackoffPolicy.delay` is a function of
 the attempt number, not a sleeping loop, so the bridge and its tests can drive
 it without a real clock.
+
+---knowledge---
+module_id: integrations.erp.webhooks.retry
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [BackoffPolicy, run_with_retry]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -17,6 +17,22 @@ schema fixes the *shape* (a rule has a ``kind``, a ``field``, a boolean
 (a rule that declares ``block`` while withholding nothing). Both run, and each
 names itself when it fails, so a reader can tell a malformed declaration from a
 contradictory one.
+
+---knowledge---
+module_id: integrations.erp.auth.schemas
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [load_schema, violations, enforce]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

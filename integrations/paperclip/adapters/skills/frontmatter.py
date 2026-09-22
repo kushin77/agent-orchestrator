@@ -12,6 +12,22 @@ Loading is fail-closed: a missing front-matter block, a missing field, a kind
 outside the closed vocabulary or an unreadable file all raise a
 :class:`~.model.SkillRefused`/:class:`~.model.CannotAssess` naming the offender —
 never a silent default.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.skills.frontmatter
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [split_front_matter, parse_provenance, parse_requirements, declaration_dir_files, assert_no_vendored_code, load_declaration, relative]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

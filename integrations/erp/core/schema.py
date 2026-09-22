@@ -54,6 +54,22 @@ installed in the gate environment; the repo's own ``check-yaml.py`` already
 hard-depends on a third-party parser). If the two disagree — in either
 direction — the suite fails. That is what keeps a hand-written subset from
 silently drifting away from the standard it claims to implement.
+
+---knowledge---
+module_id: integrations.erp.core.schema
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [SchemaError, Validator, validate, is_valid]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -29,6 +29,22 @@ have a bridge in :mod:`.bridge`.
 appears in :data:`PF2_DISPOSITIONS` below — so a PF-2 edit that adds a hook
 without a matching disposition here fails the suite instead of silently
 under-covering the acceptance criterion.
+
+---knowledge---
+module_id: integrations.erp.webhooks.hooks
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [HookDisposition]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

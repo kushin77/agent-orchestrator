@@ -13,6 +13,22 @@ newline — so two builds over one revision are byte-identical and a diff means 
 real change. :func:`validate_document` re-derives every source and refuses, by
 name, a document that has drifted from its contract, from the client's own
 routes, from the taxonomy, or that has lost the company mapping or health path.
+
+---knowledge---
+module_id: integrations.paperclip.api.openapi
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [health_schema, unshaped_schema, build_document, serialize, emit, validate_document]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

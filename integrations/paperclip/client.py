@@ -22,6 +22,22 @@ carries ``Authorization: Bearer <token>``, and a mutating request (``POST`` /
 ``PATCH`` / ``PUT`` / ``DELETE``) made during a run carries
 ``X-Paperclip-Run-Id``. Upstream status codes map to the typed errors in
 ``model.py``.
+
+---knowledge---
+module_id: integrations.paperclip.client
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [build_headers, HttpTransport, FixtureTransport, PaperclipClient]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -21,6 +21,22 @@ constructor arguments here:
 * ``headers_for(method)`` — the headers recorded per request, or ``None`` to
   record none. Paperclip's copy built its auth + run headers here so the gate's
   request-shape assertions exercise the same headers the live path sends.
+
+---knowledge---
+module_id: integrations._seam.transport
+system: integrations
+app: seam
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Transport, FixtureTransport]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

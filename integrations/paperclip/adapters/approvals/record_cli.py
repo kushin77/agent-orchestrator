@@ -10,6 +10,22 @@ branch sweep, a scheduler flip) calls before acting, and refuses by name
 Tri-state exit: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (no HMAC key configured).
 
 Run as ``python3 integrations/paperclip/adapters/approvals/record_cli.py <verb>``.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.record_cli
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [cmd_grant, cmd_check, cmd_list, cmd_self_test, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

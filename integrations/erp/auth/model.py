@@ -27,6 +27,22 @@ fails the suite rather than shipping.
 that a request can disagree with the principal and be refused for it: see
 ``scope.authorize``, where the tenant gate runs before any role or policy is
 consulted and no declaration can influence it.
+
+---knowledge---
+module_id: integrations.erp.auth.model
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Refused, Principal, Request, Decision, decision_from_refusal, is_action, is_tenant_local]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -6,6 +6,22 @@
 
 Exit-code contract (guardrails/honesty tri-state): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 A refusal is NEVER reported as a pass.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.heartbeat.cli
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [cmd_policy, cmd_derive, cmd_validate, cmd_beat, cmd_beats, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

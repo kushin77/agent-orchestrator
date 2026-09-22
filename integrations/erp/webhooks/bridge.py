@@ -30,6 +30,22 @@ Any step that raises :class:`~.model.Refused` quarantines the event
 (:mod:`quarantine`) and returns a ``"quarantined"`` result — the caller (the
 transport adapter) decides what that means for the HTTP/queue response; this
 lane never itself decides to drop a rejected event without a record.
+
+---knowledge---
+module_id: integrations.erp.webhooks.bridge
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ConversionBridge]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

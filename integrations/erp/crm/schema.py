@@ -20,6 +20,22 @@ Three properties make the subset worth having:
   a schema that demands an integer is not satisfied by ``True``, which is a
   subclass of ``int`` in Python and the classic way a type check stops
   measuring.
+
+---knowledge---
+module_id: integrations.erp.crm.schema
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [check_schema, assert_supported, load, validate, validate_named, field_type_problems, sorted_problems]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

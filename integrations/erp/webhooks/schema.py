@@ -13,6 +13,22 @@ Every refusal here is ``schema-violation`` (or ``invalid-body`` for a payload
 that is not even a mapping) — the schema gate does not distinguish *why* a
 field is wrong beyond naming it, because :mod:`bridge` treats every schema
 failure identically: quarantine, never post.
+
+---knowledge---
+module_id: integrations.erp.webhooks.schema
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [parse]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

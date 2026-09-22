@@ -16,6 +16,22 @@ path is **deterministic** (two runs, byte-identical audit head and rollup), and
 that every refusal this module can raise is provoked and refused by name
 (``negative_control``). ``demo`` prints the scenario; ``definitions`` prints the
 validated declaration set.
+
+---knowledge---
+module_id: integrations.erp.crm.cli
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [command_check, command_demo, command_definitions, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

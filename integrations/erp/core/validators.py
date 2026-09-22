@@ -41,6 +41,22 @@ Usage
     model = validators.load_model()
     model.validate_document("sales-order", document)   # raises ErpError
     model.advance(document, "submit")                  # -> "submitted"
+
+---knowledge---
+module_id: integrations.erp.core.validators
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [DocumentModel, load_model, validate_document, envelope_for, check_assets]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

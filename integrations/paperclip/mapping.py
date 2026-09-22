@@ -20,6 +20,22 @@ enforced, by both adapters.
 
 The gate drives both: a required field or a closed-vocabulary value that drifts
 is refused, by name, and the negative control proves the refusal.
+
+---knowledge---
+module_id: integrations.paperclip.mapping
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [load_schema, load_schemas, iter_seed_profiles, iter_persona_cards, load_board, load_claims, map_agents, map_tickets, (+6 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

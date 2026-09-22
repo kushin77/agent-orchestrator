@@ -11,6 +11,22 @@ in-memory, the timestamps are supplied by the caller (:func:`stamp`), and no
 part of the harness reads the wall clock. That is what makes the lane's
 determinism assertion meaningful — "two runs agree" is only evidence if neither
 run was allowed to consult ``now()``.
+
+---knowledge---
+module_id: integrations.erp.finops.harness
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [stamp, policies_from, Workspace, build_workspace, matrix_plan, run_matrix, golden_path]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -20,6 +20,22 @@ understand:
 Consumption is public-API-only: a ``UsageStore`` is passed in and appended to
 (``telemetry.metering.store``), and no path under ``telemetry/`` is ever opened
 for writing here.
+
+---knowledge---
+module_id: integrations.erp.finops.usage
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [assert_event_shape_dict, assert_event_shape, UsageSink]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

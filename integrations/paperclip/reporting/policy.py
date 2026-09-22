@@ -17,6 +17,22 @@ disagrees with the authority is worse than no policy:
 * the state it calls pending must be one of the authority's three;
 * it may not declare that pending *can* render as shipped — the whole point of
   the artifact is the opposite.
+
+---knowledge---
+module_id: integrations.paperclip.reporting.policy
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [ClaimPolicy, policy_path, load]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

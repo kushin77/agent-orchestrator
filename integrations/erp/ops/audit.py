@@ -18,6 +18,22 @@ The action vocabulary is closed (:data:`~.model.ACTIONS`), because the rail is
 the record an auditor reads back: an action field of free text would make the
 rail unqueryable, so an entry whose action is outside the vocabulary is refused
 by name at the append rather than stored and discovered later.
+
+---knowledge---
+module_id: integrations.erp.ops.audit
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Entry, Rail]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

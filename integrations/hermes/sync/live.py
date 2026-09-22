@@ -12,6 +12,22 @@ omits, and which extra ones it serves.
 No-false-green: a live capability entry that fails schema validation is
 refused BY NAME (:class:`CapabilityRejected`) — never silently dropped or
 silently accepted.
+
+---knowledge---
+module_id: integrations.hermes.sync.live
+system: integrations
+app: hermes
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: hermes
+tier: L1
+interfaces: [CapabilityRejected, serve_live_capabilities]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

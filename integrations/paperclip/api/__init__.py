@@ -28,6 +28,22 @@ ticket projection is fresh) and reports a non-ok state — 503 when a dependency
 is unreachable — rather than a hard-coded ``ok``.
 
 Stdlib-only, like the rest of the canonical adapter module.
+
+---knowledge---
+module_id: integrations.paperclip.api.__init__
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

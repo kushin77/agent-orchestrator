@@ -15,6 +15,22 @@ policy rail (``telemetry/budgets/config/policies.yaml``), which
 already read. A company the fleet has not declared is refused (404); a declared
 company that is not the caller's scope is refused (403). Fail closed throughout:
 an unreadable declaration is an *empty* known set, never a permissive default.
+
+---knowledge---
+module_id: integrations.paperclip.api.company
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [mapping, declared_companies, tenant_for, resolve]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

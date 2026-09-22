@@ -21,6 +21,22 @@ convention:
   the tenant's audit chain (``telemetry.ledger``) before a cost is published;
   a chain that does not verify refuses (``ledger-unverified``). Usage that
   cannot be attributed to an intact audit trail is not a billable figure.
+
+---knowledge---
+module_id: integrations.erp.finops.rollup
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [TenantErpUsage, ErpRollup]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

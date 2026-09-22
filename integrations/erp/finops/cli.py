@@ -29,6 +29,22 @@ suite of unit tests cannot:
 Exit-code contract (repository convention): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 CANNOT-ASSESS is never reported as a pass: a lane that cannot read its own
 declarations cannot report OK.
+
+---knowledge---
+module_id: integrations.erp.finops.cli
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Report, telemetry_digest, check_declarations, check_matrix, check_event_shape, check_rollup, check_budget_stop, check_determinism, (+9 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -33,6 +33,22 @@ Eight rules, each of which can genuinely fail, each of which names its subject:
 The rules are functions over a *root*: the gate and the suite both drive them
 against a scratch copy of the tree, where a planted violation must be refused
 *by name* — a check whose pass and fail paths collapse is a formality.
+
+---knowledge---
+module_id: integrations.erp.catalog.validate
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [verify, declared_vocabulary]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

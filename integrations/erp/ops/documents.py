@@ -14,6 +14,22 @@ delegates to the schema for everything it cannot attribute to a single field
 refused as ``missing-field`` and never reaches the schema, so the code a caller
 branches on is stable rather than dependent on which check happened to run
 first.
+
+---knowledge---
+module_id: integrations.erp.ops.documents
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [json_type_name, envelope_kind, required_fields, parse]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

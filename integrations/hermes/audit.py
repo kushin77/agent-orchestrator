@@ -21,6 +21,22 @@ The invariants are closed, and each names the drifted field:
   mapping.
 
 Stdlib-only by construction.
+
+---knowledge---
+module_id: integrations.hermes.audit
+system: integrations
+app: hermes
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: hermes
+tier: L1
+interfaces: [AuditEntry, audit_projection, violation_findings]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

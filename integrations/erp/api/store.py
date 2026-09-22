@@ -23,6 +23,22 @@ prove that a refused read is refused by policy and not by the store.
 
 Nothing here opens a socket, reads the network or consults a clock: the store is
 in-memory, seeded from :mod:`integrations.erp.api.fixtures` in every gate.
+
+---knowledge---
+module_id: integrations.erp.api.store
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [DocumentStore]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

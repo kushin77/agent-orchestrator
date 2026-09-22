@@ -12,6 +12,22 @@ Secrets are read from an environment variable (default ``PAPERCLIP_AUTH_KEY``),
 never from a file or an argv literal, and are never printed (GR-6). ``controls``
 uses an ephemeral in-process key unless one is supplied, so it can prove the
 refusals with **no** secret material present at all.
+
+---knowledge---
+module_id: integrations.paperclip.auth.cli
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [cmd_mint_agent, cmd_mint_board, cmd_authorize, cmd_controls, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

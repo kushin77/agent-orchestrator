@@ -21,7 +21,24 @@ is *truthful* (``kushin77/deepseek#117``).#:
 #: path may resolve against, which artifact the line is named in and which code a
 #: non-resolving line produces. :func:`resolves` and :func:`claim_findings` take
 #: that policy and read it — a rule restated here and a rule declared there would
-#: eventually disagree, and the brief would be the one that lied."""
+#: eventually disagree, and the brief would be the one that lied.
+
+---knowledge---
+module_id: integrations.paperclip.reporting.model
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [Claim, ClaimBook, resolves, claim_findings, state_of]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
+"""
 
 from __future__ import annotations
 

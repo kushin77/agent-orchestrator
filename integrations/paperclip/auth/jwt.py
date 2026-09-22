@@ -11,6 +11,22 @@ Deliberately small and closed: ``HS256`` is the only algorithm accepted, the
 ``alg`` header cannot be downgraded (an ``alg: none`` token is refused), and the
 signature comparison is constant-time. Anything the verifier cannot fully check
 is refused rather than waved through (fail closed).
+
+---knowledge---
+module_id: integrations.paperclip.auth.jwt
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [sign, verify, peek_claims]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

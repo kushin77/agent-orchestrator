@@ -19,6 +19,22 @@ this lane makes rather than restating them:
 Exit contract (tear-state, repository convention): ``0`` OK, ``1`` NOT-OK,
 ``2`` CANNOT-ASSESS. A catalogue or model that will not load is a 2, never a 0:
 a lane that cannot read its own declarations cannot report OK.
+
+---knowledge---
+module_id: integrations.erp.ops.cli
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [check, demo, definitions, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

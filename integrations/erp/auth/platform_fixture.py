@@ -17,6 +17,22 @@ here it is production code that admits it is a fixture.
 role with nothing grants a subject in scope nothing — which is what makes the
 platform's permission gate observable rather than assumed (see
 ``negative_control``'s ``permission-denied``).
+
+---knowledge---
+module_id: integrations.erp.auth.platform_fixture
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [scope_node, build]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

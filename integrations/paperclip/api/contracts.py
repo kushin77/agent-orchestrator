@@ -17,6 +17,22 @@ Two sources, both read — never restated:
 The one shape that is not derivable from either source — the error envelope —
 is declared exactly once, in :func:`error_schema`, and referenced by every
 taxonomy response.
+
+---knowledge---
+module_id: integrations.paperclip.api.contracts
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [contract_components, contract_sources, derive_schema, adapter_components, error_schema]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

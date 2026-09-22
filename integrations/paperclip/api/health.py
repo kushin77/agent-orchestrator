@@ -18,6 +18,22 @@ is missing or unreadable — the last reports HTTP ``503`` rather than a green
 lie. :func:`check_report` is the independent layer: it recomputes the states
 from the probes and refuses a report that claims a dependency is ok while the
 probe says otherwise, so a weakened ``health()`` cannot pass the gate.
+
+---knowledge---
+module_id: integrations.paperclip.api.health
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [Dependency, DependencyState, HealthReport, probe_claim_ledger, probe_ticket_projection, health, check_report]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

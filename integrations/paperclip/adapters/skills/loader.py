@@ -15,6 +15,22 @@ name:
 The refusal is the point: without it, loading a skill would be a privilege
 escalation. The decision object records the granted and requested capability sets
 so the no-widening property is stated, not assumed.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.skills.loader
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [profile_seed_path, load_profile, check_load, effective_capabilities, load_findings]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

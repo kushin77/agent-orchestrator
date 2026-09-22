@@ -4,6 +4,22 @@
 that cannot be reproduced from it. This is the rule the EPIC demands: an
 approval that changes only the projection — a grant with no authoritative record
 behind it — is a bug, and it must fail here rather than pass as a grant.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.verify
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [verify_approval, verify, schema_findings, deterministic, findings_summary]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

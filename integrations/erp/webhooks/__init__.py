@@ -16,6 +16,22 @@ so unlike the module's other lanes this one carries no
 ``catalog/provenance.json`` (GR-10 harvest record): there is nothing harvested
 to record. The GL posting itself is derived through
 ``integrations.erp.tx.ledger``, which already carries ERP-03's own provenance.
+
+---knowledge---
+module_id: integrations.erp.webhooks.__init__
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

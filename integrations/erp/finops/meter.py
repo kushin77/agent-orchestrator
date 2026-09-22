@@ -26,6 +26,22 @@ The meter keeps two pieces of state, both of them *derived* and both rebuildable
 from the sinks: the set of emitted source keys (so a replay is refused here as
 well as by the metering store) and each tenant's last metered timestamp (so the
 roll-up has a total order to rely on). Neither is a source of truth.
+
+---knowledge---
+module_id: integrations.erp.finops.meter
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [ErpMeter, event_sequence]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

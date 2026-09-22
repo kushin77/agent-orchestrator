@@ -11,6 +11,22 @@ templates it produces are the document's own path templates.
 
 A method that needs arguments (a mutation) is skipped: this is the *read*
 surface. The result is deterministic — sorted by ``(method, path)``.
+
+---knowledge---
+module_id: integrations.paperclip.api.surface
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [Route, client_routes, unscoped_routes, company_routes]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -18,6 +18,22 @@ that mirrors the fleet's own ``identity/cpapi`` facade:
 
 Every refusal is an :class:`AuthError` naming the rule; no refusal carries the
 credential it refused (GR-6).
+
+---knowledge---
+module_id: integrations.paperclip.auth.guard
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [header, bearer_token, authenticate, authorize, authenticate_headers, guard_request]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

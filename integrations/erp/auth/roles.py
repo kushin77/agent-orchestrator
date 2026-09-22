@@ -26,6 +26,22 @@ pairs). Every kind the declaration *covers* must be granted by at least one
 role, and every kind a role *grants* must be declared as covered. A kind that
 drifts either way is a declaration defect and is refused by name, so the
 declaration cannot quietly grow a hole.
+
+---knowledge---
+module_id: integrations.erp.auth.roles
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [resource_for, permission_for, RoleGrant, RoleMap, load, load_default]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

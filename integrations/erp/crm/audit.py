@@ -20,6 +20,22 @@ digest of its predecessor, so
 The digest covers the entry's canonical JSON *prefixed by its predecessor's
 digest*, so reordering two entries breaks the second one's back-link and
 rewriting an entry's payload breaks its own digest.
+
+---knowledge---
+module_id: integrations.erp.crm.audit
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [canonical, digest_of, Entry, Rail]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

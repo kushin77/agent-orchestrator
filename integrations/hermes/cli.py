@@ -12,6 +12,22 @@ Three verbs, matching the three things an operator needs from the seam:
   and deliberately **never** run by the gate (the service is deployable-not-running).
 
 Run as ``python3 integrations/hermes/cli.py <verb>`` from the repo root.
+
+---knowledge---
+module_id: integrations.hermes.cli
+system: integrations
+app: hermes
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: hermes
+tier: L1
+interfaces: [cmd_project, cmd_check, cmd_probe, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -39,6 +39,22 @@ contract, and the account *values* are supplied by the caller
 Anything the derivation cannot decide is refused by name rather than guessed: an
 ambiguous link, a cycle that is not linear, or two families claiming the ledger
 are each ``definitions-invalid``, naming what disagreed.
+
+---knowledge---
+module_id: integrations.erp.tx.definitions
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [as_spine_refusal, Link, schema_properties, resolve_links, resolve_chain, resolve_accounting_kind, resolve_voucher_sources, DefinitionSet, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

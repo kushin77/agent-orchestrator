@@ -18,6 +18,22 @@ Provocations:
    and can never be promoted by editing the projection.
 
 Run as ``python3 integrations/paperclip/adapters/approvals/negative_control.py``.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.negative_control
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [run]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

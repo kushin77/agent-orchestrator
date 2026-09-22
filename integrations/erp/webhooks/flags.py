@@ -13,6 +13,22 @@ The promotion row lives at ``services.erp_webhooks_bridge`` in
 ``enable_erp_webhooks_bridge`` (both added by #995). Flipping it on still
 belongs to a reviewed go-live; this file only declares the id and the
 fail-closed default and never promotes the flag.
+
+---knowledge---
+module_id: integrations.erp.webhooks.flags
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [is_enabled]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

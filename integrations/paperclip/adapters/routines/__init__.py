@@ -16,6 +16,22 @@ become a second answer about what is scheduled or who owns it.
 See ``README.md`` for the refusal and drift cases, and the
 ``integration/paperclip/adapters/approvals`` package for the sibling seam this
 one is modelled on.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.routines.__init__
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

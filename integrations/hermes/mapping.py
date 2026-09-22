@@ -20,6 +20,22 @@ The binding is stated once, here, so the projection, the CLI and the gate
 cannot drift apart: this adapter binds the **hermes-agents routing service**
 (Flask on port 9501) and names the gateway's Ollama namesake
 (``gateway/providers/hermes.py``) as explicitly excluded (ADR-0012).
+
+---knowledge---
+module_id: integrations.hermes.mapping
+system: integrations
+app: hermes
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: hermes
+tier: L1
+interfaces: [read_persona, read_profile, read_tiers, read_module_binding, load_capabilities_schema, build_projection, judge_persona_tier, canonical_document, (+2 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

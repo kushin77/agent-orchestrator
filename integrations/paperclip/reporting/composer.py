@@ -39,6 +39,22 @@ composition, never restated:
 One rule, one home: none of the three rules above is written out below, and the
 gate proves each artifact is really read by doctoring it and requiring the
 refusal to change.
+
+---knowledge---
+module_id: integrations.paperclip.reporting.composer
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [Composition, compose]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

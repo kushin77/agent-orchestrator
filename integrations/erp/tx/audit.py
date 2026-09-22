@@ -24,6 +24,22 @@ rewriting an entry's payload breaks its own digest. The discipline is the one
 ``telemetry/ledger`` ships and ``integrations/erp/crm/audit.py`` re-expresses for
 its lane; this is the same shape for the transactional spine, with the spine's own
 action vocabulary (see :data:`~.model.ACTIONS`) as its closed action column.
+
+---knowledge---
+module_id: integrations.erp.tx.audit
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [canonical, digest_of, Entry, Rail]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

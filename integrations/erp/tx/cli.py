@@ -23,6 +23,22 @@ Exit contract, the repository's tri-state convention (``guardrails/honesty``):
    measured rather than claimed;
 4. **every refusal is provoked** — ``negative_control`` provokes each code of the
    closed vocabulary and fails when the provoked set and the vocabulary diverge.
+
+---knowledge---
+module_id: integrations.erp.tx.cli
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [command_check, command_demo, command_definitions, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

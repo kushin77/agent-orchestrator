@@ -26,6 +26,22 @@ no new store                               the projection writes only its own st
 
 A finding is NOT-OK (exit 1); CANNOT-ASSESS (exit 2) is reserved for an input
 that cannot be read at all. Neither is ever reported as a pass.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.routines.projection
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [project, render, deterministic]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

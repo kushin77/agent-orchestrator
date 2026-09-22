@@ -19,6 +19,22 @@ in-repo subset loader it shares with ``integrations/paperclip/``
 (``integrations/_seam/``, issue #1208) and the offline transport replays canned
 responses, so the gate and the tests never need a third-party dependency or the
 network.
+
+---knowledge---
+module_id: integrations.hermes.__init__
+system: integrations
+app: hermes
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: hermes
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 __all__ = ["audit", "client", "mapping", "model", "policy"]

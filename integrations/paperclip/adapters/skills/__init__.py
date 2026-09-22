@@ -23,6 +23,22 @@ adapter that maps that family onto what the fleet already runs (EPIC #410, issue
 
 The package is stdlib + PyYAML only, takes no upstream dependency, vendors no
 upstream code, and never writes to a ledger.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.skills.__init__
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

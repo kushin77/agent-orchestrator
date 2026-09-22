@@ -21,6 +21,22 @@ Three refusals, and why each is a real failure mode:
   code path as any other illegal move.
 * ``unknown-action`` — the audit action is not in the closed vocabulary
   (raised by ``audit.Rail.append``).
+
+---knowledge---
+module_id: integrations.erp.crm.workflow
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [transition_targets, assert_transition, is_terminal, accepts_child_work, advance]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

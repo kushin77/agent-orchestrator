@@ -41,6 +41,22 @@ fails the suite when the provoked set and this set diverge.
 Rather than leak two dialects, :func:`_translate` maps each onto this lane's code
 and keeps the core code and message in the detail, so a caller branches on one
 vocabulary while the evidence still names the rule that refused.
+
+---knowledge---
+module_id: integrations.erp.ops.model
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Refused, Finding, Model, load_model]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

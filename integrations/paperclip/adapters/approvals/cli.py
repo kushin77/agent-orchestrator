@@ -14,6 +14,22 @@ Tri-state exit: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. The adapter is read-only:
 none of these verbs writes the tree.
 
 Run as ``python3 integrations/paperclip/adapters/approvals/cli.py <verb>`` from the repo root.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.cli
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [cmd_project, cmd_verify, cmd_authority, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

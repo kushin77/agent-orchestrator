@@ -19,6 +19,22 @@ separate on purpose:
 Every refusal names the offending field (and, where there is one, the
 vocabulary it was read against), which is what makes a refusal actionable: the
 caller is told which field to fix, not that "the document is invalid".
+
+---knowledge---
+module_id: integrations.erp.crm.documents
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [parse, validate_fields, validate_range, envelope_of, known_kinds]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

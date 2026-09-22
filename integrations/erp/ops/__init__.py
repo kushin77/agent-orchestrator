@@ -21,6 +21,22 @@ Read ``README.md`` for the surface, the flows and the lane boundary. In short:
 
 The flag is ``erp-module``, declared OFF (GR-5): this lane ships documents,
 flows and postings, and no tenant-visible surface of its own.
+
+---knowledge---
+module_id: integrations.erp.ops.__init__
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

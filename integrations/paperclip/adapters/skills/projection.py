@@ -19,6 +19,22 @@ from drifting away from the code. The rules, enforced by
 
 Import failure is **CANNOT-ASSESS**, never a pass: a projection that cannot be
 derived from the authority proves nothing (no-false-green doctrine).
+
+---knowledge---
+module_id: integrations.paperclip.adapters.skills.projection
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [callable_tools, allowlist_vocabulary, build_projection, projection_path, render_projection, load_projection, projection_findings, write_projection]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

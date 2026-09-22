@@ -29,6 +29,22 @@ a measured property instead of a promise.
 
 :func:`validate_document` re-derives every source and returns a finding per
 divergence, naming the file, the component, the route or the status that drifted.
+
+---knowledge---
+module_id: integrations.erp.api.openapi
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [component_name, schema_source, schema_components, erp_document_component, error_codes, envelope_component, health_component, payload_components, (+9 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

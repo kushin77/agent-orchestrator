@@ -14,6 +14,22 @@ rather than silently retained.
 Run it directly for the transcript:
 
     python3 integrations/erp/auth/negative_control.py
+
+---knowledge---
+module_id: integrations.erp.auth.negative_control
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [provoke, uncovered, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

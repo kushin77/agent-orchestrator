@@ -21,6 +21,22 @@ trail (``--audit``, default ``<repo>/.verify/module-brief-audit.jsonl``, which i
 gitignored runtime state): the run's resolved / unresolved claim counts and the
 finding lines it produced. ``compose`` keeps stdout byte-for-byte the brief, so
 the trail never contaminates the artifact it records.
+
+---knowledge---
+module_id: integrations.paperclip.reporting.cli
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

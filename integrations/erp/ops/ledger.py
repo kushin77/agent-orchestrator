@@ -27,6 +27,22 @@ Two invariants this module will not let slide:
   ``net_total`` or ``total``, :func:`amounts` cross-checks it against the lines
   and refuses ``invalid-value`` on a mismatch, rather than silently preferring
   one of the two.
+
+---knowledge---
+module_id: integrations.erp.ops.ledger
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [line_amount, amounts, balances, stock_effect, posting_date_for, build_stock_entry, apply_stock, build_gl_posting, (+2 more)]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

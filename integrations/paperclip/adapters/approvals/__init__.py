@@ -11,6 +11,22 @@ authority, never a second one**. This package therefore has no store, no write
 path, and no default grant — every ``granted`` state is read back from, and
 re-verified against, the authoritative record it names. See ``README.md`` for
 the kind -> authority mapping and the refused cases.
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.__init__
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

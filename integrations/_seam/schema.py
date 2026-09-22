@@ -15,6 +15,22 @@ A keyword outside this set is silently ignored, which is how a ``$ref`` or a
 (``integrations/paperclip/reporting/brief_schema.py``) walk their own schema for
 keywords outside the set and refuse one rather than trusting the validator to
 notice it.
+
+---knowledge---
+module_id: integrations._seam.schema
+system: integrations
+app: seam
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [validate]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

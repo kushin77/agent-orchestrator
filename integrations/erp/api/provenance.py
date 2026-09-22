@@ -25,6 +25,22 @@ no business adding more.
 :func:`check` requires this record to *point at* that declaration rather than
 repeat its licence — one declaration, no second copy to drift, which is the same
 rule the module manifest's gate applies to the catalogue.
+
+---knowledge---
+module_id: integrations.erp.api.provenance
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [load, check]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

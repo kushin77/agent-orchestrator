@@ -30,6 +30,22 @@ inflate a cost report with work that was never accepted. Money is integer minor
 units throughout and the per-line amount is :func:`amount_minor`, whose rounding
 rule (half up, applied once per line) is documented and pinned by tests — a float
 total is a total that differs between two machines.
+
+---knowledge---
+module_id: integrations.erp.crm.timesheet
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [amount_minor, Line, Rollup, accumulate]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

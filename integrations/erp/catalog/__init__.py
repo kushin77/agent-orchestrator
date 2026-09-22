@@ -10,6 +10,22 @@ reads the repository's own schema validator, ``governance/modules/schema.py``,
 rather than vendoring a second one). The root is derived from this file, never
 from the environment, so the module resolves the same way from the CLI, from the
 gate and from the suite.
+
+---knowledge---
+module_id: integrations.erp.catalog.__init__
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

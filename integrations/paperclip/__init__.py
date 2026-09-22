@@ -9,6 +9,22 @@ through the three frozen seam contracts in ``docs/contracts/paperclip/``.
 The package is stdlib-only: the HTTP transport uses ``urllib.request`` and the
 mapping reads its YAML sources with a small in-repo subset loader, so the gate
 and the tests never need a third-party dependency or the network.
+
+---knowledge---
+module_id: integrations.paperclip.__init__
+system: integrations
+app: paperclip
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 __all__ = ["client", "mapping", "model"]

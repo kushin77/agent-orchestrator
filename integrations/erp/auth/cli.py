@@ -20,6 +20,22 @@ gate that calls it.
    projection assembled from set or dict iteration order would show up here;
 4. **every declared refusal is provoked, by name** — computed by
    :mod:`.negative_control`, and a divergence in *either* direction fails.
+
+---knowledge---
+module_id: integrations.erp.auth.cli
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [golden_path, build_parser, command_check, command_demo, command_roles, command_fields, main]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

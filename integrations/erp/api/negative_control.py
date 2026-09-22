@@ -22,6 +22,22 @@ say so by name.** Three vocabularies meet at this surface, and each is closed:
 A declaration of unreachability is a claim like any other, so each one names the
 mechanism that makes it true (a load-time failure, a store invariant, the absence
 of a parameter), not a hand-wave.
+
+---knowledge---
+module_id: integrations.erp.api.negative_control
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Expected, Outcome, Provocation, World, provocations, run]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

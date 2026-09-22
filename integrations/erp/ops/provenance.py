@@ -17,6 +17,22 @@ was copied is refused as ``code-copied`` (the doctrine's own line), and a record
 that is malformed or empty is refused as ``provenance-invalid`` rather than
 being treated as "nothing to check" — a missing harvest record is the failure
 this module exists to catch, so it must never be the state that passes.
+
+---knowledge---
+module_id: integrations.erp.ops.provenance
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [load, schema_records, enforce_harvest, enforce_catalogue, audit]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

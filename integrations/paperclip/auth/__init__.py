@@ -17,6 +17,22 @@ This package makes the two models meet **once**, at the process boundary:
 Stdlib-only (``hmac``/``hashlib``/``base64``), so the gate and the tests need no
 third-party dependency and never touch the network. No secret value is stored,
 written or echoed anywhere in this package (GR-6).
+
+---knowledge---
+module_id: integrations.paperclip.auth.__init__
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: []
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

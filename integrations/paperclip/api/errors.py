@@ -11,6 +11,22 @@ here on the same shape, with codes taken verbatim from the fleet's canonical
 error vocabulary (``identity/cpapi/errors.py``): ``not_found``, ``refused``,
 ``unavailable``. No refusal ever carries the credential or the value it refused
 (GR-6).
+
+---knowledge---
+module_id: integrations.paperclip.api.errors
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [not_found, refused, unavailable]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

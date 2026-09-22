@@ -31,6 +31,22 @@ back to a local copy of the vocabulary and it never defaults to "allow": a
 permission check that cannot consult the permission contract has not decided
 anything, and reporting that as a decision is the defect the tri-state contract
 exists to prevent.
+
+---knowledge---
+module_id: integrations.erp.auth.contract
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [rbac, decision_levels, effect_vocabulary, is_effect]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

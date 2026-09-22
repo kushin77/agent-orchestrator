@@ -22,6 +22,22 @@ model (``integrations/erp/core``, ERP-02) does not declare the kind at all, and
 that is a different failure from ``rate-missing`` (the kind exists but this lane
 publishes no price for the operation). A caller branches on the name; the
 negative control provokes the name.
+
+---knowledge---
+module_id: integrations.erp.finops.model
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [Refused, normalize_event_ts, Finding, MeteredEvent]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -14,6 +14,22 @@ Inputs (read-only):
 
 Same input, byte-identical output. An unmappable record is never defaulted: it
 becomes a finding naming the offender (fail closed).
+
+---knowledge---
+module_id: integrations.paperclip.adapters.approvals.mapping
+system: integrations
+app: paperclip
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: paperclip
+tier: L1
+interfaces: [load_requests, authority_for_safe, load_decisions, project, render, decision_index]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

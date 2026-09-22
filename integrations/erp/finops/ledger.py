@@ -16,6 +16,22 @@ The evidence field is the event's :meth:`~.model.MeteredEvent.source_key`, which
 is also the metering feed's idempotency key — so the audit chain and the usage
 feed point at the *same* identity for one operation, and a replay is detectable
 from either side.
+
+---knowledge---
+module_id: integrations.erp.finops.ledger
+system: integrations
+app: erp
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [canonical_actor, AuditSink, open_sink]
+invariants: ""
+gotchas: ""
+related: ["#1910"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
