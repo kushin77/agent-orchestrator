@@ -78,8 +78,8 @@ contract that does not exist.
 
 ## 4. The exposition surface (this repo's, built by #497)
 
-The exposition surface is owned by issue **#497** — the **flag-gated-OFF push
-exporter** over the telemetry feed. It renders the verdicts
+The exposition surface is owned by issue **#497** — the **flag-gated push
+exporter** (ON by default, AO-GR-6) over the telemetry feed. It renders the verdicts
 [`telemetry/observability/`](../telemetry/observability/) computed **as the literal
 token**, importing the closed vocabulary rather than re-declaring it, and publishes
 `NO_DATA` as a first-class state (never as health). The canonical endpoint is the

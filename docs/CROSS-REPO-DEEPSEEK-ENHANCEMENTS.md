@@ -188,7 +188,7 @@ third criterion *is* a subset of our frozen record shape:
   **policy we hold**, not a contract we consume.
 - The read-only-default shape has a local analogue in
   `infra/feature-flags/registry.yaml`: `default_policy: off`, *"New entries MUST
-  default to `off`"*, with a promotion path in `infra/rollout/`. That is the same
+  default to `off`"* (now `on` per AO-GR-6, reversed 2026-09-21), with a promotion path in `infra/rollout/`. That is the same
   fail-safe-default construction as `DS_WRITE_ENABLED=0`, applied to infra instead
   of to a worker tier.
 - The receipt half of the record — the evidence that ties spend to a ticket — is

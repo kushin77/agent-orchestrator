@@ -11,7 +11,7 @@ feature flags (EPIC-00, issue #4).
 ## Planned contents (phase 7, issues #39–#42)
 
 - Control-plane API/backing service for admin operations.
-- Configuration and feature-flag management (flag-gated OFF by default).
+- Configuration and feature-flag management (enabled by default, AO-GR-6).
 - Cross-pillar operational commands.
 
 ## Status

@@ -6,6 +6,7 @@ Index of the repo's canonical documentation. Agents start at
 ## Canonical docs
 
 | Doc | Purpose |
+|-----|---------|
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Human contributor workflow. |
 | [`../RELEASING.md`](../RELEASING.md) | SemVer release process. |
 | [`../control-plane/cockpit/README.md`](../control-plane/cockpit/README.md) | The terminal cockpit (AgentConsole) — the operator client of the RC-3 control API and the authenticated SSE streams; keyboard-first, role-tiered, drillable, enabled by default (AO-GR-6) (EPIC #551, issue #566). |
@@ -60,7 +61,6 @@ Index of the repo's canonical documentation. Agents start at
 | [`SME-ROUTING.md`](SME-ROUTING.md) | SME-squad routing + capability/route/tier FinOps: domain→SME, complexity→chain+tier, caps and the human/advisor escalation terminal (EPIC #144, issue #149). |
 | [`SYSTEM-APP-GOVERNANCE-E2E-GAP-ANALYSIS.md`](SYSTEM-APP-GOVERNANCE-E2E-GAP-ANALYSIS.md) | Measured end-to-end (declared → implemented → gated → exercised) gap analysis of the system-app + app-model + governance path, with the four-way verdict per surface, the inert-guard list, the break-places and the provocations that earned each ENFORCED verdict (issue #1156). |
 | [`TAGGING.md`](TAGGING.md) | The tag authority end to end — one declared vocabulary per tag dimension (borrowing, never re-declaring, the `class` ladder, the FinOps tiers and the fleet roles), the new `posture` (`overall`/`saas`/`iac`/`no-human-needed`/`human-gated`) and `lifecycle` (SDLC stage) dimensions, the tag → gate derivation by channel (pr/ci/cd/ops), the generated matrix, and the gate whose negative control provokes all eleven refusals by name (issue #1175). |
-|-----|---------|
 
 ## Fleet, governance and FinOps docs
 

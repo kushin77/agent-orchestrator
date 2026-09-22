@@ -44,10 +44,10 @@ restated, and no runtime module is imported from the gateway.
 ## Endpoints
 
 All endpoints are `GET` and require a verified console session (AuthN). The
-whole `/api/v1/*` namespace ships **feature-flag-gated OFF** in
-`infra/feature-flags/registry.yaml` (`surfaces.live_bridge`), and the flag is
-checked **before** AuthN — an unpromoted surface is invisible, not merely
-unauthorised.
+whole `/api/v1/*` namespace's flag defaults **on** (AO-GR-6) in
+`infra/feature-flags/registry.yaml` (`surfaces.live_bridge`); it is invisible
+only until **promoted**, and the flag is checked **before** AuthN — an
+unpromoted surface is invisible, not merely unauthorised.
 
 | Endpoint | Payload |
 |----------|---------|

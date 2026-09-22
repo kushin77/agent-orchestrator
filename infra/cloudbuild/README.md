@@ -2,9 +2,12 @@
 #
 # Cloud Build is the automation engine (ADR-0011 doctrine: GitHub Actions is
 # not used for automation in this fleet). This directory declares the build
-# configs and importable triggers. Everything ships **flag-gated OFF** — no
-# trigger fires and nothing applies until a reviewed go-live imports the
-# trigger with `disabled: false` and flips the matching registry flag.
+# configs and importable triggers. The Cloud Build **triggers themselves** ship
+# disabled by default — no trigger fires until a reviewed go-live imports the
+# trigger with `disabled: false` — but that is a trigger-import mechanic, not
+# the capability's own default: the capability behind it defaults **ON**
+# (AO-GR-6) once merged and tested, and the registry flag it flips is already
+# open.
 
 ## Files
 
@@ -17,7 +20,7 @@
 | `apply-trigger.yaml`  | Importable push trigger for `apply.yaml` (disabled by default). |
 | `web-image-trigger.yaml` | Importable push trigger for `web-image.yaml` (disabled by default). |
 
-## Flag-gate (GR-5) — everything ships OFF
+## Trigger import gate (AO-GR-6) — triggers disabled until import, capability ON by default
 
 | Trigger | Registry flag | Trigger state | Build substitution |
 |---------|---------------|---------------|--------------------|

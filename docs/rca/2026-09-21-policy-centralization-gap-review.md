@@ -26,6 +26,13 @@
 | SemVer (AO-GR-8) | `docs/GOLDEN-RULES.md` prose only | none automated found | **absent** as enforced control-plane surface |
 | Model-tier vocabulary | Re-declared in 5+ modules per open issue #1494 | n/a | **known scattered gap**, already tracked (do not duplicate) |
 
+> **Amended 2026-09-22:** two issues with the "Secrets (AO-GR-6/7)" row above.
+> First, AO-GR-6 is a mis-citation for the secrets rule — the secrets rule is
+> AO-GR-7; AO-GR-6 is the flag-gated-default rule. Second, AO-GR-6 itself was
+> reversed (flag-gated OFF → enabled-by-default) by
+> policy-gr5-enabled-by-default (2026-09-21); see
+> docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
+
 ## Relationship to #1756 (settings aggregator)
 
 #1756 (`portal/server/settings.py`, open, Parent #1667) aggregates **descriptive/observed** config: feature-flags.yaml, fleet-jobs.json, tier-policy.json, skip-budget.json, RBAC presets — read-only snapshot for the Settings view, explicit "no per-domain ad hoc readers" mandate.

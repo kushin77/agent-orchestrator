@@ -28,7 +28,9 @@ restate them.
 AgentConsole — the browser operator terminal — is merged (#774, rename #797) and
 its transport is unified (#785), but it had **no stated live host**. The host was
 implied by an older, retired route: `infra/terraform/modules/web-surface` declares
-a Cloud Run service for a public web surface, flag-gated OFF and inert.
+a Cloud Run service for a public web surface, kept OFF and inert as a named
+exception — the route itself is retired (owner directive 2026-09-04, below),
+not a stale "built but off" surface under AO-GR-6.
 
 That route is no longer the fleet's. The contract, recorded by owner directive
 2026-09-04 in shared-frontend `docs/DEPLOYMENT.md`, is:
@@ -285,8 +287,8 @@ that repo):
       `contrib/shared-services/agentconsole.compose.yml` against the run-half
       target (`infra/docker-compose.agentconsole.yml`) and reports drift, and a
       push to `contrib/shared-services/**` fires that check
-      (`infra/cloudbuild/overlay-sync-trigger.yaml`, flag-gated OFF until a
-      reviewed go-live). The run half still applies the lift — the delta is
+      (`infra/cloudbuild/overlay-sync-trigger.yaml`, an IaC apply trigger kept
+      OFF pending a reviewed go-live per AO-GR-5, not a AO-GR-6 surface default). The run half still applies the lift — the delta is
       handed over as a direction issue on the shared-services board, never as
       an edit to that repo from here.
 - [x] Publish the image and set `AGENTCONSOLE_IMAGE` — **done by the promote
@@ -368,8 +370,9 @@ make verify
   the fleet's own files. This is a known, bounded degradation, not a fix made
   here.
 - `infra/terraform/modules/web-surface` still declares the retired Cloud Run
-  route, flag-gated OFF and inert. Retiring or repurposing it is not this lane's
-  call and this lane did not touch it.
+  route, kept OFF and inert as a named exception (the route is retired per the
+  owner directive in §1, not an unmerged AO-GR-6 surface). Retiring or
+  repurposing it is not this lane's call and this lane did not touch it.
 
 ## 11. The module/catalog packaging (issue #813)
 

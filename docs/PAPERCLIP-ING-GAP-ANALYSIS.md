@@ -25,17 +25,19 @@ is explicit about how narrow it is: it **"edits no code, stands up no process, a
 changes no runtime behaviour"**, and it says of the seam lane that
 **"#370 freezes the seam, it does not run the process"**.
 
-In plain language, measured on 2026-09-20:
+In plain language, measured on 2026-09-20 and updated 2026-09-21 for the
+enabled-by-default policy flip:
 
-- **The flag is OFF.** `enable_paperclip` is declared with `default = false` in
+- **The flag is ON by default** (AO-GR-6, 2026-09-21). `enable_paperclip` is
+  declared with `default = true` in
   [`../infra/terraform/variables.tf`](../infra/terraform/variables.tf) and recorded
-  as `services.paperclip` (`default: off`) in
+  as `services.paperclip` (`default: on`) in
   [`../infra/feature-flags/registry.yaml`](../infra/feature-flags/registry.yaml).
-- **No runtime resource is deployed.** The runtime is a **count-gated** service
-  ([`../infra/paperclip/terraform/main.tf`](../infra/paperclip/terraform/main.tf)),
-  so while the flag is closed a plan shows **zero resources** and the deploy
-  trigger stays disabled — **no container is running**. The runbook says the same
-  from the operations side: [`PAPERCLIP-ING-DEPLOY.md`](PAPERCLIP-ING-DEPLOY.md) §1.
+- **The runtime is a count-gated service**
+  ([`../infra/paperclip/terraform/main.tf`](../infra/paperclip/terraform/main.tf)):
+  with the flag now ON, a plan creates the Cloud Run v2 resource and the deploy
+  trigger is live, per [`PAPERCLIP-ING-DEPLOY.md`](PAPERCLIP-ING-DEPLOY.md) §1 —
+  this supersedes the "zero resources" state measured before the 2026-09-21 flip.
 - **What does exist in this repository is declaration and offline-verified code,
   not a live service** — the persona and seed artifacts, the gateway provider, the
   guardrail bundle and the boundary adapter under `integrations/paperclip/`, each

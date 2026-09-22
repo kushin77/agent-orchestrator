@@ -132,6 +132,10 @@ owns the session, the flag reader and the 405 refusals — and commands flow
 upstream. There is no second server, no second daemon, and no remote writer on
 the session-fleet mailbox.**
 
+> **Amended 2026-09-22:** the flag-gated-OFF default referenced in D1.1 below
+> was reversed by policy-gr5-enabled-by-default (2026-09-21, AO-GR-6); see
+> docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
+
 **D1.1 — The home.** The family is added to `portal/server/app.py`, flag-gated
 OFF (`surfaces.remote_control` in `infra/feature-flags/registry.yaml`, whose
 `default_policy` is already `off`), checked **before** AuthN so an unpromoted

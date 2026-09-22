@@ -27,7 +27,7 @@ residual risks named ahead of the v1.0.0 tag.
    - MAJOR = breaking change to a public contract (API / SDK / MCP surface,
      pillar boundary).
    - MINOR = a new capability (a new pillar subsystem, phase feature,
-     flag-gated behind OFF by default).
+     flag-gated behind a flag defaulting to ON).
    - PATCH = a fix / doc correction / hotfix.
 4. The tag is the release — no extra artifact step.
 
@@ -40,7 +40,8 @@ residual risks named ahead of the v1.0.0 tag.
 
 ## Notes
 
-- New product surfaces ship **flag-gated OFF** by default (IaC mandate, GR-5):
-  a release may add capability that is not yet visible to tenants.
+- New product surfaces ship **enabled by default** (AO-GR-6): a release's
+  capability is tenant-visible once merged and tested, unless it carries a
+  cited owner exception.
 - ADRs record decisions that change the architecture; bump MAJOR when one
   supersedes a prior contract.

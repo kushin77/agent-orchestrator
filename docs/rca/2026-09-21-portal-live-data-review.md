@@ -20,6 +20,11 @@ running instance to look at in the first place. "I haven't seen anything"
 is explained by never having loaded a URL where anything would render —
 not by the work being fake or missing.
 
+> **Amended 2026-09-22:** the flag-gated-OFF-by-design / GR-5 default cited
+> above and below ("flags are correctly off by design") was reversed by
+> policy-gr5-enabled-by-default (2026-09-21, AO-GR-6); see
+> docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
+
 ## Per-PR flag state
 
 | PR | Feature | `services.<flag>` | `default` | `promoted` |

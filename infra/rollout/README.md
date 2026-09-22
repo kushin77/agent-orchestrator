@@ -7,8 +7,9 @@ the issue #43 merge-governance gate semantics (`governance/merge/`).
 
 ## Purpose
 
-Every control-plane surface ships **behind a feature flag defaulting to OFF**
-(AO-GR-6). This lane defines and runs the **rollout & deployment pipeline**
+Every control-plane surface ships **behind a feature flag defaulting to ON**
+once merged and tested (AO-GR-6), unless a named owner exception keeps it
+OFF. This lane defines and runs the **rollout & deployment pipeline**
 that promotes those flags:
 
 - a **declarative stage model** — `off → canary → gradual → full` with
@@ -32,7 +33,7 @@ itself still lands as a PR → gate → merge.
 |------|---------|
 | `stage-model.yaml` | Canonical stage vocabulary + promotion/rollback rules (data). |
 | `go-live-plan.yaml` | Phase 0–8 surface → flag → go-live stage (declared intent). |
-| `rollout-state.yaml` | Declared-default state; every flag OFF, always (GR-28) - never records a promotion. |
+| `rollout-state.yaml` | Declared-default state; every flag ON by default (AO-GR-6), except a named owner exception - never records a promotion. |
 | `live-state.yaml` | The committed record of what is actually promoted (issue #914: flag -> stage/since/approval-or-policy/audit_record), validated separately. |
 | `model.py` | Pure domain: stages, adjacency, audience, gates, rollback decision. |
 | `engine.py` | Promotion/rollback engine, approvals, hash-chained audit log. |
@@ -74,7 +75,7 @@ calls.
 The five surfaces workbook-11/12/5 added carry an in-module switch, a row in
 `infra/feature-flags/registry.yaml` (`services.<name>`, lock-stepped with
 `infra/terraform/variables.tf` by `scripts/check-feature-flags.py`) and a flag
-here in `rollout-state.yaml` — all **OFF**. A flag is a promotion unit only
+here in `rollout-state.yaml` — all **ON by default (AO-GR-6)**. A flag is a promotion unit only
 where the pipeline can reach it: the offline engine refuses a flag that
 `rollout-state.yaml` does not carry (`unknown flag '<name>' (not declared in
 rollout state)`), so a registry row without a state row would be a declaration
@@ -91,8 +92,8 @@ OFF → CANARY → GRADUAL → FULL with the same gates as every other flag.
 | `services.erp_module` | ERP module portal surface — `GET /api/erp/module\|dashboard\|reports[<id>]`, the proxy of ERP-06's `/api/erp/documents/…`, and the frame at `/erp/module.html` (portal deployable) | `surfaces.erp_module` in `portal/config/feature-flags.yaml`, read by `portal/server/config_flags.py` | `enable_erp_module` | The module's own gate is green (`scripts/check-erp-portal.sh`: both flag postures, the verbatim ERP-06 refusal pass-through and the manifest mutation); the ERP-01 declaration still validates; a promoted module renders only from ERP-06's served contract (a family, a state or a field it re-derived would fail the gate's vocabulary scan); approval-as-code recorded for this flag and target stage. |
 
 Two properties hold for all five, and both are structural rather than promises:
-the flags default OFF in every declaration that carries them (registry,
-terraform, rollout state), and one flag can never widen more than its own
+the flags default ON in every declaration that carries them (registry,
+terraform, rollout state), per AO-GR-6, and one flag can never widen more than its own
 surface — `mcp_outbound` still needs the per-server `enabled` and the caller's
 capability, `sandbox_runtime` still needs a runtime that exists, and the three
 portal views are independent of each other and of `enable_portal`.

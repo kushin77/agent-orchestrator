@@ -182,6 +182,12 @@ declare `template.scaling` and `traffic` on the control-plane module — flag-ga
 OFF like everything else (AO-GR-6), never applied ad hoc (GR-5). This record
 fixes the *mapping*; it does not author the Terraform.
 
+> **Amended 2026-09-22:** every flag-gated-OFF / "Nothing ON by default"
+> reference in this record (here and at the "Both are flag-gated OFF" and
+> "Nothing ON by default" passages below) was reversed by
+> policy-gr5-enabled-by-default (2026-09-21, AO-GR-6); see
+> docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
+
 ### D2 — Durable execution: our engine core is the substrate of record; Temporal stays seamed
 
 **The run state machine is ours — `engine/core` — and the Temporal transport

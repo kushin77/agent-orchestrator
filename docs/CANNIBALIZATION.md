@@ -10,7 +10,7 @@ feature is built from scratch while a harvested asset already covers it.
 
 **Raw scans are NOT in git.** The full harvest reports live under
 `.research/reports/` (`CMR-harvest.md`, `leaderboard-harvest.md`,
-`fleet/*-harvest.md`) — gitignored by design (see [Auto-refresh](#auto-refresh-note)).
+`fleet/*-harvest.md`) — gitignored by design (see [Auto-refresh](#5-auto-refresh-note)).
 This file is the only committed artifact.
 
 ---
@@ -697,7 +697,7 @@ therefore **defined by this repo** (`registry/profiles/agent-profile.schema.json
 | Owner | the **same owner** as this repo (a first-party estate, not a third party) |
 | Verdict | **PATTERN** — the *shape* is the asset; the implementation is tied to that estate |
 | Ported to | `infra/cloudflare/ingress.py` + `infra/cloudflare/ao-ssh-access.sh`, gated by `scripts/check-ao-ssh-access.sh` |
-| Register | `surfaces.remote_ssh_access` in `infra/feature-flags/registry.yaml`, ships **OFF** (GR-5) |
+| Register | `surfaces.remote_ssh_access` in `infra/feature-flags/registry.yaml`, ships **ON** by default (AO-GR-6) |
 
 **The pattern.** A hostname is published through an *existing* remotely-managed
 Cloudflare Tunnel by merging one `ssh://<origin>:22` rule into the tunnel's live
@@ -722,7 +722,7 @@ the tree.
 |---|---|---|
 | `CF_ACCOUNT_ID` / `CF_ZONE_ID` / the tunnel id / the access emails default to the estate's own values | every identifier and the email allow-list come from the **environment**, and a missing one is **refused by name** | a default in this repo would point the run at another estate; the upstream values are that estate's and are not in this tree at all |
 | Vault, then GSM, then env for the API token | env (`CF_API_TOKEN`) or GCP Secret Manager (`AO_CF_TOKEN_SECRET` + `AO_GCP_SECRET_PROJECT`); never a file, never git | GR-6, and this repo has no Vault dependency to borrow |
-| apply by default | **dry run is the default**; `--apply` mutates and refuses while the surface flag is OFF | GR-5: new infrastructure ships OFF and is promoted by a reviewed change, not by a default |
+| apply by default | **dry run is the default**; `--apply` mutates and requires the surface flag ON | AO-GR-6: new infrastructure ships ON by default once merged and tested, and dry-run apply is still the safety gate, not a default OFF flag |
 | the merge lived in a shell heredoc | the merge is a **pure function** with its own suite, and the gate **mutation-proves** it against a neutered copy | one definition, unit-testable, and a gate that can genuinely fail |
 | Access could be skipped (`--no-access`) | Access is **always** ensured | a hostname without an Access app is an unauthenticated public door to sshd, which is not a supported posture |
 | run directly by whoever held the token | the live apply is documented as an **operator act**, and the route ships OFF | it changes an estate this repo does not own |
@@ -780,7 +780,7 @@ the tree.
 |---|---|---|
 | the ingress merge lived in `publish-origin.py --merge-only` — a **second** implementation | the merge stays the single `infra/cloudflare/ingress.py` (pure, mutation-proved); `publish-origin.py` is superseded by this module and shared-services should vendor it rather than keep its own | two merges drift; one is the point of the whole route |
 | token posture: Vault (`TF_VAR_*` + a `vault-env.sh` loader) | environment-first (`CF_API_TOKEN` or GSM for the API token; `AO_SSH_CONNECTOR_TOKEN` for the connector), with **both** Vault and GSM documented as the operator's upstream source | GR-6, and this repo has no Vault dependency to borrow; shared-services can source the same env vars from Vault without rework |
-| apply by default (Terraform `null_resource` local-exec/remote-exec) | **dry run is the default**; `--apply` mutates and refuses while the surface flag is OFF, and the connector deploy is an operator act | GR-5: new infrastructure ships OFF and is promoted by a reviewed change |
+| apply by default (Terraform `null_resource` local-exec/remote-exec) | **dry run is the default**; `--apply` mutates and requires the surface flag ON, and the connector deploy is an operator act | AO-GR-6: new infrastructure ships ON by default once merged and tested |
 | provisioning logic inline in a shell script + Terraform `inline` blocks | provisioning + connector logic is a **pure module** (`provision.py`) with its own suite, and the gate **mutation-proves** it against a neutered copy (fail-open read, non-idempotent deploy) | one definition, unit-testable, and a gate that can genuinely fail |
 
 **Retirement note for shared-services.** `scripts/publish-origin.py` and the
@@ -852,7 +852,7 @@ identifier was carried across.
 |---|---|---|
 | a React addon mounted in the shell (`mount.type: native`), wired through six shared-frontend surfaces | a **same-origin view served by this repo's own portal** (`portal/static/views/console.html` + `js/operator.js`), reached at `GET /console` | the console owns its transport and imports no authority; the addon route buys no user-visible gain today |
 | the shell's login (HttpOnly cookie + `/auth/me`) | the **same** gate's RS256 `os-session-token`, verified **offline** against a mirrored JWKS — the console issues no credential | one front door: the console is not a second session issuer, and it depends on no live call to the gate |
-| a live host on the remote cluster, wired by the estate | a **declaration**, flag-gated OFF, handed to the run half by a direction issue on that repo's board | GR-5 — new infrastructure ships OFF and is promoted by a reviewed change; this repo never edits shared-services |
+| a live host on the remote cluster, wired by the estate | a **declaration**, flag-gated ON by default, handed to the run half by a direction issue on that repo's board | AO-GR-6 — new infrastructure ships ON by default once merged and tested; this repo never edits shared-services |
 | the estate's own port and secret defaults | the port is re-checked on the host before the first `up`, and every secret comes from the run half's env with an **empty default** | a port is a host fact, not a declaration; and GR-6 — nothing secret in the tree |
 
 **See also.** `docs/AGENTCONSOLE-HOSTING.md` carries the full two-repo split, the

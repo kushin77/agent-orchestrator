@@ -24,8 +24,8 @@ records what is **not** reachable today.
 | steer a running fleet (pause, poke, halt, refresh) | override terminal (steer) | `python3 fleet/control.py <verb>` | shell on the box |
 | start / stop the rungs | override terminal (lifecycle) | `python3 fleet/control.py start` / `stop` / `restart` | shell on the box |
 | browse the fleet from a browser, from anywhere | browser console | `make console` | shell on the box to start it; a browser to use it |
-| **get a shell on the box from anywhere** | remote route (SSH over the Cloudflare Tunnel) | `infra/cloudflare/ao-ssh-access.sh` then `ssh <user>@<the hostname>` | the route published (§6, flag-gated OFF) **and** an Access service token to make it headless |
-| **control** the fleet from outside the box | — | **not reachable today** (see [limits](#what-an-operator-with-no-shell-on-the-box-can-and-cannot-do)) | — |
+| **get a shell on the box from anywhere** | remote route (SSH over the Cloudflare Tunnel) | `infra/cloudflare/ao-ssh-access.sh` then `ssh <user>@<the hostname>` | the route published (§6, ON by default per AO-GR-6) **and** an Access service token to make it headless |
+| **control** the fleet from outside the box | — | **not reachable today** (see [limits](#5-what-a-principal-with-no-shell-on-the-box-can-and-cannot-do)) | — |
 
 ## 1. The A2A control channel — the PRIMARY control plane
 

@@ -16,6 +16,10 @@ Ollama). Full build-out across the five pillars plus cross-cutting surfaces
 (`infra/feature-flags/registry.yaml`); nothing is tenant-visible until a
 reviewed go-live promotes it.
 
+> **Amended 2026-09-22:** the flag-gated-OFF default recorded above was
+> reversed by `policy-gr5-enabled-by-default` (2026-09-21, AO-GR-6); see
+> `docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default`.
+
 Highlights by phase:
 
 - **Phase 0 — Foundations**: repo scaffold + agent-instruction layering,

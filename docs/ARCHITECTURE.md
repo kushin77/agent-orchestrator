@@ -91,7 +91,7 @@ purpose and what will land there; later phase issues fill the dirs.
 
 ## 4. Rollout & operating doctrine
 
-- **Enabled by default (GR-5 / AO-GR-6).** Every new surface ships enabled by
+- **Enabled by default (AO-GR-6).** Every new surface ships enabled by
   default once merged and tested; there is no "built but off" state. An OFF
   default requires a cited owner exception.
 - **No-false-green gates (fleet doctrine).** The repo gate (`make verify`) is
@@ -104,7 +104,7 @@ purpose and what will land there; later phase issues fill the dirs.
 
 ## 5. Definition of done (EPIC-00)
 
-All phases 0–8 closed and the product live flag-gated: a new tenant can be
+All phases 0–8 closed and the product live and enabled by default (AO-GR-6): a new tenant can be
 provisioned end-to-end — **signup → org → personas → agents → routed model
 calls → audit + usage billing** — entirely agent-built and flag-gated. EPIC-00
 (issue #4) closes last.

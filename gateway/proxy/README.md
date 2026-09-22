@@ -228,7 +228,8 @@ health compose without this lane redefining either.
   `enforce` mode blocks → backpressure; rate limiter → `rate_limited`),
   `complete()` after the call (output throttle; real usage metered; cacheable
   response stored). Budgets default to `observe` (safe rollout) and are flipped
-  to `enforce` deliberately per scope — flag-gated-off doctrine.
+  to `enforce` deliberately per scope (AO-GR-6: enabled by default; an OFF
+  default requires a cited owner exception).
 - **Tools/constraints** are owned by the registry/rbac layers; the proxy
   carries them on the `AgentView` for downstream enforcement but does not
   re-own them.

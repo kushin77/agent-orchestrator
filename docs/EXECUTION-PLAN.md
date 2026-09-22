@@ -474,7 +474,7 @@ python3 governance/tagging/cli.py plan \
 ```
 
 The plan names the gates by channel, the FinOps floor, and the declarations the
-work owes (`flag-gated-off` for `posture:iac`). A tier **below** the floor its
+work owes (`enabled-by-default` (AO-GR-6) for `posture:iac`). A tier **below** the floor its
 own tags require is refused by name (`finops-floor-unmet`), and the floors are
 compared by **rank read from the file**, never by guessing at string order.
 

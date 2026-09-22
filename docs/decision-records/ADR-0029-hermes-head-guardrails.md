@@ -38,6 +38,10 @@ The guardrails pillar already has a working policy-as-code engine
 `uncovered` and BLOCKed. Three platform examples
 (`bundles/platform/model-call-budget.yaml`, `tool-use.yaml`,
 `data-egress.yaml`) and five workbook mechanical-rule policies (issue #636)
+
+> **Amended 2026-09-22:** the `enabled: false` / flag-gated-OFF default cited
+> above was reversed by policy-gr5-enabled-by-default (2026-09-21, AO-GR-6);
+> see docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
 already ship this shape. The question this record decides is narrow: **what
 is the minimal policy declaration for hermes and paperclip that this existing
 engine evaluates**, not whether to build a second engine.

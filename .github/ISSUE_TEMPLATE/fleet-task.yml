@@ -120,7 +120,7 @@ body:
     id: posture
     attributes:
       label: Posture (delivery)
-      description: How this work is delivered — the tag authority's `posture` dimension (AO-GR-28, governance/tagging/taxonomy.yaml). iac means the infrastructure is DECLARED, never clicked, and ships flag-gated OFF; saas puts it behind the identity and boundary gates; no-human-needed means the lane must finish with NO operator input at all; human-gated means an operator gate precedes merge. These are orthogonal — a SaaS surface can also be IaC-declared.
+      description: How this work is delivered — the tag authority's `posture` dimension (AO-GR-28, governance/tagging/taxonomy.yaml). iac means the infrastructure is DECLARED, never clicked, and ships flag-gated ON by default (AO-GR-6); saas puts it behind the identity and boundary gates; no-human-needed means the lane must finish with NO operator input at all; human-gated means an operator gate precedes merge. These are orthogonal — a SaaS surface can also be IaC-declared.
       options:
         - overall
         - saas

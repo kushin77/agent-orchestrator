@@ -30,7 +30,7 @@ bridge. OpenWebUI stays a **non-authoritative** client.
 | Auth is ONE Google login: HttpOnly `SameSite=Lax Secure` JWT cookie + `/auth/me` | `shared-frontend/docs/AUTH.md` |
 | Our console **has no login of its own**; the portal verifies the shell's RS256 `os-session-token` offline against the auth-gate JWKS and **fails closed** | `portal/server/sso.py` module docstring ("This module is the module half of that contract") |
 | The chat view is ours and same-origin | `portal/static/views/chat.html`, `portal/static/js/chat.js`, `portal/server/chat.py` |
-| The surface ships **invisible** while its flag is off: the routes answer **404 before AuthN** | `infra/feature-flags/registry.yaml` → `surfaces.chat` (`default: off`, `promoted: false`, `tf_flag: enable_chat`) |
+| Per AO-GR-6 the flag defaults **on**; the surface is invisible only until **promoted**: while unpromoted the routes answer **404 before AuthN** | `infra/feature-flags/registry.yaml` → `surfaces.chat` (`default: on`, `promoted: false`, `tf_flag: enable_chat`) |
 
 ## The origin and session model
 
@@ -69,10 +69,11 @@ point: the mount is decided, and the bridge is the work item that remains.
 
 ## The flag-before-AuthN rule
 
-`surfaces.chat` (`infra/feature-flags/registry.yaml`) is `default: off`, `promoted: false`, with its
-own `tf_flag: enable_chat`, deliberately independent of the gateway and the portal (ADR-0023 §5).
-While it is off, **the routes answer 404 before AuthN** — an unpromoted surface is not merely
-unauthorised, it is **invisible**. Consequences the mount must respect:
+`surfaces.chat` (`infra/feature-flags/registry.yaml`) is `default: on` (AO-GR-6),
+`promoted: false`, with its own `tf_flag: enable_chat`, deliberately independent of the gateway and
+the portal (ADR-0023 §5). While it is **unpromoted**, **the routes answer 404 before AuthN** — an
+unpromoted surface is not merely unauthorised, it is **invisible**. Consequences the mount must
+respect:
 
 1. The vendor module entry must not be added while the surface is unpromoted; an entry that resolves
    to a 404 is a broken mount in the SPoG.

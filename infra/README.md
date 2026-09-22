@@ -9,12 +9,14 @@ Owner lane: **infra** (issue #6 · IaC mandate GR-5). See
 Everything declared, nothing clicked. This directory is the CI/CD + IaC
 foundation for the multi-tenant **AI-agent-orchestration control plane**: the
 Terraform modules that declare the seven control-plane services, the
-feature-flag registry that keeps every surface **OFF until promoted**, and the
-Cloud Build pipelines that run the gate and perform the only apply route.
+feature-flag registry that keeps every surface's default **declared, not
+inferred**, and the Cloud Build pipelines that run the gate and perform the
+only apply route.
 
-New infrastructure ships **flag-gated OFF by default** and is applied by the
-**deployer service account** through the automated pipeline — never by a human
-in a console.
+New infrastructure ships **enabled by default (AO-GR-6)** once merged and
+tested, and is applied by the **deployer service account** through the
+automated pipeline — never by a human in a console. A surface that must stay
+off requires a named owner exception citing the decision that keeps it off.
 
 ## Layout
 
@@ -53,18 +55,19 @@ infra/
     apply-trigger.yaml       importable push trigger (disabled by default)
 ```
 
-## Flag-gated OFF by default
+## Enabled by default (AO-GR-6)
 
 Every `enable_*` variable in `infra/terraform/variables.tf` defaults to
-`false`, and every entry in [`feature-flags/registry.yaml`](feature-flags/registry.yaml)
-defaults to `off`. With all flags closed the Terraform configuration declares
-but creates **nothing** — a plan shows zero resources.
+`true`, and every entry in [`feature-flags/registry.yaml`](feature-flags/registry.yaml)
+defaults to `on`, unless it carries a named owner exception. With all flags
+open the Terraform configuration declares the full deployed surface.
 
 `scripts/check-feature-flags.py` (wired into `make verify`) enforces this
-mechanically: a service that ships ON, a missing registry entry, a terraform
-flag that defaults to `true`, or a registry/terraform mismatch all **fail the
-gate** (no-false-green). Promotion is one flag at a time, behind a reviewed
-go-live, recorded in the registry.
+mechanically: a service that ships OFF without a cited exception, a missing
+registry entry, a terraform flag that defaults to `false` without a cited
+exception, or a registry/terraform mismatch all **fail the gate**
+(no-false-green). An OFF default is one flag at a time, behind a reviewed,
+named owner decision recorded in the registry.
 
 ## The only apply path (no console)
 
