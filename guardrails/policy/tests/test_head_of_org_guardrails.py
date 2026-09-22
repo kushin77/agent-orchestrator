@@ -72,15 +72,25 @@ def head_engine(shipped_bundle_dir, head_of_org_controls_on) -> PolicyEngine:
 # flag-gated OFF: both controls OFF => uncovered => fail-closed BLOCK
 # --------------------------------------------------------------------- #
 def test_controls_off_blocks_hermes_and_paperclip_actions(shipped_bundle_dir, shipped_controls):
+    # #1953 (owner decision 2026-09-21): hermes-head-guardrails now ships
+    # proven ON (#1519) in the shipped registry, so hermes actions are
+    # covered/enforced, not uncovered/BLOCK. paperclip-operator-guardrails
+    # is still OFF (no closed canary proof yet), so paperclip stays
+    # uncovered/BLOCK.
     bundle = build_bundle([shipped_bundle_dir], controls=shipped_controls)
     engine = PolicyEngine(bundle, controls=shipped_controls)
-    for action, subject in (
-        ("agent.dispatch", "hermes"),
-        ("ticket.update", "paperclip"),
-    ):
-        result = engine.evaluate(action, subject=subject, tenant="acme", context={"channel": "gateway"})
-        assert result.decision is DecisionLevel.BLOCK
-        assert result.uncovered is True
+
+    hermes_result = engine.evaluate(
+        "agent.dispatch", subject="hermes", tenant="acme", context={"channel": "gateway"}
+    )
+    assert hermes_result.decision is DecisionLevel.LOG
+    assert hermes_result.uncovered is False
+
+    paperclip_result = engine.evaluate(
+        "ticket.update", subject="paperclip", tenant="acme", context={"channel": "gateway"}
+    )
+    assert paperclip_result.decision is DecisionLevel.BLOCK
+    assert paperclip_result.uncovered is True
 
 
 # --------------------------------------------------------------------- #

@@ -204,7 +204,11 @@ def cmd_check_report(args: argparse.Namespace) -> int:
             print(f"{row['id']:<22} {row['status']} {row['status_name']}")
     if control_set.all_default_off():
         return EXIT_OK
-    print("check-report: NOT-OK — one or more controls are enabled (not default-OFF)", file=sys.stderr)
+    print(
+        "check-report: NOT-OK — a control's state does not match its shipped "
+        "default (proven-ON controls per #1953 excepted)",
+        file=sys.stderr,
+    )
     return EXIT_FAIL
 
 
@@ -213,14 +217,24 @@ def _selftest_checks() -> list[tuple[str, bool, str]]:
     results: list[tuple[str, bool, str]] = []
 
     controls = load_controls(None)
-    default_on = [control.id for control in controls if control.default_enabled]
+    unproven_on = [
+        control.id for control in controls if control.default_enabled and not control.proven_by
+    ]
     results.append(
-        ("every control defaults OFF", not default_on, f"{len(controls)} control(s)")
+        (
+            "every control defaults OFF unless proven ON by a closed canary (#1953)",
+            not unproven_on,
+            f"{len(controls)} control(s), unproven ON: {unproven_on}",
+        )
     )
 
     fresh = build_control_set(None)
     results.append(
-        ("a fresh control set is all-OFF", fresh.all_default_off(), f"{len(fresh)} control(s)")
+        (
+            "a fresh control set matches shipped defaults",
+            fresh.all_default_off(),
+            f"{len(fresh)} control(s)",
+        )
     )
 
     unknown_refused = False

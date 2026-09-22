@@ -103,6 +103,14 @@ def load_control_policy_map(root: Optional[Path] = None) -> dict[str, dict[str, 
     return module.build_control_policy_map(catalog)
 
 
+# Controls proven to ship ON by a closed canary/promotion issue (#1953, owner
+# decision 2026-09-21). Every other control that shows up `enabled: true` in
+# the registry is still refused by PolicyControl (AO-GR-6 default-OFF).
+_PROVEN_ON_BY_DEFAULT: dict[str, str] = {
+    "hermes-head-guardrails": "#1519",
+}
+
+
 def load_controls(
     path: Optional[Path] = None,
     *,
@@ -110,9 +118,11 @@ def load_controls(
 ) -> tuple[PolicyControl, ...]:
     """Load and adapt the guardrails controls registry to the model.
 
-    Every adapted :class:`PolicyControl` ships ``default_enabled=False``; a
-    registry entry that ships ON is refused by the model even when the policy
-    loader would accept it with an ``on_since_rationale``.
+    Every adapted :class:`PolicyControl` ships ``default_enabled=False``
+    unless its id is in ``_PROVEN_ON_BY_DEFAULT`` (issue #1953): a registry
+    entry that ships ON without that proof is still refused by the model
+    even when the policy loader would accept it with an
+    ``on_since_rationale``.
     """
     registry_path = Path(path) if path else default_controls_path(root)
     try:
@@ -133,6 +143,7 @@ def load_controls(
                 audit_ref=f"{DEFAULT_CONTROLS_RELPATH.as_posix()}#{control.id}",
                 gated_actions=(),
                 default_enabled=bool(control.enabled),
+                proven_by=_PROVEN_ON_BY_DEFAULT.get(control.id),
             )
         )
     return tuple(controls)

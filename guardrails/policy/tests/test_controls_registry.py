@@ -31,10 +31,19 @@ def _valid_controls_doc() -> dict:
 
 
 def test_shipped_controls_all_default_off(shipped_controls):
+    # #1953 (owner decision 2026-09-21): hermes-head-guardrails ships ON
+    # because its paired capability flag (enable_hermes) ships
+    # `default: on` and the control has a closed canary proof (#1519).
+    # Every other control still ships OFF (AO-GR-6).
+    proven_on = {"hermes-head-guardrails"}
     assert len(shipped_controls) == 10
-    assert shipped_controls.active_ids() == ()
+    assert shipped_controls.active_ids() == tuple(sorted(proven_on))
     for control in shipped_controls.all():
-        assert control.enabled is False  # AO-GR-6: new controls ship OFF
+        if control.id in proven_on:
+            assert control.enabled is True
+            assert control.on_since_rationale.strip()
+        else:
+            assert control.enabled is False  # AO-GR-6: new controls ship OFF
     # the three issue-#26 platform controls
     assert {
         "model-call-budget",
