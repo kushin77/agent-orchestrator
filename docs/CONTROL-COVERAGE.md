@@ -114,9 +114,10 @@ The bindings are not decorative. Each control's **own stated subject** is the ru
   (`test_tenant_isolation.py`, `test_chain_integrity.py`).
 - AO-GR-18 → `check-chat-finops.sh` — *"the control that matters is the
   **refusal**: a turn over budget…"*.
-- AO-GR-20 → `check-feature-flags.py` — *"every control-plane surface **ships OFF
-  until promoted**"*, and it asserts the registry carries `default_policy: off` in
-  lock-step with `infra/terraform/variables.tf`.
+- AO-GR-20 → `check-feature-flags.py` — *"every control-plane surface **ships
+  enabled by default**"* (AO-GR-6, policy-gr5-enabled-by-default, 2026-09-21),
+  and it asserts the registry carries `default_policy: on` in lock-step with
+  `infra/terraform/variables.tf`.
 - AO-GR-19 → `check-negative-controls.sh` — *"a guard that ships no negative
   control…"*.
 

@@ -70,7 +70,7 @@ contract that does not exist.
 - **The plane holds the ingestion config** (endpoint, credentials, retention,
   recording rules, alert rules, routes, runbooks). This repo holds only the
   rendering of its own facts and the push that carries them.
-- **Flag-gated OFF** (GR-5), **inert when unconfigured** (no endpoint means no
+- **Enabled by default** (AO-GR-6), **inert when unconfigured** (no endpoint means no
   export, no retry storm, and never a fabricated healthy signal), endpoint and
   credential from **environment or a secret manager only** (GR-6), and a **periodic
   render** so a window that could not be evaluated is published as `NO_DATA` rather

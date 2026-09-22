@@ -61,7 +61,7 @@ existing surfaces, build only the fleet-specific bindings.
 | UI | `portal/static/` (app shell, asset pipeline), the leaderboard's dashboard patterns (live table, status badges, colour semantics) | the fleet frame component, filter bar, timeline, org roll-up |
 | Layout idioms | public OSS terminal dashboards — Textual / rich — as *patterns* (widget composition, bounded refresh), never as runtime dependencies | the web widget set |
 | AuthN/Z | `identity/rbac/`, `identity/cpapi/`, `identity/entitlements/` | the SPoG policy bindings (which rows a role may read) and the tenant-scoping middleware |
-| Feature flags | `infra/feature-flags/` (GR-5: new surface ships flag-gated OFF) | the SPoG flag |
+| Feature flags | `infra/feature-flags/` (AO-GR-6: new surface ships enabled by default) | the SPoG flag |
 
 ## The web SPoG roadmap (linked issues)
 

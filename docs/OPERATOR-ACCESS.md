@@ -215,9 +215,9 @@ ROOT_ADMIN_EMAILS=root@platform.example.com \
 **The security requirement, plainly:** never expose this console on a public
 interface without the auth gate in front of it, and never rely on the bind
 address as a control. A tunnel or reverse proxy in front of the console is a
-**new infrastructure surface**: it is declared in code, ships **flag-gated OFF**
-(GR-5), and lands as a reviewed change — never a console click and never an
-ad-hoc `terraform apply`.
+**new infrastructure surface**: it is declared in code, ships **enabled by
+default** (AO-GR-6), and lands as a reviewed change — never a console click and
+never an ad-hoc `terraform apply`.
 
 ## 5. What a principal with no shell on the box can and cannot do
 
@@ -235,10 +235,10 @@ Honest limits, measured (`docs/REMOTE-CONTROL-GAP-ANALYSIS.md` §2.4/§2.6):
   (`surfaces.remote_control`, RC-3 of EPIC #551, issue #554): the
   principal→fleet command channel on the existing console app
   (`POST /api/control/<family>/<action>`), which consumes RC-2's closed verb
-  declaration and re-implements no control action. It ships **flag-gated OFF**
-  and the flag is checked **before** authentication, so while it is off the
-  whole family answers `404 feature_disabled` — an unpromoted surface is absent,
-  never silently available. Check the registry for the current state:
+  declaration and re-implements no control action. It ships **enabled by
+  default** (AO-GR-6), and the flag is checked **before** authentication, so an
+  unpromoted or held-back surface still answers `404 feature_disabled` rather
+  than becoming silently available. Check the registry for the current state:
 
   ```bash
   grep -n -A 3 'remote_control:' infra/feature-flags/registry.yaml
@@ -429,7 +429,7 @@ The route is proved offline — no estate, no credentials, no Cloudflare call �
 - [`../docs/decision-records/ADR-0011-session-fleet-transport.md`](decision-records/ADR-0011-session-fleet-transport.md)
   — why the transport is what it is.
 - [`../infra/cloudflare/ao-ssh-access.sh`](../infra/cloudflare/ao-ssh-access.sh) —
-  the remote route itself (§6): the four steps, dry-run by default, flag-gated OFF.
+  the remote route itself (§6): the four steps, dry-run by default (`--apply` mutates).
 - [`../scripts/check-ao-ssh-access.sh`](../scripts/check-ao-ssh-access.sh) — the
   gate that proves the route: a dry run mutates nothing, the merge never drops a
   live rule (mutation-proved), and no estate identifier is in the tree.

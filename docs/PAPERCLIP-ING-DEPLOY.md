@@ -12,8 +12,9 @@ process half.
 ## 1. What is deployed, and where
 
 Everything lives under [`../infra/paperclip/`](../infra/paperclip/README.md) and
-is **declared** — Terraform plus a flag-gated Cloud Build pipeline. There is no
-console path and no ad-hoc apply (GR-5).
+is **declared** — Terraform plus a flag-gated Cloud Build pipeline, enabled by
+default (AO-GR-6; `surfaces.paperclip` defaults `on`). There is no console path
+and no ad-hoc apply.
 
 | Artifact | Role |
 |---|---|
