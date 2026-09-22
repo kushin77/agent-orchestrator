@@ -14,7 +14,7 @@
     }
   },
   "tracking-repoint-2026-09-20": {
-    "why": "The named decision for all 13 entries of this record (issue #1499): each named a tracker that had been CLOSED -- #1361 for the 11 `venue` entries, #1382 for the two `live-dependent` ones -- while the composite still honoured them and the venue read green. PER ENTRY, BY NAME, one of two decisions was taken: RE-POINT at the live issue that now tracks the gap, or RETIRE. Every entry is RE-POINTED and NONE is retired, and that is a measurement rather than a preference: the named preconditions are still absent in the Cloud Build venue (it still installs no gh, docker or crontab and still cannot initialise vendor/CMR), so retiring the entries would not remove a false green -- it would red that venue on 13 checks it cannot assess for an environment reason, and block every pull request. The entries die with the venue, which is #1295's own subject. This block is LOAD-BEARING, not decorative: scripts/check-skip-ratchet.sh asserts that every row names a committed entry, that the row's `now` is that entry's `tracked_by`, and that `now` differs from `was` -- so the decision cannot silently drift away from the entries it describes.",
+    "why": "The named decision for all 15 entries of this record (issue #1499): each named a tracker that had been CLOSED -- #1361 for the 11 `venue` entries, #1382 for the two `live-dependent` ones -- while the composite still honoured them and the venue read green. PER ENTRY, BY NAME, one of two decisions was taken: RE-POINT at the live issue that now tracks the gap, or RETIRE. Every entry is RE-POINTED and NONE is retired, and that is a measurement rather than a preference: the named preconditions are still absent in the Cloud Build venue (it still installs no gh, docker or crontab and still cannot initialise vendor/CMR), so retiring the entries would not remove a false green -- it would red that venue on 13 checks it cannot assess for an environment reason, and block every pull request. The entries die with the venue, which is #1295's own subject. This block is LOAD-BEARING, not decorative: scripts/check-skip-ratchet.sh asserts that every row names a committed entry, that the row's `now` is that entry's `tracked_by`, and that `now` differs from `was` -- so the decision cannot silently drift away from the entries it describes.",
     "measured_at": "2026-09-20T13:14:34Z",
     "measured_by": "scripts/lib/skip-ratchet.py lane (issue #1499, session eebbf9063562, ElevatedIQ-AK)",
     "retired": [],
@@ -25,6 +25,12 @@
         "was": "#1382",
         "now": "#1295",
         "basis": "#1382 closed 2026-09-19T15:50:08Z and tracked the PRODUCER of the required context -- a question this entry already declared itself independent of. The blindness this check actually has here is the venue: it reads branch protection live with gh, and the Cloud Build container installs no gh, which is the gap #1361 filed and #1295 superseded. The live successor is #1295."
+      },
+      {
+        "check": "chronological-dispatch",
+        "was": "unnamed",
+        "now": "#1295",
+        "basis": "NEW entry from issue #2056 (2026-09-22): this check was never named in the #1361 migration, so it carries no prior tracker -- `was` records that honestly rather than borrowing #1361's lease. `now` is #1295, the venue umbrella that still owns the Cloud Build container's missing preconditions. The row exists because the ratchet requires a decision row for EVERY committed entry."
       },
       {
         "check": "cmr-knowledge",
@@ -53,6 +59,12 @@
         "was": "#1361",
         "now": "#1295",
         "basis": "#1361 closed not_planned 2026-09-19T01:03:11Z (Superseded by #1295); the vendored contract paths this check names are still unreadable in that venue."
+      },
+      {
+        "check": "dispatch-entrypoint",
+        "was": "unnamed",
+        "now": "#1295",
+        "basis": "NEW entry from issue #2056 (2026-09-22): this check was never named in the #1361 migration, so it carries no prior tracker -- `was` records that honestly rather than borrowing #1361's lease. `now` is #1295, the venue umbrella that still owns the Cloud Build container's missing preconditions. The row exists because the ratchet requires a decision row for EVERY committed entry."
       },
       {
         "check": "fleet-cron-dev-run",
@@ -129,6 +141,23 @@
       "reason": "kind: live-dependent -- #1410, moved off `venue` (#1394). This check reads the LIVE GitHub protection, and it drives scripts/check-gate-status.sh's producer probe, whose LIVE half needs `gh` too. With `gh` supplied it assesses (measured: rc 0 on a box). With no `gh` at all it cannot, and where `gh` answers and the API read does not -- `gh-unauthenticated` / `gh-repo-unresolvable` / `gh-statuses-unreadable` -- it answers rc 2 NAMING THE SOURCE, exactly as its honesty contract requires. That last case is a property of the WORLD and not a defect of the check, which is what this kind says: honoured BY NAME while the mechanism cannot answer, NOT stale when the check assesses, and REFUSED the moment the check FAILS (rc 1), because a failing check is a finding, not a skip. It was a `standing-gap` because the producer probe could never assess, then a `venue` entry carrying the precondition `gh auth status`; that kind's refusal told the operator to repair a check that was behaving correctly whenever `gh` was present and the API still silent, which is the mislabel #1410 removes. It names the VENUE gap: its blindness in the Cloud Build container is that the venue supplies no `gh` at all, which is #1295 (the issue #1361 was superseded by on 2026-09-19). It was never waiting on a producer to exist -- #1382, the tracker it used to name, closed 2026-09-19T15:50:08Z and tracked the gate-status producer instead."
     },
     {
+      "check": "chronological-dispatch",
+      "kind": "venue",
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-22T20:15:00Z",
+        "measured_by": "copilot-e2e lane (issue #2056, session 0dd187f81fd8, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open (open board read, 2026-09-22)",
+        "max_age_hours": 720
+      },
+      "precondition": {
+        "command": "command -v gh"
+      },
+      "reason": "`chronological-dispatch: CANNOT-ASSESS — gh not found (the board refresh this check drives needs it; #2056)`. The behavioural half drives governance/dispatch/cli.py, whose staleness refresh reads the board with `gh`; with no `gh` on PATH the CLI raises an unhandled FileNotFoundError and all six arms report `(exit 2, expected 1)` -- measured twice: in the Cloud Build venue and reproduced on a box under a shadow PATH carrying every /usr/bin entry except `gh` (rc 1, the same six arms). The probe is the check's own guard, quoted verbatim. `gh` is a COMMAND this venue does not supply (#2056); the check assesses rc 0 wherever it does."
+    },
+    {
       "check": "cmr-knowledge",
       "kind": "venue",
       "issue": 1295,
@@ -187,6 +216,23 @@
       },
       "precondition": "vendor/CMR/catalog/schemas/architecture-manifest.schema.json",
       "reason": "`check-diagrams-declaration: CANNOT-ASSESS - vendored contract unreadable: .../architecture-manifest.schema.json, .../gdc-manifest.schema.json, .../templates/module/gdc-manifest.yaml (initialise vendor/CMR)` -- the first of the three paths the check names (#1361)."
+    },
+    {
+      "check": "dispatch-entrypoint",
+      "kind": "venue",
+      "issue": 1295,
+      "tracked_by": "#1295",
+      "tracking": {
+        "state": "open",
+        "measured_at": "2026-09-22T20:15:00Z",
+        "measured_by": "copilot-e2e lane (issue #2056, session 0dd187f81fd8, ElevatedIQ-AK)",
+        "measured_via": "REST: repos/kushin77/agent-orchestrator/issues/1295 -> state=open (open board read, 2026-09-22)",
+        "max_age_hours": 720
+      },
+      "precondition": {
+        "command": "command -v gh"
+      },
+      "reason": "`check-dispatch-entrypoint: CANNOT-ASSESS — gh not found (the board refresh the STATUS probe needs; #2056)`. STATUS-REACHES-A-VERDICT asks the entrypoint for a verdict on a fresh fixture; with no `gh` the board cannot be refreshed, the probe answers rc 2 and the check reports FAIL for a container reason rather than a tree one -- reproduced on a box under a shadow PATH with no `gh` (rc 1, the same probe, snapshot age 3537842.2m). `gh` is a COMMAND this venue does not supply (#2056)."
     },
     {
       "check": "fleet-cron-dev-run",
