@@ -76,8 +76,12 @@ PORTAL_FLAGS = os.path.join(ROOT, "portal", "config", "feature-flags.yaml")
 # here). enable_paperclip's 2026-09-20 NO-GO (issue #1515) was superseded by
 # explicit owner call on 2026-09-21 (see infra/terraform/variables.tf and
 # infra/feature-flags/registry.yaml) — it defaults on like everything else,
-# so this set is currently empty.
-OFF_BY_EXPLICIT_DECISION: set[str] = set()
+# so this set holds only surfaces with their own dedicated promotion gate.
+# enable_erp_module (issue #1955): erp_module's own gate
+# (scripts/check-erp-portal.sh, e2e/erp/golden_path.py) requires the shipped
+# default stay off; the GR-5 blanket sweep (#1789) flipped it without this
+# exemption.
+OFF_BY_EXPLICIT_DECISION: set[str] = {"enable_erp_module"}
 
 # Surfaces exempt from the portal-drift cross-check (issue #1941), because
 # their portal declaration is deliberately NOT the registry's default: the

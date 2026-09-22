@@ -172,9 +172,9 @@ variable "enable_sandbox_runtime" {
 # the portal deployable — so it is a switch, not a deploy target, and
 # `erp_module_enabled` records the posture it rendered.
 variable "enable_erp_module" {
-  description = "Serve the ERP module's portal surface (ERP-07, issue #652). In-module switch: surfaces.erp_module in portal/config/feature-flags.yaml. ON by default (policy-gr5-enabled-by-default, 2026-09-21)."
+  description = "Serve the ERP module's portal surface (ERP-07, issue #652). In-module switch: surfaces.erp_module in portal/config/feature-flags.yaml. OFF by default (#1955): erp_module carries its own dedicated promotion gate (e2e/erp/golden_path.py, scripts/check-erp-portal.sh) requiring off-by-default, exempted from the GR-5 blanket enabled-by-default sweep."
   type        = bool
-  default     = true # policy-gr5-enabled-by-default
+  default     = false # 1955-erp-own-promotion-gate
 }
 
 variable "enable_erp_webhooks_bridge" {

@@ -289,7 +289,7 @@ services:
   # promoting (or killing) the module neither implies nor requires promoting the
   # portal around it (the `services.chat` precedent).
   erp_module:
-    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
+    default: off  # #1955: erp_module carries its own promotion gate (e2e/erp/golden_path.py, scripts/check-erp-portal.sh) that requires off-by-default; the #1789 GR-5 blanket sweep flipped it without that exemption
     promoted: false
     posture: hold
     phase: 7
@@ -675,7 +675,7 @@ surfaces:
       `remote_control` for the two halves it composes), runs `make verify` +
       `terraform plan`, then applies via the deployer SA.
   erp_module:
-    default: on  # GR-5/AO-GR-6 reversal (owner decision 2026-09-21): new capabilities ship enabled by default
+    default: off  # #1955: erp_module carries its own promotion gate (e2e/erp/golden_path.py, scripts/check-erp-portal.sh) that requires off-by-default; the #1789 GR-5 blanket sweep flipped it without that exemption
     promoted: false
     posture: hold
     service: portal
