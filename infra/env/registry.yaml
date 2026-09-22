@@ -146,6 +146,15 @@ variables:
     secret: false
     required_by: [deploy, local-run]
     readers: [portal/server/sso.py]
+  - name: AO_PORTAL_ERROR_LOG
+    purpose: >-
+      the path the portal's server-error sink appends to, overriding the
+      repo-local .portal/error_log.jsonl default that the console's
+      root-admin-only GET /api/errors reads back; it carries a PATH, never a
+      value.
+    secret: false
+    required_by: [deploy, local-run]
+    readers: [portal/server/error_log.py]
   - name: AO_SURFACE_REGISTRY
     purpose: >-
       the fleet projection the cockpit reads (the surface registry document);
