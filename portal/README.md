@@ -217,12 +217,13 @@ Not-found and refused are different answers on purpose: an unknown tier is
 chat_tier_only` (the client selects a *tier*, never a model), and a turn that
 was stopped is persisted `cancelled` rather than silently dropped.
 
-The surface ships **feature-flag-gated OFF** in
-`infra/feature-flags/registry.yaml` under `surfaces.chat` (read through the
+The surface is **feature-flag-gated**, declared in
+`infra/feature-flags/registry.yaml` under `surfaces.chat` and **enabled by
+default** (`default: on`, the 2026-09-21 GR-5/AO-GR-6 reversal; read through the
 fleet projection's fail-closed `surface_enabled`, so an absent entry is OFF):
 while it is off the whole `/api/chat/*` family **and** the view's own static
 assets (`views/chat.html`, `js/chat.js`) are absent, and the check runs
-**before** AuthN so an unpromoted surface is invisible rather than
+**before** AuthN so an unswitched surface is invisible rather than
 distinguishable by an authentication probe. `scripts/check-chat-ux.sh` proves
 that control by provoking it.
 
