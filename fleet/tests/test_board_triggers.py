@@ -279,7 +279,14 @@ def test_the_one_refresh_clears_the_staleness_when_the_board_is_reachable(tmp_pa
 
     def reachable(cmd, **kwargs):
         calls.append(list(cmd))
-        return type("Done", (), {"returncode": 0, "stdout": "[]", "stderr": ""})()
+        # Post-#2035 (`governance/dispatch/snapshot.py:290-296`) the fetch reads one
+        # JSON OBJECT per row and raises on anything else -- deliberately, so a
+        # malformed line cannot fail OPEN. The pre-#2035 fixture handed the runner
+        # `"[]"`, a single ARRAY row, which under that contract is a malformed line:
+        # the refresh parked and this test reddened `pytest-fleet` on master (#2053).
+        # An empty board is an empty ROW STREAM, which is what a reachable board with
+        # nothing on it produces. The assertions below are unchanged.
+        return type("Done", (), {"returncode": 0, "stdout": "", "stderr": ""})()
 
     trigger = board.refresh_or_park(
         "d-stale", snapshot_path=snapshot, base=state, repo="owner/repo", runner=reachable
