@@ -66,7 +66,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Callable, Protocol
 
 from governance.lifecycle.report import (
     DEFAULT_LABELS,
@@ -82,6 +82,7 @@ from governance.reconcile.audit import (
     parse_worktrees,
 )
 from governance.reconcile.heartbeat import (
+    CANNOT_ASSESS,
     DEFAULT_TTL_MINUTES,
     ORPHAN,
     SHELVED,
@@ -230,6 +231,29 @@ class ReconcileOps(Protocol):
     def preserved_remotely(self, worktree: str, branch: str) -> bool:
         """The lane's HEAD is contained in some remote branch — the work is safe."""
 
+    def uncommitted_work(self, worktree: str) -> list[str]:
+        """The lane's *own* uncommitted paths — the work a reclaim would destroy.
+
+        Asked **before any effect** (#1897). A lane whose worktree carries these
+        is the *shelved* case however its HEAD reads, because that work exists
+        nowhere else: nothing was ever committed, so `git worktree remove --force`
+        leaves no object to recover it from.
+
+        Optional, like the audit's ``landing_proof``: a minimal read-only port
+        (the fleet health export's dry-run fake) predates it and is not required
+        to answer. A port that *does* answer is authoritative, and a port that
+        cannot be asked never reclaims — see :func:`_uncommitted_work`.
+        """
+
+    def remote_branch_unlanded(self, branch: str) -> bool:
+        """Whether ``branch`` exists on the remote with a tip not on master.
+
+        The gone-worktree arm's read (#1897): with no HEAD locally, the branch's
+        remote tip (``git ls-remote``) is the only remaining evidence of where
+        the work lives. ``True`` means the work is preserved on the server but has
+        not landed — *parked*, never *reclaimed*.
+        """
+
     def remove_worktree(self, path: str) -> str: ...
 
     def delete_branch(self, branch: str, *, remote: bool) -> str: ...
@@ -303,8 +327,114 @@ def _clear_heartbeat_if_terminal(action: Action, ops: ReconcileOps, session: Ses
     _attempt(action, "clear-heartbeat", lambda: ops.clear_session(session.session_id))
 
 
+class WorkLocationUnreadable(RuntimeError):
+    """The lane's worktree could not be read, so *where its work lives* is unknown.
+
+    Named, and deliberately raised instead of letting git's own bare
+    ``RuntimeError`` escape (issue #1897). A session whose recorded ``worktree``
+    path exists but is not a git repository — a lane path some other process
+    turned into a scratch extraction — raised out of the decision and out of the
+    pass, so ``cli.cmd_watch`` logged ``pass failed: RuntimeError: fatal: not a
+    git repository (or any of the parent directories): .git`` every 60 s and
+    reconciled **nothing**; the beat was never cleared, so the session stayed in
+    the plane and wedged the worker until a human cleared the beat by hand.
+
+    The refusal is data, not a crash: the decision catches it, keeps the beat,
+    names the venue, and lets the pass continue to every other session.
+    """
+
+
+def gate_in_flight(worktree: str) -> bool | None:
+    """Whether a composite gate holds ``worktree`` right now (#1897).
+
+    The default implementation of ``sweep``'s ``gate_in_flight`` seam. The gate
+    already records a HELD permit per worktree (``scripts/gate-lock.sh``), so this
+    is a *read* of that record — ``fleet/gatelock.probe`` — not a re-derivation of
+    "is a gate running".
+
+    Tri-state on purpose: ``True`` (a permit is held), ``False`` (free), ``None``
+    (the permit store could not be read). The last is CANNOT-ASSESS: "no permit is
+    held" and "I could not look" must not share a verdict, so a stale-looking lane
+    is never reclaimed on state this worker could not read.
+    """
+    if not worktree:
+        return False
+    try:
+        from fleet import gatelock  # noqa: PLC0415 - the seam's own dependency
+    except Exception:  # noqa: BLE001 - an unimportable store is unreadable, never "free"
+        return None
+    try:
+        state = gatelock.probe(gatelock.worktree_lock_path(worktree))
+    except Exception:  # noqa: BLE001 - StoreUnusable and friends: unreadable, never "free"
+        return None
+    return bool(state.held)
+
+
+def _uncommitted_work(ops: ReconcileOps, worktree: str) -> list[str]:
+    """The lane's own uncommitted paths, or ``[]`` when the port cannot be asked.
+
+    Optional *by construction*, the same shape ``audit.py`` uses for its
+    ``landing_proof`` source, because a purpose-built read-only port predates it:
+    the fleet health export's dry-run fake answers exactly ``worktree_present`` /
+    ``preserved_on_main`` / ``preserved_remotely`` and never performs a teardown.
+    A port that *can* answer is authoritative — when it reports dirty paths the
+    lane is the *shelved* case, however its HEAD reads.
+    """
+    reader = getattr(ops, "uncommitted_work", None)
+    if reader is None:
+        return []
+    return list(reader(worktree))
+
+
+def _remote_branch_unlanded(ops: ReconcileOps, branch: str) -> bool:
+    """Whether the branch survives on the remote with work that has not landed.
+
+    **Best-effort, by design.** This arm *deletes nothing*: the gone-worktree path
+    runs bookkeeping only (forget the lane record, release the claim, clear the
+    beat) and never removes a branch, so the branch is kept whether the lane ends
+    ``parked`` or ``reclaimed`` — the read only ever *sharpens the label*.
+    Refusing the bookkeeping on an unreadable remote would therefore lose no work
+    while re-wedging the worker on exactly the shape Defect 2 is about, and the
+    common crash case is a checkout with no readable ``origin`` at all. A port that
+    cannot answer, or that raises a named ``WorkLocationUnreadable``, reads as "no
+    unlanded remote work" — the pre-#1897 behaviour for this arm.
+    """
+    if not branch:
+        return False
+    reader = getattr(ops, "remote_branch_unlanded", None)
+    if reader is None:
+        return False
+    try:
+        return bool(reader(branch))
+    except WorkLocationUnreadable:
+        return False
+
+
+def _cannot_assess(action: Action, exc: Exception) -> Action:
+    """Record a read that failed, keep the beat, and never touch the disk.
+
+    The disposition is the existing, non-destructive ``reported`` outcome carrying
+    the ``cannot-assess`` token (``heartbeat.CANNOT_ASSESS``) — *not* a new
+    outcome, because the outcome vocabulary is closed and mirrored on the health
+    plane (``fleet/health_signals.py`` refuses an undeclared token by name). No
+    step of this teardown runs, so the lane keeps its worktree, its branch, its
+    claim and its beat, and the next pass re-measures it.
+    """
+    action.steps.append(Step("locate-work", FAILED, f"{CANNOT_ASSESS}: {exc}"[:300]))
+    action.outcome = REPORTED
+    action.reason = f"{CANNOT_ASSESS}: {exc}"[:300]
+    return action
+
+
 def _teardown(session: Session, verdict: Verdict, ops: ReconcileOps, apply: bool) -> Action:
-    """Drive one orphaned lane to the terminal state its work allows."""
+    """Drive one orphaned lane to the terminal state its work allows.
+
+    Every rule below reads **before** it touches anything (issue #1897): ask about
+    the lane's own uncommitted work first; read where the work lives exactly once
+    and refuse by name when it cannot be read; let the branch's remote tip decide
+    when there is no HEAD to read; and leave a lane that a held gate is currently
+    working in entirely alone.
+    """
     action = Action(
         session_id=session.session_id,
         issue=session.issue,
@@ -319,35 +449,72 @@ def _teardown(session: Session, verdict: Verdict, ops: ReconcileOps, apply: bool
     if not apply:
         action.steps.append(Step("plan", SKIPPED, "dry run: pass --apply to act"))
         # Even on a dry run the *decision* is computed, so the report says which
-        # of the three cases this lane is in rather than only that it is old.
-        if worktree and ops.worktree_present(worktree):
-            if ops.preserved_on_main(worktree):
+        # case this lane is in rather than only that it is old.
+        try:
+            if not worktree or not ops.worktree_present(worktree):
+                action.outcome = PARKED if _remote_branch_unlanded(ops, branch) else RECLAIMED
+            elif _uncommitted_work(ops, worktree):
+                action.outcome = SHELVED_OUTCOME
+            elif ops.preserved_on_main(worktree):
                 action.outcome = RECLAIMED
             elif ops.preserved_remotely(worktree, branch):
                 action.outcome = PARKED
             else:
                 action.outcome = SHELVED_OUTCOME
-        else:
-            action.outcome = RECLAIMED
+        except WorkLocationUnreadable as exc:
+            return _cannot_assess(action, exc)
         return action
 
     if not worktree or not ops.worktree_present(worktree):
-        # The worktree is already gone; finish the bookkeeping that the crash
-        # skipped — a lane record or a claim with no lane is exactly the wedge
-        # this worker exists to clear.
+        # The worktree is already gone; finish the bookkeeping the crash skipped —
+        # a lane record or a claim with no lane is exactly the wedge this worker
+        # exists to clear. But with no HEAD to read, the branch's *remote* tip is
+        # the only remaining evidence of where the work lives: it is read first,
+        # and if it holds work that has not landed the lane is PARKED (the branch
+        # kept, and said so), never RECLAIMED. The read is best-effort because
+        # this arm removes no branch — see `_remote_branch_unlanded`.
+        unlanded = _remote_branch_unlanded(ops, branch)
         _attempt(action, "forget-lane", lambda: ops.forget_lane(session.session_id), bool(session.session_id))
         _attempt(action, "release-claim", lambda: ops.release_claim(session.issue, session.agent), bool(session.issue))
         _clear_heartbeat_if_terminal(action, ops, session)
-        action.outcome = FAILED_OUTCOME if action.steps and any(s.outcome == FAILED for s in action.steps) else RECLAIMED
+        if unlanded:
+            action.steps.append(Step(
+                "keep-remote-branch",
+                SKIPPED,
+                f"origin/{branch} holds work that is not on master; parked, not reclaimed",
+            ))
+        if any(step.outcome == FAILED for step in action.steps):
+            action.outcome = FAILED_OUTCOME
+        else:
+            action.outcome = PARKED if unlanded else RECLAIMED
         return action
 
-    if not ops.preserved_on_main(worktree) and not ops.preserved_remotely(worktree, branch):
+    # One read of where the work lives, before any effect. A worktree carrying the
+    # lane's own uncommitted paths is the *shelved* case however its HEAD reads:
+    # nothing was ever committed, so a `git worktree remove --force` here would
+    # leave no object from which the work could be recovered.
+    try:
+        uncommitted = _uncommitted_work(ops, worktree)
+        landed = False if uncommitted else ops.preserved_on_main(worktree)
+        remotely = ops.preserved_remotely(worktree, branch) if not (uncommitted or landed) else False
+    except WorkLocationUnreadable as exc:
+        return _cannot_assess(action, exc)
+
+    if uncommitted:
+        reason = (
+            f"the worktree holds uncommitted work ({', '.join(sorted(uncommitted)[:4])}"
+            f"{', …' if len(uncommitted) > 4 else ''}) — unmerged work that exists nowhere else"
+        )
+        _attempt(action, "mark-shelved", lambda: ops.mark_shelved(session, reason))
+        action.outcome = SHELVED_OUTCOME
+        return action
+
+    if not landed and not remotely:
         # Unmerged work exists only here: keep the lane, keep the claim, escalate.
         _attempt(action, "mark-shelved", lambda: ops.mark_shelved(session, verdict.reason))
         action.outcome = SHELVED_OUTCOME
         return action
 
-    landed = ops.preserved_on_main(worktree)
     _attempt(action, "remove-worktree", lambda: ops.remove_worktree(worktree))
     # A branch preserved only remotely must NOT be deleted remotely — that copy is
     # the work. It is parked: worktree reclaimed, branch kept on the server.
@@ -377,6 +544,7 @@ def sweep(
     reporter: BoardReporter | None = None,
     recheck: RecheckFindings | None = None,
     controls: "reconcile_policy.Controls | None" = None,
+    gate_in_flight: Callable[[str], bool | None] | None = None,
 ) -> SweepReport:
     """One reconciliation pass over every session with a heartbeat.
 
@@ -399,6 +567,14 @@ def sweep(
     re-evaluated every pass exactly as a lane is, and retires into a terminal
     state once the invariant it names is no longer charged. Without the seam no
     finding is re-measured, which is what keeps every offline proof offline.
+
+    ``gate_in_flight`` is the gate seam (#1897): a callable answering, per
+    worktree, whether a composite gate holds a permit for it right now. It is
+    threaded into ``heartbeat.judge`` so a **held gate outranks a stale beat** — a
+    lane inside its own ~13-minute ``make verify`` is a live lane, not an orphan —
+    and ``None`` from it (the permit store could not be read) is CANNOT-ASSESS and
+    refuses the reclaim. Omitted, no gating information is consulted and the TTL
+    arm applies exactly as it did before the seam existed.
     """
     if ops is None:
         raise ValueError("sweep requires an operations port (see RepoOps)")
@@ -408,15 +584,28 @@ def sweep(
 
     destructive_count = 0
     for session in list_sessions(root):
+        # The gate seam is tri-state and read once per session, *before* the
+        # verdict it qualifies: True (a permit is HELD for this worktree), False
+        # (free, or no gating information was offered), None (the store could not
+        # be read — CANNOT-ASSESS). A probe that raises is unreadable, never free.
+        gate_value: bool | None = False
+        if gate_in_flight is not None:
+            try:
+                gate_value = gate_in_flight(session.worktree or "")
+            except Exception:  # noqa: BLE001 - a store that cannot be read is not "free"
+                gate_value = None
         verdict = judge(
             session,
             ttl_minutes,
             at=moment,
             alive=(alive or {}).get(session.session_id) if alive else None,
+            gate_in_flight=gate_value,
         )
         # A shelved lane is re-evaluated every pass, not written off: once its
-        # work lands or is pushed, the next sweep reclaims it.
-        if verdict.reclaimable or session.state == SHELVED:
+        # work lands or is pushed, the next sweep reclaims it. A held gate still
+        # outranks that re-evaluation — the lane is being worked in right now, so
+        # a shelved record from a previous pass must not authorise tearing it down.
+        if verdict.reclaimable or (session.state == SHELVED and gate_value is False):
             if apply and destructive_count >= resolved_controls.max_actions_per_pass:
                 action = Action(
                     session_id=session.session_id,
@@ -702,7 +891,58 @@ class RepoOps:
         return bool(path) and Path(path).exists()
 
     def _head(self, worktree: str) -> str:
-        return self._run(["git", "-C", worktree, "rev-parse", "HEAD"])
+        try:
+            return self._run(["git", "-C", worktree, "rev-parse", "HEAD"])
+        except RuntimeError as exc:
+            # A named refusal, never git's own bare `RuntimeError`: "not a git
+            # repository" is a fact about *where this worker looked*, and the
+            # decision has to be able to tell it apart from a failure of the
+            # reclaim it guards (issue #1897).
+            raise WorkLocationUnreadable(
+                f"the worktree {worktree} is not a readable git repository: {exc}"
+            ) from exc
+
+    def uncommitted_work(self, worktree: str) -> list[str]:
+        """The lane's *own* uncommitted paths, via the isolation package (#1897).
+
+        ``governance.isolation.worktree.foreign_uncommitted`` already owns the
+        rule for which dirty paths are the lane's work and which a machine
+        rewrites (``.board/focus.json`` and friends, #834); a second definition
+        here would be a second answer. Loaded through ``_isolation_worktree`` for
+        the reason ``forget_lane`` documents — by package, from *this* checkout.
+        """
+        try:
+            isolation_worktree = _isolation_worktree()
+        except IsolationUnavailable as exc:
+            raise WorkLocationUnreadable(str(exc)) from exc
+        return list(isolation_worktree.foreign_uncommitted(worktree))
+
+    def remote_branch_unlanded(self, branch: str) -> bool:
+        """Whether ``branch``'s tip on the remote is not yet on ``origin/master``.
+
+        Read with ``git ls-remote`` — the server's answer, not this checkout's
+        cached remote-tracking refs, which are exactly what is missing for a lane
+        whose work was pushed from a worktree that no longer exists. A remote that
+        cannot be read is a **named refusal** (CANNOT-ASSESS), never "no branch
+        there": the two answers park and reclaim a lane respectively.
+        """
+        if not branch:
+            return False
+        try:
+            listing = self._git("ls-remote", "--heads", "origin", branch)
+        except RuntimeError as exc:
+            raise WorkLocationUnreadable(
+                f"the remote tip of {branch} could not be read (git ls-remote): {exc}"
+            ) from exc
+        tip = listing.split()[0] if listing.strip() else ""
+        if not tip:
+            return False
+        landed = subprocess.run(
+            ["git", "-C", str(self.root), "merge-base", "--is-ancestor", tip, "origin/master"],
+            capture_output=True,
+            text=True,
+        )
+        return landed.returncode != 0
 
     def preserved_on_main(self, worktree: str) -> bool:
         head = self._head(worktree)

@@ -74,6 +74,16 @@ ORPHAN = "orphan"
 SHELVED = "shelved"
 RUNNING = "running"
 
+#: The name of the disposition this worker takes when it cannot read state that a
+#: destructive decision rests on -- "no gate is held" and "I could not look" must
+#: not share a verdict (issue #1897). Deliberately a token in the *reason*, not a
+#: fourth ``status``: ``live``/``suspect``/``orphan`` is a closed three that
+#: ``fleet/health_signals.py`` mirrors and ``fleet/schema/health-signal.schema.json``
+#: enumerates, so a fourth status minted in this package alone would be refused on
+#: the health plane. The refusal is carried instead by the existing,
+#: non-destructive verdicts plus this word, which every consumer already renders.
+CANNOT_ASSESS = "cannot-assess"
+
 
 def now_epoch() -> float:
     return time.time()
@@ -302,6 +312,7 @@ def judge(
     *,
     at: float | None = None,
     alive: bool | None = None,
+    gate_in_flight: bool | None = False,
 ) -> Verdict:
     """Decide a session's status: ``live``, ``suspect`` or ``orphan``.
 
@@ -310,6 +321,22 @@ def judge(
     * a fresh beat whose process is gone is **suspect** — reported, never torn
       down, because absence alone is weak evidence;
     * otherwise the session is **live**.
+
+    ``gate_in_flight`` is the seam that lets a **held gate permit outrank a stale
+    beat** (issue #1897). ``scripts/verify.sh`` runs for ~13 minutes against a
+    15-minute TTL, so a lane inside its own gate looks orphaned while it is in
+    fact being worked in — and the gate lock already records exactly that state.
+    Like a refusal and unlike a boolean it is tri-state:
+
+    * ``True`` — a permit is HELD for this session's worktree, so the lane is
+      **live**: reported, never reclaimed (``sweep.py``'s ``gate_in_flight()``
+      reads it through ``fleet/gatelock.probe``);
+    * ``False`` — no permit holds it, and the TTL arm applies unchanged. This is
+      the default, so every caller predating the seam keeps the verdict it had;
+    * ``None`` — the permit store could not be read, which is **CANNOT-ASSESS**,
+      never a reclaim: "no permit is held" and "I could not look" must not share
+      a verdict. Nothing is asserted about the lane — only that this worker
+      refuses to tear it down on state it could not read.
     """
     moment = now_epoch() if at is None else at
     age = moment - session.at
@@ -317,6 +344,22 @@ def judge(
     process_alive = pid_alive(session.pid) if alive is None else alive
 
     if age > ttl_seconds:
+        if gate_in_flight:
+            return Verdict(
+                session,
+                LIVE,
+                f"heartbeat is {int(age)}s old, past the {ttl_minutes:g}m TTL, but a composite gate "
+                f"holds worktree {session.worktree or '(none)'} right now, so the lane is live; "
+                "reported, not reclaimed",
+            )
+        if gate_in_flight is None:
+            return Verdict(
+                session,
+                LIVE,
+                f"{CANNOT_ASSESS}: the gate permit store could not be read, so a live gate in "
+                f"worktree {session.worktree or '(none)'} cannot be ruled out; refusing to "
+                "reclaim a stale-looking lane (reported, not reclaimed)",
+            )
         return Verdict(session, ORPHAN, f"heartbeat is {int(age)}s old, past the {ttl_minutes:g}m TTL")
     if not process_alive:
         return Verdict(
