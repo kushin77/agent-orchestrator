@@ -270,7 +270,12 @@ header_values_cmd() {
   # a fleet checkout can legitimately have a sibling repo sitting on someone
   # else's in-progress feature branch, and this gate must judge the committed
   # contract, not transient WIP noise on an unrelated branch (#1890 review).
-  TMPD="${TMPD:-$(mktemp -d 2>/dev/null)}"
+  if [ -z "$TMPD" ]; then
+    TMPD="$(mktemp -d "/tmp/ao1890-headervals.$(printf 'X%.0s' 1 2 3 4 5 6)")" || {
+      echo 'check-duplicates: CANNOT-ASSESS — no scratch directory for header-values' >&2
+      return 2
+    }
+  fi
   for h in "${headers[@]}"; do
     vals=()
     labels=()
@@ -517,8 +522,10 @@ self_test() {
   local hv_headers=(x-frame-options permissions-policy strict-transport-security)
   local hv_h
   local control_leaked=0
+  local hv_sites
   for hv_h in "${hv_headers[@]}"; do
-    if header_sites "$hv_h" | grep -qi 'content-security-policy'; then
+    hv_sites="$(header_sites "$hv_h")"
+    if contains "$(printf '%s' "$hv_sites" | tr '[:upper:]' '[:lower:]')" 'content-security-policy'; then
       control_leaked=1
     fi
   done
