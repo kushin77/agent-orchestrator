@@ -32,10 +32,10 @@ kpi:
     - AGENTS.md
     - CLAUDE.md
     - .cursorrules
-  baselineBytes: 33505
+  baselineBytes: 33558
   measuredOn: "2026-09-22"
   measuredBy: "wc -c AGENTS.md CLAUDE.md .cursorrules"
-  ceilingBytes: 33505
+  ceilingBytes: 33558
   ceilingReason: >-
     Raised from 32883 to 33244 (2026-09-21): CLAUDE.md grew by 361 bytes
     (2335 -> 2696) in exactly one commit, 6dfa54b7 ("docs: point Claude Code at
@@ -54,6 +54,20 @@ kpi:
     unchanged, so 28576+2696+1972 = 33244 was the previous total and
     28775+2696+2034 = 33505 is the new one. Reverting either merged change to
     fit the old ceiling would undo doctrine another lane landed, so the ceiling
+    is raised to the measured total, dated and named, exactly as this gate's own
+    remedy requires. Raised again from 33505 to 33558 (2026-09-22) — the
+    re-fire of #1973, a single +53 byte commit. AGENTS.md grew 28775 -> 28828
+    (+53) in c6520545 ("vendor: add AgenticAutomationFramework as pinned
+    Playwright E2E submodule", #2011), which generalized the vendor/ Hard
+    DON'T to name both pinned submodules (vendor/CMR and
+    vendor/AgenticAutomationFramework — the pair declared in .gitmodules)
+    instead of only vendor/CMR, so the standing instruction file no longer
+    understates which trees are off-limits. CLAUDE.md (2696) and .cursorrules
+    (2034) are unchanged, so 28775+2696+2034 = 33505 was the previous total and
+    28828+2696+2034 = 33558 is the new one. The added text is not duplicated
+    (the "No editing vendor/" line appears exactly once in AGENTS.md), so there
+    is nothing to revert as accidental prose; shrinking AGENTS.md to fit the
+    old ceiling would restore a factually incomplete instruction, so the ceiling
     is raised to the measured total, dated and named, exactly as this gate's own
     remedy requires.
   zeroHeadroomNote: >-
