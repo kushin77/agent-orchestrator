@@ -13,7 +13,12 @@
 #   5  gap          - status `gap` cites no filed direction issue (the ref is `GAP`)
 #   6  #472 coverage- a capability EPIC #472 names is absent from the mapping, a
 #                     mapping row names a register row that does not exist, or the
-#                     mapping table is empty
+#                     mapping table is empty. A capability is matched by PHRASING
+#                     SET, and where EPIC #472's historical wording and the
+#                     register's reconciled wording differ (the 2026-09-21 AO-GR-6
+#                     GR-5 vocabulary reversal) the SAME capability is recognised
+#                     under EITHER wording - issue #2023. Rule 6 stays two-way and
+#                     non-vacuous: a capability neither authority names still fails.
 #
 # `UNVERIFIED` is an HONEST state, not a violation: the register deliberately
 # holds a row we already consume whose provider has not published the contract.
@@ -104,6 +109,13 @@ EPIC_REPO = "kushin77/agent-orchestrator"
 # post-normalisation) phrase set that proves EPIC #472 names it. The `epic`
 # anchors are what `--epic-live` re-checks against the live body, so this table
 # cannot silently drift into invention: every entry names where the EPIC says it.
+#
+# EITHER phrase set may carry SEVERAL accepted phrasings (a tuple of anchor
+# tuples): any ONE phrasing matching is enough to recognise the capability. That
+# is how one capability described under two vocabularies - EPIC #472's historical
+# "flag-gated OFF" and the register's reconciled "named default-OFF exception
+# seam" (2026-09-21 owner reversal `policy-gr5-enabled-by-default`, AO-GR-6) - is
+# still recognised as the SAME capability. See issue #2023.
 EPIC_472_CAPABILITIES = (
     (  # Objective: "as the org-wide **code-location** SSOT on the agent surface"
         "the org-wide code-location SSOT on the agent surface",
@@ -150,10 +162,35 @@ EPIC_472_CAPABILITIES = (
         ("mandatory consumer surface", ".mcp.json", "gdc-manifest.yaml"),
         ("gr-17 mandatory consumer surface", "mandatory_consumer_assets", "gdc-manifest.yaml"),
     ),
-    (  # will-not-do: "The real-backend path ships **flag-gated OFF**"
-        "the real backend behind a flag-gated OFF seam",
-        ("flag-gated off",),
-        ("real-backend path ships", "flag-gated off"),
+    (  # The ONE capability whose descriptor changed vocabulary. Both authorities
+        # are recorded verbatim below, because neither is edited to match the
+        # other - the EPIC body is a historical record, and the register is the
+        # reconciled current wording.
+        #
+        #   EPIC #472 body, will-not-do (read 2026-09-14; re-read 2026-09-22):
+        #     "- **No new always-on service invented here.** The real-backend path
+        #      ships **flag-gated OFF** (GR-5),"
+        #   docs/CODEIDX-CAPABILITY-REGISTER.md, #472 mapping row (read
+        #   2026-09-22), reconciled 2026-09-21 by the owner reversal
+        #   `policy-gr5-enabled-by-default` (AO-GR-6):
+        #     "| The real backend behind a named default-OFF exception seam (live
+        #      external call, `AO_MCP_CODEIDX_ENABLED`) | `C-28`, `C-29` |"
+        #
+        # WHY they differ: the reversal reworded the DESCRIPTOR (the capability is
+        # a named default-OFF exception seam with a live external call, no longer
+        # "flag-gated OFF") while the EPIC - a historical record - kept the
+        # original. They name the SAME seam, so this entry accepts EITHER phrasing
+        # on EITHER side; a capability that NEITHER authority names still fails
+        # both ways. See issue #2023.
+        "the real backend behind a (named) default-OFF exception seam",
+        (  # register side: the reconciled wording, or EPIC #472's own wording
+            ("real backend", "default-off"),
+            ("real backend", "flag-gated off"),
+        ),
+        (  # EPIC side (`--epic-live`, against the live body): either wording
+            ("real-backend path ships", "flag-gated off"),
+            ("real backend", "default-off"),
+        ),
     ),
     (  # children table: "the two-index authority split + the no-re-derivation rule"
         "the two-index authority split and the frozen no-re-derivation rule",
@@ -181,6 +218,29 @@ def norm(text):
     """
     flat = text.replace("`", "").replace("*", "")
     return re.sub(r"\s+", " ", flat).strip().lower()
+
+
+def phrasings(anchor_set):
+    """A capability's accepted phrasings, as a tuple of anchor tuples.
+
+    One phrasing is a tuple of string anchors (the common case). A capability
+    whose descriptor carries more than one accepted vocabulary is a tuple of such
+    tuples, and any ONE phrasing matching is enough to recognise it. This is what
+    lets one capability described under both EPIC #472's historical wording and
+    the register's reconciled wording be treated as the same capability - issue
+    #2023 - without accepting a capability NEITHER authority names.
+    """
+    if anchor_set and all(isinstance(anchor, str) for anchor in anchor_set):
+        return (anchor_set,)
+    return tuple(anchor_set)
+
+
+def match_phrasings(flat, anchor_set):
+    """True when ANY accepted phrasing of the capability is fully in `flat`."""
+    return any(
+        all(anchor in flat for anchor in anchors)
+        for anchors in phrasings(anchor_set)
+    )
 
 
 def split_row(line):
@@ -400,7 +460,7 @@ def check_mapping(mapping, register_ids, messages, subject):
         # (c) the mapping capability must be one EPIC #472 actually names
         flat = norm(capability)
         if not any(
-            all(anchor in flat for anchor in anchors)
+            match_phrasings(flat, anchors)
             for _title, anchors, _epic in EPIC_472_CAPABILITIES
         ):
             messages.append(
@@ -411,7 +471,7 @@ def check_mapping(mapping, register_ids, messages, subject):
 
     # (c) every capability EPIC #472 names must be carried by a mapping row
     for title, anchors, _epic in EPIC_472_CAPABILITIES:
-        if not any(all(anchor in flat for anchor in anchors) for _cap, flat in carried):
+        if not any(match_phrasings(flat, anchors) for _cap, flat in carried):
             messages.append(
                 "%s: rule 6 #472 coverage: EPIC #%d names the capability %r and the "
                 "#472 mapping table carries no row for it"
@@ -615,6 +675,11 @@ def _cases():
         ("mapping-invents-capability", "vendor's web UI",
          lambda t: mapping_append_row(
              t, "The vendor's web UI surfaces the index", "`C-01`")),
+        # rule 6 (c) - the RECONCILED capability (EPIC's "flag-gated OFF" == the
+        # register's "named default-OFF exception seam") dropped from the mapping:
+        # its own entry must still bite in the reverse direction (issue #2023).
+        ("mapping-drops-reconciled-capability", "default-OFF",
+         lambda t: mapping_drop_row(t, "default-OFF exception seam")),
         # an emptied register is a violation, not a pass
         ("register-emptied", "ZERO rows", drop_register_rows),
     ]
@@ -734,13 +799,23 @@ def cmd_epic_live(root, register=None):
     body = norm(done.stdout)
     failures = 0
     for title, _anchors, epic_anchors in EPIC_472_CAPABILITIES:
-        missing = [a for a in epic_anchors if a not in body]
-        if missing:
-            failures += 1
-            sys.stderr.write(
-                "  FAIL  EPIC #%d no longer names %r - missing anchor(s) %s\n"
-                % (EPIC_ISSUE, title, ", ".join(repr(m) for m in missing))
-            )
+        # any accepted phrasing is enough; the failure names what is missing per
+        # phrasing, so a genuinely dropped capability is still provable.
+        if any(
+            all(anchor in body for anchor in anchors)
+            for anchors in phrasings(epic_anchors)
+        ):
+            continue
+        failures += 1
+        missing = " | ".join(
+            ", ".join(repr(m) for m in [a for a in anchors if a not in body]) or "?"
+            for anchors in phrasings(epic_anchors)
+        )
+        sys.stderr.write(
+            "  FAIL  EPIC #%d no longer names %r - no accepted phrasing anchors in "
+            "the live body (missing per phrasing: %s)\n"
+            % (EPIC_ISSUE, title, missing)
+        )
     if failures:
         sys.stderr.write(
             "check-codeidx-capability-register: FAIL - %d of %d transcribed "
