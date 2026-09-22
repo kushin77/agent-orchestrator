@@ -9,6 +9,22 @@
 # file, so it is retired here (issue #1073). The repo's automation is
 # code-native (`make verify`); dependabot PRs land via the normal PR gate on
 # `master` and are never auto-merged.
+#
+# ---knowledge---
+# module_id: github.dependabot
+# system: governance
+# app: board
+# solution_class: pattern
+# patterns: [issue-first]
+# derives_from: null
+# owner_sme: pmo-sme
+# tier: L0
+# interfaces: [.github/dependabot.yml, weekly pip update PRs]
+# invariants: "no github-actions ecosystem block — GR-15 bans Actions workflows here"
+# gotchas: ""
+# related: ["#812", "#1073", "#1913"]
+# do_not_duplicate: null
+# ---knowledge---
 
 version: 2
 updates:

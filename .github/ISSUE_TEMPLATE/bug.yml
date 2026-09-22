@@ -1,3 +1,20 @@
+# .github/ISSUE_TEMPLATE/bug.yml — the bug-report issue form (observed/expected/repro/RCA).
+#
+# ---knowledge---
+# module_id: github.issue-template.bug
+# system: governance
+# app: board
+# solution_class: pattern
+# patterns: [issue-first]
+# derives_from: null
+# owner_sme: pmo-sme
+# tier: L0
+# interfaces: [the bug issue body fields]
+# invariants: "severity and model_tier are closed dropdowns, not freeform"
+# gotchas: "rca field points into governance/lessons/, not the PR body"
+# related: ["#1913"]
+# do_not_duplicate: null
+# ---knowledge---
 name: Bug report
 description: Defect brief — observed vs expected, the reproduction command, the canonical severity, and the RCA that closes the loop back into governance/lessons/.
 title: "[bug]"

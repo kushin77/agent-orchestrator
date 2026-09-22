@@ -62,6 +62,22 @@ scriptable transport rig, provider traffic is a canned response, and no socket,
 key, secret or network call is involved.  Run it:
 
     python3 -m e2e.chat_surface --out /tmp/e2e-chat-surface
+
+---knowledge---
+module_id: e2e.chat_surface
+system: e2e
+app: chat
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: e2e/golden_path.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [CLI-runnable check]
+invariants: "proves the conversational chain EPIC #500 / M30 shipped, not just the platform/delivery journeys"
+gotchas: ""
+related: ["#1013", "#500", "#506"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

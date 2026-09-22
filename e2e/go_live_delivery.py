@@ -51,6 +51,22 @@ The clock is the only thing that is not real: the declared ``gradual`` dwell is
 24h, so the second pass drives the same driver with its ``now`` field set past
 the recorded hold (the driver's own time source — no sleeping, no faked
 timestamp). The evidence records exactly how far ahead it was advanced.
+
+---knowledge---
+module_id: e2e.go_live_delivery
+system: e2e
+app: delivery
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: e2e/golden_path.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [ordered go-live run]
+invariants: "runs the platform, portal and delivery halves in sequence, not just each alone"
+gotchas: ""
+related: ["#955"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

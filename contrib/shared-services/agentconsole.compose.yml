@@ -2,6 +2,22 @@
 # behind the OS SSO gate) as a DECLARED service on the shared-services remote
 # cluster (host 192.168.168.42).
 #
+# ---knowledge---
+# module_id: contrib.shared-services.agentconsole-compose
+# system: control-plane
+# app: portal
+# solution_class: enterprise
+# patterns: [additive-only, flag-gated-off, declared-never-clicked]
+# derives_from: contrib/shared-services/docker-compose.frontends.yml
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [services.agentconsole, services.agentconsole-dev-build]
+# invariants: "production runs only an immutable AR ref; no secrets committed here (GR-6)"
+# gotchas: "image build context is repo ROOT, not portal/, because portal/ imports identity/, telemetry/, fleet/"
+# related: ["#801", "#800", "#1329", "#1913"]
+# do_not_duplicate: null
+# ---knowledge---
+#
 # WHY this file exists (issue #801, EPIC #800 lane A): the fleet live-hosting
 # contract — owner directive 2026-09-04, recorded in shared-frontend
 # `docs/DEPLOYMENT.md` — is that live hosting of the portal surfaces runs ONLY on

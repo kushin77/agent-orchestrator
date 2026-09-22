@@ -27,6 +27,22 @@ Layout:
 
 Offline by construction: no sockets, no network, no credentials. Every hop is read
 through the ERP module's own public surfaces, and no pillar file is edited.
+
+---knowledge---
+module_id: e2e.erp
+system: e2e
+app: erp
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: e2e/wiring.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [e2e.erp package layout]
+invariants: "a tenant can switch the ERP module on and run a full selling cycle offline"
+gotchas: ""
+related: ["#655", "#645"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

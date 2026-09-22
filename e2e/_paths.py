@@ -18,6 +18,22 @@ and ``gateway/proxy/wiring.py`` imports it as ``import metering`` after
 appending ``gateway/finops`` to ``sys.path``.  Adding ``telemetry/``
 top-level would shadow it with ``telemetry/metering`` (a different module
 with a different contract) and break ``build_real_gateway``.
+
+---knowledge---
+module_id: e2e._paths
+system: e2e
+app: platform
+solution_class: pattern
+patterns: [sys-path-bootstrap]
+derives_from: null
+owner_sme: qa-sme
+tier: L0
+interfaces: [configure_paths]
+invariants: "telemetry/ is never added as a top-level root"
+gotchas: ""
+related: ["#46"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -42,6 +42,22 @@ the suite ran.
 Run from the repo root:
 
     python3 -m e2e.finops_loop --out /tmp/pf5   # the evidence, as JSON
+
+---knowledge---
+module_id: e2e.finops_loop
+system: e2e
+app: finops
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: e2e/erp_finops_golden.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [webhook -> mcp -> cache_hit chain probe]
+invariants: "measures the two links erp_finops_golden.py leaves unmeasured"
+gotchas: ""
+related: ["#1019", "#665", "#675"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

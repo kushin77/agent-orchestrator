@@ -24,6 +24,22 @@ the producers' own values:
 
 Offline by construction: no sockets, no network, no real keys. It reads the
 merged modules through their public APIs and never edits a pillar file.
+
+---knowledge---
+module_id: e2e.workbook11_portal
+system: e2e
+app: portal
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: e2e/wiring.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [workbook-11 portal views joined over one request path]
+invariants: "served documents still carry the producers' own values, never a second copy"
+gotchas: ""
+related: ["#642"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

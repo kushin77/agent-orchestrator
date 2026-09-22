@@ -1,3 +1,20 @@
+# .github/ISSUE_TEMPLATE/epic.yml — one line on what this template collects.
+#
+# ---knowledge---
+# module_id: github.issue-template.epic
+# system: governance
+# app: board
+# solution_class: pattern
+# patterns: [issue-first]
+# derives_from: null
+# owner_sme: pmo-sme
+# tier: L0
+# interfaces: [the epic issue body fields]
+# invariants: ""
+# gotchas: "the number field is a string, not an integer"
+# related: ["#1913"]
+# do_not_duplicate: null
+# ---knowledge---
 name: Epic
 description: Issue brief for an epic — objective, measured landscape, the child lanes and the verification contract the epic closes on.
 title: "[epic]"

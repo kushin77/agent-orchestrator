@@ -17,6 +17,22 @@ What this file deliberately does NOT do: reach a network, read a credential, or 
 verifier. The console verifies a real RS256 token against a real JWKS with the same code
 path it uses in production; only the key's *provenance* differs (it is generated here,
 in-process, and never leaves it).
+
+---knowledge---
+module_id: e2e.erp.gate
+system: e2e
+app: erp
+solution_class: enterprise
+patterns: [offline-composition-root]
+derives_from: e2e/wiring.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [gate.session helpers]
+invariants: "the console session is minted locally, no network"
+gotchas: "repeated rather than imported from e2e/wiring.py or portal/tests/conftest.py on purpose — those are a sibling stage's private helpers"
+related: ["#655"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
