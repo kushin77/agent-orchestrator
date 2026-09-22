@@ -76,7 +76,7 @@ CANNOT-ASSESS — no verdict was obtainable. An unreachable plane therefore exit
 
 | plane says | named reason | exit |
 |---|---|---|
-| `404 feature_disabled` | the family is feature-flag-gated OFF (`surfaces.remote_control`): invisible, not merely unauthorised | 2 |
+| `404 feature_disabled` | the family is currently switched off at the flag (`surfaces.remote_control` — declared in `infra/feature-flags/registry.yaml`, and **enabled by default** per the 2026-09-21 GR-5/AO-GR-6 reversal, so this is a runtime state, not the shipped posture): invisible, not merely unauthorised | 2 |
 | `404 not_found` | the plane serves no control route at that address | 1 |
 | `401 unauthorized` | the plane verified no caller session | 1 |
 | `405 method_not_allowed` | the family is POST-only | 1 |
