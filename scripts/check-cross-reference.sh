@@ -255,6 +255,29 @@ else
 fi
 
 # --- the gate's own scratch must not decide the verdict (#2013) -----------
+# The fixture below SEEDS throwaway git repositories, so the inherited git
+# environment must be neutralised first: `git -C` does not override an exported
+# GIT_DIR, so a caller with one exported makes `git init/add/commit` act on the
+# REAL repository instead of the scratch fixture -- measured here as three stray
+# `base` commits on this lane's own branch and a stripped `vendor/` gitlink.
+# `scripts/lib/unset-git-env.sh` (issue #1642, SP-11) is that remedy.
+git_env_lib="$root/scripts/lib/unset-git-env.sh"
+if [ ! -r "$git_env_lib" ]; then
+  echo "check-cross-reference: CANNOT-ASSESS — scripts/lib/unset-git-env.sh is missing; the fixture block below would inherit GIT_DIR and could write into the repo it judges" >&2
+  exit 2
+fi
+# shellcheck source=scripts/lib/unset-git-env.sh
+source "$git_env_lib"
+# The guard is an assertion, not a hope: if any repo-routing variable survives it,
+# `git -C` would lose to the environment and the fixture below could write into the
+# repository this check is judging. Measured on this lane: with GIT_DIR exported,
+# `git -C <scratch> init` returns 0 while creating nothing, and the following
+# `add -A`/`commit` would land as `base` commits in the real repository.
+if [ -n "${GIT_DIR:-}${GIT_WORK_TREE:-}${GIT_INDEX_FILE:-}${GIT_COMMON_DIR:-}${GIT_OBJECT_DIRECTORY:-}" ]; then
+  echo "check-cross-reference: FAIL — a git repository environment survived scripts/lib/unset-git-env.sh (GIT_DIR='${GIT_DIR:-}' GIT_WORK_TREE='${GIT_WORK_TREE:-}'); the fixture block would write into the repository it judges" >&2
+  exit 1
+fi
+#
 # `make verify` rewrites `.board/snapshot.json` IN PLACE before this check runs:
 # scripts/check-dispatch-queue.sh self-heals it through board_selfheal ->
 # snapshot.refresh, which truncates at `gh issue list --limit 1000`. Reading that
@@ -304,7 +327,7 @@ def build(directory, committed, working):
 
 
 good = build(scratch / "committed-good", [4, 645], [645])
-bad = build(scratch / "committed-bad", [645], [645])
+bad = build(scratch / "committed-bad", [645], [645, 4])
 
 on_disk = json.loads((good / ".board" / "snapshot.json").read_text(encoding="utf-8"))
 on_disk_numbers = {issue["number"] for issue in on_disk["issues"]}

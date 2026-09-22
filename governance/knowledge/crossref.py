@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -127,24 +128,53 @@ def _read_committed_json(root: Path, relpath: str) -> Optional[Any]:
 
     ``HEAD`` is the committed tree of whatever checkout is under test, so a
     genuinely committed bad snapshot still fails legitimately; only the gate's
-    own uncommitted scratch stops being able to change the verdict. A root that
-    is not a git checkout (a fixture, a test tree) falls back to the
-    working-tree file, which is the only source it has.
+    own uncommitted scratch stops being able to change the verdict.
+
+    Two guards, both of which a naive ``git -C`` reads gets wrong:
+
+    * An exported ``GIT_DIR``/``GIT_WORK_TREE`` outranks ``-C`` (see
+      ``scripts/lib/unset-git-env.sh``, issue #1642), so the subprocesses run
+      with those removed -- otherwise a caller that has one exported makes this
+      read the *other* repository, and a fixture-seeding caller can even write
+      into it.
+    * ``git -C`` **walks up**. A root that is not itself a repository (a
+      fixture, a scratch tree) would otherwise silently answer with the
+      *enclosing* repository's snapshot. The root must be the repository root
+      (``rev-parse --show-toplevel`` equal to it) or this falls back to the
+      working-tree file, which is then the only source the caller has.
     """
+    working = root / relpath
+    root = Path(root).resolve()
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in ("GIT_DIR", "GIT_WORK_TREE")
+    }
     try:
+        toplevel = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            check=False,
+            env=env,
+        )
+        if toplevel.returncode != 0:
+            return _read_json(working)
+        if Path(toplevel.stdout.decode("utf-8").strip()).resolve() != root:
+            return _read_json(working)
         out = subprocess.run(
             ["git", "-C", str(root), "show", "HEAD:%s" % relpath],
             capture_output=True,
             check=False,
+            env=env,
         )
-    except OSError:
-        return _read_json(root / relpath)
+    except (OSError, UnicodeDecodeError):
+        return _read_json(working)
     if out.returncode != 0:
-        return _read_json(root / relpath)
+        return _read_json(working)
     try:
         return json.loads(out.stdout.decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
-        return _read_json(root / relpath)
+        return _read_json(working)
 
 
 def _read_ledger_lines(path: Path) -> List[Dict[str, Any]]:
