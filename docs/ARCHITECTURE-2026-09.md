@@ -77,8 +77,8 @@ Constraints); tracked as issue #1651 (filed below, assignee kushin77, Parent:
         ▼
  ┌───────────────────────────────────────────────────────────┐
  │ LAYER 5 — lanes / gates / attestation                        │
- │ scripts/verify.sh (make verify), fleet/runner/ (merge train),│
- │ make land, master-attestation                                 │
+ │ scripts/verify.sh (make verify), fleet/runner/ (retired      │
+ │ merge train, #1714), make land, master-attestation            │
  └───────────────────────────────────────────────────────────┘
 ```
 
@@ -233,10 +233,10 @@ for this — it is consistent with the CMR hub/spoke split documented in
 
 **IMPLEMENTED:**
 - `scripts/verify.sh` — the honest composite gate (GR-12), `make verify` target (Makefile:153)
-- `fleet/runner/` — the merge train: `plan.py`, `verify.py`, `merge.py`, `train.py`, `evidence.py`, `capacity.py`, `cli.py`
+- `fleet/runner/` — the **retired** merge train (`plan.py`, `verify.py`, `merge.py`, `train.py`, `evidence.py`, `capacity.py`, `cli.py`): superseded 2026-09-21 by the single-developer landing method (#1714); `ao/gate-of-record` is no longer a required status check, kept as history
 - `make land ISSUE=<n>` (Makefile:851) — dry-run by default (prints the plan, changes nothing); `AO_LAND_APPLY=1 make land ISSUE=<n>` for a real landing; refused unless pre-merge attestation is green and names the commit (`governance/merge`, `scripts/check-landing.sh`)
 - `make master-attestation` (Makefile:869) — `governance/landing/cli.py write-master-attestation`; **not yet wired into `scripts/verify.sh`** itself per the Makefile's own comment (held by open PR #1127 at the time the target was added) — a **DECLARED-ONLY** seam, by the Makefile's own admission
-- Gate-lock / merge-train docs: `docs/PR-RUNNER.md`, `docs/PR-QUEUE.md`, `docs/EXECUTION-PLAN.md`
+- Gate-lock / merge-train docs (historical, superseded #1714): `docs/PR-RUNNER.md`, `docs/PR-QUEUE.md`, `docs/EXECUTION-PLAN.md`
 
 **MISSING:** none beyond the already-tracked `master-attestation` ↔
 `scripts/verify.sh` wiring gap (owned by #1127, not re-filed here).

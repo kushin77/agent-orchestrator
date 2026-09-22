@@ -157,8 +157,10 @@ and the shipped paperclip integration) sit on the other side of the seam and are
 integrations, not children.
 
 *Shipped* above means shipped **in this repository** and gated offline — not
-running. The upstream runtime is **not** deployed: `enable_paperclip` defaults
-`false` and no runtime resource is planned today
+running. The upstream runtime is **not** deployed, but the flag itself
+defaults `true` per AO-GR-6 (the 2026-09-20 NO-GO was superseded 2026-09-21 by
+the owner's enabled-by-default reversal); the runtime module stays
+count-gated and no resource is planned today
 ([`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md), section
 *Current status*).
 

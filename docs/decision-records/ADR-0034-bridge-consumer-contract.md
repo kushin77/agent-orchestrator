@@ -29,6 +29,10 @@ contract `ao.bridge/v1`. The route is implemented (`portal/server/app.py`
 flag is declared (`infra/feature-flags/registry.yaml`, `surfaces.live_bridge`,
 OFF), and the backend has its own suite (`portal/tests/test_bridge.py`).
 
+> **Amended 2026-09-22:** the `surfaces.live_bridge` OFF default referenced
+> above was reversed by policy-gr5-enabled-by-default (2026-09-21, AO-GR-6);
+> see docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
+
 **What was never decided is who the consumer is.** Nothing in the tree said
 whether the bridge is a console-internal read (and therefore owes the console a
 caller and a widget) or a machine-facing contract for clients outside the

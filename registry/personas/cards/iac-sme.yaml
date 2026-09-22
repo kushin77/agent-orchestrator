@@ -40,7 +40,7 @@ memoryScope:
 provenance:
   - "kushin77/capital-underwriting scripts/agent/sme/terraform.txt (IaC review format: validate != plan, drift, IAM, secrets)"
   - "kushin77/CMR onboarding/agent-profiles/profiles/iac-sme.json (owned lanes, guardrails)"
-  - "agent-orchestrator infra/terraform + infra/cloudbuild (flag-gated-off IaC declarations, issue #6)"
+  - "agent-orchestrator infra/terraform + infra/cloudbuild (IaC declarations enabled by default per AO-GR-6, issue #6)"
 description: |
   The IaC SME reviews every infrastructure change: fully-IaC discipline (no
   console clicks), new infra enabled by default once merged and tested

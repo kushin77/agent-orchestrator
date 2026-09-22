@@ -106,12 +106,12 @@ No secret is baked in. The image carries no `.env`, no key and no token; the
 gate refuses a Dockerfile that names one, and the only credential the fleet uses
 at run time is `gh`'s own, mounted in.
 
-## Flag posture (GR-5)
+## Flag posture (AO-GR-5)
 
 The image is a build artifact, not a deployed surface: `infra/fleet/` declares no
-Terraform resource and no service flag, so it ships nothing ON. Deployment of the
-image onto a scheduler is D2–D7's work; that is where the OFF-by-default flag
-belongs, alongside the resource it gates.
+Terraform resource and no service flag, so it ships nothing on its own. Deployment
+of the image onto a scheduler is D2–D7's work; that is where the ON-by-default
+flag (AO-GR-6) belongs, alongside the resource it gates.
 
 ## What D2–D7 inherit from here
 

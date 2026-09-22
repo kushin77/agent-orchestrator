@@ -73,8 +73,8 @@ sequenceDiagram
 
 - Routes in capability-space (capability:* → hermes/paperclip).
 - Consumes routing policy from `routing.policy.json` (personas: [hermes, paperclip]).
-- Hermes is flag-OFF by default (`gateway/providers/flags.py` hermes_enabled() fail-closed).
-- Paperclip platform-activation defaults false; no Cloud Run deployed.
+- Hermes's flag (`enable_hermes`) defaults **on** (AO-GR-6); `gateway/providers/flags.py` hermes_enabled() still fails closed if the flag is ever unset.
+- Paperclip platform-activation defaults **true** (AO-GR-6, supersedes the earlier NO-GO); no Cloud Run deployed (count-gated runtime module).
 - Routing unifies with tier-space only through the bridge (route.py).
 
 ### 6. Mailbox delivery: `fleet/channel.py`

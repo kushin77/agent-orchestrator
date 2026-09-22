@@ -62,7 +62,7 @@ Coverage is classified per concern:
 | # | Concern | Golden rule | Enforcing gate (surface) | Coverage |
 |---|---|---|---|---|
 | 1 | Secrets in code / history | AO-GR-7 | `secrets` → `scripts/check-secrets.sh` (`verify.sh:133`); `paperclip-secrets` → `scripts/check-paperclip-secrets.sh` (`verify.sh:110`) | **covered-by-gate** |
-| 2 | DLP + prompt-injection + egress on model calls | AO-GR-16 | *none* — `guardrails/dlp/` ships flag-gated OFF | **declared-only** |
+| 2 | DLP + prompt-injection + egress on model calls | AO-GR-16 | *none* — `guardrails/dlp/` is declared but carries no `verify.sh`-wired gate or promotion flag at all (not an AO-GR-6 off-by-default case) | **declared-only** |
 | 3 | Policy-as-code bundle validation | AO-GR-9 / AO-GR-16 | `scripts/check-policy-schema.sh` (via `gate.sh`/`merge-gate.sh`, **not** `verify.sh`) | **covered-by-gate** (`make gate` only) |
 | 4 | Guard honesty (tri-state + negative controls) | AO-GR-19 | `guardrail-controls` (`verify.sh:85`); `control-verbs`/`control-audit`/`control-functions` (`verify.sh:300–302`); `check-negative-controls.sh` (via `gate.sh`) | **covered-by-gate** |
 | 5 | Tamper-evident audit ledger | AO-GR-17 | `audit-read-model` → `scripts/check-audit-read-model.sh` (`verify.sh:83`) | **covered-by-gate** |

@@ -293,8 +293,12 @@ would be a file-disjointness violation (AGENTS.md rule 2 / rule 21) for a change
 the surface's own promotion lane will make anyway. The promotion posture for this
 declaration is therefore:
 
-- the **Terraform** side is flag-gated OFF by default and needs no registry row to
-  stay inert (`create_gcp_edge_route = false`, `enabled = false`);
+- the **Terraform** side's `enabled` flag is ON by default (AO-GR-6), but
+  `create_gcp_edge_route` itself is a cited owner exception: the route it
+  gates is RETIRED (issue #731) in favor of the Cloudflare tunnel, so it
+  defaults `false` and `scripts/check-edge-cutover.sh` gates against it ever
+  defaulting back to `true` (`create_gcp_edge_route = false`, `enabled =
+  true`) — no registry row is needed to keep it inert;
 - the **run-half** side is not gated by a flag in this repository at all — it is
   an operator act in the other repository ([§5](#5-the-run-half-steps-env-seam-and-named-refusals));
 - if a registry row is wanted for `edge_cutover`, it belongs to the lane that owns

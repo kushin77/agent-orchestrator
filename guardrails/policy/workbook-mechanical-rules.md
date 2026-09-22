@@ -107,7 +107,8 @@ the *only* way to be allowed is to publish the affirming boolean.
 ## 4. Controls (all OFF)
 
 Each policy is gated behind its own control — the same id as the policy — and
-every control ships `enabled: false` (AO-GR-6). With a control OFF the policy
+every control ships `enabled: false` (a cited owner exception to AO-GR-6,
+which otherwise ships new capabilities ON by default). With a control OFF the policy
 is **inactive**, so the action is uncovered and the engine fails closed to
 BLOCK; flipping the control ON is the deliberate, reviewed act that activates
 the rule.

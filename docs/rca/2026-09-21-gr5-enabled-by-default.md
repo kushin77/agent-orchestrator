@@ -97,6 +97,13 @@ call. `scripts/check-feature-flags.py` gained a narrow, named
 `OFF_BY_EXPLICIT_DECISION = {"enable_paperclip"}` carve-out so the mechanical
 gate does not force this resolution either.
 
+> **Amended 2026-09-22:** for later readers — this RCA is the record that
+> establishes AO-GR-6 (enabled-by-default, superseding "flag-gated OFF by
+> default"); the `enable_paperclip` OFF state above is the recorded named
+> exception AO-GR-6 itself provides for (an explicit owner NO-GO), not a
+> stale reference to the old default. See
+> docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
+
 ## Gate-hygiene bookkeeping — explicitly NOT touched
 
 `scripts/skip-budget.json` and `scripts/gate-coverage-baseline.txt` record

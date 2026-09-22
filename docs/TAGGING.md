@@ -52,7 +52,7 @@ IaC-declared.
 |---|---|---|
 | `overall` | cross-cutting work | no extra gate; declares the dimension so it is never silently absent |
 | `saas` | a multi-tenant surface | the agent-identity parity and cross-repo boundary gates, at a `pro` floor |
-| `iac` | infrastructure is **declared**, never clicked (GR-5) | `make terraform`, `make tf-validate`, `make tf-fmt`, the **flag-gated-OFF** declaration, at a `pro` floor |
+| `iac` | infrastructure is **declared**, never clicked (AO-GR-5) | `make terraform`, `make tf-validate`, `make tf-fmt`, the **enabled-by-default (AO-GR-6)** declaration, at a `pro` floor |
 | `no-human-needed` | the lane must finish with **zero operator input** | the runaway guard and the dead-letter check; escalation markers are **forbidden**, not warned |
 | `human-gated` | an operator gate precedes merge | `make merge-gate` |
 

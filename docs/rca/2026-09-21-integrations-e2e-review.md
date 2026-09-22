@@ -17,6 +17,12 @@ traces (backend, frontend, middleware) against `origin/master` (`459a1d3b`),
 | Hermes | missing | stubbed — `gateway/providers/hermes.py:22` real adapter code exists but flag-gated OFF by default (`gateway/providers/flags.py` `hermes_enabled()` fail-closed), catalog module `status: "active"` (issue #1907: reconciled from stale `"retired"`; `gateway/catalog/modules/hermes/module.json:14`); standalone `integrations/hermes/client.py` is real, keyless, read-only HTTP but "never called at dispatch time" per its own docstring (ADR-0012) | wired (capability-space only) — `fleet/routing.py` + `routing.policy.json` `personas: [hermes, paperclip]`; **not reachable from `tiered.py`** |
 | Paperclip | missing | wired but not deployed — `gateway/providers/paperclip.py:22` + `integrations/paperclip/client.py` real OpenAI-compat + custom HTTP path, but platform-level `enable_paperclip` defaults `false`, no Cloud Run resource deployed (confirmed by merged #1610) | wired (capability-space only) — same `fleet/routing.py`, **not reachable from `tiered.py`** |
 
+> **Amended 2026-09-22:** the "flag-gated OFF by default" / `defaults false`
+> language in the Hermes and Paperclip rows above (and the flag-OFF state
+> referenced in the gap list below) reflects the pre-2026-09-21 default,
+> reversed by policy-gr5-enabled-by-default (2026-09-21, AO-GR-6); see
+> docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
+
 ## Gap list
 
 1. **P0 — filed #1701** (`Parent: #1268`): `governance/dispatch/tiered.py`

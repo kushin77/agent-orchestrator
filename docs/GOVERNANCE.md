@@ -333,7 +333,7 @@ not mint a rung, a tier or a role by editing one side.
 
 | Dimension | Values | What it decides |
 |---|---|---|
-| `posture` | `overall`, `saas`, `iac`, `no-human-needed`, `human-gated` (multi-valued) | which delivery gates apply: `iac` owes declared-infrastructure plus **flag-gated-OFF**; `saas` owes the identity and boundary evidence; `no-human-needed` must finish with **no operator input at all** and forbids escalation markers; `human-gated` owes the pre-merge contract |
+| `posture` | `overall`, `saas`, `iac`, `no-human-needed`, `human-gated` (multi-valued) | which delivery gates apply: `iac` owes declared-infrastructure plus **enabled-by-default (AO-GR-6)**; `saas` owes the identity and boundary evidence; `no-human-needed` must finish with **no operator input at all** and forbids escalation markers; `human-gated` owes the pre-merge contract |
 | `lifecycle` | `plan`, `build`, `verify`, `release`, `operate`, `retire` | which half of the pipeline applies — the SDLC stage, and therefore the `pr`/`ci`/`cd`/`ops` channel a gate runs in |
 
 `posture:no-human-needed` and `posture:human-gated` are **mutually exclusive**

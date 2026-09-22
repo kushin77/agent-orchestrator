@@ -24,7 +24,7 @@ and no ad-hoc apply.
 | [`health/healthcheck.py`](../infra/paperclip/health/healthcheck.py) | The `GET /api/health` probe. |
 | [`../scripts/check-paperclip-deploy.sh`](../scripts/check-paperclip-deploy.sh) | The gate that proves the flag, pin, probe and no-vendoring assertions hold. |
 
-### The flag — `enable_paperclip`, OFF by default
+### The flag — `enable_paperclip`, ON by default
 
 The runtime ships behind `enable_paperclip`, wired exactly like every other
 surface: declared in

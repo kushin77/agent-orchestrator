@@ -132,8 +132,8 @@ onto defaults; `build_engine(config)` wires a fully configured
 - **throttle**: `default_cap`, `mode` (`trim`|`refuse`), per-taskType `caps`.
 - **backpressure**: `strategy` (`degrade`|`queue`) and `queue_capacity`.
 
-Every limiter ships in a safe default; nothing is tenant-visible until a
-config override deliberately enables/enforces it (flag-gated-off doctrine).
+Every limiter ships enabled by default (AO-GR-6); a config override is
+required only to disable a limiter or change its enforcement mode.
 
 ## Usage
 

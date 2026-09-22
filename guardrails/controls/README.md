@@ -31,8 +31,9 @@ consumer would not understand.
 Two invariants are structural, not advisory:
 
 - **Default OFF.** A `PolicyControl` refuses construction with
-  `default_enabled=True` (AO-GR-6). A control that ships ON is not a policy
-  choice the model will accept.
+  `default_enabled=True` (a cited owner exception to AO-GR-6, which otherwise
+  ships new capabilities ON by default). A control that ships ON is not a
+  policy choice the model will accept.
 - **No silent creation.** `ControlSet.toggle()` refuses an unknown control id
   and writes **exactly one** append-only audit record per flip.
 

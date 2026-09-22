@@ -155,7 +155,7 @@ set -u
 # owner_sme: iac-sme
 # tier: L1
 # interfaces: [module output "service_uri"]
-# invariants: "every new resource ships disabled by default"
+# invariants: "every new resource ships enabled by default (AO-GR-6)"
 # gotchas: ""
 # related: ["#1535"]
 # do_not_duplicate: null

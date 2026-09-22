@@ -1,15 +1,15 @@
-# infra/terraform — control-plane environment (flag-gated OFF)
+# infra/terraform — control-plane environment (enabled by default, AO-GR-6)
 
 Terraform declarations for the agent-orchestrator control-plane environment.
-Every resource is gated by an `enable_*` variable that defaults to `false`
-(IaC mandate): with all flags closed the configuration creates **nothing**.
+Every resource is gated by an `enable_*` variable that defaults to `true`
+(AO-GR-6), except where a named owner exception keeps it `false`.
 
 ## Reading this environment
 
 | File | Purpose |
 |------|---------|
 | `versions.tf` / `providers.tf` | Terraform + Google provider pins (offline-validatable). |
-| `variables.tf` | Root inputs, including the nine `enable_*` service flags + `deployer_enabled`, all default `false`. |
+| `variables.tf` | Root inputs, including the nine `enable_*` service flags + `deployer_enabled`, all default `true` except a named owner exception (see below). |
 | `main.tf` | Composes `modules/control-plane-service` once per service, `modules/deployer-sa`, and the `../paperclip/terraform` runtime module. |
 | `outputs.tf` | Gated outputs (`service_uris`, `deployer_service_account`, `web_surface_uri`, `paperclip_runtime_uri`) — null while flags are OFF. |
 | `backend.tf.example` | GCS remote-state template; copy to `backend.tf` at go-live. |
@@ -29,7 +29,7 @@ the comment above it in `main.tf` for the full reasoning.
 ### Deployed-surface coverage (issue #884, lane L5 of EPIC #878)
 
 Every surface this repo actually deploys has a module here, each behind its
-own `enable_*` flag defaulting OFF:
+own `enable_*` flag defaulting ON (AO-GR-6), except a named owner exception:
 
 | Deployed surface | Module | Flag |
 |---|---|---|
@@ -37,6 +37,10 @@ own `enable_*` flag defaulting OFF:
 | public web surface (portal + shared-frontend) | `modules/web-surface` (owned by lane #881 — reference only, not touched by this lane) | `enable_web` |
 | self-hosted paperclip runtime | `../paperclip/terraform` | `enable_paperclip` |
 | fleet-cron container pair (shared-services HA cluster) | `modules/fleet-cron` | `enable_fleet_cron` |
+
+`enable_erp_module` is the one named exception: it defaults `false` per issue
+#1955 (erp_module carries its own dedicated promotion gate and is exempted
+from the AO-GR-6 sweep) — every other `enable_*` flag defaults `true`.
 | deployer service account (the only apply identity) | `modules/deployer-sa` | `deployer_enabled` |
 
 **Residual (not covered by Terraform, tracked separately, not closed by this

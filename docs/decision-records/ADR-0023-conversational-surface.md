@@ -88,6 +88,11 @@ guarded, metered and audited by the components that already own those jobs here.
 | **Identity is already ours and already offline-verified** | [`identity/sso/tokens.py`](../../identity/sso/tokens.py) mints/verifies the auth-gate RS256 `os-session-token` (`purpose: os-session-token`); [`portal/server/sso.py`](../../portal/server/sso.py) verifies it against the gate's JWKS mirror and issues nothing of its own. |
 | **Every surface ships invisible until promoted** | [`infra/feature-flags/registry.yaml`](../../infra/feature-flags/registry.yaml) `services:` + `surfaces:` (all `default: off`), parity-enforced against [`infra/terraform/variables.tf`](../../infra/terraform/variables.tf) by [`scripts/check-feature-flags.py`](../../scripts/check-feature-flags.py). |
 
+> **Amended 2026-09-22:** the `default: off` / flag-gated-OFF posture referenced
+> in this table and below was reversed by policy-gr5-enabled-by-default
+> (2026-09-21, AO-GR-6); see
+> docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
+
 ### The client being adopted — and its honest caveats
 
 Upstream **OpenWebUI** is a real, already-running product in the shared-services

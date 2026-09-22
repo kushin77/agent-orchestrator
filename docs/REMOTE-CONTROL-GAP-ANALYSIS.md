@@ -130,11 +130,11 @@ GET-only**, with the refusal visible in the source:
 
 The only `POST`s in the whole route table are `console/login`, `console/logout` and the
 conversational surface's conversation/turn routes (ADR-0023) — session and chat, not
-fleet control. And every one of these families is **flag-gated OFF**:
-`infra/feature-flags/registry.yaml` declares `default_policy: off` and carriers for
+fleet control. And every one of these families is **flag-gated ON by default** (AO-GR-6):
+`infra/feature-flags/registry.yaml` declares carriers for
 `fleet_projection`, `portal_surfaces`, `finops_reports`, `telemetry_live_feed`,
 `ops_health`, `live_bridge`, `telemetry_exposition`, `fleet_health_export` — each
-`default: off`.
+`default: on`.
 
 ### 2.5 The one outbound network write we own
 
@@ -386,8 +386,8 @@ from the artifact that owns it, so the constraint is checkable rather than remem
    (wired as `paperclip-canonical-module`) already fails by name on a second top-level
    module for the boundary, so the guard for this exists.
 
-5. **Flag-gated OFF, no Actions, no secrets, no ad-hoc apply.** GR-5 with
-   `infra/feature-flags/registry.yaml` `default_policy: off`; GR-15 (automation is
+5. **Flag-gated ON by default, no Actions, no secrets, no ad-hoc apply.** AO-GR-6 with
+   `infra/feature-flags/registry.yaml` `default_policy: on`; GR-15 (automation is
    code-native — `make` targets and cron, never a workflow file); GR-6 (endpoints and
    tokens from the environment or a secret manager, never committed).
 
@@ -436,7 +436,7 @@ verb is not permitted for that caller, or when the command was already applied.
 
 **Non-goals, stated so a child cannot drift into them:** no new dashboard or UI
 (ADR-0022); no second knowledge store or second ledger (ADR-0012/0015); no upstream code
-edited (NG4); no workflow file (GR-15); nothing ON by default (GR-5).
+edited (NG4); no workflow file (GR-15); nothing shipped without owner review, ON by default per AO-GR-6.
 
 ### 8.2 The children, dependency-ordered
 

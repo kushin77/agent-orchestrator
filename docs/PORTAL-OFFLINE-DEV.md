@@ -11,7 +11,7 @@
 > three (see [What this refuses](#what-the-helper-refuses)).
 
 The console (the fleet SPoG) is a self-contained static app served offline by
-`python3 -m portal.server.main`. It ships **flag-gated OFF** (GR-5) and it
+`python3 -m portal.server.main`. It ships **flag-gated ON by default** (AO-GR-6) and it
 **fails closed** on sessions, so a plain "start the server and open the page"
 gives a page whose every API call answers `404` or `401` with no visible reason.
 This doc is the four steps that get a **200 with real fleet data**, and the table

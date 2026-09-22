@@ -1,4 +1,4 @@
-# infra/paperclip — the self-hosted upstream runtime (flag-gated OFF)
+# infra/paperclip — the self-hosted upstream runtime (enabled by default, AO-GR-6)
 
 The deployment declaration for the upstream paperclip runtime that runs
 **beside** the control plane as an external operator surface (issue #411,
@@ -19,21 +19,20 @@ declaration — no console clicks, no ad-hoc apply (GR-5).
 | [`cloudbuild/deploy-trigger.yaml`](cloudbuild/deploy-trigger.yaml) | The importable trigger; ships `disabled: true` with `_ENABLE_PAPERCLIP: "false"`. |
 | [`health/healthcheck.py`](health/healthcheck.py) | The real `GET /api/health` probe (exit 0 healthy / 1 absent-or-unhealthy / 2 cannot-assess). |
 
-## Flag — `enable_paperclip`, OFF by default
+## Flag — `enable_paperclip`, ON by default (AO-GR-6)
 
 The runtime is wired into the root environment exactly like every other
 surface:
 
 - [`../terraform/variables.tf`](../terraform/variables.tf) declares
-  `enable_paperclip` with `default = false`;
+  `enable_paperclip` with `default = true`;
 - [`../terraform/main.tf`](../terraform/main.tf) instantiates this module with
   `enabled = var.enable_paperclip`;
 - [`../feature-flags/registry.yaml`](../feature-flags/registry.yaml) records
-  `services.paperclip` with `default: off`. The `feature-flags` gate keeps the
-  variable and the registry row in lock-step.
+  `services.paperclip` with `default: on, promoted: true`. The `feature-flags`
+  gate keeps the variable and the registry row in lock-step.
 
-With the flag closed the runtime module is inert: `terraform plan` shows zero
-resources.
+With the flag open the runtime module deploys.
 
 ## Pin — exact tag, never floating
 

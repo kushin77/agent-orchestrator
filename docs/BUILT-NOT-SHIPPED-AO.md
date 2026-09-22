@@ -1,8 +1,12 @@
 # Built-not-shipped inventory — agent-orchestrator
 
 **Issue:** #1540 (parent EPIC #1510). **Measured at:** `5357190f` (`master`,
-2026-09-20T19:52Z). **Method:** the issue's steps 1-7, with the corrections
-recorded in the next section.
+2026-09-20T19:52Z) — **the day before** the AO-GR-6 enabled-by-default policy
+reversal (owner decision 2026-09-21, `policy-gr5-enabled-by-default`); rows
+below that describe a flag as defaulting OFF should be re-checked against the
+current registry, since several (e.g. `enable_paperclip`) were flipped ON the
+next day and are no longer "built but not shipped" in that sense. **Method:**
+the issue's steps 1-7, with the corrections recorded in the next section.
 
 This is the extended inventory the issue asks for: every agent-orchestrator
 artifact that is **built but not shipped** — feature-flagged off, route without

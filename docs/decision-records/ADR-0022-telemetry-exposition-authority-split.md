@@ -76,6 +76,10 @@ apply route ([`infra/cloudbuild/`](../../infra/cloudbuild/README.md), both trigg
 `disabled: true`). It is **not** a Kubernetes pod: there is no pod, no sidecar
 injection, no annotation surface and no service monitor to write.
 
+> **Amended 2026-09-22:** the flag-gated-OFF default referenced above was
+> reversed by policy-gr5-enabled-by-default (2026-09-21, AO-GR-6); see
+> docs/GOLDEN-RULES.md#ao-gr-6--flag-gated-off-by-default.
+
 **The vendor's documented default assumes the opposite runtime.** On
 `kushin77/monitoring-stack`'s own board,
 [`docs/app-instrumentation-guide.md`](https://github.com/kushin77/monitoring-stack/blob/main/docs/app-instrumentation-guide.md)
