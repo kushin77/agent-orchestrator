@@ -98,10 +98,16 @@ def test_the_board_is_tenant_scoped(tmp_board):
     assert observed["code"] == "tenant_mismatch"
 
 
-def test_the_task_board_is_gated_off_and_invisible_unauthorised(tmp_board):
-    """GR-5 over the real app: OFF by default, and 404 BEFORE authentication."""
+def test_the_task_board_is_gated_and_invisible_when_explicitly_off(tmp_board):
+    """The gate itself: an explicitly-disabled board is 404 BEFORE authentication.
+
+    task_board now ships ON by default (GR-5 reversal, 2026-09-21; issue
+    #1941), matching infra/feature-flags/registry.yaml — configDeclaresOff
+    measures that shipped default. The probe forces the app itself off via an
+    explicit enabled=False, so status/code below still prove the gate works.
+    """
     observed = probe_flags_off_by_default(tmp_board)[TASK_BOARD_SURFACE]
 
-    assert observed["configDeclaresOff"] is True
+    assert observed["configDeclaresOff"] is False
     assert observed["status"] == 404
     assert observed["code"] == "feature_disabled"

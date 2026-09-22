@@ -11,7 +11,7 @@ prove end to end:
   engine would refuse;
 * a ticket the engine's store does not hold is **absent** (404) — an empty log
   is not a ticket, and the board must not project one into existence;
-* the board is **feature-flag-gated OFF** until promoted, before authN, and is
+* the board is **feature-flag-gated, ON by default** (GR-5 reversal 2026-09-21), before authN, and is
   bound to its own tenant.
 """
 
@@ -144,23 +144,26 @@ def _authed(app: ConsoleApplication):
 
 
 # --------------------------------------------------------------------------- #
-# The flag gate (GR-5: a new surface ships OFF)
+# The flag gate (GR-5 reversal 2026-09-21: a new surface ships ON by default)
 # --------------------------------------------------------------------------- #
-def test_config_declares_the_board_off():
+def test_config_declares_the_board_on():
     document = yaml.safe_load(
         (REPO_ROOT / "portal" / "config" / "feature-flags.yaml").read_text(
             encoding="utf-8"
         )
     )
     entry = document["surfaces"][TASK_BOARD_SURFACE]
-    assert entry["default"] in (False, "off"), (
-        "the tenant task board must ship OFF (GR-5)"
+    # policy-gr5-enabled-by-default (2026-09-21): this test hardcoded the OLD
+    # off-by-default policy; updated to assert the new correct default,
+    # matching infra/feature-flags/registry.yaml's surfaces.task_board entry.
+    assert entry["default"] in (True, "on"), (
+        "the tenant task board must ship ON (GR-5 reversal)"
     )
-    assert surface_enabled(REPO_ROOT, surface=TASK_BOARD_SURFACE) is False
+    assert surface_enabled(REPO_ROOT, surface=TASK_BOARD_SURFACE) is True
 
 
 def test_surface_is_refused_while_the_flag_is_off():
-    app = build_app(sso=console_sso())
+    app = _app(_surface(runtime=None, ticket_ids=(), enabled=False))
     api = _authed(app)
     status, payload = api.get("/api/taskboard/tickets")
     assert status == 404
@@ -170,6 +173,21 @@ def test_surface_is_refused_while_the_flag_is_off():
     anonymous.cookies.clear()
     status, _ = anonymous.get("/api/taskboard/tickets")
     assert status == 404
+
+
+def test_the_default_app_is_visible_flag_is_on_by_default():
+    """policy-gr5-enabled-by-default (2026-09-21): the default app (config
+    decides) is no longer feature-flag-gated OFF, matching
+    infra/feature-flags/registry.yaml. (No runtime is wired into the bare
+    default app, so the route answers 503 rather than 200 — but it is no
+    longer the flag's 404 feature_disabled.)"""
+    app = build_app(sso=console_sso())
+    api = _authed(app)
+    status, payload = api.get("/api/taskboard/tickets")
+    # 503, not the flag's 404 feature_disabled: no runtime is wired into the
+    # bare default app, so the route fails for a different, unrelated reason.
+    assert status == 503, status
+    assert payload["error"]["code"] != "feature_disabled"
 
 
 def test_the_board_renders_once_its_flag_is_flipped_on():

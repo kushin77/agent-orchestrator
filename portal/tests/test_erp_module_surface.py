@@ -205,6 +205,9 @@ def test_the_portal_declares_the_surface_off_and_keeps_its_key():
     document = yaml.safe_load((REPO_ROOT / CONFIG_RELATIVE).read_text(encoding="utf-8"))
     entry = (document.get("surfaces") or {}).get(ERP_MODULE_SURFACE)
     assert isinstance(entry, dict), "portal/config/feature-flags.yaml declares no erp_module"
+    # NOT part of GR-5's default-on reversal (issue #1941): erp_module has its
+    # own dedicated promotion gate (scripts/check-erp-portal.sh,
+    # e2e/erp/golden_path.py) that requires this surface ship OFF.
     assert entry.get("default") in (False, "off"), entry.get("default")
     assert ERP_MODULE_SURFACE in DECLARED_SURFACES
     assert surface_enabled(REPO_ROOT, surface=ERP_MODULE_SURFACE) is False

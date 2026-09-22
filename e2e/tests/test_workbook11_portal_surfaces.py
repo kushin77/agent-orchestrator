@@ -21,13 +21,22 @@ from e2e.workbook11_portal import (
 )
 
 
-def test_every_workbook11_surface_ships_off_and_is_invisible_unauthorised():
-    """GR-5 over the real app: OFF by default, 404 before authentication."""
+def test_every_workbook11_surface_is_gated_and_invisible_when_explicitly_off():
+    """The gate itself: an explicitly-disabled surface is invisible, 404 before
+    authentication. (Not a claim about the shipped default — see
+    infra/feature-flags/registry.yaml's GR-5 reversal, 2026-09-21: org_chart,
+    skill_studio and task_board now ship ON by default, matching
+    portal/config/feature-flags.yaml, cross-checked by
+    scripts/check-feature-flags.py, issue #1941.)"""
     observed = probe_flags_off_by_default()
 
     assert set(observed) == set(SURFACE_ROUTES)
     for surface, row in observed.items():
-        assert row["configDeclaresOff"] is True, f"{surface} is not declared OFF"
+        # configDeclaresOff measures the SHIPPED default (config, no override),
+        # which is now ON for these three surfaces (GR-5 reversal) — the probe
+        # forces the app itself off via an explicit enabled=False, so status
+        # and code below still prove the gate works when a surface is off.
+        assert row["configDeclaresOff"] is False, f"{surface} is not declared ON"
         assert row["status"] == 404, f"{surface} served while its flag was off"
         assert row["code"] == "feature_disabled", f"{surface} refused with {row['code']}"
 
