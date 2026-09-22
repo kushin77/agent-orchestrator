@@ -391,7 +391,7 @@ def test_every_profile_credential_is_an_iac_declared_secret() -> None:
         executable="bogus",
         model_flag="-m",
         models={},
-        iac_secret="not-a-declared-mount",
+        iac_secret="not-a-real-mount",
     )
     assert bogus.iac_secret not in secrets_contract.BY_NAME, (
         "the membership arm is vacuous unless an undeclared name is genuinely absent"

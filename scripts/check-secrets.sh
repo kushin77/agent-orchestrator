@@ -86,11 +86,25 @@ st_passed=0
 st_failed=0
 
 # High-signal secret shapes (never exempted — no legitimate placeholder shape).
+#
+# THE OpenAI-KEY SHAPE IS ANCHORED AT A WORD BOUNDARY (issue #1975, the #1872
+# bug class). Unanchored, the OpenAI prefix matched INSIDE a word: any token
+# whose text happens to contain "ta" + "sk" + "-" + 16 more word characters — an
+# ordinary generated index path, or a source comment — was refused as a key.
+# MEASURED on master before this fix: 19 findings, most of them exactly that
+# shape over `catalog/indexer/index-graph.json` and one source comment. `\b` is
+# grep -E's word-boundary assertion and is exact here: it fires only where the
+# preceding character is not a word character, which is precisely the negative
+# lookbehind `(?<![A-Za-z0-9_])` #1872 used in the Python scanner
+# (governance/cto-overlay/overlay.py) — grep -E has no lookbehind. The
+# alternation and the quantifier are UNCHANGED, so a genuine `sk-` credential is
+# still refused, at a boundary; the self-test below provokes both directions, and
+# (per #1872) no comment here carries a continuous prefix-plus-16 run.
 RE_EC2KEY='-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY( BLOCK)?-----'
 RE_AWS='AKIA[0-9A-Z]{16}'
 RE_GHP='(ghp|gho|ghu|ghs)_[A-Za-z0-9]{36,}'
 RE_GHAPP='github_pat_[A-Za-z0-9_]{20,}'
-RE_SK='(sk|sk-ant|sk-proj)-[A-Za-z0-9_\-]{16,}'
+RE_SK='\b(sk|sk-ant|sk-proj)-[A-Za-z0-9_\-]{16,}'
 RE_GOOG='AIza[0-9A-Za-z_\-]{30,}'
 RE_SLACK='xox[baprs]-[0-9A-Za-z\-]{10,}'
 SHAPES="$RE_EC2KEY|$RE_AWS|$RE_GHP|$RE_GHAPP|$RE_SK|$RE_GOOG|$RE_SLACK"
@@ -302,6 +316,38 @@ self_test() {
     st_ok "MUTANT without the guard grep exits $rc and reports NOTHING: the '--' is load-bearing"
   else
     st_bad "MUTANT the unguarded call still caught the shape (rc=$rc) -- the guard proves nothing"
+  fi
+
+  # (d) the word-boundary anchor on the OpenAI-key shape (#1975). Both
+  #     directions, because a fix that only silenced the false positive would be
+  #     a hole: a genuine key MUST still be refused, and the "ta"+"sk" tail of an
+  #     ordinary word must NOT be. Fixtures are assembled from fragments so this
+  #     file is not its own finding.
+  local fx_sk_p='s'"k-" fx_sk_body='PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP'
+  local fx_fp_a='ta' fx_fp_b='sk' fx_fp_c='-1-review-request'
+  local fx_sk_unanchored='(sk|sk-ant|sk-proj)-[A-Za-z0-9_\-]{16,}'
+  printf '%s\n' "$fx_sk_p$fx_sk_body" > "$d/sk-real.txt"
+  printf '%s\n' "$fx_fp_a$fx_fp_b$fx_fp_c" > "$d/sk-word.txt"
+
+  scan_file "$d/sk-real.txt" 2>"$d/d.err"
+  if [ "$scan_findings" -eq 1 ] && st_has "$(cat "$d/d.err")" 'high-signal-shape'; then
+    st_ok "the anchored OpenAI shape still refuses a genuine key BY NAME"
+  else
+    st_bad "the anchored OpenAI shape did not refuse a genuine key: $(cat "$d/d.err")"
+  fi
+  scan_file "$d/sk-word.txt" 2>"$d/d2.err"
+  if [ "$scan_findings" -eq 0 ]; then
+    st_ok "the 'ta'+'sk' tail of an ordinary word is NO longer a finding (the anchor bites)"
+  else
+    st_bad "the anchor did not move the false positive ($scan_findings finding(s)): $(cat "$d/d2.err")"
+  fi
+  # ...and the UNANCHORED shape must still match that same word, so the anchor
+  # is proven load-bearing rather than assumed.
+  out="$(grep -nHE -- "$fx_sk_unanchored" "$d/sk-word.txt" 2>/dev/null)"
+  if [ -n "$out" ]; then
+    st_ok "MUTANT the unanchored shape still matches that word: the anchor is load-bearing"
+  else
+    st_bad "MUTANT the unanchored shape did not match -- the false positive was never real"
   fi
 
   # Vacuity: a rule that matches everything must not survive the clean half.

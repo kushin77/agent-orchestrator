@@ -22,6 +22,14 @@ from conftest import REPO_ROOT
 
 from portal.server.settings import SettingsAggregator, SettingsRow
 
+# The poisoned credential VALUES are assembled at runtime from fragments, the
+# convention in ``guardrails/dlp/tests/support.py``: ``scripts/check-secrets.sh``
+# flags a complete OpenAI-style key shape anywhere in file text and never exempts
+# it, even in tests, so no literal in this file may spell one. The aggregator
+# still receives the complete value.
+_FAKE_LEAK_VALUE = "sk-" + "fake-should-never-leak"
+_FAKE_LEAK_API_KEY = "sk-" + "fake-also-should-never-leak"
+
 REGISTRY_YAML = """
 services:
   paperclip:
@@ -72,8 +80,8 @@ POISONED_CREDENTIALS = {
             "env": "NOUS_API_KEY",
             "secret_id": "ao-nous-api-key",
             "gate": "enable_hermes",
-            "value": "sk-fake-should-never-leak",
-            "api_key": "sk-fake-also-should-never-leak",
+            "value": _FAKE_LEAK_VALUE,
+            "api_key": _FAKE_LEAK_API_KEY,
         }
     ],
 }
@@ -182,8 +190,8 @@ def test_no_secret_value_ever_reaches_a_row_against_poisoned_fixture(tmp_path):
     nous_rows = [r for r in rows if r.domain == "nous_secret"]
     assert nous_rows
     for row in nous_rows:
-        assert "sk-fake-should-never-leak" not in row.value
-        assert "sk-fake-also-should-never-leak" not in row.value
+        assert _FAKE_LEAK_VALUE not in row.value
+        assert _FAKE_LEAK_API_KEY not in row.value
         assert "api_key" not in row.value
         projected = json.loads(row.value)
         assert "value" not in projected

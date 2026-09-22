@@ -32,10 +32,10 @@ kpi:
     - AGENTS.md
     - CLAUDE.md
     - .cursorrules
-  baselineBytes: 33244
-  measuredOn: "2026-09-21"
+  baselineBytes: 33505
+  measuredOn: "2026-09-22"
   measuredBy: "wc -c AGENTS.md CLAUDE.md .cursorrules"
-  ceilingBytes: 33244
+  ceilingBytes: 33505
   ceilingReason: >-
     Raised from 32883 to 33244 (2026-09-21): CLAUDE.md grew by 361 bytes
     (2335 -> 2696) in exactly one commit, 6dfa54b7 ("docs: point Claude Code at
@@ -44,7 +44,18 @@ kpi:
     AGENTS.md (28576) and .cursorrules (1972) are unchanged. Shrinking CLAUDE.md
     to fit the old ceiling would revert that merged change, so the ceiling is
     raised to the measured total rather than silently, per this gate's own
-    documented remedy.
+    documented remedy. Raised again from 33244 to 33505 (2026-09-22): two
+    commits grew the measured set by 261 bytes, each a legitimate doctrine
+    landing rather than prompt bloat. AGENTS.md grew 28576 -> 28775 (+199) in
+    897e1803 ("docs(module): write down the new-module scaffold convention",
+    #1943) — the standing instruction file itself, not an injected surface.
+    .cursorrules grew 1972 -> 2034 (+62) in 92866917 ("docs: reconcile stale
+    flag-gated-OFF doctrine with AO-GR-6", #1930). CLAUDE.md (2696) is
+    unchanged, so 28576+2696+1972 = 33244 was the previous total and
+    28775+2696+2034 = 33505 is the new one. Reverting either merged change to
+    fit the old ceiling would undo doctrine another lane landed, so the ceiling
+    is raised to the measured total, dated and named, exactly as this gate's own
+    remedy requires.
   zeroHeadroomNote: >-
     Zero headroom is deliberate and accepted (#1885). #1876 set the ceiling
     equal to the measurement because "a ceiling above the measurement is how

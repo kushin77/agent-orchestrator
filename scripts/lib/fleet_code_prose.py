@@ -21,6 +21,14 @@ A retired word inside a marked legacy-gloss region (`# legacy-gloss:start` /
 markers declared in `governance/vocabulary/fleet.yaml`) is a declared gloss, not
 a finding.
 
+A STRUCTURAL IDENTIFIER is not prose either (issue #1974). A `---knowledge---`
+block is machine-readable data (docs/CODE-HEADER-STANDARD.md), and its
+`module_id:` field carries this file's stable, dotted identity — `fleet.brain`
+names the module, it does not name a role. That field's value is therefore
+skipped BY NAME, and ONLY that field: the free-text fields (`invariants:`,
+`gotchas:`) stay in scope, so a retired term written as prose in the block is
+still refused.
+
 Usage:
     python3 scripts/lib/fleet_code_prose.py [FILE ...]
 
@@ -58,6 +66,12 @@ WORD_RE = {term: re.compile(rf"\b{term}\b", re.IGNORECASE) for term in RETIRED}
 LEGACY_START = "legacy-gloss:start"
 LEGACY_END = "legacy-gloss:end"
 
+# The knowledge block's delimiter (docs/CODE-HEADER-STANDARD.md) and its one
+# structural `id` field. A `module_id:` value is this file's identity, not prose
+# naming a role, so it is the single field skipped inside the block (#1974).
+KNOWLEDGE_DELIM = "---knowledge---"
+_KNOWLEDGE_ID_FIELD = re.compile(r"^\s*#?\s*module_id:\s*\S")
+
 # Artifact-reference strippers, applied to a candidate prose line before it is
 # checked for a retired word used as a NAME. Order matters: code spans and
 # printed tags first (they can contain slashes/dots that the path stripper
@@ -90,7 +104,7 @@ def find_findings(path: Path) -> list[tuple[int, str, str]]:
     findings: list[tuple[int, str, str]] = []
 
     # --- comments, via tokenize -------------------------------------------------
-    in_legacy = False
+    in_knowledge = False
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
     except tokenize.TokenizeError as exc:  # pragma: no cover - defensive
@@ -126,10 +140,15 @@ def find_findings(path: Path) -> list[tuple[int, str, str]]:
         if tok.type != tokenize.COMMENT:
             continue
         lineno = tok.start[0]
+        text = tok.string
+        if KNOWLEDGE_DELIM in text:
+            in_knowledge = not in_knowledge
+            continue
         if lineno in legacy_lines:
             continue
-        text = tok.string
         if LEGACY_START in text or LEGACY_END in text:
+            continue
+        if in_knowledge and _KNOWLEDGE_ID_FIELD.match(text):
             continue
         stripped = artifact_stripped(text)
         for term in RETIRED:
@@ -161,8 +180,12 @@ def find_findings(path: Path) -> list[tuple[int, str, str]]:
         # source line doc_node.lineno + N.
         base_line = doc_node.lineno
         in_legacy_doc = False
+        in_knowledge_doc = False
         for offset, doc_line in enumerate(doc.splitlines()):
             src_lineno = base_line + offset
+            if KNOWLEDGE_DELIM in doc_line:
+                in_knowledge_doc = not in_knowledge_doc
+                continue
             if LEGACY_START in doc_line:
                 in_legacy_doc = True
                 continue
@@ -170,6 +193,10 @@ def find_findings(path: Path) -> list[tuple[int, str, str]]:
                 in_legacy_doc = False
                 continue
             if in_legacy_doc:
+                continue
+            if in_knowledge_doc and _KNOWLEDGE_ID_FIELD.match(doc_line):
+                # The block's structural identity field, not prose: this file's
+                # stable ``module_id`` names the module, never a role (#1974).
                 continue
             stripped = artifact_stripped(doc_line)
             for term in RETIRED:

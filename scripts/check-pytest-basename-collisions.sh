@@ -2,6 +2,22 @@
 # check-pytest-basename-collisions.sh — guard against NEW pytest module
 # basename collisions across the declared per-suite corpus (issue #1935).
 #
+# ---knowledge---
+# module_id: scripts.check-pytest-basename-collisions
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [ratchet-metric, named-refusal, offline-hermetic]
+# derives_from: null
+# owner_sme: qa-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 new-collision-refused]
+# invariants: "the recorded baseline is the only excuse: a duplicate basename beyond it is refused by name, never silently accepted"
+# gotchas: "the baseline is a two-field text file diffed line by line, not a content fingerprint, so it can only grow by an explicit edit"
+# related: ["#1935"]
+# do_not_duplicate: null
+# ---knowledge---
+#
 # THE DEFECT THIS EXISTS FOR
 #   `scripts/pytest-suites.txt` declares suites that are run only in isolation
 #   (scripts/check-pytest-suites.sh, scripts/run-pytest-suites.sh) precisely
@@ -29,7 +45,7 @@
 #   change described above. Use `scripts/check-pytest-suites.sh` for the
 #   sanctioned, gated pytest run.
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 2
 
 BASELINE="scripts/pytest-basename-collisions-baseline.txt"
 CURRENT="$(mktemp)"

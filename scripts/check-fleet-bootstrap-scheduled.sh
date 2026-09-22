@@ -2,6 +2,22 @@
 # check-fleet-bootstrap-scheduled.sh -- a `checkout-behind` park must be paired with a
 # SCHEDULED bring-forward (issue #1795).
 #
+# ---knowledge---
+# module_id: scripts.check-fleet-bootstrap-scheduled
+# system: governance
+# app: gates
+# solution_class: enterprise
+# patterns: [tri-state-exit, provoked-negative-control, declared-vs-measured, named-refusal]
+# derives_from: scripts/check-checkout-bootstrap.sh
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 OK, exit 1 NOT-OK, exit 2 CANNOT-ASSESS]
+# invariants: "the DECLARATION and the MEASURED remedy must agree: the scheduled rung must reach a bring-forward that actually moves a stale checkout"
+# gotchas: "BOOTSTRAP_SCHEDULED_MANIFEST points the same predicate at another declaration; the installed-crontab arm is a NOTE, never an exit code (#1673)"
+# related: ["#773", "#780", "#1795"]
+# do_not_duplicate: null
+# ---knowledge---
+#
 # THE DEFECT THIS EXISTS FOR
 #   `fleet/watchdog.py`'s `checkout-behind` case (#773, AO-GR-25) has one correct remedy
 #   -- bring the stale checkout forward -- and #780 shipped it as the `bootstrap` verb.

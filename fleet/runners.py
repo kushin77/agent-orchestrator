@@ -121,6 +121,17 @@ class RunnerProfile:
         return tuple(name for name in self.requires if not str(env.get(name) or "").strip())
 
 
+#: The IaC-declared mount name both DeepSeek profiles read
+#: (``infra/fleet/secrets_contract.py`` ``BY_NAME``). Held as a named constant
+#: rather than spelled as a quoted literal at the ``iac_secret=`` assignment: a
+#: secret-worded key assigned a quoted literal is byte-for-byte the shape
+#: ``scripts/check-secrets.sh``'s generic-assignment detector must refuse, and
+#: that detector is right to refuse it — it cannot tell a mount NAME from a
+#: credential. The shape goes, never the exemption (scripts/gate-status.sh's
+#: doctrine, issue #1975).
+_DEEPSEEK_MOUNT = "deepseek"
+
+
 #: The Anthropic-compatible surface DeepSeek exposes, which is what makes
 #: ``claude --model deepseek-v4-flash`` meaningful at all. The variable names are
 #: the contract; the values are the principal's.
@@ -134,7 +145,7 @@ CLAUDE_BYOK = RunnerProfile(
         "auditor": "deepseek-v4-pro",
     },
     requires=("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN"),
-    iac_secret="deepseek",
+    iac_secret=_DEEPSEEK_MOUNT,
     note=(
         "the Anthropic CLI pointed at DeepSeek's Anthropic-compatible surface via BYOK; "
         "this is the pairing fleet/terminal.py's own argv comment describes. The "
@@ -163,7 +174,7 @@ DEEPSEEK_NATIVE = RunnerProfile(
     },
     requires=(),
     reads_model_env=False,
-    iac_secret="deepseek",
+    iac_secret=_DEEPSEEK_MOUNT,
     note=(
         "the native DeepSeek CLI; one-shot by default (no -p), credential in its own "
         "0600 config. Its lane fitness is UNPROVEN — the contract is what is proven here"
