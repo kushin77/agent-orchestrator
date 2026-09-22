@@ -174,6 +174,20 @@ def master_health_is_green_by_default(isolate_fleet_runtime, monkeypatch):
 #: mismatch fails loudly rather than silently resolving some other binary.
 DEFAULT_RUNNER_BINARY = "deepseek"
 
+#: Runners the suite drives EXPLICITLY, by name, in addition to the default above.
+#: `test_runners.KNOWN_RUNNER`, `test_terminal_finops_runner.BASE_RUNNER` and
+#: `test_context_pack` drive ``claude -p``, and `test_runner_preflight` probes its
+#: resolution — so standing in for the DEFAULT alone left those tests depending on
+#: whether the HOST happens to have ``claude`` installed, which is precisely the
+#: host dependency the fixture below exists to remove. Measured 2026-09-22 (#2060):
+#: green on a box that has ``claude``, and in the Cloud Build container (no
+#: ``claude``) five tests fail with ``PREFLIGHT FAILED — runner unresolvable:
+#: 'claude' is not on PATH``, whose own searched list names this fixture's
+#: ``runner-bin`` directory — proof the fixture RAN and simply never created that
+#: binary. #1787 renamed the default and did not notice the tests still naming the
+#: old one; listing them here is what keeps the two in step from now on.
+EXPLICIT_RUNNER_BINARIES = ("claude",)
+
 
 @pytest.fixture(autouse=True)
 def resolvable_default_runner(tmp_path, monkeypatch):
@@ -186,13 +200,18 @@ def resolvable_default_runner(tmp_path, monkeypatch):
     executable file on a PATH built here. A test that wants an unresolvable runner
     asks for one by name (``resolve_runner("claude-733-absent")``) or empties PATH
     itself, which is how the negative controls are written.
+
+    Every name the suite drives is covered, not only the default: see
+    ``EXPLICIT_RUNNER_BINARIES``.
     """
-    binary = tmp_path / "runner-bin" / DEFAULT_RUNNER_BINARY
-    binary.parent.mkdir(parents=True, exist_ok=True)
-    binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    binary.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{binary.parent}{os.pathsep}{os.environ.get('PATH', '')}")
-    return binary
+    searched = tmp_path / "runner-bin"
+    searched.mkdir(parents=True, exist_ok=True)
+    for name in (DEFAULT_RUNNER_BINARY, *EXPLICIT_RUNNER_BINARIES):
+        binary = searched / name
+        binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        binary.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{searched}{os.pathsep}{os.environ.get('PATH', '')}")
+    return searched / DEFAULT_RUNNER_BINARY
 
 
 #: The environment the default runner profile DECLARES it needs (`fleet/runners.py`,
