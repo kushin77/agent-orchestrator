@@ -1,5 +1,21 @@
 """portal.server.error_log — structured server-error sink (issue #2000).
 
+---knowledge---
+module_id: portal.server.error_log
+system: portal
+app: server
+solution_class: enterprise
+patterns: []
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [default_log_path, ErrorLog]
+invariants: ""
+gotchas: ""
+related: ["#2000"]
+do_not_duplicate: null
+---knowledge---
+
 Every uncaught exception ConsoleApplication.handle() catches is appended here
 as one JSON line (path, method, exception type/message, UTC timestamp,
 request id). Stdlib only — no new dependency for what is a few lines. Read
