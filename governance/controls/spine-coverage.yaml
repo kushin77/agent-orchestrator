@@ -249,6 +249,14 @@ rules:
     gate: scripts/check-tagging.sh
     note: "The tag authority (#1175) made constitutional (#1183): one declared vocabulary for every governed artifact, borrowing the class ladder from governance/conformance/policy.yaml and the FinOps tiers from governance/finops/policy.json — mirrored and proven equal, because a borrow that reads its own values can never fail. scripts/check-tagging.sh runs six checks: the authority's shape, drift against every borrowed authority, rule/gate resolution, the frozen shapes and declared controls, matrix freshness, the suite, THIRTEEN provoked refusals each with its clean twin, the artifact round trips, and tagging-mandate — which FAILS naming the document AND the marker when AGENTS.md, docs/GOLDEN-RULES.md, docs/GOVERNANCE.md, docs/EXECUTION-PLAN.md or docs/QA-GATE.md stops declaring the rule. tagging-freshness (#1427) is the eighth: it bounds the committed .board/snapshot.json's own age via `board --live --max-stale-minutes`, offline, so drift since the last manual `snapshot --from-github` refresh fails the gate by name instead of going unreported. Wired into make verify by auto-discovery (#698) and into make lint."
 
+  AO-GR-29:
+    status: GAP
+    covered: false
+    origin: local
+    modules: []
+    gate: "-"
+    note: "Introduced by #1928's rule-ID cross-reference table (docs/GOLDEN-RULES.md \"Rule-ID cross-reference\"), which documents that docs/erp-finops/compliance-audit.md:216 cites `AO-GR-29` although docs/GOLDEN-RULES.md itself has no AO-GR-29 heading (headings stop at AO-GR-28) -- a dangling reference, not a rule this repo has actually authored. Recorded GAP rather than omitted, so this scanner does not silently drop an id it now finds in the spine doc. Fixing the dangling citation itself is a separate, not-yet-filed issue; #1928 only documents it."
+
   # ---- Hub (kushin77/CMR) rules this repo's spine cites by number --------
   GR-2:
     status: ENFORCED
@@ -363,6 +371,28 @@ rules:
     modules: [governance/tagging/]
     gate: scripts/check-tagging.sh
     note: "Cited by AO-GR-28 (\"a rule only prose carries is advice\"). The principle — a doc-only rule is advisory, only a platform-enforced gate is binding — is instantiated for THIS rule by scripts/check-tagging.sh's tagging-mandate check, which reads the contract documents and fails naming the document and the marker the moment one stops declaring the tag authority. Recorded PARTIAL, not ENFORCED: no gate enumerates doc-only rules in general and refuses them, so the principle is enforced rule-by-rule as each gate ships rather than by one control."
+
+  GR-28:
+    status: GAP
+    covered: false
+    origin: hub-cited
+    modules: []
+    gate: "-"
+    note: "Introduced by #1928's rule-ID cross-reference table (docs/GOLDEN-RULES.md \"Rule-ID cross-reference\"). Hub GR-28 (\"a standards-bundle change gets a PR opened on every onboarded spoke ASAP\") is not implemented or cited by this repo's own doctrine -- the table records it only because scripts/check-terraform-iac.sh and scripts/check-rbac-head-binding.sh separately embed a same-digits \"GR-28\" citation for an unrelated, pre-#1928-reversal concept (flag-gated-off-by-default). No gate here enforces the hub's actual GR-28. Honest GAP, not a claim this repo implements the hub rule."
+  GR-32:
+    status: GAP
+    covered: false
+    origin: hub-cited
+    modules: []
+    gate: "-"
+    note: "Introduced by #1928's rule-ID cross-reference table. Hub GR-32 (\"a catch that does not record is a formality\") is quoted only inside a provenance note at docs/SHELL-PATTERNS.md:28 (a commit-message excerpt, \"add check-silent-catch gate and record GR-32\") -- not cited as live doctrine elsewhere in this repo. scripts/check-silent-catch.sh implements the underlying principle but does not itself cite the id. Honest GAP."
+  GR-33:
+    status: GAP
+    covered: false
+    origin: hub-cited
+    modules: []
+    gate: "-"
+    note: "Introduced by #1928's rule-ID cross-reference table, which lists the full hub GR-1..GR-33 range (`kushin77/CMR` GOLDEN-RULES.md) for context while resolving the GR-28 collision. GR-33 (\"an applier verifies its own post-state; revert is proven by round-trip\") is not cited by this repo's own doctrine anywhere. Honest GAP, not a claim this repo implements it."
 
 # ---- #803 delivery controls (branch protection, required checks, CODEOWNERS) ----
 # #803 is an open EPIC (PR #1075 in flight) that this lane does not close.

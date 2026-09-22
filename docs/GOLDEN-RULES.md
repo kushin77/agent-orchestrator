@@ -774,3 +774,36 @@ This spine is **adapted** from, not copied from, the following (full index:
 | `kushin77/leaderboard` `config/policy.yaml` | rule format: `enforcement` / `check` / `status` declared honestly (precursor to issue #26 policy-as-code) |
 | `kushin77/shared-frontend` `docs/GOLDEN-RULES.md` | per-rule Rule/Why/Verify format |
 | `kushin77/shared-governance` `GLOBAL_STANDARDS/**` | agent-action / JWT / OIDC / task / telemetry contracts, approval gate, external-LLM egress (feed AO-GR-12..19 and the reserved pillar ADRs) |
+
+## Rule-ID cross-reference (issue #1928)
+
+Three numbering schemes name overlapping rule content and are **not**
+number-for-number shared: the hub's own `GR-N` (`kushin77/CMR`
+`GOLDEN-RULES.md`, currently GR-1..GR-33), this repo's adapted spine
+`AO-GR-N` (this doc, AO-GR-1..AO-GR-28), and IDs a few scripts embed in
+comments/output that are *not* guaranteed to match either. This table covers
+every rule ID that carries more than one label somewhere in this repo (found
+via `grep -rohE 'AO-GR-[0-9]+|GR-[0-9]+' AGENTS.md docs/ scripts/`); it is a
+cross-reference, not a renumbering — each source keeps its own numbering.
+
+| Hub `GR-N` (`kushin77/CMR`) | This repo `AO-GR-N` | Script-embedded ID | One-line description |
+|---|---|---|---|
+| GR-2 | — | — | Issue-first: every change tracked in a GitHub issue before work starts. |
+| GR-3 | AO-GR-2 | — | One issue = one lane = one branch; no two lanes share a file. |
+| GR-4 | — | — | `master`/`main` protected by convention: every change lands via PR. |
+| GR-5 | AO-GR-5 (IaC/no-console-clicks only) **and** AO-GR-6 (flag-default posture, separately numbered) | GR-28 in `scripts/check-terraform-iac.sh`, `scripts/check-rbac-head-binding.sh` (both cite "flag-gated OFF by default") | Fully IaC, never console-clicked; AGENTS.md's GR-5 is a merged bundle of the IaC rule and the flag-default rule, split apart in this doc's AO-GR-5/AO-GR-6 (see AGENTS.md:85-88, reconciled by content, not number, per #1789). **Caution:** the flag-default *posture* was reversed by the owner on 2026-09-21 to enabled-by-default (`policy-gr5-enabled-by-default`); the "ships OFF by default" wording the two scripts above still assert under their own "GR-28" label is the pre-reversal posture and does not match either hub GR-28 (below) or current AO-GR-6 policy — those two scripts' "GR-28" citation is a stale/mislabeled reference to this rule, not a fourth distinct rule. |
+| GR-6 | AO-GR-7 | — | No secrets in code, files, or git history; env/secret manager only. |
+| GR-7 | AO-GR-8 | — | SemVer is law; releases are annotated `vX.Y.Z` tags at a gate-green commit. |
+| GR-10 | AO-GR-10 | — | Provenance is mandatory for cannibalized/harvested assets. |
+| GR-12 | AO-GR-3 | — | Verify before claiming done; `make verify` is the evidence of record. |
+| GR-17 | — (repo-local only) | — | Debug against this checkout first (local-code-first). |
+| GR-20 | — (repo-local only; content differs from hub GR-20) | — | AGENTS.md's GR-20 = chronological, dependency-gated issue selection. Hub GR-20 is a *different* rule ("board mandate: every task lands on the CMR issues board") — same number, unrelated content, not reconciled here. |
+| GR-22 | — (repo-local only) | — | No-questions doctrine: apply the documented default, escalate only when genuinely absent. |
+| GR-28 (hub) | AO-GR-28 | GR-28 in `scripts/check-terraform-iac.sh`, `scripts/check-rbac-head-binding.sh` — **different concept, same digits, collision** | Hub GR-28 = "a standards-bundle change gets a PR opened on every onboarded spoke ASAP." This repo's AO-GR-28 = "every governed artifact is tagged, and a tag set derives its gates." Neither matches what the two scripts mean by "GR-28" (flag-gated-off-by-default — see the GR-5 row above). Three unrelated rules currently share the digits 28; do not add a fourth. |
+| GR-29 (hub) | referenced as `AO-GR-29` at `docs/erp-finops/compliance-audit.md:216`, but **no `AO-GR-29` heading exists in this doc** (headings stop at AO-GR-28) — dangling reference, not fixed here, tracked separately | GR-29 in `scripts/check-code-headers.sh`, `scripts/check-pr-contract.sh`, `scripts/check-pytest-rootdir.sh`, `scripts/check-reconcile.sh`, `scripts/check-diagrams-capability-register.sh`, `scripts/check-codeidx-capability-register.sh`, and prose in `AGENTS.md:328`, `docs/GOVERNANCE.md:215,364`, `docs/CODE-HEADER-STANDARD.md:229`, `docs/AGENTCONSOLE-GOLIVE.md:119`, `docs/REGISTRY-PROVENANCE.md:80` | Hub GR-29 = "a doc-only rule is advisory; only a platform-enforced gate is binding." All script/prose uses of GR-29 in this repo match this hub definition consistently — the one open gap is the dangling `AO-GR-29` citation noted above. |
+| GR-32 (hub) | — | quoted inside a commit-message provenance note at `docs/SHELL-PATTERNS.md:28` ("record GR-32") — not a live citation elsewhere in this repo | Hub GR-32 = "a catch that does not record is a formality" (`check-silent-catch.sh`'s origin). |
+
+Not in this table: AO-GR-1, AO-GR-4, AO-GR-9, AO-GR-11, AO-GR-13..AO-GR-27 —
+these carry only the one `AO-GR-N` label in this repo today (no competing
+`GR-N` or script-embedded ID was found for them), so there is nothing to
+cross-reference yet.

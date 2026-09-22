@@ -248,11 +248,16 @@ See `governance/dispatch/README.md` for the reason table, the chain markers
 
 ## 9. Spine coverage map (issue #890)
 
-Every rule id in the spine — `AO-GR-1`..`AO-GR-27` in `docs/GOLDEN-RULES.md`,
+Every rule id in the spine — `AO-GR-1`..`AO-GR-28` in `docs/GOLDEN-RULES.md`,
 plus the hub (`kushin77/CMR`) rules this repo's own doctrine cites by number
 (`GR-2`, `GR-3`, `GR-4`, `GR-5`, `GR-6`, `GR-7`, `GR-8`, `GR-9`, `GR-10`,
 `GR-12`, `GR-17`, `GR-20`, `GR-22` in `AGENTS.md`/`docs/GOLDEN-RULES.md`) —
 maps to a named control in [`governance/controls/spine-coverage.yaml`](../governance/controls/spine-coverage.yaml).
+These are two distinct numbering schemes (hub `GR-N` vs. this repo's adapted
+`AO-GR-N`), not one flat shared numbering — see the
+["Rule-ID cross-reference"](GOLDEN-RULES.md#rule-id-cross-reference-issue-1928)
+table in `docs/GOLDEN-RULES.md` for the full id-to-id mapping, including the
+script-embedded IDs (e.g. `GR-28`) that don't align with either scheme.
 
 This is deliberately a **superset** of `scripts/control-coverage.tsv` (#874),
 which maps only Part B (`AO-GR-12`..`AO-GR-20`) of the spine and remains the
