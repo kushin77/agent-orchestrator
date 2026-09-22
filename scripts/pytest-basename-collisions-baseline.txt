@@ -1,0 +1,135 @@
+__main__.py: control-plane/instructions/csuite/__main__.py, governance/isolation/__main__.py, governance/lifecycle/__main__.py, governance/reconcile/__main__.py, guardrails/chat/__main__.py, guardrails/honesty/__main__.py, guardrails/isolation/__main__.py, telemetry/ledger/__main__.py
+adapter.py: integrations/paperclip/adapters/heartbeat/adapter.py, integrations/paperclip/adapters/sync/adapter.py, telemetry/ledger/adapter.py
+approvals.py: identity/chat/approvals.py, identity/cpapi/approvals.py
+attestation.py: guardrails/honesty/attestation.py, registry/packs/attestation.py
+audit.py: gateway/mcp/audit.py, governance/dispatch/audit.py, governance/isolation/audit.py, governance/lifecycle/audit.py, governance/modules/audit.py, governance/reconcile/audit.py, guardrails/controls/audit.py, guardrails/policy/audit.py, identity/cpapi/audit.py, integrations/paperclip/reporting/audit.py, telemetry/budgets/audit.py
+authn.py: gateway/mcp/authn.py, identity/edges/authn.py
+backpressure.py: engine/queue/backpressure.py, gateway/limits/backpressure.py
+budget.py: gateway/finops/budget.py, gateway/limits/budget.py, integrations/paperclip/budget.py, telemetry/budgets/budget.py, telemetry/metering/budget.py
+capacity.py: fleet/capacity.py, fleet/runner/capacity.py
+catalog.py: guardrails/dlp/catalog.py, guardrails/sandbox/catalog.py, identity/entitlements/catalog.py, registry/service/catalog.py
+checker.py: governance/conformance/checker.py, governance/lessons/checker.py
+chooser.py: gateway/finops/chooser.py, governance/finops/chooser.py
+cli.py: control-plane/control/cli.py, control-plane/functions/cli.py, e2e/erp/cli.py, engine/core/cli.py, engine/core/tickets/cli.py, engine/loop/cli.py, engine/memory/cli.py, engine/queue/cli.py, fleet/runner/cli.py, gateway/finops/cli.py, gateway/health/cli.py, gateway/limits/cli.py, gateway/mcp/cli.py, gateway/proxy/cli.py, gateway/sme-routing/cli.py, governance/authority/cli.py, governance/board/cli.py, governance/conformance/cli.py, governance/dispatch/cli.py, governance/isolation/cli.py, governance/knowledge/cli.py, governance/lessons/cli.py, governance/lifecycle/cli.py, governance/modules/cli.py, governance/pmo/cli.py, governance/reconcile/cli.py, governance/remediation/cli.py, governance/rollup/cli.py, governance/spawn/cli.py, governance/sync/cli.py, governance/ticket/cli.py, governance/waves/cli.py, guardrails/chat/cli.py, guardrails/controls/cli.py, guardrails/dlp/cli.py, guardrails/honesty/cli.py, guardrails/isolation/cli.py, guardrails/policy/cli.py, identity/edges/cli.py, identity/onboarding/cli.py, infra/rollout/cli.py, integrations/erp/auth/cli.py, integrations/erp/catalog/cli.py, integrations/paperclip/adapters/approvals/cli.py, integrations/paperclip/adapters/heartbeat/cli.py, integrations/paperclip/adapters/routines/cli.py, integrations/paperclip/adapters/secrets/cli.py, integrations/paperclip/adapters/skills/cli.py, integrations/paperclip/api/cli.py, integrations/paperclip/auth/cli.py, integrations/paperclip/cli.py, integrations/paperclip/reporting/cli.py, telemetry/audit/cli.py, telemetry/budgets/cli.py, telemetry/ledger/cli.py, telemetry/metering/cli.py, telemetry/observability/cli.py
+config.py: engine/queue/config.py, gateway/health/config.py, gateway/limits/config.py, gateway/providers/config.py, identity/onboarding/config.py, identity/sso/config.py
+contract.py: gateway/chat/contract.py, gateway/providers/contract.py, gateway/proxy/contract.py, integrations/erp/auth/contract.py
+control.py: fleet/control.py, identity/cpapi/control.py
+egress.py: guardrails/chat/egress.py, guardrails/dlp/egress.py
+engine.py: governance/merge/engine.py, guardrails/dlp/engine.py, guardrails/policy/engine.py, identity/entitlements/engine.py, infra/rollout/engine.py
+envelope.py: guardrails/chat/envelope.py, identity/edges/envelope.py, registry/chat/envelope.py
+errors.py: engine/core/errors.py, gateway/chat/errors.py, gateway/mcp/errors.py, gateway/providers/errors.py, guardrails/isolation/errors.py, guardrails/policy/errors.py, guardrails/sandbox/errors.py, identity/chat/errors.py, identity/cpapi/errors.py, identity/entitlements/errors.py, identity/sso/errors.py, integrations/paperclip/api/errors.py, registry/service/errors.py, telemetry/ledger/errors.py
+events.py: engine/core/events.py, gateway/health/events.py, gateway/providers/events.py
+feedback.py: registry/chat/feedback.py, registry/prompts/feedback.py
+fixtures.py: gateway/mcp/fixtures.py, integrations/paperclip/adapters/approvals/fixtures.py
+flags.py: gateway/chat/flags.py, gateway/providers/flags.py, integrations/erp/webhooks/flags.py, integrations/paperclip/adapters/sync/flags.py
+gate.py: e2e/erp/gate.py, governance/board/gate.py, governance/lifecycle/gate.py, governance/merge/gate.py
+gateway.py: gateway/mcp/gateway.py, gateway/proxy/gateway.py
+golden_path.py: e2e/erp/golden_path.py, e2e/golden_path.py
+guard.py: identity/rbac/guard.py, integrations/paperclip/auth/guard.py
+handlers.py: engine/core/handlers.py, engine/core/tickets/handlers.py
+health.py: fleet/health.py, governance/modules/health.py, integrations/paperclip/api/health.py
+identity.py: governance/isolation/identity.py, registry/service/identity.py
+intake.py: telemetry/metering/intake.py, telemetry/observability/intake.py
+isolation.py: governance/authority/isolation.py, identity/chat/isolation.py
+keystore.py: identity/sso/keystore.py, telemetry/ledger/keystore.py
+ledger.py: governance/knowledge/ledger.py, governance/lifecycle/ledger.py, governance/reconcile/ledger.py, governance/waves/ledger.py, telemetry/budgets/ledger.py
+live.py: gateway/sync/live.py, governance/dispatch/live.py, governance/isolation/live.py, governance/lifecycle/live.py, governance/modules/sync/live.py, governance/reconcile/live.py, integrations/hermes/sync/live.py, registry/sync/live.py
+liveness.py: governance/dispatch/liveness.py, governance/spawn/liveness.py
+loader.py: gateway/finops/loader.py, guardrails/policy/loader.py, integrations/paperclip/adapters/skills/loader.py
+mapping.py: integrations/paperclip/adapters/approvals/mapping.py, integrations/paperclip/mapping.py, registry/personas/mapping.py
+model.py: engine/core/model.py, engine/core/tickets/model.py, engine/loop/model.py, engine/memory/model.py, engine/multiagent/model.py, engine/queue/model.py, fleet/runner/model.py, gateway/limits/model.py, gateway/mcp/model.py, gateway/proxy/model.py, governance/authority/model.py, governance/board/model.py, governance/conformance/model.py, governance/dispatch/model.py, governance/knowledge/model.py, governance/lessons/model.py, governance/lifecycle/model.py, governance/merge/model.py, governance/modules/model.py, governance/rollup/model.py, governance/spawn/model.py, governance/sync/model.py, governance/ticket/model.py, governance/waves/model.py, guardrails/controls/model.py, guardrails/isolation/model.py, guardrails/policy/model.py, guardrails/sandbox/model.py, identity/cpapi/model.py, identity/edges/model.py, identity/entitlements/model.py, identity/onboarding/model.py, identity/rbac/model.py, identity/sso/model.py, infra/rollout/model.py, integrations/erp/auth/model.py, integrations/erp/catalog/model.py, integrations/erp/webhooks/model.py, integrations/paperclip/adapters/approvals/model.py, integrations/paperclip/adapters/routines/model.py, integrations/paperclip/adapters/secrets/model.py, integrations/paperclip/adapters/skills/model.py, integrations/paperclip/auth/model.py, integrations/paperclip/model.py, integrations/paperclip/reporting/model.py, registry/service/model.py, telemetry/budgets/model.py, telemetry/chat/model.py, telemetry/metering/model.py, telemetry/observability/model.py
+monitor.py: fleet/monitor.py, gateway/health/monitor.py
+negative_control.py: governance/lessons/negative_control.py, guardrails/honesty/negative_control.py, integrations/erp/auth/negative_control.py, integrations/erp/webhooks/negative_control.py, integrations/paperclip/adapters/approvals/negative_control.py
+negative_controls.py: e2e/erp/negative_controls.py, e2e/negative_controls.py
+parity.py: infra/fleet/parity.py, registry/parity/parity.py
+plan.py: fleet/runner/plan.py, governance/pmo/plan.py
+policy.py: engine/loop/policy.py, gateway/health/policy.py, governance/dispatch/policy.py, governance/isolation/policy.py, governance/lifecycle/policy.py, governance/modules/policy.py, governance/pmo/policy.py, governance/reconcile/policy.py, guardrails/chat/policy.py, integrations/paperclip/auth/policy.py, integrations/paperclip/reporting/policy.py
+projection.py: integrations/paperclip/adapters/routines/projection.py, integrations/paperclip/adapters/skills/projection.py
+provenance.py: governance/sync/provenance.py, integrations/erp/auth/provenance.py
+registry.py: gateway/mcp/registry.py, gateway/providers/registry.py, governance/modules/registry.py, guardrails/controls/registry.py, integrations/paperclip/adapters/skills/registry.py, integrations/paperclip/auth/registry.py, registry/packs/registry.py, registry/personas/registry.py, registry/prompts/registry.py, registry/service/registry.py
+render.py: control-plane/fleet-template/render.py, governance/spawn/render.py
+report.py: fleet/report.py, governance/lifecycle/report.py, guardrails/isolation/report.py, telemetry/metering/report.py
+resolver.py: gateway/chat/resolver.py, gateway/proxy/resolver.py
+retrieval.py: engine/memory/retrieval.py, guardrails/chat/retrieval.py
+router.py: gateway/proxy/router.py, gateway/sme-routing/router.py, identity/cpapi/router.py
+routing.py: fleet/routing.py, registry/service/routing.py
+runtime.py: engine/core/runtime.py, engine/core/tickets/runtime.py, engine/loop/runtime.py, fleet/runtime.py, guardrails/sandbox/runtime.py
+runtimes.py: fleet/runtimes.py, governance/isolation/runtimes.py
+schema.py: engine/loop/schema.py, gateway/providers/schema.py, gateway/proxy/schema.py, governance/dispatch/schema.py, governance/isolation/schema.py, governance/modules/schema.py, governance/rollup/schema.py, guardrails/sandbox/schema.py, integrations/erp/webhooks/schema.py, integrations/paperclip/adapters/approvals/schema.py, telemetry/ledger/schema.py
+schemas.py: guardrails/policy/schemas.py, integrations/erp/auth/schemas.py
+skills.py: identity/rbac/skills.py, registry/packs/skills.py
+sources.py: gateway/mcp/sources.py, governance/knowledge/sources.py, governance/spawn/sources.py, governance/ticket/sources.py
+state.py: engine/queue/state.py, fleet/state.py
+store.py: engine/conversation/store.py, engine/memory/store.py, engine/queue/store.py, guardrails/isolation/store.py, identity/entitlements/store.py, identity/onboarding/store.py, identity/rbac/store.py, identity/sso/store.py, registry/service/store.py, telemetry/ledger/store.py, telemetry/metering/store.py, telemetry/observability/store.py
+surface.py: gateway/chat/surface.py, integrations/paperclip/api/surface.py
+test_adapter.py: integrations/paperclip/adapters/heartbeat/tests/test_adapter.py, telemetry/ledger/tests/test_adapter.py
+test_agent_identity.py: integrations/paperclip/auth/tests/test_agent_identity.py, registry/profiles/tests/test_agent_identity.py
+test_attestation.py: guardrails/honesty/tests/test_attestation.py, registry/packs/tests/test_attestation.py
+test_audit.py: governance/isolation/tests/test_audit.py, guardrails/controls/tests/test_audit.py, guardrails/policy/tests/test_audit.py, identity/entitlements/tests/test_audit.py, integrations/paperclip/reporting/tests/test_audit.py, telemetry/budgets/tests/test_audit.py
+test_auth.py: control-plane/sdk/python/tests/test_auth.py, integrations/erp/webhooks/tests/test_auth.py
+test_backpressure.py: engine/queue/tests/test_backpressure.py, gateway/limits/tests/test_backpressure.py
+test_bridge.py: integrations/erp/webhooks/tests/test_bridge.py, portal/tests/test_bridge.py
+test_budget.py: gateway/finops/tests/test_budget.py, gateway/limits/tests/test_budget.py, integrations/paperclip/tests/test_budget.py, telemetry/budgets/tests/test_budget.py, telemetry/metering/tests/test_budget.py
+test_capacity.py: fleet/runner/tests/test_capacity.py, fleet/tests/test_capacity.py
+test_catalog.py: guardrails/dlp/tests/test_catalog.py, guardrails/sandbox/tests/test_catalog.py
+test_chat_surface.py: e2e/tests/test_chat_surface.py, portal/tests/test_chat_surface.py
+test_claims.py: governance/dispatch/tests/test_claims.py, integrations/paperclip/reporting/tests/test_claims.py
+test_cli.py: control-plane/cli/tests/test_cli.py, gateway/sme-routing/tests/test_cli.py, guardrails/controls/tests/test_cli.py, guardrails/honesty/tests/test_cli.py, guardrails/policy/tests/test_cli.py, integrations/paperclip/adapters/routines/tests/test_cli.py, integrations/paperclip/adapters/secrets/tests/test_cli.py, integrations/paperclip/adapters/skills/tests/test_cli.py, integrations/paperclip/api/tests/test_cli.py, integrations/paperclip/reporting/tests/test_cli.py, telemetry/budgets/tests/test_cli.py, telemetry/ledger/tests/test_cli.py, telemetry/metering/tests/test_cli.py, telemetry/observability/tests/test_cli.py
+test_client.py: identity/cpapi/tests/test_client.py, integrations/paperclip/tests/test_client.py
+test_config.py: gateway/health/tests/test_config.py, identity/edges/tests/test_config.py
+test_context_pack.py: engine/memory/tests/test_context_pack.py, fleet/tests/test_context_pack.py
+test_contract.py: fleet/tests/test_contract.py, gateway/providers/tests/test_contract.py
+test_core_integration.py: engine/loop/tests/test_core_integration.py, engine/multiagent/tests/test_core_integration.py
+test_determinism.py: engine/loop/tests/test_determinism.py, governance/modules/tests/test_determinism.py, integrations/paperclip/api/tests/test_determinism.py, integrations/paperclip/reporting/tests/test_determinism.py
+test_dispatch.py: gateway/chat/tests/test_dispatch.py, gateway/proxy/tests/test_dispatch.py, gateway/sme-routing/tests/test_dispatch.py, governance/pmo/tests/test_dispatch.py
+test_drift.py: control-plane/fleet-template/tests/test_drift.py, governance/sync/tests/test_drift.py
+test_egress.py: guardrails/chat/tests/test_egress.py, guardrails/dlp/tests/test_egress.py
+test_end_to_end.py: control-plane/sdk/python/tests/test_end_to_end.py, telemetry/budgets/tests/test_end_to_end.py
+test_engine.py: guardrails/dlp/tests/test_engine.py, guardrails/policy/tests/test_engine.py
+test_envelope.py: guardrails/chat/tests/test_envelope.py, identity/edges/tests/test_envelope.py
+test_escalation.py: engine/loop/tests/test_escalation.py, engine/multiagent/tests/test_escalation.py, gateway/finops/tests/test_escalation.py
+test_events.py: gateway/health/tests/test_events.py, gateway/providers/tests/test_events.py
+test_fallback.py: gateway/health/tests/test_fallback.py, gateway/proxy/tests/test_fallback.py
+test_falsifiability.py: engine/queue/tests/test_falsifiability.py, gateway/health/tests/test_falsifiability.py
+test_file_store.py: engine/memory/tests/test_file_store.py, engine/queue/tests/test_file_store.py
+test_health.py: fleet/tests/test_health.py, gateway/finops/tests/test_health.py, integrations/paperclip/api/tests/test_health.py
+test_idempotency.py: engine/queue/tests/test_idempotency.py, integrations/erp/webhooks/tests/test_idempotency.py
+test_intake.py: telemetry/metering/tests/test_intake.py, telemetry/observability/tests/test_intake.py
+test_isolation.py: control-plane/fleet-template/tests/test_isolation.py, engine/memory/tests/test_isolation.py, governance/authority/tests/test_isolation.py, identity/chat/tests/test_isolation.py
+test_jobs.py: fleet/tests/test_jobs.py, identity/onboarding/tests/test_jobs.py
+test_lifecycle.py: engine/conversation/tests/test_lifecycle.py, registry/personas/tests/test_lifecycle.py
+test_live.py: gateway/sync/tests/test_live.py, governance/dispatch/tests/test_live.py, governance/modules/sync/tests/test_live.py, integrations/hermes/sync/tests/test_live.py, registry/sync/tests/test_live.py
+test_live_sync.py: governance/knowledge/tests/test_live_sync.py, integrations/paperclip/reporting/tests/test_live_sync.py
+test_liveness.py: fleet/tests/test_liveness.py, governance/spawn/tests/test_liveness.py
+test_loader.py: gateway/finops/tests/test_loader.py, integrations/paperclip/adapters/skills/tests/test_loader.py
+test_mapping.py: integrations/paperclip/tests/test_mapping.py, registry/personas/tests/test_mapping.py
+test_model.py: engine/memory/tests/test_model.py, guardrails/controls/tests/test_model.py, guardrails/sandbox/tests/test_model.py, integrations/erp/auth/tests/test_model.py, integrations/paperclip/adapters/secrets/tests/test_model.py, telemetry/budgets/tests/test_model.py, telemetry/observability/tests/test_model.py
+test_negative_control.py: guardrails/honesty/tests/test_negative_control.py, integrations/erp/auth/tests/test_negative_control.py, integrations/erp/webhooks/tests/test_negative_control.py, integrations/paperclip/api/tests/test_negative_control.py
+test_negative_controls.py: control-plane/fleet-template/tests/test_negative_controls.py, e2e/tests/test_negative_controls.py, governance/rollup/tests/test_negative_controls.py, integrations/erp/catalog/tests/test_negative_controls.py, telemetry/chat/tests/test_negative_controls.py
+test_parity.py: infra/fleet/tests/test_parity.py, registry/parity/tests/test_parity.py
+test_plan.py: fleet/runner/tests/test_plan.py, governance/pmo/tests/test_plan.py
+test_policy.py: governance/dispatch/tests/test_policy.py, governance/pmo/tests/test_policy.py, integrations/paperclip/reporting/tests/test_policy.py
+test_projection.py: governance/rollup/tests/test_projection.py, integrations/paperclip/adapters/routines/tests/test_projection.py, integrations/paperclip/adapters/skills/tests/test_projection.py
+test_queue_integration.py: engine/loop/tests/test_queue_integration.py, engine/multiagent/tests/test_queue_integration.py
+test_registry.py: gateway/providers/tests/test_registry.py, governance/modules/tests/test_registry.py, guardrails/controls/tests/test_registry.py, integrations/paperclip/adapters/skills/tests/test_registry.py, registry/packs/tests/test_registry.py, registry/prompts/tests/test_registry.py
+test_retrieval.py: engine/memory/tests/test_retrieval.py, guardrails/chat/tests/test_retrieval.py
+test_roles.py: control-plane/cockpit/tests/test_roles.py, integrations/erp/auth/tests/test_roles.py
+test_router.py: gateway/proxy/tests/test_router.py, gateway/sme-routing/tests/test_router.py
+test_schema.py: gateway/sme-routing/tests/test_schema.py, governance/dispatch/tests/test_schema.py, guardrails/sandbox/tests/test_schema.py, integrations/erp/webhooks/tests/test_schema.py, integrations/paperclip/adapters/secrets/tests/test_schema.py, integrations/paperclip/tests/test_schema.py, telemetry/ledger/tests/test_schema.py
+test_schema_validation.py: gateway/providers/tests/test_schema_validation.py, integrations/paperclip/reporting/tests/test_schema_validation.py
+test_state.py: engine/queue/tests/test_state.py, fleet/tests/test_state.py
+test_store.py: engine/conversation/tests/test_store.py, telemetry/observability/tests/test_store.py
+test_telemetry.py: fleet/tests/test_telemetry.py, gateway/chat/tests/test_telemetry.py, guardrails/dlp/tests/test_telemetry.py
+test_tiering.py: governance/spawn/tests/test_tiering.py, telemetry/chat/tests/test_tiering.py
+test_tristate.py: governance/rollup/tests/test_tristate.py, guardrails/honesty/tests/test_tristate.py
+test_vault.py: gateway/providers/tests/test_vault.py, integrations/paperclip/adapters/secrets/tests/test_vault.py
+test_window.py: engine/memory/tests/test_window.py, gateway/health/tests/test_window.py
+tiering.py: governance/spawn/tiering.py, telemetry/chat/tiering.py
+tools.py: engine/loop/tools.py, gateway/mcp/tools.py
+transport.py: gateway/providers/transport.py, identity/cpapi/transport.py
+tristate.py: guardrails/honesty/tristate.py, guardrails/isolation/tristate.py
+validate.py: integrations/erp/catalog/validate.py, registry/packs/validate.py, registry/profiles/validate.py
+vault.py: gateway/providers/vault.py, integrations/paperclip/adapters/secrets/vault.py
+verify.py: fleet/runner/verify.py, integrations/paperclip/adapters/approvals/verify.py, telemetry/ledger/verify.py
+wiring.py: e2e/wiring.py, gateway/chat/wiring.py, gateway/proxy/wiring.py, identity/cpapi/wiring.py
+workflow.py: engine/core/tickets/workflow.py, engine/core/workflow.py
