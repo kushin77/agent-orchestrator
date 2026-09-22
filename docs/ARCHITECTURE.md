@@ -104,10 +104,10 @@ purpose and what will land there; later phase issues fill the dirs.
 
 ## 5. Definition of done (EPIC-00)
 
-All phases 0–8 closed and the product live flag-gated: a new tenant can be
-provisioned end-to-end — **signup → org → personas → agents → routed model
-calls → audit + usage billing** — entirely agent-built and flag-gated. EPIC-00
-(issue #4) closes last.
+All phases 0–8 closed and the product live and enabled by default (AO-GR-6): a
+new tenant can be provisioned end-to-end — **signup → org → personas → agents →
+routed model calls → audit + usage billing** — entirely agent-built and enabled
+by default. EPIC-00 (issue #4) closes last.
 
 ## 6. Cannibalization & provenance
 

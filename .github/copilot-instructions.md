@@ -43,6 +43,8 @@ bash -n <file>.sh
 - No direct pushes to `master`; changes land via a PR against `master` (squash
   merge). No merging failing work — green `make verify` evidence required first.
 - No secrets in code, files, or git history (env / secret managers only).
-- No ad-hoc `terraform apply` / console clicks; new infra ships flag-gated OFF.
+- No ad-hoc `terraform apply` / console clicks; new infra ships enabled by
+  default once merged and tested (AO-GR-6) — an OFF default needs a cited owner
+  exception, and the old "ships off by default" rule is retired.
 - No editing `vendor/` (pinned CMR submodule); never commit `.research/`
   clones; no unfinished markers or debug leftovers.

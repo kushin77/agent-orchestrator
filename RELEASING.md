@@ -26,8 +26,8 @@ residual risks named ahead of the v1.0.0 tag.
    ```
    - MAJOR = breaking change to a public contract (API / SDK / MCP surface,
      pillar boundary).
-   - MINOR = a new capability (a new pillar subsystem, phase feature,
-     flag-gated behind OFF by default).
+   - MINOR = a new capability (a new pillar subsystem, phase feature),
+     enabled by default once merged and tested (AO-GR-6).
    - PATCH = a fix / doc correction / hotfix.
 4. The tag is the release — no extra artifact step.
 
@@ -40,7 +40,9 @@ residual risks named ahead of the v1.0.0 tag.
 
 ## Notes
 
-- New product surfaces ship **flag-gated OFF** by default (IaC mandate, GR-5):
-  a release may add capability that is not yet visible to tenants.
+- New product surfaces ship **enabled by default** once merged and tested
+  (AO-GR-6, `policy-gr5-enabled-by-default`, 2026-09-21). The IaC mandate is a
+  separate rule (AO-GR-5): infrastructure is declared, never clicked. A surface
+  is off only as a named exception citing the owner decision that keeps it off.
 - ADRs record decisions that change the architecture; bump MAJOR when one
   supersedes a prior contract.

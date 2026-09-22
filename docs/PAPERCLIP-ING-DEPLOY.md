@@ -24,12 +24,12 @@ and no ad-hoc apply.
 | [`health/healthcheck.py`](../infra/paperclip/health/healthcheck.py) | The `GET /api/health` probe. |
 | [`../scripts/check-paperclip-deploy.sh`](../scripts/check-paperclip-deploy.sh) | The gate that proves the flag, pin, probe and no-vendoring assertions hold. |
 
-### The flag — `enable_paperclip`, OFF by default
+### The flag — `enable_paperclip`, enabled by default
 
 The runtime ships behind `enable_paperclip`, wired exactly like every other
 surface: declared in
 [`../infra/terraform/variables.tf`](../infra/terraform/variables.tf) with
-`default = false`, instantiated in
+`default = true` (`policy-gr5-enabled-by-default`, 2026-09-21), instantiated in
 [`../infra/terraform/main.tf`](../infra/terraform/main.tf), and recorded in
 [`../infra/feature-flags/registry.yaml`](../infra/feature-flags/registry.yaml)
 as `services.paperclip` (`default: off`). While the flag is closed the runtime

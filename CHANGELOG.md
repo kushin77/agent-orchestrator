@@ -12,15 +12,18 @@ Initial release of the **AI-agent-orchestration service control plane** (EPIC-00
 blueprint, issue #4): a multi-tenant SaaS control plane that organizes, governs,
 and manages commercial AI agents (Claude, DeepSeek, Copilot, Gemini, local
 Ollama). Full build-out across the five pillars plus cross-cutting surfaces
-(phases 0-8, ~47 PRs). All product surfaces ship **flag-gated OFF** by default
-(`infra/feature-flags/registry.yaml`); nothing is tenant-visible until a
-reviewed go-live promotes it.
+(phases 0-8, ~47 PRs). At the time of this release all product surfaces shipped
+**flag-gated OFF** by default (`infra/feature-flags/registry.yaml`); that default
+was **reversed 2026-09-21** by the owner decision `policy-gr5-enabled-by-default`
+(AO-GR-6) — new capabilities now ship enabled by default once merged and tested.
+This entry records the state as released and is kept as history.
 
 Highlights by phase:
 
 - **Phase 0 — Foundations**: repo scaffold + agent-instruction layering,
-  golden-rules product spine (AO-GR-1..28), CI/CD + IaC foundation
-  (flag-gated OFF, `make verify`), cannibalization index (issue #5-#8, #50-#53).
+  golden-rules product spine (AO-GR-1..28), CI/CD + IaC foundation (flag-gated
+  OFF as released; reversed 2026-09-21 by AO-GR-6; `make verify`),
+  cannibalization index (issue #5-#8, #50-#53).
 - **Phase 1 — Agent Registry & Profiling** (`registry/`): AgentProfile schema +
   validator + versioning, prompt/instruction library, SME persona registry,
   Agent Identity + Registry service, tenant onboarding/provisioning (#9-#14).

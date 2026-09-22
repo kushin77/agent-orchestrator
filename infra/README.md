@@ -9,10 +9,12 @@ Owner lane: **infra** (issue #6 · IaC mandate GR-5). See
 Everything declared, nothing clicked. This directory is the CI/CD + IaC
 foundation for the multi-tenant **AI-agent-orchestration control plane**: the
 Terraform modules that declare the seven control-plane services, the
-feature-flag registry that keeps every surface **OFF until promoted**, and the
+feature-flag registry that declares each surface's default and records the
+named exception that keeps any surface off, and the
 Cloud Build pipelines that run the gate and perform the only apply route.
 
-New infrastructure ships **flag-gated OFF by default** and is applied by the
+New infrastructure ships **enabled by default** once merged and tested
+(AO-GR-6, `policy-gr5-enabled-by-default`) and is applied by the
 **deployer service account** through the automated pipeline — never by a human
 in a console.
 
@@ -53,17 +55,22 @@ infra/
     apply-trigger.yaml       importable push trigger (disabled by default)
 ```
 
-## Flag-gated OFF by default
+## Enabled by default (AO-GR-6)
 
 Every `enable_*` variable in `infra/terraform/variables.tf` defaults to
-`false`, and every entry in [`feature-flags/registry.yaml`](feature-flags/registry.yaml)
-defaults to `off`. With all flags closed the Terraform configuration declares
-but creates **nothing** — a plan shows zero resources.
+`true` — 18 of the 19 declare it so; `enable_erp_module` is the one **recorded
+exception** (#1955, it carries its own dedicated promotion gate) — and every
+entry in [`feature-flags/registry.yaml`](feature-flags/registry.yaml)
+defaults to `on` (`default_policy: on`). The 2026-09-21 owner decision
+`policy-gr5-enabled-by-default` reversed the previous "ships OFF" default.
 
 `scripts/check-feature-flags.py` (wired into `make verify`) enforces this
-mechanically: a service that ships ON, a missing registry entry, a terraform
-flag that defaults to `true`, or a registry/terraform mismatch all **fail the
-gate** (no-false-green). Promotion is one flag at a time, behind a reviewed
+mechanically: the registry must carry `default_policy: on`, every declared
+`services:`/`surfaces:` entry must default to ON, and a missing registry entry,
+a terraform flag that defaults to `false` without a recorded exception, or a
+registry/terraform mismatch all **fail the gate** (no-false-green). An entry
+may stay off only as a **named exception** citing the recorded owner decision
+that keeps it off; promotion is then one flag at a time, behind a reviewed
 go-live, recorded in the registry.
 
 ## The only apply path (no console)
@@ -80,7 +87,8 @@ flowchart LR
 ```
 
 - The **deployer service account** (`modules/deployer-sa`) is the only identity
-  that runs `terraform apply`. It is created by Terraform, flag-gated OFF, and
+  that runs `terraform apply`. It is created by Terraform, off by a named
+  exception at this layer, and
   granted roles only at promotion.
 - The **apply pipeline** (`cloudbuild/apply.yaml`) runs as the deployer SA and
   is **fail-closed**: invoked with the apply flag OFF it fails loudly rather

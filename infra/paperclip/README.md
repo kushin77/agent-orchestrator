@@ -1,4 +1,4 @@
-# infra/paperclip — the self-hosted upstream runtime (flag-gated OFF)
+# infra/paperclip — the self-hosted upstream runtime
 
 The deployment declaration for the upstream paperclip runtime that runs
 **beside** the control plane as an external operator surface (issue #411,
@@ -25,15 +25,17 @@ The runtime is wired into the root environment exactly like every other
 surface:
 
 - [`../terraform/variables.tf`](../terraform/variables.tf) declares
-  `enable_paperclip` with `default = false`;
+  `enable_paperclip` with `default = true` (`policy-gr5-enabled-by-default`,
+  2026-09-21);
 - [`../terraform/main.tf`](../terraform/main.tf) instantiates this module with
   `enabled = var.enable_paperclip`;
 - [`../feature-flags/registry.yaml`](../feature-flags/registry.yaml) records
-  `services.paperclip` with `default: off`. The `feature-flags` gate keeps the
-  variable and the registry row in lock-step.
+  `services.paperclip` with `default: on` and `promoted: true`. The
+  `feature-flags` gate keeps the variable and the registry row in lock-step.
 
-With the flag closed the runtime module is inert: `terraform plan` shows zero
-resources.
+The runtime is enabled by default; setting the flag to `false` is the
+deliberate, reviewed act that renders the module inert (`terraform plan` shows
+zero resources).
 
 ## Pin — exact tag, never floating
 

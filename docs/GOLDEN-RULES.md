@@ -94,6 +94,41 @@ each a golden rule (or composition of two) in this file — not prose aspiration
 
 ---
 
+## Rule numbering — the one mapping table
+
+**A rule number is not portable across this repo's three numbering schemes.**
+The same concept can carry a different id in each, and one id can mean different
+things in two of them. Before citing a rule by number, resolve it here — or read
+the machine-readable map, [`governance/controls/spine-coverage.yaml`](../governance/controls/spine-coverage.yaml),
+which is what `docs/GOVERNANCE.md` §9 walks and what a gate validates.
+
+| Concept | `AGENTS.md` (list position) | This file (`AO-GR-N`) | Script-embedded ids | Note |
+|---|---|---|---|---|
+| Issue-first | rule 1, cited as `GR-2` | `AO-GR-1` | — | hub id `GR-2`; the local list position is **1** |
+| One issue = one lane = one branch | rule 2, cited as `GR-3` | `AO-GR-2` | — | |
+| PR-gated `master` | rule 3, cited as `GR-4` | `AO-GR-3` | — | |
+| **Fully IaC; no console clicks** | rule 4, cited as `GR-5` | `AO-GR-5` | `GR-5` | `AGENTS.md` rule 4 **bundles** this with the next row under the single label `GR-5` |
+| **Enabled by default** | rule 4 (same bundle) | `AO-GR-6` | `GR-28` | the 2026-09-21 reversal (`policy-gr5-enabled-by-default`); separate rule id here, glued to IaC in `AGENTS.md`, and called `GR-28` in `scripts/check-terraform-iac.sh` (the hub's number for the *old* flag-gated-OFF mandate) |
+| No secrets | rule 5, cited as `GR-6` | `AO-GR-7` | — | hub `GR-6` ⇒ local `AO-GR-7` |
+| SemVer is law | rule 6, cited as `GR-7` | `AO-GR-8` | — | |
+| Verify before done | rule 7, cited as `GR-12` | `AO-GR-3` + `AO-GR-11` | `GR-12` | hub `GR-12` ⇒ local `AO-GR-3`/`AO-GR-11` |
+| **No-false-green gates** | rule 8 (**no hub id cited**) | `AO-GR-4` | `GR-12` | ⚠️ `scripts/check-*.sh` cites `GR-12` for *this* rule, while `AGENTS.md` rule 7 cites `GR-12` for *verify-before-done* — the same id, two concepts |
+| Tag authority | — | `AO-GR-28` | — | not a hub id; `AGENTS.md`:329 cites it as `AO-GR-28` |
+
+Two consequences, stated so neither is rediscovered as a defect:
+
+1. **`AGENTS.md` rule 4 and this file's `AO-GR-5`/`AO-GR-6` are one bundle and two
+   rules.** The reversal split IaC (unchanged) from the flag *default* (reversed);
+   `AGENTS.md` still presents them as one `GR-5`, and the audit that fixed the
+   reversal explicitly mapped by content, not by label (#1789). This table is the
+   label half of that decision — it reconciles the numbers without renumbering
+   anything, so no existing citation breaks.
+2. **`AO-GR-6` keeps its historical anchor** `#ao-gr-6--flag-gated-off-by-default`
+   (the rule was renamed, not moved). Links to that anchor are correct and are not
+   a stale reference.
+
+---
+
 ## Part A — delivery & repo spine
 
 ### AO-GR-1 — Everything is tracked in a GitHub issue

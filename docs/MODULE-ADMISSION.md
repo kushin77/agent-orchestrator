@@ -156,9 +156,11 @@ paperclip.ing adapters (`docs/decision-records/ADR-0013-paperclip-ing-integratio
 and the shipped paperclip integration) sit on the other side of the seam and are
 integrations, not children.
 
-*Shipped* above means shipped **in this repository** and gated offline — not
-running. The upstream runtime is **not** deployed: `enable_paperclip` defaults
-`false` and no runtime resource is planned today
+*Shipped* above means shipped **in this repository**, behind its flag — not
+necessarily running. When this section was written `enable_paperclip` defaulted
+`false` and no runtime resource was planned; since the 2026-09-21 reversal
+(AO-GR-6) it defaults `true`, so the runtime is declared ON by the same
+declaration
 ([`PAPERCLIP-ING-GAP-ANALYSIS.md`](PAPERCLIP-ING-GAP-ANALYSIS.md), section
 *Current status*).
 

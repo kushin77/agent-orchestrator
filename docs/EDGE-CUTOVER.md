@@ -5,7 +5,8 @@
 > happened**: the hostname still answers through its current fronting, and the
 > run-half steps in [§5](#5-the-run-half-steps-env-seam-and-named-refusals) are
 > **owed, not done.** The Terraform half of the reconciliation is declared and
-> flag-gated OFF ([§4](#4-the-retired-route-as-code)); the mechanical gate that
+> ships off as a **named exception** — no cutover has happened, so the route is
+> owed, not promoted ([§4](#4-the-retired-route-as-code)); the mechanical gate that
 > keeps it from regressing is `scripts/check-edge-cutover.sh`
 > ([§9](#9-how-this-cannot-silently-regress)).
 
@@ -293,7 +294,8 @@ would be a file-disjointness violation (AGENTS.md rule 2 / rule 21) for a change
 the surface's own promotion lane will make anyway. The promotion posture for this
 declaration is therefore:
 
-- the **Terraform** side is flag-gated OFF by default and needs no registry row to
+- the **Terraform** side ships off as a **named exception** (AO-GR-6: no cutover
+  has happened, so the route is owed) and needs no registry row to
   stay inert (`create_gcp_edge_route = false`, `enabled = false`);
 - the **run-half** side is not gated by a flag in this repository at all — it is
   an operator act in the other repository ([§5](#5-the-run-half-steps-env-seam-and-named-refusals));

@@ -1,15 +1,18 @@
-# infra/terraform — control-plane environment (flag-gated OFF)
+# infra/terraform — control-plane environment
 
 Terraform declarations for the agent-orchestrator control-plane environment.
-Every resource is gated by an `enable_*` variable that defaults to `false`
-(IaC mandate): with all flags closed the configuration creates **nothing**.
+Every resource is gated by an `enable_*` variable. Following the 2026-09-21
+reversal `policy-gr5-enabled-by-default` (AO-GR-6) those flags now default to
+`true` — 18 of 19; `enable_erp_module` is the one **recorded exception**
+(#1955, it carries its own dedicated promotion gate). Flipping a flag to
+`false` is a deliberate, reviewed act that declares nothing for that surface.
 
 ## Reading this environment
 
 | File | Purpose |
 |------|---------|
 | `versions.tf` / `providers.tf` | Terraform + Google provider pins (offline-validatable). |
-| `variables.tf` | Root inputs, including the nine `enable_*` service flags + `deployer_enabled`, all default `false`. |
+| `variables.tf` | Root inputs, including the `enable_*` service flags + `deployer_enabled`; the service flags default `true` per AO-GR-6 (`enable_erp_module` the recorded exception, #1955). |
 | `main.tf` | Composes `modules/control-plane-service` once per service, `modules/deployer-sa`, and the `../paperclip/terraform` runtime module. |
 | `outputs.tf` | Gated outputs (`service_uris`, `deployer_service_account`, `web_surface_uri`, `paperclip_runtime_uri`) — null while flags are OFF. |
 | `backend.tf.example` | GCS remote-state template; copy to `backend.tf` at go-live. |
@@ -29,7 +32,8 @@ the comment above it in `main.tf` for the full reasoning.
 ### Deployed-surface coverage (issue #884, lane L5 of EPIC #878)
 
 Every surface this repo actually deploys has a module here, each behind its
-own `enable_*` flag defaulting OFF:
+own `enable_*` flag — defaulting ON per AO-GR-6, except `enable_erp_module`
+(the recorded exception, #1955):
 
 | Deployed surface | Module | Flag |
 |---|---|---|

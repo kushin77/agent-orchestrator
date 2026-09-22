@@ -72,6 +72,8 @@ every PR and merge; paste its output as evidence.
 ## Status
 
 - Phase 0 foundations in progress. EPIC-00 (issue #4) stays open until all
-  phases are closed and the product is live flag-gated OFF by default.
+  phases are closed and the product is live — new capabilities ship enabled by
+  default once merged and tested (AO-GR-6, `policy-gr5-enabled-by-default`),
+  with a cited owner exception the only thing that keeps a surface off.
 - Extraction history: `MIGRATION_NOTES.md`, `VALIDATION.md` (legacy artifacts).
 
