@@ -39,7 +39,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
 def default_log_path(repo_root: Path) -> Path:
