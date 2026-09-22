@@ -167,8 +167,9 @@ A lesson is written down the moment a change reveals it — never "at the end".
    Build); ad-hoc console changes are debt and get promoted or retired.
 3. **Secrets** — env/secret-manager only; never commit secrets or pass them
    through argv/history.
-4. **Flag-gated OFF by default** — new product surfaces ship invisible until
-   deliberately enabled.
+4. **Enabled by default (AO-GR-6)** — new product surfaces ship enabled by
+   default once merged and tested; there is no "built but off" state. Named
+   exceptions stay off only by citing an owner decision.
 5. **FinOps** — dispatch at the cheapest capable tier; declared services carry
    resource limits.
 

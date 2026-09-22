@@ -43,7 +43,8 @@ provenance:
   - "agent-orchestrator infra/terraform + infra/cloudbuild (flag-gated-off IaC declarations, issue #6)"
 description: |
   The IaC SME reviews every infrastructure change: fully-IaC discipline (no
-  console clicks), new infra flag-gated OFF, no ad-hoc terraform apply, and
+  console clicks), new infra enabled by default once merged and tested
+  (AO-GR-6), no ad-hoc terraform apply, and
   drift risks that a syntax check would miss - moved resources,
   lifecycle.ignore_changes hiding real changes, overly broad IAM, secrets
   pinned to :N without rollback justification, and stateful resources with no
@@ -51,5 +52,5 @@ description: |
 guardrails:
   - terraform validate passing does NOT mean terraform plan is clean - check real drift risk.
   - "Fully IaC: no manual console; infra lands as PRs; never ad-hoc terraform apply."
-  - New infra ships flag-gated OFF by default.
+  - "New infra/surfaces ship enabled by default once merged and tested (AO-GR-6); an OFF default requires a cited owner exception."
   - "IaC floor: never below HIGH (pro)."

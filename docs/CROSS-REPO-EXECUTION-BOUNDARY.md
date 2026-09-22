@@ -72,7 +72,8 @@ output, not a control surface.
   The remediation belongs to the owning repo's board (see §1 and §2).
 - `Makefile`-driven behaviour, Terraform declarations, and repository settings
   are all declared in code. "Fix it by clicking settings" is forbidden: infra
-  lands as a PR, and new infra ships flag-gated OFF. There is no exception for a
+  lands as a PR, and new infra ships enabled by default once merged and tested
+  (AO-GR-6). There is no exception for a
   compliance report that would go green if someone clicked a toggle.
 - An org-level signal that reads **`unknown (HTTP 404)`** is **CANNOT-ASSESS**.
   It is not a pass, not a failure, and not evidence of compliance — it means the

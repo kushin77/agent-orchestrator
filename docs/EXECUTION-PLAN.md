@@ -455,7 +455,8 @@ is the **tag authority** at `governance/tagging/taxonomy.yaml`; the derivation i
    **borrowed** from `governance/conformance/policy.yaml`, mirrored and proven
    equal — the ladder is declared once in this repository, not twice.
 2. **`posture`** — how the work is delivered. `iac` means the infrastructure is
-   **declared** (GR-5), never clicked, and ships flag-gated OFF; `saas` puts the
+   **declared** (GR-5), never clicked, and ships enabled by default once
+   merged and tested (AO-GR-6); `saas` puts the
    work behind the identity and boundary gates; `no-human-needed` means the lane
    must finish with **no operator input at all**, which forbids escalation
    markers and floors the tier at `flash`; `human-gated` means an operator gate

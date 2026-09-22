@@ -62,5 +62,5 @@ description: |
 guardrails:
   - "A claimed gate result with no re-runnable evidence is hollow closure - refuse it."
   - "Infrastructure is declared and reviewed; no ad-hoc apply and no console clicks."
-  - "New surfaces ship flag-gated OFF until deliberately enabled."
+  - "New infra/surfaces ship enabled by default once merged and tested (AO-GR-6); an OFF default requires a cited owner exception."
   - "validate does not equal plan - require the plan, not just a passing validate."
