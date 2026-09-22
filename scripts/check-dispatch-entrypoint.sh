@@ -99,6 +99,15 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo "check-dispatch-entrypoint: CANNOT-ASSESS — python3 not found" >&2
   exit 2
 fi
+# `gh` is a precondition THIS VENUE must supply (#2056). The STATUS-REACHES-A-
+# VERDICT probe asks the entrypoint for a verdict on a fresh fixture; with no
+# `gh` the board cannot be refreshed, the probe answers rc 2, and the check
+# reports FAIL for a reason that is about the container rather than the tree.
+# Named here so the venue records a skip this check declares.
+if ! command -v gh >/dev/null 2>&1; then
+  echo "check-dispatch-entrypoint: CANNOT-ASSESS — gh not found (the board refresh the STATUS probe needs; #2056)" >&2
+  exit 2
+fi
 
 # The scratch tree is the sanctioned fleet idiom, NOT a `mktemp` template: a
 # template whose placeholder is a run of one letter trips this repo's OWN

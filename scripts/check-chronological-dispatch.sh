@@ -16,7 +16,8 @@
 #     lives in a temporary directory and the fleet mailbox is rebound through
 #     AO_FLEET_DIR.
 #
-# Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (no python3, no mktemp).
+# Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (no python3, no mktemp,
+# no gh -- the board refresh the behavioural half drives reads it with `gh`).
 #
 # Usage: bash scripts/check-chronological-dispatch.sh
 #
@@ -109,6 +110,17 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 if ! command -v mktemp >/dev/null 2>&1; then
   printf 'chronological-dispatch: CANNOT-ASSESS — mktemp not found\n' >&2
+  exit 2
+fi
+# `gh` is a precondition THIS VENUE must supply (#2056). The behavioural half
+# drives the dispatch CLI, whose staleness refresh reads the board with `gh`;
+# with no `gh` on PATH every arm below stops at an unhandled FileNotFoundError
+# and the check exits 2 for a reason no arm names, which the composite reports
+# as FAIL rather than as the SKIP it is. Named here so the venue records a skip
+# this check declares (scripts/skip-budget.json) instead of a red that says
+# nothing about this tree.
+if ! command -v gh >/dev/null 2>&1; then
+  printf 'chronological-dispatch: CANNOT-ASSESS — gh not found (the board refresh this check drives needs it; #2056)\n' >&2
   exit 2
 fi
 
