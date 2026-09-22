@@ -114,7 +114,16 @@ console=(
   "ROOT_ADMIN_EMAILS"
   "fails closed"
   "loopback"
-  "flag-gated OFF"
+  # Was the literal "flag-gated OFF" until the 2026-09-21 owner reversal
+  # (AO-GR-6, `policy-gr5-enabled-by-default`). The doc was then correctly
+  # reconciled away from the retired phrase (#1998, #1957) while this probe
+  # kept demanding it — which left `check-operator-access` RED on master, a
+  # check asserting a rule the repo had deliberately superseded. The safety
+  # fact the old probe guarded (this surface is not broadly reachable) is
+  # still stated, in the *exposure* vocabulary the reversal introduced: the
+  # server binds loopback by default and fails closed with no JWKS mirror.
+  # Probe that, so the control still bites without asserting the old rule.
+  "binds loopback by default"
 )
 limits=(
   "shell on the box"
