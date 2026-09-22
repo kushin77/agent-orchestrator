@@ -91,9 +91,9 @@ purpose and what will land there; later phase issues fill the dirs.
 
 ## 4. Rollout & operating doctrine
 
-- **Flag-gated OFF by default (IaC mandate, GR-5).** Every new surface ships
-  behind a feature flag defaulting to OFF; nothing is tenant-visible until
-  deliberately enabled.
+- **Enabled by default (GR-5 / AO-GR-6).** Every new surface ships enabled by
+  default once merged and tested; there is no "built but off" state. An OFF
+  default requires a cited owner exception.
 - **No-false-green gates (fleet doctrine).** The repo gate (`make verify`) is
   honest — every check can genuinely fail; formalities are rejected.
 - **Verify before done (GR-12).** Changes merge only with green verification
