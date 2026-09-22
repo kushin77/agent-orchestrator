@@ -362,3 +362,58 @@ def test_a_refused_decision_produces_exactly_one_named_ledger_record(root: Path)
     assert len(records) == 1
     assert records[0]["outcome"] == REFUSED_OUTCOME
     assert records[0]["code"] == "reconcile.batch-limit-exceeded"
+
+
+# --- the real port's `preserved_remotely` must not trust a stale local cache
+# (issue #1887) ---------------------------------------------------------------
+#
+# `git branch -r --contains <sha>` only sees remote-tracking refs this checkout
+# has already fetched. The reconcile daemon's checkout is long-running and never
+# fetches before a sweep, so a branch another lane pushed moments ago is
+# invisible to that command even though `origin/<branch>` genuinely holds the
+# work. The old form then found the work "nowhere" and let `_teardown` delete
+# the branch it had just failed to see (measured 2026-09-22, #1887). The fix
+# asks the remote directly (`git ls-remote origin <branch>`), which needs no
+# fetch.
+
+import subprocess  # noqa: E402
+
+
+def _run(*args: str, cwd: Path) -> str:
+    result = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True, check=True)
+    return result.stdout.strip()
+
+
+def test_preserved_remotely_sees_a_branch_pushed_after_this_checkout_was_cloned(tmp_path: Path):
+    """Provoke: push a branch to the remote, but never fetch it into the sweep's clone."""
+    remote = tmp_path / "remote.git"
+    remote.mkdir()
+    _run("init", "--bare", "-q", cwd=remote)
+
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    _run("init", "-q", "-b", "master", cwd=origin)
+    _run("config", "user.email", "t@example.com", cwd=origin)
+    _run("config", "user.name", "t", cwd=origin)
+    (origin / "f.txt").write_text("one\n")
+    _run("add", "f.txt", cwd=origin)
+    _run("commit", "-q", "-m", "initial", cwd=origin)
+    _run("remote", "add", "origin", str(remote), cwd=origin)
+    _run("push", "-q", "origin", "master", cwd=origin)
+
+    # The sweep's own checkout: cloned BEFORE the lane's branch exists upstream,
+    # so it carries no `origin/issue-1887` remote-tracking ref at all.
+    sweep_clone = tmp_path / "sweep-clone"
+    _run("clone", "-q", str(remote), str(sweep_clone), cwd=tmp_path)
+
+    # A lane pushes unmerged work to a NEW branch, from its own worktree.
+    lane_worktree = tmp_path / "lane-worktree"
+    _run("worktree", "add", "-q", "-b", "issue-1887", str(lane_worktree), "master", cwd=origin)
+    (lane_worktree / "g.txt").write_text("two\n")
+    _run("add", "g.txt", cwd=lane_worktree)
+    _run("commit", "-q", "-m", "unmerged lane work", cwd=lane_worktree)
+    _run("push", "-q", "origin", "issue-1887", cwd=lane_worktree)
+
+    ops = RepoOps(sweep_clone)
+    assert ops.preserved_on_main(str(lane_worktree)) is False
+    assert ops.preserved_remotely(str(lane_worktree), "issue-1887") is True
