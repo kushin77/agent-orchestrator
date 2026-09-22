@@ -326,35 +326,52 @@ def build(directory, committed, working):
     return directory
 
 
-good = build(scratch / "committed-good", [4, 645], [645])
-bad = build(scratch / "committed-bad", [645], [645, 4])
+try:
+    good = build(scratch / "committed-good", [4, 645], [645])
+    bad = build(scratch / "committed-bad", [645], [645, 4])
+except (OSError, subprocess.CalledProcessError) as exc:
+    print("CANNOT-ASSESS: could not build the fixture roots: %s" % exc, file=sys.stderr)
+    raise SystemExit(2)
 
 on_disk = json.loads((good / ".board" / "snapshot.json").read_text(encoding="utf-8"))
 on_disk_numbers = {issue["number"] for issue in on_disk["issues"]}
 ok_good, why_good = crossref.resolve_target(good, "issue-4")
 ok_bad, why_bad = crossref.resolve_target(bad, "issue-4")
 
-print("PROVOKED_WORKING_TREE_LOST_4=%d" % (0 if 4 in on_disk_numbers else 1))
-print("FIX_WORKTREE_LOSS_IGNORED=%d" % (1 if ok_good else 0))
-print("TRUTH_COMMITTED_LOSS_REFUSED=%d" % (1 if not ok_bad else 0))
+checks = (
+    ("PROVOKED_WORKING_TREE_LOST_4", 4 not in on_disk_numbers),
+    ("FIX_WORKTREE_LOSS_IGNORED", bool(ok_good)),
+    ("TRUTH_COMMITTED_LOSS_REFUSED", not ok_bad),
+)
+for name, held in checks:
+    print("%s=%d" % (name, 1 if held else 0))
 print("WHY_GOOD=%s" % why_good)
 print("WHY_BAD=%s" % why_bad)
+
+# Asserted HERE, not in the shell: reading the report with `... | grep -q` is the
+# idiom that loses text to SIGPIPE once the report outgrows the pipe buffer
+# (scripts/check-verdict-contains.sh), and this file is already at its recorded
+# allowance of one such site -- a second one is refused by name.
+unproven = [name for name, held in checks if not held]
+if unproven:
+    print("NOT_HELD=" + " ".join(unproven), file=sys.stderr)
+    raise SystemExit(1)
 PY
 )"
-if [ $? -ne 0 ]; then
-  printf '%s\n' "$scratch_out" | sed 's/^/    /' >&2
-  echo "check-cross-reference: CANNOT-ASSESS — could not provoke the gate-scratch control" >&2
-  exit 2
-fi
-unproven=""
-for flag in PROVOKED_WORKING_TREE_LOST_4 FIX_WORKTREE_LOSS_IGNORED TRUTH_COMMITTED_LOSS_REFUSED; do
-  printf '%s\n' "$scratch_out" | grep -q "^${flag}=1$" || unproven="$unproven $flag"
-done
-if [ -n "$unproven" ]; then
-  printf '%s\n' "$scratch_out" | sed 's/^/    /' >&2
-  echo "check-cross-reference: FAIL — the gate-scratch control did not hold:$unproven" >&2
-  exit 1
-fi
+scratch_rc=$?
+case "$scratch_rc" in
+  0) : ;;
+  1)
+    printf '%s\n' "$scratch_out" | sed 's/^/    /' >&2
+    echo "check-cross-reference: FAIL — the gate-scratch control did not hold (NOT_HELD names the flags above)" >&2
+    exit 1
+    ;;
+  *)
+    printf '%s\n' "$scratch_out" | sed 's/^/    /' >&2
+    echo "check-cross-reference: CANNOT-ASSESS — could not provoke the gate-scratch control (rc=$scratch_rc)" >&2
+    exit 2
+    ;;
+esac
 echo "  OK    gate-scratch control: a working-tree refresh that loses a referenced issue is ignored, and a committed loss is still refused"
 
 echo "check-cross-reference: OK — relationships valid, markers resolved, builds deterministic, negative controls refused"
