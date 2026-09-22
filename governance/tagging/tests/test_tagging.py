@@ -266,7 +266,7 @@ def test_plan_channels_are_derived_from_the_tags(taxonomy, rules):
 def test_plan_raises_the_floor_for_iac(taxonomy, rules):
     plan, _ = M.derive(M.parse_labels(CLEAN), taxonomy, rules)
     assert plan.finops_floor == "pro"
-    assert "flag-gated-off" in plan.declarations
+    assert "declared-never-clicked" in plan.declarations
 
 
 def test_plan_refuses_a_tier_below_the_floor(taxonomy, rules):

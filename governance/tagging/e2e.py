@@ -84,8 +84,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise AssertionError("the plan derives no ci/cd gates: %s" % plan.gates)
         if plan.finops_floor != "pro":
             raise AssertionError("the FinOps floor is %r, expected pro" % plan.finops_floor)
-        if "flag-gated-off" not in plan.declarations:
-            raise AssertionError("posture:iac owes flag-gated-off, not derived")
+        if "declared-never-clicked" not in plan.declarations:
+            raise AssertionError("posture:iac owes declared-never-clicked, not derived")
         return "gates=%d floor=%s fired=%d" % (
             sum(len(v) for v in plan.gates.values()), plan.finops_floor, len(plan.rules_fired))
 
