@@ -29,6 +29,22 @@ Fail closed, the same posture every other reader in this rollout pillar takes
 mapping, or a flag entry that is not a mapping, projects to the same result as
 an absent flag — "never promoted" — never an exception and never an
 assumed promotion.
+
+---knowledge---
+module_id: infra.rollout.registry_projection
+system: infra
+app: rollout
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [project_surface, plan_surface_names, project_all, registry_matches_projection]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

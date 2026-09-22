@@ -71,6 +71,22 @@ Exit codes (repo tri-state convention): 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS.
 
     python3 infra/fleet/parity.py                  # one tick, writes .verify/fleet-parity.json
     python3 infra/fleet/parity.py --ticks 3         # N ticks (>=3 per issue #714's acceptance)
+
+---knowledge---
+module_id: infra.fleet.parity
+system: infra
+app: fleet
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [now, normalize, digest_of, load_markers, check_role_table, tree, diff_tree, PersonaState, (+9 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

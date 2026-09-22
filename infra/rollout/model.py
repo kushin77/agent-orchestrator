@@ -29,6 +29,22 @@ The model guarantees (each is tested):
   (`gradual.ramp.dwell: 24h`) exposes it as ``StageSpec.dwell_seconds``, so a
   driver can enforce the hold from a recorded timestamp rather than trusting a
   caller-supplied boolean (#619).
+
+---knowledge---
+module_id: infra.rollout.model
+system: infra
+app: rollout
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [parse_dwell, RolloutStage, stable_bucket, Audience, StageSpec, ApprovalPolicy, StageModel, FlagState, (+7 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

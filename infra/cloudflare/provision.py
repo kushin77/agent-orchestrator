@@ -39,6 +39,22 @@ PROVENANCE (GR-10): the *pattern* (find-or-create by name, idempotent
 `kushin77/shared-services` `infra/modules/cloudflare-tunnel/` (issue #1171).
 That repo is private, carries no license and is owned by the same owner, so no
 code was copied; see `docs/CANNIBALIZATION.md` section 16.
+
+---knowledge---
+module_id: infra.cloudflare.provision
+system: infra
+app: cloudflare
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [tunnel_id_from_list, initial_tunnel_config, connector_container_name, connector_deploy_lines]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

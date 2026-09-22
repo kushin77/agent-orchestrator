@@ -59,6 +59,21 @@
 #   infra/cloudflare/ao-ssh-access.sh --apply      # mutate (flag must be ON)
 #   infra/cloudflare/ao-ssh-access.sh --provision  # also find-or-create the tunnel
 #   infra/cloudflare/ao-ssh-access.sh --connector  # also deploy the connector
+# ---knowledge---
+# module_id: infra.cloudflare.ao-ssh-access
+# system: infra
+# app: cloudflare
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [usage, refuse, abort, read_flag, require_var, resolve_token, release_lease, cf, (+2 more)]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 set -euo pipefail
 
 SURFACE="remote_ssh_access"

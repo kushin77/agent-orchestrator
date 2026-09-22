@@ -5,6 +5,21 @@
 # enablement, nothing. Promotion = a reviewed go-live flips `enabled` and
 # supplies a real `image`.
 
+# ---knowledge---
+# module_id: infra.terraform.modules.control-plane-service.variables
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [enabled, name, project_id, region, image, ingress, service_account_email, cpu, (+3 more)]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 variable "enabled" {
   description = "Master flag-gate for this service. When false (default), nothing is created."
   type        = bool

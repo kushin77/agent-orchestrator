@@ -18,6 +18,22 @@ CANNOT-ASSESS must never be reported as a pass.
 Usage:
     python3 infra/paperclip/health/healthcheck.py [--base URL] [--path PATH]
                                                   [--timeout SECONDS]
+
+---knowledge---
+module_id: infra.paperclip.health.healthcheck
+system: infra
+app: paperclip
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [probe, main]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

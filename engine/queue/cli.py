@@ -42,18 +42,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from typing import Optional
 
-from engine.queue.config import load_config
+from engine.queue.config import env_store_path, load_config
 from engine.queue.model import Priority, TaskState, coerce_priority
 from engine.queue.queue import JobQueue, QueueError
 from engine.queue.store import FileStore
 
-DEFAULT_STORE = os.environ.get("AO_QUEUE_STORE") or os.path.join(
-    os.getcwd(), ".ao-queue.json"
-)
+DEFAULT_STORE = env_store_path()
 
 _OPERATIONAL = 1
 _USAGE = 2

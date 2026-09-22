@@ -35,6 +35,22 @@ promoted entry whose record is missing fails checks/check_rollout.py), and
 the chain lives only in memory. Output paths are resolved against the working
 directory (the repo root in the Cloud Build pipelines) and must land under
 infra/rollout/ - this lane records its own promotions, nowhere else.
+
+---knowledge---
+module_id: infra.rollout.cli
+system: infra
+app: rollout
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [cmd_status, cmd_plan, cmd_grant_approval, cmd_promote, cmd_canary, cmd_rollback, cmd_surface_health, cmd_validate_approval, (+4 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

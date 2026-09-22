@@ -5,6 +5,21 @@
 # takes once its phase promotes a build; the count-gating guarantees a plan
 # with all flags OFF stays inert.
 
+# ---knowledge---
+# module_id: infra.terraform.modules.control-plane-service.main
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [google_project_service, google_cloud_run_v2_service]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 locals {
   create = var.enabled ? 1 : 0
   labels = merge(

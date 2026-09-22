@@ -34,6 +34,21 @@
 #   bash infra/portal/mirror-auth-gate-jwks.sh --jwks-file payload.json --project P --apply --create
 #
 # Exit: 0 OK / 1 NOT-OK (refused) / 2 CANNOT-ASSESS (an input or tool is missing).
+# ---knowledge---
+# module_id: infra.portal.mirror-auth-gate-jwks
+# system: infra
+# app: portal
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [usage]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 set -u
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

@@ -54,6 +54,21 @@
 # stdout, never a file: a restart loses a file this container did not durably
 # mount, and Promtail/Loki (the peer contract's own consumer) reads container
 # stdout, not a path inside it.
+# ---knowledge---
+# module_id: infra.fleet.entrypoint
+# system: infra
+# app: fleet
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [json_escape, log_json, on_term]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 set -eu
 
 REPO="${AO_FLEET_REPO:-/repo}"

@@ -6,6 +6,21 @@
 # plan shows zero resources. Promotion flips one flag at a time behind a
 # reviewed go-live (infra/feature-flags/registry.yaml records the state).
 
+# ---knowledge---
+# module_id: infra.terraform.main
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [google_artifact_registry_repository, control_plane_service, google_project_service, google_service_account, google_secret_manager_secret, google_secret_manager_secret_iam_member, deployer, web_surface, (+3 more)]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 locals {
   services = {
     registry   = { enabled = var.enable_registry, image = var.registry_image }

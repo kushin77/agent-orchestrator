@@ -33,6 +33,22 @@ Two deliberate refusals, stated here because a reader will ask:
 
 Tri-state exit contract (this repository's convention): 0 OK / 1 NOT-OK /
 2 CANNOT-ASSESS.
+
+---knowledge---
+module_id: infra.fleet.env_contract
+system: infra
+app: fleet
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [Var, Finding, resolve, validate, undeclared, cmd_check, cmd_print, build_parser, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
