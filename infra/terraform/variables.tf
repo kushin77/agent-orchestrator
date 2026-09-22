@@ -171,9 +171,9 @@ variable "enable_erp_webhooks_bridge" {
 # --- Deployer service account (the ONLY apply route) ------------------------
 
 variable "deployer_enabled" {
-  description = "Create the flag-gated deployer service account. OFF until the apply path is reviewed."
+  description = "Create the flag-gated deployer service account. ON by default (policy-gr5-enabled-by-default, 2026-09-21) and matches the live state: this service account already exists in purebliss-ghl."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "deployer_role_class" {
