@@ -208,7 +208,7 @@
           CP.el("span", { class: "mono", text: "metered debits " + money(credits.debitedUsd) }),
           CP.el("span", { class: "mono", text: "remaining " + money(credits.remainingUsd) }),
           CP.el("span", { class: "hint",
-            text: "24h " + money((data.usage || {}).window ? data.usage.window.last24hCostUsd : null) }));
+            text: "24h " + money((data.usage || {}).window ? data.usage.window.last24hCostUsd : null) })));
         if (credits.remainingReason) {
           card.appendChild(CP.el("div", { class: "hint", "data-nous-remaining-reason": "1",
             text: credits.remainingReason }));
