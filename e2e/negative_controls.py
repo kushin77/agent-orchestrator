@@ -19,6 +19,22 @@ Guards exercised (each is a real merged module, offline):
 10. audit tamper detected          -> telemetry/ledger verify (NOT-OK)
 
 Run from the repo root:  python3 -m e2e.negative_controls [--out DIR]
+
+---knowledge---
+module_id: e2e.negative_controls
+system: e2e
+app: platform
+solution_class: enterprise
+patterns: [no-false-green]
+derives_from: e2e/golden_path.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [one check per guard]
+invariants: "a check passes only when the guard actually refuses/denies/fails-closed"
+gotchas: ""
+related: ["#46", "#28"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

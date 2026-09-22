@@ -34,6 +34,22 @@ is a function of the scenario, never of when the simulation ran.
 Run from the repo root:
 
     python3 -m e2e.erp_finops_golden --out /tmp/pf10   # the evidence, as JSON
+
+---knowledge---
+module_id: e2e.erp_finops_golden
+system: e2e
+app: erp
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: e2e/golden_path.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [PF-10 sandbox money-chain run]
+invariants: "signup -> billing -> revenue recognition, offline, deterministic, zero manual intervention"
+gotchas: ""
+related: ["#675"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

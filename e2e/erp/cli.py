@@ -23,6 +23,22 @@ would blame the module for the reader's problem.
 
 Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS. ``demo`` prints the journey and
 the controls as one JSON document; ``controls`` prints only the controls.
+
+---knowledge---
+module_id: e2e.erp.cli
+system: e2e
+app: erp
+solution_class: enterprise
+patterns: [tri-state-honesty, no-false-green]
+derives_from: guardrails/honesty
+owner_sme: qa-sme
+tier: L1
+interfaces: [python3 -m e2e.erp.cli, check()]
+invariants: "a declaration that will not load is CANNOT-ASSESS, never NOT-OK"
+gotchas: ""
+related: ["#655"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

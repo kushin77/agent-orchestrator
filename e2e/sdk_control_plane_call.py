@@ -30,6 +30,22 @@ call runs in-process against ``ControlPlane.handle``.
 Run it:
 
     python3 -m e2e.sdk_control_plane_call [--out DIR]
+
+---knowledge---
+module_id: e2e.sdk_control_plane_call
+system: e2e
+app: control-plane
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: e2e/wiring.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [SDK Transport bound onto the real ControlPlane.handle]
+invariants: "the shipped SDK, not a FakeControlPlane, is the caller under test"
+gotchas: ""
+related: ["#1229", "#1201"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

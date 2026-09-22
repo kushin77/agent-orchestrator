@@ -22,6 +22,22 @@ Two known integration facts are handled locally (documented in README):
 2. ``telemetry/`` is imported through the repo-root PEP-420 namespace, never
    as a top-level root, so gateway/finops' plain top-level ``metering``
    module keeps resolving to itself.
+
+---knowledge---
+module_id: e2e.wiring
+system: e2e
+app: platform
+solution_class: enterprise
+patterns: [offline-composition-root]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [composition root: builds every real pillar module offline]
+invariants: "nothing here edits a pillar file — consumed read-only through public APIs"
+gotchas: ""
+related: ["#46"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

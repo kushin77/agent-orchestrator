@@ -13,6 +13,22 @@ Layout:
                      offline and records GuardAttestation evidence.
 * ``golden_path.py`` the canonical tenant journey (CLI-runnable).
 * ``negative_controls.py`` one runnable check per guard (CLI-runnable).
+
+---knowledge---
+module_id: e2e
+system: e2e
+app: platform
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [e2e package layout]
+invariants: "every suite runs against the REAL merged pillar modules, offline"
+gotchas: ""
+related: ["#46", "#28"]
+do_not_duplicate: null
+---knowledge---
 * ``tests/``         pytest suite (offline) that exercises both runners.
 * ``README.md``      the golden-path contract + negative-control evidence.
 """

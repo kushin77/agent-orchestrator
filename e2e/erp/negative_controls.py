@@ -37,6 +37,22 @@ owning module's code.
 Run from the repo root:
 
     python3 -m e2e.erp.negative_controls [--out DIR]
+
+---knowledge---
+module_id: e2e.erp.negative_controls
+system: e2e
+app: erp
+solution_class: enterprise
+patterns: [no-false-green]
+derives_from: e2e/negative_controls.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [one control per acceptance-criterion-2 refusal]
+invariants: "a guard that silently passes when it should block fails the check"
+gotchas: ""
+related: ["#655"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

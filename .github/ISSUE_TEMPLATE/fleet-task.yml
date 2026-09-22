@@ -1,3 +1,20 @@
+# .github/ISSUE_TEMPLATE/fleet-task.yml — the brain-directed fleet-task issue form.
+#
+# ---knowledge---
+# module_id: github.issue-template.fleet-task
+# system: governance
+# app: board
+# solution_class: pattern
+# patterns: [issue-first]
+# derives_from: null
+# owner_sme: pmo-sme
+# tier: L0
+# interfaces: [the fleet-task issue body fields]
+# invariants: ""
+# gotchas: "model_tier here is the L0/L1/L2 escalation ladder, not the FinOps flash/pro/auditor tier"
+# related: ["#1913"]
+# do_not_duplicate: null
+# ---knowledge---
 name: Fleet task
 description: Issue brief for a brain-directed fleet task — role, epic, lane, FinOps model tier + thinking effort, Verify command, and chain markers.
 title: "[fleet-task]"

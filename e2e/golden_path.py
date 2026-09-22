@@ -16,6 +16,22 @@ Each stage records a GuardAttestation (guardrails/honesty) and the run writes
 an evidence document.  Run from the repo root:
 
     python3 -m e2e.golden_path [--out DIR]
+
+---knowledge---
+module_id: e2e.golden_path
+system: e2e
+app: platform
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: e2e/wiring.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [the EPIC-00 Definition-of-Done journey]
+invariants: "signup through audit runs over the REAL merged pillar modules, offline"
+gotchas: ""
+related: ["#46"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -36,6 +36,22 @@ wall-clock reading anywhere in a value the evidence carries.
 Run from the repo root:
 
     python3 -m e2e.erp.golden_path [--out DIR]
+
+---knowledge---
+module_id: e2e.erp.golden_path
+system: e2e
+app: erp
+solution_class: enterprise
+patterns: [no-false-green, offline-composition-root]
+derives_from: e2e/golden_path.py
+owner_sme: qa-sme
+tier: L1
+interfaces: [golden_path stages: provision, cycle]
+invariants: "every hop is read through the real surface that owns it, offline"
+gotchas: ""
+related: ["#655"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
