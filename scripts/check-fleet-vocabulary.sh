@@ -601,6 +601,14 @@ fi
 # hyphenated code identifier like `brain-inbox`), which the detector never
 # visits in the first place (it walks `tokenize.COMMENT` tokens and
 # `ast.get_docstring` text only — see scripts/lib/fleet_code_prose.py).
+#
+# A STRUCTURAL IDENTIFIER is out of scope for the same reason (#1974): a
+# `---knowledge---` block is machine-readable data (docs/CODE-HEADER-STANDARD.md)
+# and its `module_id:` value is this file's stable identity — `fleet.brain`
+# NAMES THE MODULE, it does not name a role. The detector skips that one field
+# BY NAME and nothing else, so a retired term written as prose in the block's
+# free text (`invariants:`, `gotchas:`) is still refused — both halves are
+# provoked below.
 prose_checker="scripts/lib/fleet_code_prose.py"
 if [ ! -f "$prose_checker" ]; then
   bad "$prose_checker is missing: the code-prose surface has no detector"
@@ -664,6 +672,60 @@ PYEOF
     bad "the detector refused a declared gloss or an artifact reference: $(cat /tmp/ao-fleet-vocab-gloss.out)"
   fi
   rm -f /tmp/ao-fleet-vocab-gloss.out
+
+  # #1974, both halves of the module_id scoping. A retired word in the STRUCTURAL
+  # `module_id:` field is a machine-readable identifier, not prose, so it is
+  # allowed BY NAME...
+  id_py="$scratch/module_id_prose.py"
+  cat >"$id_py" <<'PYEOF'
+"""The fleet module — its identity lives in the knowledge block below.
+
+---knowledge---
+module_id: fleet.brain
+system: fleet
+app: fleet
+invariants: ""
+gotchas: ""
+---knowledge---
+"""
+
+
+def dispatch():
+    return None
+PYEOF
+  if python3 "$prose_checker" "$id_py" 2>&1; then
+    ok "a retired word in the structural module_id field is allowed BY NAME (the block is data, not prose)"
+  else
+    bad "the detector refused a structural module_id field, which is data rather than prose"
+  fi
+
+  # ...and the free text of the SAME block is still prose: a retired term in
+  # `invariants:` is refused by name, so the exemption is the one field it names
+  # and not the whole block.
+  free_py="$scratch/module_free_prose.py"
+  cat >"$free_py" <<'PYEOF'
+"""The fleet module — its identity lives in the knowledge block below.
+
+---knowledge---
+module_id: fleet.brain
+system: fleet
+app: fleet
+invariants: "the sister never picks work; the brain only orders"
+gotchas: ""
+---knowledge---
+"""
+
+
+def dispatch():
+    return None
+PYEOF
+  if free_out="$(python3 "$prose_checker" "$free_py" 2>&1)"; then
+    bad "the detector accepted a retired term in the knowledge block's free text (the exemption leaked past module_id)"
+  elif [[ "$free_out" == *"retired term 'sister'"* ]] && [[ "$free_out" == *"retired term 'brain'"* ]]; then
+    ok "a retired term in the block's free text is still refused by name — the exemption is module_id only"
+  else
+    bad "the block's free text was refused but not by name: $free_out"
+  fi
 fi
 
 # --- verdict ----------------------------------------------------------------
