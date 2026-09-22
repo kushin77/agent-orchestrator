@@ -50,6 +50,21 @@
 #   declares no Terraform resource and no service flag. Deployment onto a
 #   scheduler is D3+ — that is where the OFF-by-default flag belongs.
 
+# ---knowledge---
+# module_id: infra.fleet.docker-compose.agent-cron
+# system: infra
+# app: fleet
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [name, services, volumes]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 name: agent-fleet-cron
 
 services:

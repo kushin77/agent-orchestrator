@@ -43,6 +43,22 @@ unable to tell a clean stop from a crash (AGENTS.md rule 24).
     python3 infra/fleet/dev_run.py --once          # dispatch, report, exit (no /healthz)
 
 Exit codes: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (this repository's convention).
+
+---knowledge---
+module_id: infra.fleet.dev_run
+system: infra
+app: fleet
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [Role, now, log, digest_of, tree, mount_flags, state_snapshot, permitted_writes, (+11 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

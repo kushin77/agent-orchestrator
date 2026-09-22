@@ -1,6 +1,21 @@
 # Web-surface outputs. Every output is null while the flag is OFF, so
 # downstream automation cannot read a value for a surface that does not exist.
 
+# ---knowledge---
+# module_id: infra.terraform.modules.web-surface.outputs
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [service_name, service_uri, domain, domain_mapping_name, runtime_service_account, auth_gate_env_secrets]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 output "service_name" {
   description = "Web Cloud Run service name, or null while the flag is OFF."
   value       = var.enabled ? google_cloud_run_v2_service.this[0].name : null

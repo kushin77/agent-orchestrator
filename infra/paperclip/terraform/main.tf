@@ -13,6 +13,21 @@
 # There is no apply path here: this module is inert until a reviewed go-live
 # flips `enable_paperclip` and the flag-gated deploy pipeline runs.
 
+# ---knowledge---
+# module_id: infra.paperclip.terraform.main
+# system: infra
+# app: paperclip
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [google_project_service, google_cloud_run_v2_service]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 locals {
   create = var.enabled ? 1 : 0
   labels = merge(

@@ -56,6 +56,22 @@ document, and this surface reports the document.
 Usage:
     python3 infra/fleet/healthz.py status --decision <file>   # print the verdict (0/1/2)
     python3 infra/fleet/healthz.py metrics --decision <file>  # print the Prometheus text
+
+---knowledge---
+module_id: infra.fleet.healthz
+system: infra
+app: fleet
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [declared_enabled_markers, reset_declared_cache, load_decision, decision_status, render_metrics, serve, cmd_status, cmd_metrics, (+4 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

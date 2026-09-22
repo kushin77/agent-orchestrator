@@ -24,6 +24,22 @@ PROVENANCE (GR-10): the *pattern* (merge, never replace) is ported from
 `kushin77/shared-services`, `scripts/deploy-ssh-tunnel-access.sh`. That repo is
 private, carries no license and is owned by the same owner, so no code was
 copied; see `docs/CANNIBALIZATION.md` section 15.
+
+---knowledge---
+module_id: infra.cloudflare.ingress
+system: infra
+app: cloudflare
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [ssh_service, tunnel_cname, tunnel_config_ingress, merge_ssh_rule]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

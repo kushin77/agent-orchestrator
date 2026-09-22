@@ -16,6 +16,21 @@
 # Both blocks are safe to leave in the tree permanently; importing an already-
 # imported resource is a no-op.
 
+# ---knowledge---
+# module_id: infra.terraform.import
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: []
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 import {
   to = google_artifact_registry_repository.ao_images
   id = "projects/purebliss-ghl/locations/us-central1/repositories/ao-images"
