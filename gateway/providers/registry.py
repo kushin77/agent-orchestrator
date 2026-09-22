@@ -273,8 +273,10 @@ class ProviderRegistry:
         configs = configs or default_provider_configs()
         self._configs: dict[str, ProviderConfig] = dict(configs)
         # ``enable_hermes`` is the real gate on the hermes provider (issue
-        # #1518): when the flag is off (the default), hermes is retired — it is
-        # dropped from the active config set and cannot be routed to. The flag
+        # #1518): when the flag is off, hermes is dropped from the active
+        # config set and cannot be routed to (the module itself is active and
+        # under development, not retired — this flag is an enablement
+        # kill-switch, unrelated to module status). The flag
         # is read from the declared registry (infra/feature-flags/registry.yaml)
         # unless a caller overrides it explicitly (tests).
         self._hermes_enabled = (
