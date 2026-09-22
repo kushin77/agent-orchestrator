@@ -348,9 +348,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _env_store() -> str | None:
-    import os
+    from identity.onboarding.config import env_store_path
 
-    return os.environ.get("AO_ONBOARDING_STORE")
+    return env_store_path()
 
 
 if __name__ == "__main__":
