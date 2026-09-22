@@ -43,14 +43,15 @@ baseline:
 rules:
 
   # -- posture ---------------------------------------------------------------
-  # Infrastructure is DECLARED, never clicked, and new infrastructure ships
-  # flag-gated OFF (GR-5). The floor is `pro`: security, secrets, auth and IaC
-  # work never start below the measured-audit tier.
+  # Infrastructure is DECLARED, never clicked (GR-5); the flag it ships behind
+  # defaults ON since the policy-gr5-enabled-by-default reversal (#1789). The
+  # floor is `pro`: security, secrets, auth and IaC work never start below the
+  # measured-audit tier.
   - id: posture-iac
     description: >-
       IaC-postured work owes the declared-infrastructure gates and the
-      flag-gated-OFF posture, at the elevated FinOps floor the doctrine sets for
-      infrastructure.
+      declared-never-clicked posture, at the elevated FinOps floor the doctrine
+      sets for infrastructure.
     when:
       dimension: posture
       includes: [iac]
@@ -58,7 +59,7 @@ rules:
       - {gate: make:terraform, channel: ci}
       - {gate: make:tf-validate, channel: ci}
       - {gate: make:tf-fmt, channel: ci}
-    require_declaration: flag-gated-off
+    require_declaration: declared-never-clicked
     finops_floor: pro
 
   - id: posture-saas
@@ -143,8 +144,9 @@ rules:
 
   - id: lifecycle-release
     description: >-
-      Release work owes the CD half: feature flags must ship OFF, the Cloud Build
-      declarations must be valid, and the promotion owes a master attestation.
+      Release work owes the CD half: infrastructure must ship declared, never
+      clicked, the Cloud Build declarations must be valid, and the promotion
+      owes a master attestation.
     when:
       dimension: lifecycle
       includes: [release]

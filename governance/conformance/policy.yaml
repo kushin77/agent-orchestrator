@@ -22,15 +22,16 @@ ladder:
   - faang
   - elite
 
-# Applies across every rung: infrastructure is declared, never clicked, and new
-# infrastructure ships flag-gated OFF.
+# Applies across every rung: infrastructure is declared, never clicked (GR-5);
+# the flag it ships behind defaults ON since the policy-gr5-enabled-by-default
+# reversal (#1789).
 mandates:
   iac:
     id: iac
     description: >-
       Infrastructure is declared in Terraform or Cloud Build; new infrastructure
-      ships disabled. A change that adds infrastructure without a flag or a
-      declared-off posture does not conform at any class.
+      ships behind a flag. A change that adds infrastructure without a flag or a
+      declared posture does not conform at any class.
     infra_paths:
       - infra/
       - .github/workflows/
