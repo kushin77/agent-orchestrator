@@ -13,6 +13,22 @@ portal/server uses (config_flags.py, chat.py).
 
 # ponytail: single flat file, append-only, no rotation — add a size-based
 # rotation if this ever runs unattended for weeks.
+
+---knowledge---
+module_id: portal.server.error_log
+system: portal
+app: server
+solution_class: pattern
+patterns: [append-only, env-seam, fail-closed]
+derives_from: null
+owner_sme: platform-sme
+tier: L1
+interfaces: [default_log_path, ErrorLog]
+invariants: "the sink is append-only and never raises into the request path — an unwritable log degrades quietly rather than turning a served request into a 500"
+gotchas: "the path defaults outside the repo (`.portal/error_log.jsonl`) and is overridable via AO_PORTAL_ERROR_LOG; there is no rotation, so a size-based one is owed if this ever runs unattended for weeks"
+related: ["#2000"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
