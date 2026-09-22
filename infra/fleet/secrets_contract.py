@@ -31,6 +31,22 @@ Terraform-declared flag for a *deployed* scheduler surface is D4+'s work — see
 
 Tri-state exit contract (this repository's convention): 0 OK / 1 NOT-OK /
 2 CANNOT-ASSESS.
+
+---knowledge---
+module_id: infra.fleet.secrets_contract
+system: infra
+app: fleet
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [SecretMount, Finding, validate, scan_for_secret_values, cmd_check, build_parser, main]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

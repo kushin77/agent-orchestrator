@@ -24,6 +24,22 @@ The hostnames it serves are reserved placeholders, not anybody's estate.
 Usage:
     python3 infra/cloudflare/stub_cf_api.py --port 0 \
         --port-file /tmp/stub.port --log /tmp/stub.requests
+
+---knowledge---
+module_id: infra.cloudflare.stub_cf_api
+system: infra
+app: cloudflare
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [Handler, main]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

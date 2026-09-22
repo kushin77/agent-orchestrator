@@ -13,6 +13,22 @@ Usage::
 
     python3 infra/rollout/checks/check_registry_projection.py            # exit 0/1/2
     python3 infra/rollout/checks/check_registry_projection.py --self-test # negative probe
+
+---knowledge---
+module_id: infra.rollout.checks.check_registry_projection
+system: infra
+app: rollout
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [check_projection, check_all, main]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -29,6 +29,22 @@ Usage:
 ``--self-test`` probes every check on a known-bad input and requires it to
 fail; a probe that passes when it should fail exits nonzero, proving the gate
 is not a formality.
+
+---knowledge---
+module_id: infra.rollout.checks.check_rollout
+system: infra
+app: rollout
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [check_stage_model, check_rollout_state, check_live_state, check_state_reachability, check_go_live_plan, check_registry_parity, check_triggers, check_all, (+1 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

@@ -45,6 +45,22 @@ Usage::
     python3 infra/env/surface.py check --root .
     python3 infra/env/surface.py check --root . --registry <path> --json
     python3 infra/env/surface.py describe --root .
+
+---knowledge---
+module_id: infra.env.surface
+system: infra
+app: env
+solution_class: class
+patterns: [pre-standard-snapshot]
+derives_from: null
+owner_sme: iac-sme
+tier: L1
+interfaces: [RegistryUnavailable, Variable, Exemption, IndirectRead, Registry, load_registry, schema_findings, Measurement, (+13 more)]
+invariants: ""
+gotchas: ""
+related: ["#1911"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations

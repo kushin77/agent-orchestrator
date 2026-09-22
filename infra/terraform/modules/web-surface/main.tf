@@ -23,6 +23,21 @@
 # flips the flag and the flag-gated apply pipeline (infra/cloudbuild/apply.yaml)
 # deploys it as the deployer service account.
 
+# ---knowledge---
+# module_id: infra.terraform.modules.web-surface.main
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [google_project_service, google_service_account, google_secret_manager_secret_iam_member, google_cloud_run_v2_service, google_cloud_run_v2_service_iam_member, google_dns_managed_zone, google_dns_record_set, google_cloud_run_domain_mapping]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 locals {
   create = var.enabled ? 1 : 0
 

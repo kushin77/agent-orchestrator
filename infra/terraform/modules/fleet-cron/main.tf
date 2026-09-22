@@ -40,6 +40,21 @@
 # `enable_fleet_cron = false` shows zero resources, matching
 # control-plane-service's `local.create` convention.
 
+# ---knowledge---
+# module_id: infra.terraform.modules.fleet-cron.main
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [null_resource]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 locals {
   nodes = var.enabled ? var.nodes : {}
 }

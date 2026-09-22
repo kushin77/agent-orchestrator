@@ -5,6 +5,21 @@
 # no console path. `enabled` defaults to false; the account is created only by
 # a reviewed go-live that also grants it exactly the roles it needs.
 
+# ---knowledge---
+# module_id: infra.terraform.modules.deployer-sa.variables
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [enabled, account_id, display_name, project_id, roles]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 variable "enabled" {
   description = "Master flag-gate. When false (default), no service account is created."
   type        = bool

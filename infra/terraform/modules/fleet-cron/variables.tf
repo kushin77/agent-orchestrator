@@ -4,6 +4,21 @@
 # Everything here is gated by `enabled`, which defaults to false (IaC
 # mandate / GR-5). With the flag closed this module creates nothing.
 
+# ---knowledge---
+# module_id: infra.terraform.modules.fleet-cron.variables
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [enabled, image, container_name, port, nodes, ssh_private_key_path, keydb_host, keydb_port, (+6 more)]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 variable "enabled" {
   description = "Master flag-gate for the fleet-cron pair. When false (default), nothing is created."
   type        = bool

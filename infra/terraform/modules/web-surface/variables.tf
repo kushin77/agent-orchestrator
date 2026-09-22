@@ -14,6 +14,21 @@
 # surface must NOT silently re-create a competing GCP record. Declaring the GCP
 # route again is a deliberate, separate act.
 
+# ---knowledge---
+# module_id: infra.terraform.modules.web-surface.variables
+# system: infra
+# app: terraform
+# solution_class: class
+# patterns: [pre-standard-snapshot]
+# derives_from: null
+# owner_sme: iac-sme
+# tier: L1
+# interfaces: [enabled, name, project_id, region, image, domain, zone_name, dns_name, (+6 more)]
+# invariants: ""
+# gotchas: ""
+# related: ["#1911"]
+# do_not_duplicate: null
+# ---knowledge---
 variable "enabled" {
   description = "Master flag-gate for the web surface. When false (default), nothing is created."
   type        = bool
