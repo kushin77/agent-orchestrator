@@ -32,23 +32,28 @@ kpi:
     - AGENTS.md
     - CLAUDE.md
     - .cursorrules
-  baselineBytes: 32883
+  baselineBytes: 33244
   measuredOn: "2026-09-21"
   measuredBy: "wc -c AGENTS.md CLAUDE.md .cursorrules"
-  ceilingBytes: 32883
+  ceilingBytes: 33244
   ceilingReason: >-
-    Raised from 30604 to 32883 (2026-09-21): AGENTS.md grew by 2072 bytes
-    (26504 -> 28576) across four independently-landed doctrine changes, none of
-    them prompt bloat to trim — #1698 (adopt the single-developer landing
-    method, +360), #1699 (generate the PR body from the issue, +148), #1731
-    (run-lane chaining PMO->paperclip->route->claim in one command, +765), and
-    #1789 (GR-5: new capabilities ship enabled by default, +799). CLAUDE.md
-    (2335) and .cursorrules (1972) are unchanged. Those bytes are other lanes'
-    merged work, so shrinking AGENTS.md to fit the old ceiling would revert four
-    merged changes; the ceiling is raised to the measured total rather than
-    silently, per this gate's own documented remedy. The ceiling is set equal to
-    the measurement (no headroom) so any further growth fails this gate and must
-    come with its own attributable reason.
+    Raised from 32883 to 33244 (2026-09-21): CLAUDE.md grew by 361 bytes
+    (2335 -> 2696) in exactly one commit, 6dfa54b7 ("docs: point Claude Code at
+    front_load(), the 4th MCP tool, now that the pin carries it", #1532/#1881)
+    — a legitimate doc pointer another lane landed, not prompt bloat to trim.
+    AGENTS.md (28576) and .cursorrules (1972) are unchanged. Shrinking CLAUDE.md
+    to fit the old ceiling would revert that merged change, so the ceiling is
+    raised to the measured total rather than silently, per this gate's own
+    documented remedy.
+  zeroHeadroomNote: >-
+    Zero headroom is deliberate and accepted (#1885). #1876 set the ceiling
+    equal to the measurement because "a ceiling above the measurement is how
+    this signal stops binding"; that choice is kept here by setting the ceiling
+    to the measured total exactly, so the ratchet still binds. The accepted
+    consequence: any growth in the three measured files reds the gate of record
+    until a new raise carries its own attributable reason. That churn is a
+    stated decision, not a surprise — no padding, no headroomBytes field, and no
+    change to scripts/check-finops-kpi.sh.
   target90PctNote: >-
     The owner's 90%+ prompt-reduction objective is tracked in
     docs/cfo/PROMPT-REDUCTION-PLAN.md against total inbound bytes, most of
