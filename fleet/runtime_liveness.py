@@ -1,5 +1,21 @@
 """fleet/runtime_liveness.py — the pure runtime-liveness judge (issue #1271).
 
+---knowledge---
+module_id: fleet.runtime_liveness
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [no_beats_yet, Finding, judge, ok, gather_and_judge, beat_module_beats, cmd_run, cmd_self_test, (+2 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Every runtime beats through `integrations/paperclip/adapters/heartbeat`
 (`{runtime, commit, state, ts}`), registered in `fleet/runtimes.yaml`. This
 module is the JUDGE over those beats — a pure function of the inputs it is

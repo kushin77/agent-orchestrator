@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Publish the fleet's own health signals to the monitoring plane (issue #498).
 
+---knowledge---
+module_id: fleet.health_publish
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [surface_flag, endpoint_from_env, RungFacts, Observation, observe, rung_state_signals, beat_age_signals, reconcile_signals, (+9 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The fleet computes verdicts about itself and they die inside the process: which
 rung is up, how old its beat is, what a reconciliation sweep did with an orphaned
 lane, what the watchdog found missing. None of it leaves the host. This module is

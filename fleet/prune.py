@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """fleet/prune.py — bounded retention for the fleet's own runtime state.
 
+---knowledge---
+module_id: fleet.prune
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [live_run_ids, live_claims, keep_reason, Removal, Rotation, Plan, build_plan, render, (+5 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY this exists (issue #280)
     ``.fleet/`` is the session fleet's mailbox and audit surface, and every part
     of it was append-only: thousands of ``outbox`` entries, dozens of ``sent``

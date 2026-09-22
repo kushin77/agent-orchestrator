@@ -1,5 +1,21 @@
 """merge.py — the PR runner's merge transport (issue #1343).
 
+---knowledge---
+module_id: fleet.runner.merge
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [MergeOutcome, seam_available, named_refusal, run_merge, real_classify_tip]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 TWO SEAMS, IN ORDER, AND NOTHING ELSE
   1. `bash scripts/pr-queue.sh --check-merged-tree <pr> --head <sha>
      --against-base origin/master` — the merged-tree evidence seam (#1332,

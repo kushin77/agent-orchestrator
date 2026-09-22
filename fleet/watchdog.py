@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Fleet watchdog — the cron-owned keeper of the brain/sister loops.
 
+---knowledge---
+module_id: fleet.watchdog
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [RespawnRefused, WatchdogConfigError, respawn_attempt_cap, respawn_backoff_seconds, drift_state_dir, drift_record_path, escalation_dir, load_drift_record, (+41 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Run by cron (installed with ``python3 fleet/cron.py install``) or by hand
 (``python3 fleet/watchdog.py run`` / ``--force``). It respawns a missing, stale or
 drifted loop rung, ensures the monitor rung (``fleet/monitor.py``) is running,

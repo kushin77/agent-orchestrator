@@ -1,5 +1,21 @@
 """plan.py — the PR runner's planner: a pure function of its inputs (issue #1343).
 
+---knowledge---
+module_id: fleet.runner.plan
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [plan, explain]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
     plan(open_prs, evidence, live_builds, holds, prune, master_tip, capacity)
         -> ordered list[Action]
 

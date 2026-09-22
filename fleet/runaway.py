@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Bounded runaway guard for directive dispatch (issue #723).
 
+---knowledge---
+module_id: fleet.runaway
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [RunawayConfigError, attempt_cap, backoff_base, cap_or_default, backoff_delay, attempts_dir, dead_letter_dir, inbox_dir, (+19 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY THIS EXISTS (measured)
 --------------------------
 An order the fleet cannot execute used to be re-read every cycle for ever.

@@ -1,5 +1,21 @@
 """model.py — the record types the PR runner plans over (issue #1343).
 
+---knowledge---
+module_id: fleet.runner.model
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [OpenPR, Evidence, LiveBuild, PruneResult, Action]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Everything here is a plain frozen dataclass or a string constant: no I/O, no
 subprocess. The planner (`plan.py`) is a pure function of these values, and the
 transports (`verify.py`, `merge.py`) produce and consume them.

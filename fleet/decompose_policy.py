@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The micro-decomposition POLICY — sizing, anti-explosion guards, wave cap.
 
+---knowledge---
+module_id: fleet.decompose_policy
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [lanes, verify_lines, criteria, files, sizing_problem, duplicate_problem, file_collision_problems, wave_problems, (+2 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Epic #707 lane F4 / issue #719.
 
 `fleet/brain.py` could already *file* a decomposition, but it validated the

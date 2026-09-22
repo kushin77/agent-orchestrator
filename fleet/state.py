@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Unified fleet-state projection across lanes, sessions, claims and journals (#323).
 
+---knowledge---
+module_id: fleet.state
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [Finding, Directive, Claim, Item, Projection, load_json, read_lanes, read_sessions, (+7 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 The fleet keeps one work item's state in five different stores, each added by a
 different lane: lane identities in ``.fleet/lanes/``, session heartbeats in
 ``.fleet/sessions/``, closure journals in ``.fleet/lifecycle/``, claims in

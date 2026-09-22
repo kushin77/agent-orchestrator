@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """Fleet health signal — cmr-style healthy/degraded/failing (issue #163).
 
+---knowledge---
+module_id: fleet.health
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [process_running, loop_running, brain_running, read_beat, rungs, stalest_claim_minutes, rung_health, evaluate, (+20 more)]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 Harvested pattern (docs/CANNIBALIZATION.md #163): `leaderboard/docker/worker-fleet/personas.yaml`
 ships a `fleet-health` persona ("periodic health reports") as prior art for a
 health check separate from the dispatch loop itself. This module is that

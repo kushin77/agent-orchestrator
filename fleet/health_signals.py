@@ -1,6 +1,22 @@
 #!/usr/bin/env python3
 """The declared machine shape of the fleet-health signal family (issue #498).
 
+---knowledge---
+module_id: fleet.health_signals
+system: fleet
+app: fleet
+solution_class: pattern
+patterns: []
+derives_from: null
+owner_sme: unassigned
+tier: L1
+interfaces: [ShapeRefused, metric_name, Signal, make]
+invariants: ""
+gotchas: ""
+related: []
+do_not_duplicate: null
+---knowledge---
+
 WHY this module exists: the fleet computes verdicts about **itself** — which rung
 is up, how old its beat is, what a reconciliation sweep did with an orphaned lane,
 what the watchdog found missing — and every one of them dies inside the process
