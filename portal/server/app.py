@@ -322,6 +322,12 @@ class ConsoleApplication:
                 self.repo_root, surface=OPERATOR_TERMINAL_SURFACE
             )
         )
+        # The backend error logger (issue #2000): every uncaught exception
+        # handle() catches below is appended to a JSONL sink and readable back
+        # through GET /api/errors (root_admin only).
+        from portal.server.error_log import ErrorLog, default_log_path
+
+        self.error_log = ErrorLog(default_log_path(self.repo_root))
 
     # -- request pipeline ---------------------------------------------------
     def handle(
@@ -395,13 +401,20 @@ class ConsoleApplication:
                 },
             )
         except Exception as exc:  # noqa: BLE001 - fail closed with a 500
+            request_id = _request_id()
+            try:
+                self.error_log.record(
+                    method=method, path=path, exc=exc, request_id=request_id
+                )
+            except Exception:  # noqa: BLE001 - logging must never mask the 500
+                pass
             return Response(
                 status=500,
                 is_json=True,
                 payload={
                     "ok": False,
                     "status": 500,
-                    "requestId": _request_id(),
+                    "requestId": request_id,
                     "data": None,
                     "error": {"code": "internal", "message": str(exc)},
                 },
@@ -738,6 +751,8 @@ class ConsoleApplication:
                 return self._logout(cookies, now_iso)
             if parts[:2] == ["console", "me"] and method == "GET":
                 return self._me(principal)
+            if parts == ["errors"] and method == "GET":
+                return self._errors(principal, query)
             if parts == ["tenants"] and method == "GET":
                 return self._list_tenants(principal)
             if parts and parts[0] == "tenants":
@@ -1944,6 +1959,22 @@ class ConsoleApplication:
             if row["tenantId"] in scoped
         ]
         return self._ok({"tenants": rows})
+
+    def _errors(self, principal: Principal, query: dict[str, str]) -> Response:
+        """The error-log tail (issue #2000) — root_admin only, fail closed."""
+        if not principal.super_admin:
+            raise ApiError(
+                403, "permission_denied",
+                "the server error log is root_admin only",
+            )
+        limit = 100
+        raw_limit = query.get("limit")
+        if raw_limit:
+            try:
+                limit = max(1, min(1000, int(raw_limit)))
+            except ValueError:
+                pass
+        return self._ok({"errors": self.error_log.tail(limit=limit)})
 
     def _ok(self, data: Any) -> Response:
         return Response(
