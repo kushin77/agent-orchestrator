@@ -73,3 +73,30 @@ governance/landing/README.md is unaffected by #1789 and still correct.
 Security-header restatement, commit-message double-enforcement, and
 debt-ledger triplication are #1890/#1891/#1892 — out of scope here by
 instruction.
+
+## Resolution (closed 2026-09-22)
+
+All 12 children of epic #1919 are closed. #1920/#1921/#1922/#1924/#1925
+(P0, above) and #1993 (a second-wave P0 finding: the #1789 reversal had not
+propagated to the machine authorities — tagging, conformance, rollout) are
+doctrine findings from this audit. #1992 (~40 further prose surfaces, second
+audit wave) and #1927/#1926 (P1, above) round out the doctrine/stale set.
+#1928 (P2, above) is the rule-numbering redundancy. #2001 and #2015 are
+reconcile-engine bugs surfaced by lanes working this epic's children, not
+findings of this audit itself — listed here as closed under #1919, not
+retrofitted into the tables above.
+
+| Issue | Resolution |
+|---|---|
+| #1920 | closed via #1930 |
+| #1921 | closed via #1930 |
+| #1922 | closed via #1930 |
+| #1924 | closed via #1930 |
+| #1925 | closed via #1930 |
+| #1926 | closed 2026-09-22 |
+| #1927 | closed 2026-09-22 |
+| #1928 | closed via #2019 |
+| #1992 | closed 2026-09-22 |
+| #1993 | closed via #1996 |
+| #2001 | closed via #2016 |
+| #2015 | closed via #2040 |
