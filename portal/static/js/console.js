@@ -11,7 +11,7 @@
  * interfaces: [portal/static/views/shell.html]
  * invariants: "each nav target loads an isolated view frame that links its own tokens.css + console.css"
  * gotchas: "an unauthenticated /api/console/me redirects the shell to /auth/login"
- * related: ["#39"]
+ * related: ["#39", "#1561"]
  * do_not_duplicate: null
  * ---knowledge---
  * The shell is the super-admin/tenant frame host: rail navigation, tenant
@@ -87,7 +87,29 @@
   ];
 
   function isGlobalView(view) {
-    return NAV_GLOBAL.some(function (item) { return item.id === view; });
+    return allGlobalViews().some(function (item) { return item.id === view; });
+  }
+
+  /* Gated *org-wide* views (issue #1561). These are global in the same sense
+   * NAV_GLOBAL is — the provider is not scoped to one tenant, so the frame
+   * takes no ?tenant= and its crumb is its own label — but they are a second
+   * list rather than rows of NAV_GLOBAL for one deliberate reason: NAV_GLOBAL
+   * entries are the console's own control-plane views and are always present,
+   * while a provider surface is offered only while its backend is actually
+   * reachable. An unpromoted provider surface is ABSENT from the shell, not a
+   * dead link in it — the same rule offerErpModule and offerGatedViews keep.
+   * The Nous provider surface (issue #1561) is the first member: its probe is
+   * /api/nous/overview, which answers 404 feature_disabled while
+   * portal/config/feature-flags.yaml surfaces.nous is off. */
+  var GATED_GLOBAL_VIEWS = [
+    { id: "nous", label: "Nous", icon: "◐", probe: "/api/nous/overview" }
+  ];
+
+  /* Every view the shell treats as org-wide: the always-present ones plus the
+   * gated ones. Both take no ?tenant= and both name their own crumb, so each
+   * lookup below reads this one list rather than NAV_GLOBAL alone. */
+  function allGlobalViews() {
+    return NAV_GLOBAL.concat(GATED_GLOBAL_VIEWS);
   }
 
   /* A view whose frame is not under /views/ names its own target. The ERP module
@@ -141,6 +163,21 @@
         continue;
       }
       nav.appendChild(navButton({ id: spec.id, label: spec.label, icon: spec.icon }));
+    }
+    /* The gated *org-wide* views (issue #1561). They join the "Control plane"
+     * group and, like NAV_GLOBAL, are offered to super-admins only — an
+     * org-level provider surface (cost, credits, account) is not tenant-scoped
+     * and is not a tenant view. Same probe-and-hide rule as above. */
+    if (!state.me.superAdmin) return;
+    for (var j = 0; j < GATED_GLOBAL_VIEWS.length; j++) {
+      var gspec = GATED_GLOBAL_VIEWS[j];
+      try {
+        var gpayload = await CP.get(gspec.probe);
+        if (!gpayload || !gpayload.data) continue;
+      } catch (err) {
+        continue;
+      }
+      nav.appendChild(navButton({ id: gspec.id, label: gspec.label, icon: gspec.icon }));
     }
   }
 
@@ -210,7 +247,7 @@
 
   function showCrumb(view) {
     var crumb = document.getElementById("crumb");
-    var global = NAV_GLOBAL.filter(function (item) { return item.id === view; })[0];
+    var global = allGlobalViews().filter(function (item) { return item.id === view; })[0];
     var label = global ? global.label
       : (VIEW_TARGETS[view] ? view : state.tenant + " / " + view);
     crumb.textContent = label;
