@@ -418,6 +418,9 @@ The gate must be green before any PR or merge; its output is the evidence.
   phase/wave sequencing.
 - `docs/GOVERNANCE.md` — branch, provenance, session-label, review conventions.
 - `docs/INFRA-LIMITS.md` — the sandbox + ephemeral-storage contract (issue #729): the shared `/tmp` limit, the read-back-non-empty write rule, and `scripts/check-infra-limits.sh`.
+- `docs/MODULE-SCAFFOLD.md` — the README + entry module + `tests/` shape for a
+  new internal module (governance/gateway/integrations), and when a
+  `module.json` manifest is (and isn't) required.
 - `CONTRIBUTING.md` — human contributor workflow.
 - `RELEASING.md` — SemVer release process.
 - GitHub issues board — the canonical roadmap; EPIC-00 = issue #4.
