@@ -294,7 +294,11 @@ header_values_cmd() {
         continue
       }
       tmpf="${TMPD}/$(echo "$reponame-$relpath" | tr '/' '_')"
-      if ! git -C "${siblings}/${reponame}" show "${branch}:${relpath}" >"$tmpf" 2>/dev/null; then
+      # Prefer origin/<branch> (what was actually fetched) over the bare local
+      # branch name, which can be stale or checked out by an unrelated
+      # worktree and never fast-forwarded (#1890 review).
+      if ! git -C "${siblings}/${reponame}" show "origin/${branch}:${relpath}" >"$tmpf" 2>/dev/null &&
+         ! git -C "${siblings}/${reponame}" show "${branch}:${relpath}" >"$tmpf" 2>/dev/null; then
         printf '  SKIP     %s — not present on %s@%s\n' "$line" "$reponame" "$branch" >&2
         continue
       fi
