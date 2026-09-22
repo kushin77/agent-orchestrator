@@ -97,3 +97,17 @@ calls, and doesn't itself confirm dead status. Filed as #1909
 
 No safe-to-remove findings were confirmed in this pass; both filed issues
 are needs-a-decision by design — nothing here is a same-PR delete.
+
+## Outcome (epic #1906 closeout)
+
+Both needs-a-decision issues resolved with no deletions:
+
+- #1907 — closed: Hermes module status corrected to active (not retired);
+  the manifest field was stale, the buildout was correctly live.
+- #1909 — closed: all 7 dead-code candidates re-verified as LIVE. The
+  original scan's caller grep excluded each function's own defining file,
+  which guaranteed a false "zero callers" for every in-module private
+  caller — a measurement defect, not dead code. Each has a live in-module
+  caller, a public export, or direct test coverage.
+
+Retiring overlap turned out to mean confirming there was none.
