@@ -24,13 +24,16 @@
 # reversal, owner decision 2026-09-21). erp_module stays OFF — it has its own
 # dedicated promotion gate (scripts/check-erp-portal.sh,
 # e2e/erp/golden_path.py) that requires the shipped default stay off.
-# fleet_board, sessions and settings default OFF — they have no registry.yaml
-# `surfaces:` counterpart to promote against, so they are governed here
-# alone. `scripts/check-feature-flags.py` cross-validates every surface
-# declared in both files against drift (issue #1941). nous (issue #1561)
-# also defaults OFF and is governed here alone: its live probe reaches a
-# billed external provider, so the surface is promoted only after the
-# operator step #1748 (the secret) is done.
+# fleet_board, sessions and settings default ON — they have no registry.yaml
+# `surfaces:` counterpart to promote against (governed here alone) and no
+# documented reason to withhold; flipped per GR-5's fleet-wide default-on
+# reversal (owner directive 2026-09-22). `scripts/check-feature-flags.py`
+# cross-validates every surface declared in both files against drift (issue
+# #1941). nous (issue #1561) stays OFF and is governed here alone: its live
+# probe reaches a billed external provider, and the operator has not yet
+# created the Secret Manager value #1748 declares the boundary for (#1748
+# itself only lands the IaC declaration, not the credential) — promoted only
+# once that operator step is done.
 schema_version: 1
 
 default_policy: off
@@ -99,7 +102,7 @@ surfaces:
       ERP-06 surface is transport-free, so the module renders with no socket, no
       network and no deployment.
   fleet_board:
-    default: off
+    default: on
     phase: 11
     description: >
       Fleet board (issue #880, EPIC #878 lane L1): the live issue roster the
@@ -111,7 +114,7 @@ surfaces:
       produced is refused by name (issue number + defect) rather than served,
       never a fabricated or best-effort row.
   sessions:
-    default: off
+    default: on
     phase: 11
     description: >
       Cross-engine Sessions view (issue #1563): joins .fleet/claims/*,
@@ -120,7 +123,7 @@ surfaces:
       at GET /api/sessions/rows. A root that does not exist on this checkout
       is named in the response's missing[] list rather than silently dropped.
   settings:
-    default: off
+    default: on
     phase: 11
     description: >
       Settings view (issue #1757): renders portal.server.settings.

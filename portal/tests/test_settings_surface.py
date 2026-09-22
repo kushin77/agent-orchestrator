@@ -30,24 +30,24 @@ def _authed(app):
     return login_as(app, "root@platform.example.com", TENANT)
 
 
-def test_config_declares_the_view_off():
+def test_config_declares_the_view_on():
     document = yaml.safe_load(
         (REPO_ROOT / "portal" / "config" / "feature-flags.yaml").read_text(
             encoding="utf-8"
         )
     )
     entry = document["surfaces"][SETTINGS_SURFACE]
-    assert entry["default"] in (False, "off"), "settings must ship OFF (GR-5)"
-    assert surface_enabled(REPO_ROOT, surface=SETTINGS_SURFACE) is False
+    assert entry["default"] in (True, "on"), "settings must ship ON (GR-5 reversal)"
+    assert surface_enabled(REPO_ROOT, surface=SETTINGS_SURFACE) is True
 
 
-def test_surface_is_refused_while_the_flag_is_off():
+def test_the_default_app_requires_authn_not_hidden_by_flag():
     app = build_app(sso=console_sso())
-    api = _authed(app)
-    status, payload = api.get("/api/settings/rows")
-    assert status == 404
-    assert payload["error"]["code"] == "feature_disabled"
-    assert "portal/config/feature-flags.yaml" in payload["error"]["message"]
+    anonymous = _authed(app)
+    anonymous.cookies.clear()
+    status, payload = anonymous.get("/api/settings/rows")
+    assert status == 401
+    assert payload["error"]["code"] == "unauthorized"
 
 
 def test_rows_are_grouped_by_domain_and_cover_every_domain(tmp_path):
