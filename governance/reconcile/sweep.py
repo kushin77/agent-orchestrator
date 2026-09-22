@@ -713,9 +713,20 @@ class RepoOps:
         return result.returncode == 0
 
     def preserved_remotely(self, worktree: str, branch: str) -> bool:
+        """Ask the remote directly — never trust this checkout's own cached refs.
+
+        ``git branch -r --contains`` only sees remote-tracking refs THIS clone has
+        already fetched. The reconcile daemon's checkout is long-running and never
+        fetches before a sweep, so a branch another lane pushed moments ago is
+        invisible to that command even though ``origin/<branch>`` genuinely holds
+        the work — the bug that let `_teardown` delete a pushed, unmerged branch
+        it had simply failed to see (#1887). ``git ls-remote`` needs no fetch.
+        """
+        if not branch:
+            return False
         head = self._head(worktree)
-        contains = self._git("branch", "-r", "--contains", head)
-        return bool(contains.strip())
+        remote_sha = self._git("ls-remote", "origin", branch)
+        return bool(remote_sha) and remote_sha.split()[0] == head
 
     def remove_worktree(self, path: str) -> str:
         return self._git("worktree", "remove", "--force", path)
