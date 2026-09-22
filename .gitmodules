@@ -10,3 +10,16 @@
 [submodule "vendor/CMR"]
 	path = vendor/CMR
 	url = https://github.com/kushin77/CMR.git
+# Vendored module: kushin77/AgenticAutomationFramework (AAF) — this is our
+# Playwright E2E module going forward, replacing ad-hoc `pip install
+# playwright` in lanes (its `e2e/` carries package.json + playwright.config.ts
+# + tests/). Pinned to 6478907 (main tip, 2026-09-22; `git describe --tags`
+# reports "v0.1.0-9-g6478907" — 9 commits past the v0.1.0 tag).
+# Deliberately has NO `branch =` key. With one, `git submodule update --remote`
+# silently walks this submodule to that branch's tip and destroys the pin (fleet
+# doctrine — see kushin77/capital-underwriting .gitmodules). To move the pin:
+# check out the new commit in the submodule, commit the gitlink, and record the
+# new `git describe --tags` output here in the same commit.
+[submodule "vendor/AgenticAutomationFramework"]
+	path = vendor/AgenticAutomationFramework
+	url = https://github.com/kushin77/AgenticAutomationFramework.git
