@@ -123,8 +123,9 @@ cannot=0
 # --- 1. the tests -----------------------------------------------------------
 if command -v pytest >/dev/null 2>&1; then
   if ! python3 -m pytest -q governance/dispatch/tests/test_queue.py \
-    governance/dispatch/tests/test_queue_freshness.py; then
-    echo "check-dispatch-queue: FAIL — the governance/dispatch queue/freshness suites are red" >&2
+    governance/dispatch/tests/test_queue_freshness.py \
+    governance/dispatch/tests/test_snapshot.py; then
+    echo "check-dispatch-queue: FAIL — the governance/dispatch queue/freshness/snapshot suites are red" >&2
     fail=1
   fi
 else
