@@ -47,13 +47,13 @@
       "id": "prompt-caching",
       "default": "off",
       "flags": ["anthropic.prompt_caching"],
-      "desc": "Marks the system prompt and trailing message content block cache_control:ephemeral so a stable prefix is eligible for Anthropic's prompt cache. Claude-specific improvement over the deepseek module; flag-gated OFF by default (GR-28) - enable per provider config via provider_options.prompt_caching."
+      "desc": "Marks the system prompt and trailing message content block cache_control:ephemeral so a stable prefix is eligible for Anthropic's prompt cache. Claude-specific improvement over the deepseek module; opt-in per provider config via provider_options.prompt_caching (AO-GR-6 dropped the blanket OFF default - the feature is enabled by naming its key)."
     },
     {
       "id": "thinking-effort",
       "default": "off",
       "flags": ["anthropic.thinking_effort"],
-      "desc": "Enables adaptive extended thinking (thinking:{type:adaptive}) at a chosen output_config.effort (low/medium/high/xhigh/max). Claude-specific improvement over the deepseek module; flag-gated OFF by default (GR-28) - enable per provider config via provider_options.thinking_effort."
+      "desc": "Enables adaptive extended thinking (thinking:{type:adaptive}) at a chosen output_config.effort (low/medium/high/xhigh/max). Claude-specific improvement over the deepseek module; opt-in per provider config via provider_options.thinking_effort (AO-GR-6 dropped the blanket OFF default - the feature is enabled by naming its key)."
     }
   ],
   "integrations": [

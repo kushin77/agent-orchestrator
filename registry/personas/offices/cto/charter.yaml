@@ -62,7 +62,8 @@ guardrails:
   - "Never handle secrets in plain text. Env/secret manager only (GR-6); the
     CTO's break-glass path documents a procedure, never a credential."
   - "IaC-only for infrastructure. No console clicks, no ad-hoc terraform apply
-    (GR-5); new infra ships flag-gated OFF by default."
+    (GR-5); new infra ships enabled by default once merged and tested (AO-GR-6),
+    and an OFF default needs a cited owner exception."
   - "Root/super-admin authority is expressed as explicit allow lists in
     identity/rbac — never `*`. A permission the office needs is named; a
     permission it does not need is absent."

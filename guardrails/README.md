@@ -50,7 +50,7 @@ policy file rather than passing by construction.
 
 **Tests:** `guardrails/policy/tests/test_head_of_org_guardrails.py` (23 cases
 — named refusals, allowed passes, default-deny, audit-record assertions,
-flag-gated-OFF, and cross-subject scoping).
+fail-closed-by-default, and cross-subject scoping).
 
 **Canary (issue #1519):** the gate above and the suite above both build their
 "control ON" registry **in-process, in a fixture** — so until #1519 the policies

@@ -8,9 +8,10 @@ model decides and records.
 Two invariants are structural, not advisory:
 
 * **Default OFF, unless proven.**  A :class:`PolicyControl` refuses to be
-  constructed with ``default_enabled=True`` (AO-GR-6, flag-gated-OFF
-  doctrine) *unless* ``proven_by`` names the closed canary/promotion issue
-  that earns the exception (issue #1953, owner decision 2026-09-21: a
+  constructed with ``default_enabled=True`` (the 2026-09-21 reversal in AO-GR-6
+  moved the default to enabled, so an *unproven* ON is the thing refused)
+  *unless* ``proven_by`` names the closed canary/promotion issue that earns the
+  exception (issue #1953, owner decision 2026-09-21: a
   control paired with an enabled-by-default capability that has a proven
   canary is expected ON, not OFF). An unproven ON is still refused, so the
   gate's self-mutating negative control still bites any fixture that lacks

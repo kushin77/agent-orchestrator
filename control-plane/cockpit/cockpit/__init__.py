@@ -12,8 +12,10 @@ never an owner of fleet state (ADR-0026 D5/D6):
 * it watches through the two authenticated SSE streams
   (``surfaces.fleet_projection``, ``surfaces.telemetry_live_feed``) with
   ``--follow``, holding no credential of its own (ADR-0025 D2, ADR-0026 D5.3);
-* it ships flag-gated OFF: while ``surfaces.cockpit`` is off it refuses to
-  start with the named ``FLAG_OFF`` condition.
+* it is fail-closed: while ``surfaces.cockpit`` is off it refuses to
+  start with the named ``FLAG_OFF`` condition. The surface itself ships
+  enabled by default (AO-GR-6, `policy-gr5-enabled-by-default`), so an OFF
+  state is a cited exception, never the default.
 
 The stack is the one ADR-0026 D5.1 fixes: Python stdlib only (plus the repo's
 accepted PyYAML), ANSI alternate-screen rendering — no TUI framework. The
@@ -31,7 +33,7 @@ derives_from: null
 owner_sme: frontend-sme
 tier: L0
 interfaces: [cockpit.__version__]
-invariants: "the cockpit is a CLIENT of the served API and never an owner of fleet state; it renders only what the RC-10 registry declares and ships flag-gated OFF"
+invariants: "the cockpit is a CLIENT of the served API and never an owner of fleet state; it renders only what the RC-10 registry declares and is fail-closed while its surface flag is off"
 gotchas: "the issue's Python-plus-Textual parenthetical is superseded by ADR-0026 D5.1: the stack is Python stdlib plus the repo's accepted PyYAML"
 related: ["#566", "#551"]
 do_not_duplicate: null

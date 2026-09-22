@@ -448,7 +448,7 @@ variables:
 
   # -- autonomous ops: landing, lifecycle --------------------------------------
   - name: AO_LAND_APPLY
-    purpose: whether the landing driver applies or only reports (flag-gated OFF by default).
+    purpose: whether the landing driver applies or only reports (default report-only — a deliberate fail-closed safeguard on a mutating verb, not a capability default).
     secret: false
     required_by: [ops]
     readers: [governance/landing/cli.py]

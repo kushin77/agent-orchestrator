@@ -13,7 +13,7 @@ Proves the hermes and paperclip policies in
   fail-closed ``uncovered_decision``;
 * every directive hermes issues is audited (the engine's baseline: every
   decision is written to the audit log);
-* the flag-gated-OFF doctrine: with the two controls OFF, every hermes/
+* the default-deny posture: with the two controls OFF, every hermes/
   paperclip action is uncovered and BLOCKed (nothing sails through before a
   reviewed control flip).
 

@@ -90,7 +90,9 @@ class ProviderConfig:
     #: unavailable (cloud -> local). Empty tuple = no fallback.
     fallback: tuple[str, ...] = ()
     #: Generic, adapter-read, platform-config bag for provider-specific
-    #: capabilities that must ship flag-gated OFF by default (GR-28) - e.g.
+    #: capabilities that are opt-in per provider config - the 2026-09-21
+    #: reversal dropped the blanket "ships flag-gated OFF" default (AO-GR-6),
+    #: so the bag is empty unless a provider pins a key. E.g.
     #: the anthropic adapter's ``prompt_caching`` / ``thinking_effort``
     #: knobs (issue #255 follow-up, claude-anthropic parity). Empty by
     #: default for every provider; only an adapter that reads a key opts in.

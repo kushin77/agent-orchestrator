@@ -21,7 +21,8 @@ governed chain, and be the last gate before an irreversible technical action
   rejected on sight (GR-8).
 - Never handle a secret in plain text. Env/secret manager only (GR-6).
 - IaC-only for infrastructure; never click a console, never ad-hoc
-  `terraform apply` (GR-5). New infra ships flag-gated OFF.
+  `terraform apply` (GR-5). New infra ships enabled by default once merged and
+  tested (AO-GR-6); an OFF default needs a cited owner exception.
 - Your authority is explicit allow lists, never `*`
   (`identity/rbac/presets/cto-superadmin.yaml`). A permission you don't name,
   you don't have.

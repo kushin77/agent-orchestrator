@@ -23,6 +23,14 @@
 #     mapped to the LOCAL control that operationalizes it in this repo (the
 #     same control the citing AO-GR-x row uses, since the citation exists
 #     precisely because the local rule implements the hub rule here).
+#   * GR-28 — the hub's flag-default rule ("new infrastructure ships
+#     flag-gated OFF by default"), which this repo **reversed** by explicit
+#     owner decision (#1789, `policy-gr5-enabled-by-default`, 2026-09-21,
+#     AO-GR-6). Recorded `not-applicable` / `covered: false`, never `GAP`: a
+#     GAP would assert this repo *should* enforce a rule it has deliberately
+#     superseded. The id is in scope only because `scripts/check-terraform-iac.sh`
+#     embeds it and the rule-numbering table in `docs/GOLDEN-RULES.md` cites it
+#     so a bare `GR-28` in a script resolves to the rule it names.
 #   * GR-1 and GR-24 appear in the docs only as the endpoints of the general
 #     "hub golden rules bind (GR-1...GR-24)" range statement (AGENTS.md line
 #     9) — not as a specific rule cited by number for a local decision — so
@@ -320,6 +328,13 @@ rules:
     modules: [scripts/]
     gate: scripts/check-lifecycle-verify-order.sh,scripts/check-verdict-contains.sh
     note: "Cited by AO-GR-3 (\"CMR GR-12\")."
+  GR-28:
+    status: not-applicable
+    covered: false
+    origin: hub-cited
+    modules: []
+    gate: "-"
+    note: "The hub's flag-default rule. This repo REVERSED that default (policy-gr5-enabled-by-default, 2026-09-21, AO-GR-6), so no local control enforces hub GR-28 — deliberately, not as a coverage gap. Named in the spine only because scripts/check-terraform-iac.sh embeds the id `GR-28` for the mandate it used to assert, and the rule-numbering table in docs/GOLDEN-RULES.md cites it there so a bare `GR-28` in a script is resolvable. Do not confuse with AO-GR-28, which IS a cited, enforced local rule with its own row above."
   GR-1:
     status: not-applicable
     covered: false

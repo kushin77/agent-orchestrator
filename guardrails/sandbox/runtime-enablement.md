@@ -14,7 +14,7 @@ and after that act.
 Every runtime in this package ships `enabled=False` and refuses to execute
 while it is off — the correct fail-closed posture. But that leaves three
 questions a deployment has to answer, and answering them in prose is how a
-flag-gated-OFF doctrine quietly rots into "it was enabled in an ad-hoc shell
+fail-closed default quietly rots into "it was enabled in an ad-hoc shell
 one afternoon":
 
 1. **How** is a runtime turned on — and is there exactly one way?

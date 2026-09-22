@@ -460,7 +460,7 @@ surfaces:
     service: telemetry
     tf_flag: enable_telemetry
     description: >
-      Telemetry exposition (issue #497, ADR-0022): the flag-gated-OFF OTLP/HTTP
+      Telemetry exposition (issue #497, ADR-0022): the OTLP/HTTP
       **push** exporter that renders the telemetry pillar's own facts — the
       per-tenant SLO verdicts from slo_templates/* (imported verbatim from
       telemetry/observability/slos.py), the BudgetStateExporter budget/quota/

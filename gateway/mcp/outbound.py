@@ -702,7 +702,8 @@ def build_registry(
     With no ``root`` the seeded config is loaded from this checkout. The
     registry flag defaults to the compiled OFF value, so a registry built with
     no arguments declares the seeded draw.io entry **and refuses every call** -
-    the flag-gated-OFF posture the issue requires.
+    the fail-closed, opt-in posture the issue requires (an OFF default under
+    AO-GR-6's named-exception clause).
     """
     if root is None:
         root = Path(__file__).resolve().parents[2]

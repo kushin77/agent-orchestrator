@@ -62,8 +62,8 @@ fail-closed behaviour.
 | `offline.py` | `OfflineRuntime`: deterministic in-process enforcement model |
 | `enablement.py` | `SandboxEnablement`: the ONE feature flag that enables a runtime; ships OFF, reversible, negative-controlled (issue #636) |
 | `enablement.schema.json` | Declared contract for the runtime-enablement flag |
-| `docker.py` | Docker runtime - **DECLARED, flag-gated OFF** + pure `docker_run_flags` |
-| `firecracker.py` | Firecracker microVM executor - **DECLARED, flag-gated OFF** (schema + seam) |
+| `docker.py` | Docker runtime - **DECLARED, fail-closed** (off until activated) + pure `docker_run_flags` |
+| `firecracker.py` | Firecracker microVM executor - **DECLARED, fail-closed** (off until activated; schema + seam) |
 | `executor.py` | `SandboxExecutor`: per-category defaults, fail-closed dispatch, optional audit |
 | `mcp_seam.py` | Additive MCP wiring: `sandboxed_tool(...)` factory (gateway/mcp imported read-only) |
 | `demo.py` | Offline walkthrough / self-check (exits nonzero on any failure) |
@@ -79,7 +79,8 @@ fail-closed behaviour.
    per-category default from `categories.yaml`, else the map's fail-closed
    default (`restricted`) for an unknown category. An unknown explicit
    override also fails closed to `restricted`.
-3. **Refuses** unless the injected runtime is enabled (flag-gated-OFF
+3. **Refuses** unless the injected runtime is enabled (fail-closed: the
+   runtime's own enablement flag defaults off as the cited exception AO-GR-6
    doctrine, AO-GR-6): a disabled sandbox never degrades into an unsandboxed
    run.
 4. **Dispatches** to the injected runtime, which enforces the profile's
@@ -111,7 +112,7 @@ deterministic simulated completion. It is explicitly **not** a real sandbox -
 it exists so the executor seam, the profile resolution and the fail-closed
 rules are fully testable offline.
 
-### 3.3 Docker runtime (DECLARED, flag-gated OFF)
+### 3.3 Docker runtime (DECLARED, fail-closed)
 
 `DockerRuntime` ships disabled (`enabled=False`). `docker_run_flags(profile)`
 is a pure, offline 1:1 profile→`docker run` flag mapping (read-only rootfs,
@@ -119,7 +120,7 @@ no-new-privileges, cap-drop, network mode, user, workdir, cpu/memory/PID
 quotas) and is unit-tested without a daemon. Enabling the flag is a deployment
 decision behind its own IaC flag; this offline repository never invokes docker.
 
-### 3.4 Firecracker microVM executor (DECLARED, flag-gated OFF)
+### 3.4 Firecracker microVM executor (DECLARED, fail-closed)
 
 Per the acceptance criteria the optional Firecracker executor ships as a
 **declared seam only** (no real lifecycle): `microvm.schema.json` + the
@@ -204,7 +205,7 @@ real:
   bounds with same-request positive controls at the higher ceiling.
 - **unknown category → restricted** (network op denied), including through the
   real MCP gateway path.
-- **flag-gated-OFF honesty** - Docker/Firecracker runtimes (and a disabled
+- **Fail-closed honesty** - Docker/Firecracker runtimes (and a disabled
   executor/runtime) refuse to run; enabling the flag does not fake a success
   (declared-seam error instead).
 - The validator and profile/category loaders genuinely fail on bad documents

@@ -10,7 +10,8 @@ in-memory graph (symbols per repo, modules, freshness) as the **offline
 fixture** - legitimate in tests / gates / demo, never a silent production
 answer - and adds a **real backend option** (:class:`CodeidxBackend`) that
 proxies the same tool contract to the actual ``kushin77/code-indexing``
-indexer. It is **flag-gated OFF by default** (:data:`DEFAULT_CODEIDX_ENABLED`);
+indexer. It is **opt-in** (:data:`DEFAULT_CODEIDX_ENABLED` is off, and a
+surface left off carries its own recorded owner exception under AO-GR-6);
 the declared fixture answers until an operator opts a tenant in.
 
 Every answer envelope names its provenance (``source`` = ``codeidx`` or
@@ -31,7 +32,7 @@ derives_from: null
 owner_sme: platform-sme
 tier: L1
 interfaces: [CodeidxBackend, KbRegistry, TenantKb, MemoryKbBackend, IndexBackend, CodeidxClient, DEFAULT_CODEIDX_ENABLED]
-invariants: "the declared in-memory index answers only until an operator opts a tenant into the real backend, which is flag-gated OFF by default"
+invariants: "the declared in-memory index answers only until an operator opts a tenant into the real backend, which is opt-in (off until opted in, the cited owner exception AO-GR-6 requires for an OFF default)"
 gotchas: "the tool shapes are consumed from the published codeidx contract, never mirrored (ADR-0018)"
 related: ["#20"]
 do_not_duplicate: null
@@ -495,7 +496,7 @@ class KbRegistry:
     ``backend_for`` always returns an :class:`IndexBackend` - an unknown tenant
     gets an empty KB, never another tenant's graph (fail closed).
 
-    The real codeidx backend is **flag-gated OFF by default**
+    The real codeidx backend is **opt-in** — off until a tenant is opted in,
     (:data:`DEFAULT_CODEIDX_ENABLED`, or ``AO_MCP_CODEIDX_ENABLED`` when
     ``codeidx_enabled`` is omitted). While it is OFF every tenant is answered by
     the declared fixture. When it is ON, a tenant that has been opted in with

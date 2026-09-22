@@ -89,7 +89,7 @@ def test_under_budget_passes_byte_identical():
 
 
 def test_disabled_filter_is_inert_byte_identical():
-    f = ResponseFilter(enabled=False)  # flag-gated OFF by default
+    f = ResponseFilter(enabled=False)  # the inline opt-out / fail-closed default
     payload = _verbose_payload()
 
     out = f.filter("code.references", payload)

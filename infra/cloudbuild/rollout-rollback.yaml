@@ -13,7 +13,9 @@ options:
   serviceAccount: $_DEPLOYER_SA
 
 steps:
-  # Fail-closed gate: rollback tooling is also flag-gated OFF by default.
+  # Fail-closed gate: rollback tooling also ships off by default — a CI/CD
+  # trigger mechanic, which scripts/check-feature-flags.py clause (4) carves
+  # out of AO-GR-6's enabled-by-default rule.
   - id: gate-flag
     name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
     entrypoint: 'bash'
