@@ -34,6 +34,10 @@ bash -n <file>.sh
   (`docs/EXECUTION-PLAN.md`). An orchestrating lead does not write lane code
   inline.
 - **Local-code-first (GR-17):** debug against this checkout first.
+- **Front-load first:** before task-specific work, call the `front_load(repo, prompt)` MCP
+  tool (`cmr-indexer`, per `.mcp.json`) — it returns that repo's pre-indexed context pack,
+  and honestly reports `state: absent` when no index graph has been built yet
+  (`python3 vendor/CMR/catalog/indexer/index.py --out vendor/CMR/catalog/indexer/out/graph.json`).
 - **SME personas:** the dispatchable personas live in
   `~/.copilot/agents/<id>.agent.md`; the platform persona registry mirrors them
   as `registry/personas/cards/<id>.yaml`; the persona spec's canonical copy is
