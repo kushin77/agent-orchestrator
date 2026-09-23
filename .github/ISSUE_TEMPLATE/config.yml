@@ -1,28 +1,11 @@
-# GitHub issue-form configuration (.github/ISSUE_TEMPLATE/config.yml).
-#
-# ---knowledge---
-# module_id: github.issue_template.config
-# system: github
-# app: issue_template
-# solution_class: template
-# patterns: [blank-issue-disabled]
-# derives_from: null
-# owner_sme: platform-sme
-# tier: L1
-# interfaces: [blank_issues_enabled, contact_links]
-# invariants: "blank_issues_enabled stays false, or the three governed issue forms can be routed around"
-# gotchas: ""
-# related: ["#1533"]
-# do_not_duplicate: null
-# ---knowledge---
-#
-# Issue #1533. The three governed forms above only bind a brief that is FILED
-# through them; GitHub's default also offers "Open a blank issue", which routes
-# around every required field in all three and puts an unvalidated free-text box
-# on the board. Disabling blank issues is what makes those required fields
-# load-bearing rather than optional.
-#
-# `contact_links` is declared, even though it is empty, so the file states that
-# no fallback channel is offered rather than leaving the answer to a default.
 blank_issues_enabled: false
-contact_links: []
+contact_links:
+  - name: CMR Golden Rules
+    url: https://github.com/kushin77/CMR/blob/main/GOLDEN-RULES.md
+    about: How work is done in this hub. GR-2 requires every task to be tracked as an issue.
+  - name: AGENTS.md (AI agents)
+    url: https://github.com/kushin77/CMR/blob/main/AGENTS.md
+    about: Instructions for AI agents working in the hub — read before opening or executing issues.
+  - name: Board requirements (INTENT)
+    url: https://github.com/kushin77/CMR/blob/main/board/INTENT.md
+    about: R1–R15 requirements and NG1–NG5 non-goals. Cite an R# in your issue.

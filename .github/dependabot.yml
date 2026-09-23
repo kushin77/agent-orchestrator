@@ -1,40 +1,88 @@
-# Dependabot configuration — agent-orchestrator
+# Dependabot configuration for CMR (CMR-1103: GHAS deep — Dependabot version
+# updates; CMR-105 already keeps security updates on).
 #
-# Governed-repo dependency automation (hub GR-9/GR-13, conformance `dependabot`
-# signal). Kept simple: weekly grouped updates for the Python dependency
-# surface. GR-15 bans GitHub Actions workflows in this repo (enforced by
-# `scripts/check-no-actions.sh`, issue #812) and there is no GitHub Actions
-# surface to update — the `github-actions` ecosystem block was a stale
-# holdover from before that doctrine was ratified and named no real workflow
-# file, so it is retired here (issue #1073). The repo's automation is
-# code-native (`make verify`); dependabot PRs land via the normal PR gate on
-# `master` and are never auto-merged.
+# harvested_from: kushin77/github-workflow@.github/dependabot.yml (convention)
+#                 kushin77/ERP-CRM@.github/dependabot.yml (version-updates +
+#                 grouped-PR convention), per the CMR-1103 epic "Canibalize".
 #
-# ---knowledge---
-# module_id: github.dependabot
-# system: governance
-# app: board
-# solution_class: pattern
-# patterns: [issue-first]
-# derives_from: null
-# owner_sme: pmo-sme
-# tier: L0
-# interfaces: [.github/dependabot.yml, weekly pip update PRs]
-# invariants: "no github-actions ecosystem block — GR-15 bans Actions workflows here"
-# gotchas: ""
-# related: ["#812", "#1073", "#1913"]
-# do_not_duplicate: null
-# ---knowledge---
-
+# Dependabot version updates are NOT GitHub Actions — they run natively in
+# GitHub, so GR-15 (code-native automation only) and ADR-0011 (Actions stays
+# disabled) do not apply. Nothing here auto-merges: every Dependabot PR is
+# reviewable and merged by a human (NG2). Security updates always arrive as
+# separate, reviewable PRs — `groups` below applies to version updates only.
+#
+# CMR ships no application code (NG4), so `updates` is empty by design — the
+# version-updates blocks stay commented/harmless here. They are the canonical
+# polyglot template for governed repos: uncomment the ecosystems that match
+# the repo and set `directory`. The ACTIVE template for code-hosting governed
+# repos is infra/terraform/github/modules/ghas/files/dependabot.yml
+# (distributed by the ghas Terraform submodule, flag-gated OFF — see its
+# README); templates/module/.github/dependabot.yml keeps the scaffolder
+# variant.
 version: 2
-updates:
-  - package-ecosystem: "pip"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: "chore(deps)"
+updates: []
+
+# --- Polyglot version-updates template (weekly, grouped, reviewable) ---------
+# - package-ecosystem: "gomod"
+#   directory: "/"
+#   schedule:
+#     interval: "weekly"
+#   open-pull-requests-limit: 5
+#   labels:
+#     - "dependencies"
+#   commit-message:
+#     prefix: "chore(deps)"
+#   groups:
+#     go-dependencies:
+#       patterns:
+#         - "*"
+#
+# - package-ecosystem: "terraform"
+#   directory: "/"
+#   schedule:
+#     interval: "weekly"
+#   open-pull-requests-limit: 5
+#   labels:
+#     - "dependencies"
+#   commit-message:
+#     prefix: "chore(deps)"
+#   groups:
+#     terraform-modules:
+#       patterns:
+#         - "*"
+#
+# - package-ecosystem: "npm"
+#   directory: "/"
+#   schedule:
+#     interval: "weekly"
+#   open-pull-requests-limit: 5
+#   labels:
+#     - "dependencies"
+#   commit-message:
+#     prefix: "chore(deps)"
+#   groups:
+#     npm-dependencies:
+#       patterns:
+#         - "*"
+#
+# - package-ecosystem: "pip"
+#   directory: "/"
+#   schedule:
+#     interval: "weekly"
+#   open-pull-requests-limit: 5
+#   labels:
+#     - "dependencies"
+#   commit-message:
+#     prefix: "chore(deps)"
+#   groups:
+#     python-dependencies:
+#       patterns:
+#         - "*"
+#
+# Deliberately NO `github-actions` ecosystem block: Actions is disabled on CMR
+# and every governed repo (GR-15 / ADR-0011), so a bot that bumps action
+# versions would maintain a surface that must not exist.
+#
+# Notes: weekly cadence + `groups` => at most one grouped PR per ecosystem per
+# week; `open-pull-requests-limit` caps them. Security updates are exempt from
+# both: they arrive as individual, reviewable PRs (never auto-merged, NG2).

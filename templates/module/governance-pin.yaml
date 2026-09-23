@@ -1,0 +1,45 @@
+# governance-pin.yaml — per-repo declaration of the shared-governance gate
+# surface this repo consumes (GR-18, fourth mandatory module, DR-011 #264).
+#
+# Provided per CMR:ONBOARD-0008 (kushin77/shared-governance#727) / catalog-request
+# #632: shared-governance is a dual-role vendor (docs/VENDOR-DUAL-ROLE.md) — the
+# governed module surface every repo CMR touches pins, and separately the
+# upstream CMR's own guardrails/gates/** was bootstrap-harvested from
+# (ADR-0008), now being reclassified as pinned consumption (ADR-0019, DR-012
+# #265 — tracked separately, never bundled into this seed).
+#
+# Mandatory scope today is declaration + pin only: this file records which
+# `shared-governance` gate surface this repo consumes and at what version; it
+# does NOT itself vendor or replace any local governance script — that
+# migration is each repo's own direction issue per ADR-0019.
+#
+# Shape adopted verbatim from the vendor's registered module surface
+# (catalog/modules/shared-governance/module.json `features[]`): only `schema`
+# and the top-level key names are fixed contract.
+
+schema: cmr.governance-pin/v1
+repo: "{{REPO}}"
+
+# The shared-governance module surface this repo consumes, feature-qualified
+# against catalog/modules/shared-governance/module.json `features[].id`.
+# Every governed repo declares membership even before adopting any gate
+# locally — this is the GR-18 "declaration now" half of the two-part surface
+# (see docs/MANDATORY-MODULES.md).
+gates:
+  - id: gates
+    enabled: false
+  - id: govctl
+    enabled: false
+
+# Local governance scripts/validators this repo still keeps, if any (ADR-0019
+# dissection tracking). Empty for a repo with no pre-existing local copy.
+# Filled in / overwritten by the fleet governance-dissection sweep (DR-015)
+# — never hand-maintained past the initial declaration.
+local_copies: []
+
+# Filled in / overwritten by the sync run itself on every pass — never
+# hand-edited by a human or an agent. `null` here means this repo has not
+# yet had a first sync pass.
+generated:
+  last_synced: null
+  synced_by: null

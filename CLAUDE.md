@@ -1,49 +1,46 @@
-# CLAUDE.md — agent-orchestrator (Claude Code pointer)
+# CLAUDE.md — CMR (Claude Code pointer)
 
-Claude Code working in this repo. **Read `AGENTS.md` first** — it is the
-canonical, model-agnostic instruction file; this file only adds
-Claude-specific notes and never contradicts it.
+## Connections
 
-## What this repo is
+- **Owner-lane:** qa-sme
+- **Class:** class
+- **Connects-to:** consumes=none; called-by=none; gates=none
+- **Env:** none
+- **Updated-by:** qa-sme (2026-09-12)
+- **Landed-by:** 2f022c3
 
-`agent-orchestrator` = the **AI-agent-orchestration service control plane**
-(EPIC-00, issue #4): a multi-tenant SaaS control plane that organizes, governs,
-and manages commercial AI agents (Claude, DeepSeek, Copilot, Gemini, local
-Ollama). Five-pillar architecture — Agent Registry & Profiling (`registry/`),
-Model Gateways (`gateway/`), State-machine execution (`engine/`), Security &
-guardrails (`guardrails/`), Observability (`telemetry/`) — plus cross-cutting
-tenant identity/RBAC (`identity/`), control-plane/portal (`control-plane/`,
-`portal/`), and autonomous ops/governance. Default branch is `master`.
+This file is the **Claude Code** runtime pointer for CMR. It contains only
+Claude Code-specific invocation context. **Read `AGENTS.md` first — it is the
+canonical, model-agnostic instruction file; do not contradict it.** The
+model-agnostic policy, the runtime → file map, and the drift check live in
+`docs/MODEL-AGNOSTIC.md`.
 
-## Commands
+## Claude Code-specific context
 
-```bash
-make verify   # evidence of record (lane venue = code-only; box-state -> make master-attestation)
-scripts/check-squash-message.sh --pr <N> && gh pr merge <N> --squash   # landing (single-dev method 2026-09-21)
-make help     # list all targets
-bash -n <file>.sh
-```
+- Claude Code auto-reads this file from the repo root; it is the only
+  Claude-specific entry point. All behavior, frontloading, memory, and facts live in
+  `AGENTS.md`.
+- `.claude/settings.json` is Claude Code's local deny list — it reinforces the
+  human/CI-gated action that stays hard-blocked at every scale: `terraform apply`.
+  `git push` is allowed at the solo-dev scale (ADR-0020) — `make scale-tripwire`
+  (GR-4 carve-out) already watches the reinstatement trigger (committer count /
+  onboarded-spoke count vs. the 10 threshold); re-add the deny entry when it fires.
+  The deny list is a safety default; `AGENTS.md` (Hard DON'Ts) and `GOLDEN-RULES.md`
+  are the rule.
+- Dispatch Claude subagents per the FinOps ladder in `docs/MODEL-PROFILES.md`
+  (flash-by-default in ladder terms — the concrete Claude Code model is
+  **haiku**, set as the project default via `.claude/settings.json`'s
+  `CLAUDE_CODE_SUBAGENT_MODEL`; escalate on observed difficulty, never
+  pre-emptively, per `guardrails/instructions/model-tier-discipline.md`).
 
-## Claude-specific notes
+## Pointers
 
-- **Precedence:** `AGENTS.md` is canonical. This file and `.cursorrules` defer
-  to it; never contradict it (supersede doctrine in `AGENTS.md`).
-- **Subagent-first + FinOps** (fleet doctrine): delegate to subagents at the
-  cheapest capable tier (flash/LOW default; escalate on observed difficulty,
-  never pre-emptively). One issue = one lane = one branch = disjoint files
-  (`docs/EXECUTION-PLAN.md`). An orchestrating lead does not write lane code
-  inline.
-- **Local-code-first (GR-17):** debug against this checkout first.
-- **Front-load first:** before task-specific work, call the `front_load(repo, prompt)` MCP
-  tool (`cmr-indexer`, per `.mcp.json`) — it returns that repo's pre-indexed context pack,
-  and honestly reports `state: absent` when no index graph has been built yet
-  (`python3 vendor/CMR/catalog/indexer/index.py --out vendor/CMR/catalog/indexer/out/graph.json`).
-- **SME personas:** the dispatchable personas live in
-  `~/.copilot/agents/<id>.agent.md`; the platform persona registry mirrors them
-  as `registry/personas/cards/<id>.yaml`; the persona spec's canonical copy is
-  `vendor/CMR/docs/SME-PROFILES.md` (there is no local `docs/SME-PROFILES.md`
-  here — `docs/CANNIBALIZATION.md` §3.1).
-- **Never:** push directly to `master`; commit secrets (env only, GR-6); run
-  ad-hoc `terraform apply` (GR-5); merge failing work (verification evidence
-  first, owner autonomous-merge mandate); edit `vendor/` (pinned submodule);
-  commit `.research/` clones (gitignored).
+- Canonical rules: `AGENTS.md` (read first) → `GOLDEN-RULES.md` → `board/INTENT.md` →
+  `docs/ARCHITECTURE.md`.
+- Run the issue's `Verify:` command and `make verify` before merge/close. Merge/push
+  posture is defined in `GOLDEN-RULES.md` GR-4 — it is not restated here.
+- Local guardrails (hard-deny floor): `guardrails/hooks/{shell-aware-deny,scale-aware-allow}.sh`;
+  code-native gate `make guardrails-check`. Runtime permission modes + bypass notes:
+  `docs/PERMISSIONS-OPERATIONS.md`.
+- Defaults: `docs/DEFAULTS.md` · No-questions doctrine: GR-22 + `guardrails/instructions/no-questions.md` (apply defaults, escalate only per GR-22).
+- Agent operating doctrine: `guardrails/instructions/agent-operating-doctrine.md`.

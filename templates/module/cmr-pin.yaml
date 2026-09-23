@@ -1,0 +1,12 @@
+# Spoke-side standards pin (EPIC-26/M23, GH #453), born from templates/module/
+# in kushin77/CMR. Records which CMR standards bundle this repo last synced.
+# This seed's placeholder values are overwritten on the FIRST real standards
+# delivery (controller/onboard.sh / controller/standards-sync.sh, #458) — they
+# are never valid pins and must never be treated as a real sync.
+# repo: {{REPO}}
+schema: cmr.standards-pin/v1
+bundle_ref: "0000000000000000000000000000000000000000"
+manifest_sha: "0000000000000000000000000000000000000000000000000000000000000000"
+bundle_digest: "0000000000000000000000000000000000000000000000000000000000000000"
+delivered_at: "1970-01-01T00:00:00Z"
+delivered_by: "https://github.com/kushin77/CMR"

@@ -1,0 +1,19 @@
+# Seed for the `pmo` mandatory-module consumer asset (ADR-0038).
+# Every repo CMR touches ships this file, declaring which pinned kushin77/pmo
+# capability version it consumes and which PMO surfaces are active for it.
+# Modeled on governance-pin.yaml (shared-governance) and cmr-pin.yaml precedent.
+schema: cmr.pmo-pin/v1
+pin:
+  repo: kushin77/pmo
+  version: v0.1.0
+capabilities:
+  dependency-graph: on
+  raid-register: on
+  status-rollup: on
+  priority-tiers: on
+orchestration:
+  # CMR is orchestration authority (ADR-0038): this repo's PMO data is
+  # dispatched into and consumed FROM kushin77/pmo; kushin77/pmo does not
+  # independently drive fleet-wide PMO decisions.
+  driven_by: kushin77/CMR
+project_of_record: github-projects

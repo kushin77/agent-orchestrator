@@ -1,99 +1,72 @@
-# Contributing to agent-orchestrator
+# Contributing to CMR
 
-> New here? Read [`AGENTS.md`](AGENTS.md) first — it is the canonical,
-> model-agnostic instruction file for AI agents and humans. This file is the
-> human contributor's working guide. The GitHub issues board is the canonical
-> roadmap (EPIC-00 = issue #4).
+## Connections
 
-`agent-orchestrator` is the **AI-agent-orchestration service control plane**:
-a multi-tenant SaaS control plane that organizes, governs, and manages
-commercial AI agents (Claude, DeepSeek, Copilot, Gemini, local Ollama).
-Start here:
+- **Owner-lane:** qa-sme
+- **Class:** class
+- **Connects-to:** consumes=none; called-by=none; gates=none
+- **Env:** none
+- **Updated-by:** qa-sme (2026-09-12)
+- **Landed-by:** 9d61bf5
 
-1. **`AGENTS.md`** — how agents work in this repo (canonical, read first).
-2. **`docs/ARCHITECTURE.md`** — five-pillar architecture (source of truth).
-3. **`docs/EXECUTION-PLAN.md`** — lane ownership and phase/wave sequencing.
-4. **`docs/GOVERNANCE.md`** — branch, provenance, and session-label
-   conventions.
+> **New to the CMR program?** Start at the official onboarding process —
+> [`docs/ONBOARDING.md`](docs/ONBOARDING.md) — it routes every role (owner, SME, lane agent,
+> vendor, spoke consumer, repo role) to its canonical instruction files, checklist, gate, and
+> "onboarded" record. This file is the human contributor's working guide **once onboarded**.
 
-## Issue briefs are brain directives
+CMR is the **hub / control plane** for the `kushin77` ecosystem. Start here:
 
-An issue is not a note — it is the directive a fleet agent executes. Start from
-the [fleet task brief](.github/ISSUE_TEMPLATE/fleet-task.yml) so every issue
-carries what the dispatcher and the FinOps block read:
-
-- **GOAL first, then constraints, then context.** The first sentence states the
-  objective and its success criteria; an agent that reads only that line must
-  still act correctly.
-- **Role, epic, lane** — who executes, which epic it serves, and the single lane
-  that owns its files. One issue = one lane = one branch
-  ([`docs/EXECUTION-PLAN.md`](docs/EXECUTION-PLAN.md)).
-- **Model tier** (`flash` / `pro` / `auditor`) and **thinking effort**
-  (`none` / `low` / `medium` / `high`) — start cheap; escalate on observed
-  difficulty, never pre-emptively.
-- **Verify command** — the exact command whose literal output is the evidence of
-  done (GR-12).
-- **Chain markers** — `Parent: #n`, `Part-of: #n`, `Blocked-by: #n, #m`. These
-  are the dependency edges the chronological dispatcher reads; an issue with no
-  edge declares `Root=none`.
-- **Acceptance criteria + evidence** — mechanically checkable criteria, and the
-  literal output that proves them.
-
-The brief contract is gated: `make issue-template` fails, by name, if a required
-field is dropped from the template.
+1. **`AGENTS.md`** — how AI agents work in this repo (canonical, read first).
+2. **`GOLDEN-RULES.md`** — the non-negotiable rules (GR-1…GR-23).
+3. **`board/INTENT.md`** — requirements `R#` and non-goals `NG#`; cite them.
+4. **`docs/EXECUTION-PLAN.md`** + `fleet/MANIFEST.tsv` — lane ownership.
 
 ## Branching
 
-- `master` is **protected by convention** — no direct pushes, no force-push.
-  Branch protection as code ships with issue #6.
-- All work happens on a short-lived topic branch named for the issue:
-  `issue-<n>-<slug>` (e.g. `issue-5-repo-foundation`).
-- One branch per issue; merged (squash) and deleted when the PR lands.
+- `main` is **protected** — no direct pushes, no force-push, no mass rewrites.
+- All work happens on a topic branch named per `docs/DEFAULTS.md`:
+  `cmr/<lane>` or `topic/<id>` (e.g. `iac/CMR-104-branch-protection`).
+- One branch per issue; merged and deleted when the PR lands.
+- Merge/approve rule (self-merge ban + autonomous-merge carve-out) is canonical
+  in `GOLDEN-RULES.md` GR-4 (NG2). Open the PR; GR-4 governs who/what merges it.
 
 ## Workflow
 
-1. **Pick an issue.** Prefer issues that carry a `Verify:` command. State the
-   goal and success criteria before acting.
-2. **Stay in your lane.** Edit only files your issue owns
-   (`docs/EXECUTION-PLAN.md`). Smallest focused diff; no unfinished markers,
-   no debug leftovers, no unused imports.
-3. **Make the change**, then run the issue's `Verify:` command **and** the
-   repo gate:
+1. **Pick an issue.** Prefer `fleet-ready` issues — they carry their own
+   `Verify:` command. State the goal and success criteria before acting.
+2. **Stay in your lane.** Edit only files your issue owns (GR-3). Smallest
+   focused diff; no `TODO`/`FIXME`, no debug leftovers, no unused imports.
+3. **Make the change**, then run the issue's `Verify:` command **and** the hub
+   gate:
    ```bash
-   make verify   # gate of record: shell syntax + YAML + JSON + docs + secrets
+   make verify          # gate of record: shell syntax + markdown lint + YAML
    ```
-   Plus any issue-specific command (`bash -n <script>`,
-   `python3 -m json.tool <file>.json`, …).
-4. **Declare AI assistance** on the PR — e.g.
-   `AI-assistance: Copilot (Relentless, flash/LOW)`. Every AI-originated PR
-   declares this.
+   (Plus any issue-specific command, e.g. `bash -n <script>`,
+   `python3 -m json.tool <file>.json`, or the target named in the issue.)
+4. **Declare AI assistance** on the PR (CMR-505). State the runtime/agent used
+   and the model tier — e.g. `AI-assistance: Copilot (Relentless, L1)`. Every
+   AI-originated PR declares this; no exceptions.
 5. **Report evidence**, never an unverified "done": the exact command + output,
-   files touched, and the issue it closes (GR-12).
+   files touched, and the R#/issue it closes (GR-12).
 
 ## PR checklist
 
-- [ ] Branch is `issue-<n>-<slug>` based on latest `master`
+- [ ] Branch name matches `/<lane>/<issue>-<slug>`; based on latest `main`
 - [ ] Touches only files owned by the issue's lane (GR-3)
 - [ ] Issue `Verify:` command ran and output is included
 - [ ] `make verify` green locally
-- [ ] No secrets / credentials / build artifacts committed (GR-6)
-- [ ] AI-assistance + runtime declared
-- [ ] Docs kept in sync (architecture / execution plan / governance)
-- [ ] PR body includes `Closes #<n>`
-
-## Review & merge
-
-- Every change lands via a PR. Under the owner's autonomous-merge mandate an
-  agent may merge its own PR **only after** green `make verify` evidence —
-  never merge failing work (GR-12). Branch protection/required checks land
-  with issue #6.
+- [ ] No secrets / credentials / `*.tfstate` / build artifacts committed (GR-6)
+- [ ] AI-assistance + runtime declared (CMR-505)
+- [ ] ADR updated if this changes a recorded decision (see
+      `docs/decision-records/README.md`)
+- [ ] Docs kept in sync (architecture / adoption / distribution)
+- [ ] `Closes #<issue>` referenced
 
 ## Governance asks
 
-1. **Issue-first** — every task lands on the issues board before the work.
-2. **IaC over console** — infra changes land as Terraform/Cloud Build PRs, not
-   console clicks (GR-5).
-3. **No secrets** — env/secret manager only; the secret scan runs in
-   `make verify` (GR-6).
-4. **Provenance first** — cannibalized assets record source (GR-10).
-5. **Verify before done** — evidence, not assertion (GR-12).
+1. **Hub never hosts spoke code** (GR-1) — no vendored live apps.
+2. **IaC over console** (GR-5) — infra changes land as Terraform PRs, not clicks.
+3. **AI guardrails ship everywhere** (GR-9) — new governed repos carry the
+   instruction-file set.
+4. **Provenance first** (GR-10) — canibalized assets record source.
+5. **Lessons flow back** (GR-11) — a spoke fix returns as a hub PR.

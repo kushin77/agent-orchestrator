@@ -1,7 +1,7 @@
-name: Epic
-description: A large roadmap theme on the hub board, spanning many issues. Mirrors one board/epics/EPIC-*.md.
-title: "Epic: "
-labels: ["type:epic"]
+name: Task
+description: A small, well-scoped unit of work. Per GR-2, opened before the work starts; per GR-12 it carries an objectively verifiable Verify command.
+title: "Task: "
+labels: ["type:task"]
 body:
   - type: markdown
     attributes:
@@ -12,15 +12,17 @@ body:
   - type: markdown
     attributes:
       value: |
-        Epics mirror `board/epics/EPIC-*.md` and materialize to the board via
-        `board/materialize.sh`. Use the namespaced labels from `board/LABELS.md`
-        so the board stays machine-readable.
+        Every task is tracked here, opened **before** the work (GR-2). Acceptance
+        criteria must be objectively verifiable — a command that exits 0, a file
+        that is gone, a number that changed. Prefer `fleet-ready` tasks: they are
+        self-contained and carry a `Verify:` command an agent can execute. Labels
+        follow `board/LABELS.md`.
   - type: dropdown
     id: solution_class
     attributes:
       label: Target solution class
       description: >-
-        Quality bar this epic aims for, per docs/SOLUTION-CLASSES.md (higher =
+        Quality bar this task aims for, per docs/SOLUTION-CLASSES.md (higher =
         more rigor/cost). Mirrored in fleet/MANIFEST.tsv's `class` column;
         `pattern`+ triggers the completion RCA in docs/RCA-TEMPLATE.md.
       options:
@@ -30,33 +32,35 @@ body:
         - enterprise
         - faang
         - elite
-      default: 2
+      default: 1
     validations:
       required: true
   - type: textarea
     id: ai_execution_note
     attributes:
-      label: AI-agent execution note (edit only if this epic's bar differs)
+      label: AI-agent execution note (edit only if this task's bar differs)
       description: >-
         Kept in the issue body (not a markdown-only block) so an executing
         agent reads it directly with `gh issue view`, no separate doc lookup.
       value: |
-        This epic's issues are executed by AI agents end-to-end — solo, once,
-        without follow-up meetings (guardrails/instructions/agent-operating-doctrine.md).
-        The "Target solution class" above plus GR-12 "resolved with evidence"
-        must together be sufficient for an agent to know it is actually done:
-        at `pattern` class or above, "Verify exits 0" is necessary but not
-        sufficient — see this class's own bar in docs/SOLUTION-CLASSES.md
-        before opening child issues. `board/materialize.sh update-bodies`/`stats`
-        is the idempotent roadmap-refresh mechanism — re-run after adding or
-        re-scoping issues under this epic so the board stays reconciled.
+        This task is executed by an AI agent end-to-end — solo, once, without
+        follow-up meetings (guardrails/instructions/agent-operating-doctrine.md).
+        Acceptance criteria + Verify must be sufficient on their own for the
+        agent to know it's done: at `pattern` class or above, "Verify exits 0"
+        is necessary but not sufficient — acceptance criteria must also cover
+        the target class's own bar (docs/SOLUTION-CLASSES.md), extending GR-12
+        "resolved with evidence" rather than restating it. Closing at `pattern`+
+        expects a short completion RCA — see docs/RCA-TEMPLATE.md §
+        "Completion RCA". `board/materialize.sh update-bodies`/`stats` is the
+        idempotent roadmap-refresh mechanism — no separate action needed here,
+        it re-syncs from fleet/MANIFEST.tsv.
     validations:
       required: false
   - type: dropdown
     id: epic
     attributes:
       label: Epic (epic:*)
-      description: Which epic owns this roadmap theme.
+      description: Which epic owns this work.
       options:
         - epic:00-blueprint
         - epic:01-hub-bootstrap
@@ -73,7 +77,7 @@ body:
     id: milestone
     attributes:
       label: Milestone
-      description: Target milestone bucket (M0–M8, see board/MILESTONES.md).
+      description: Target milestone bucket (M0–M8).
       options:
         - M0
         - M1
@@ -91,40 +95,48 @@ body:
     id: req
     attributes:
       label: Requirements (req:*)
-      description: "R#s this epic closes (see board/INTENT.md). Example: req:R1, req:R13."
-      placeholder: "req:R1, req:R13"
+      description: "R#s this task satisfies (see board/INTENT.md). Example: req:R1, req:R2."
+      placeholder: "req:R1, req:R2"
     validations:
       required: true
-  - type: textarea
-    id: vision
-    attributes:
-      label: Vision
-      description: What the fleet gains when this epic is done.
-    validations:
-      required: true
-  - type: textarea
-    id: goals
-    attributes:
-      label: Goals
-      description: High-level outcomes.
-      placeholder: |
-        - [ ] ...
-    validations:
-      required: false
-  - type: textarea
+  - type: input
     id: depends
     attributes:
-      label: Dependent epics / issues
-      description: Links or issue numbers this epic depends on or unblocks.
+      label: Depends on
+      description: Issue numbers that must land first (optional).
+      placeholder: "#CMR-000"
     validations:
       required: false
   - type: textarea
-    id: definition-of-done
+    id: story
     attributes:
-      label: Definition of done
-      description: "Checkboxes. Each item objectively verifiable (see GOLDEN-RULES GR-12)."
+      label: Story
+      description: What and why. The observation or decision that prompted it.
       placeholder: |
+        What:
+        - ...
+        Why:
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: "Checkboxes. Each one verifiable without judgement (GR-12)."
+      placeholder: |
+        - [ ] `make verify` exits 0
         - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: verify
+    attributes:
+      label: "Verify: command"
+      description: The exact command(s) an agent or reviewer runs to prove done. No formalities.
+      placeholder: |
+        make verify
+        bash -n scripts/foo.sh
     validations:
       required: true
   - type: dropdown
@@ -171,3 +183,13 @@ body:
         - label: "\"No human needed\" step-reduction impact stated (GR-22)"
         - label: "RCA written and linked if incident-class, else explicitly marked N/A — docs/RCA-TEMPLATE.md"
         - label: "SaaS/multi-tenant applicability noted, or explicitly marked N/A — docs/SAAS-BOUNDARY.md"
+  - type: checkboxes
+    id: qualifiers
+    attributes:
+      label: Qualifiers
+      description: Optional cross-cutting labels.
+      options:
+        - label: fleet-ready
+        - label: pilot
+        - label: good first issue
+        - label: "status:blocked"
