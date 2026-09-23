@@ -224,6 +224,32 @@ if [ "$apply" -ne 1 ]; then
   echo "run-lane: DRY RUN complete for #$issue — rerun with --apply to provision the lane"
   exit 0
 fi
+# #2046: the lane-open preflight runs the one drift predicate
+# (scripts/check-lane-base-drift.sh --lane <n>) and REPORTS the intersection —
+# the lane's changed files vs what origin/master changed since its fork point —
+# before any code is written. Report, never block: a drift is a candidate
+# duplicate or a rebase need, decided by a reader; the refusing verb stays the
+# gate's (make verify / --scan).
+python3 - "$issue" "$root" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[2])
+from governance.isolation.lane_drift import report
+
+drift = report(int(sys.argv[1]), sys.argv[2])
+if drift.status == "clean":
+    print("   lane-base-drift: clean — no file this lane will touch changed on master since it forked")
+elif drift.status == "drift":
+    for f in drift.findings:
+        print(
+            f"   lane-base-drift: {f.file} changed on master at {f.master_commit} "
+            f"since issue-{f.issue} forked — candidate duplicate or rebase needed",
+            file=sys.stderr,
+        )
+elif drift.status == "cannot-assess":
+    print("   lane-base-drift: CANNOT-ASSESS — the fork point could not be resolved; never assumed clean", file=sys.stderr)
+else:
+    print("   lane-base-drift: predicate unavailable in this checkout — preflight unavailable, never assumed clean", file=sys.stderr)
+PY
 python3 - "$issue" "$agent" "$lane" "$root" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[4])

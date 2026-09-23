@@ -755,6 +755,13 @@ checks=(
   # being recorded as CANNOT-ASSESS.
   'erp-core-model|bash scripts/check-erp-core-model.sh'
   'lane-collision|bash scripts/check-lane-collision.sh'
+  # lane-base-drift (#2046): `lane-collision` proves a wave is file-disjoint from
+  # its SIBLINGS, but reads no `origin/master` at all — so a lane can be disjoint
+  # from every sibling and still collide with what master landed after it forked.
+  # Measured 2026-09-22: a whole lane and a public PR (#2045) were spent on a red
+  # master had already fixed in a661d5ae. This refuses a lane whose own files
+  # intersect post-fork master changes, naming the file and the master commit.
+  'lane-base-drift|bash scripts/check-lane-base-drift.sh'
   # codeowners (issue #1073, cites #803 row 12 — platform-level enforcement of a
   # declared control): `.github/CODEOWNERS` did not exist, so the five-pillar +
   # cross-cutting map AGENTS.md and docs/ARCHITECTURE.md declare had no reviewer

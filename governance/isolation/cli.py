@@ -60,6 +60,7 @@ if str(ROOT) not in sys.path:
 
 from governance.isolation import journal, live, runtimes, session, speculative  # noqa: E402
 from governance.isolation.audit import Violation, audit_lane  # noqa: E402
+from governance.isolation.lane_drift import DriftReport, report as drift_report  # noqa: E402
 from governance.isolation.identity import (  # noqa: E402
     IDENTITY_DOMAIN,
     IdentityRefused,
@@ -321,6 +322,16 @@ def cmd_open(args: argparse.Namespace) -> int:
         # this lane is allowed to open a PR.
         speculative.claim(main, identity, args.speculative_base, base=speculative.DEFAULT_BASE)
     problems = audit_lane_full(identity, main) if result.ok else []
+    # #2046: the lane-open path reports base drift — the lane's changed files
+    # intersected with what origin/master changed since its fork point — at the
+    # moment it is cheapest to ask, BEFORE a line of code is written. REPORT,
+    # never block: a drift is a candidate duplicate or a rebase need, decided
+    # by a reader; the refusing verb stays the gate's (make verify / --scan).
+    drift = (
+        drift_report(args.issue, main)
+        if result.created
+        else DriftReport(status="cannot-assess")
+    )
     payload = {
         "identity": identity.to_json(),
         "created": result.created,
@@ -342,6 +353,16 @@ def cmd_open(args: argparse.Namespace) -> int:
             else {"stamped": False, "reason": "unstamped: governance.reconcile is not importable from this root"}
         ),
         "problems": [str(problem) for problem in problems],
+        # #2046: the preflight drift answer, surfaced where it is cheapest.
+        # `clean` needs no comment; every other status is named with its
+        # findings so a reader can judge duplicate-vs-rebase before work starts.
+        "lane_drift": {
+            "status": drift.status,
+            "findings": [
+                {"file": f.file, "master_commit": f.master_commit, "issue": f.issue}
+                for f in drift.findings
+            ],
+        },
         # #1301: what the lane is bound to. `runtime-unrecorded` is a NOTE, never
         # a refusal — see runtimes.py for why.
         "binding": {
@@ -353,6 +374,30 @@ def cmd_open(args: argparse.Namespace) -> int:
         },
     }
     print(json.dumps(payload, indent=2))
+    # #2046: the drift answer is also a human-readable line on stderr, because
+    # `open` is used interactively and the JSON payload is easy to miss in a
+    # long chain. Every non-clean status names itself — never silent.
+    if drift.status == "drift":
+        for f in drift.findings:
+            print(
+                f"open: NOTE — lane-base-drift: {f.file} changed on master at "
+                f"{f.master_commit} since issue-{f.issue} forked — candidate duplicate "
+                "or rebase needed; the gate (make verify / --scan) refuses by name",
+                file=sys.stderr,
+            )
+    elif drift.status == "cannot-assess":
+        print(
+            "open: NOTE — lane-base-drift: CANNOT-ASSESS (lane reattached, or the "
+            "fork point could not be resolved) — run scripts/check-lane-base-drift.sh "
+            "--lane <n> by hand; never assumed clean",
+            file=sys.stderr,
+        )
+    elif drift.status == "absent":
+        print(
+            "open: NOTE — lane-base-drift: the predicate script is not installed in "
+            "this checkout — preflight unavailable, never assumed clean",
+            file=sys.stderr,
+        )
     if problems:
         print(f"open: NOT-OK — lane provisioned but {len(problems)} isolation problem(s)", file=sys.stderr)
         return EXIT_NOT_OK
