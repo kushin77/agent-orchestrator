@@ -121,6 +121,53 @@ These are **standing business-as-usual** concerns — never re-request, never sk
   (ADR-0027/0030, amended by ADR-0033). Once the tripwire fires, this reverts to
   requiring an independent reviewer.
 
+## Operational friction vs. evidence gates (the line agents must not blur)
+
+**This is the distinction that matters.** ADR-0033 says "evidence gates stay
+absolute at every scale." That is correct. But it does **not** mean "every
+operational step must remain a separate manual command." The two categories:
+
+| Category | Definition | What solo-dev scale allows |
+|---|---|---|
+| **Evidence gates** | Does the change work? (`make verify`, CI green) | Never lifted. Always runs. |
+| **Coordination gates** | Which identity approved? (PR review, merge approval) | Tripwire-conditional. Solo-dev scale lifts these. |
+| **Operational friction** | How many commands does it take? (copy-paste, multi-step workflows) | **Always reducible.** Not a gate at all. |
+
+When the user says "make it so I don't have to copy-paste every command," they
+are asking you to reduce **operational friction** — a coordination concern, not
+an evidence concern. The sanctioned tool for this is `make ship`
+(`ops/ship.sh`): one command that runs `make verify` → commits → pushes →
+opens a PR. The verify step is still there, still runs, still blocks on
+failure. Nothing about the evidence gate is relaxed.
+
+**What you must NOT do:** refuse to build convenience tooling by citing
+ADR-0033's evidence-gate language. That is a category error — confusing "fewer
+commands" with "fewer gates." If the user asks for a `make ship`-style target,
+build it. If they ask for a one-command deploy, build it. The evidence gate
+runs inside whatever wrapper you build.
+
+**What you MUST still do:** never skip `make verify`, never bypass CI, never
+merge without green evidence. Those are evidence gates — absolute at every
+scale, per ADR-0033.
+
+Two mechanical consequences of the sanctioned wrapper, stated because an agent
+that read only the paragraph above would get both wrong:
+
+- **Staging is lane-scoped — never `git add -A`.** `make ship` stages only the
+  paths named with `--path`; with none named it derives the file set from this
+  lane's own change set (worktree diff + branch-vs-`origin/main` diff + new
+  untracked files). A blanket add would sweep another lane's files into this
+  commit and break "one issue = one lane = one branch".
+- **Issue linkage is explicit: `--closes <n>`.** It puts a bare `Closes #<n>`
+  line at the top of the PR body — the only form GitHub links on, and the form
+  `guardrails/hooks/pr-close-citation-guard.sh` requires. Without it the PR is
+  opened with no linkage and `ops/ship.sh` says so loudly.
+
+The ship **actions** (`ship`, `ship-dry-run`, `ship-help`) are deliberately
+absent from `VERIFY_TARGETS`: a gate of record that commits, pushes and opens a
+PR is not a gate. They live in the top-level `Makefile`, and the wired control
+`ship-self-test` (`mk/ship.mk`) is what keeps them out.
+
 ## Hard DON'Ts
 
 - **No secrets** in code, files, or git history — env / GSM / secret managers only;
