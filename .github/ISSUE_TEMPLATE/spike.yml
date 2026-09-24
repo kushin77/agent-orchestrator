@@ -1,7 +1,7 @@
-name: Bug
-description: Something behaved incorrectly. Per GR-2, file it even if already fixed — the failure mode becomes searchable.
-title: "Bug: "
-labels: ["type:bug"]
+name: Spike / Decision
+description: Research or a decision needed before building (spike:decide). If the decision is architectural, the outcome becomes an ADR.
+title: "Spike: "
+labels: ["type:spike", "spike:decide"]
 body:
   - type: markdown
     attributes:
@@ -12,53 +12,74 @@ body:
   - type: markdown
     attributes:
       value: |
-        File this **even when the fix landed in the same change** (GR-2). The value
-        is not the fix — it is that the failure mode becomes searchable. Anchor the
-        report to mechanism, not prose. Labels follow `board/LABELS.md`.
-  - type: textarea
-    id: observed
+        A spike answers a question or makes a decision — it does **not** ship a
+        feature. "Done" is a recorded decision with rationale, not code. If the
+        outcome changes the architecture, it lands as an ADR in
+        `docs/decision-records/`. Labels follow `board/LABELS.md`.
+  - type: dropdown
+    id: epic
     attributes:
-      label: What happened
-      description: The wrong behaviour, with the actual output.
+      label: Epic (epic:*)
+      description: Which epic owns this decision.
+      options:
+        - epic:00-blueprint
+        - epic:01-hub-bootstrap
+        - epic:02-module-contract
+        - epic:03-registry
+        - epic:04-sync
+        - epic:05-ai-guardrails
+        - epic:06-harvest
+        - epic:07-observability
+        - epic:08-consumers
+    validations:
+      required: true
+  - type: input
+    id: req
+    attributes:
+      label: Requirements (req:*)
+      description: "R#s this decision touches (see board/INTENT.md). Example: req:R4, req:R15."
+      placeholder: "req:R4, req:R15"
     validations:
       required: true
   - type: textarea
-    id: steps
+    id: decision-needed
     attributes:
-      label: Steps to reproduce
-      description: Numbered, minimal, runnable. Include the repo/path and commands.
+      label: Decision needed
+      description: The single question to answer. If there is more than one, split the spike.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why now. Constraints, prior art, observations that frame the options.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: Each candidate with its tradeoffs. Leave no option unexamined.
       placeholder: |
-        1. ...
-        2. ...
-        3. ...
+        Option A — ...
+          Pros / cons
+        Option B — ...
+          Pros / cons
     validations:
       required: true
   - type: textarea
-    id: expected
+    id: recommendation
     attributes:
-      label: Expected behavior
-      description: What should have happened.
-    validations:
-      required: true
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual behavior
-      description: What happened instead, with the real output/exit code.
-    validations:
-      required: true
-  - type: textarea
-    id: mechanism
-    attributes:
-      label: Why it was wrong
-      description: The mechanism, not the symptom. What in the code produced this?
+      label: Recommendation & criteria
+      description: "Recommended option (if any) and the criteria that decide it. Be concrete."
     validations:
       required: false
   - type: textarea
-    id: blast
+    id: outcome
     attributes:
-      label: Blast radius
-      description: What would have happened had it not been caught. Be concrete.
+      label: "Outcome: ADR?"
+      description: "If this changes a recorded architecture decision, note the ADR number to open."
+      placeholder: "ADR-000X — <slug>"
     validations:
       required: false
   - type: dropdown
@@ -77,7 +98,7 @@ body:
   - type: checkboxes
     id: area
     attributes:
-      label: Areas affected (area:*)
+      label: Areas touched (area:*)
       description: Select all that apply.
       options:
         - label: area:governance

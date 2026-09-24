@@ -1,33 +1,46 @@
-# agent-orchestrator gitleaks configuration (issue #5).
+# CMR gitleaks configuration (CMR-108: pre-commit + secrets baseline).
 #
-# gitleaks v8. The allowlist is deliberately narrow — nothing here may
+# gitleaks v8.18.4. The allowlist is deliberately narrow — nothing here may
 # silently pass a planted secret. Smoke test:
 #
 #   gitleaks detect -c .gitleaks.toml --no-git --source . -v
 #
 # A planted `aws_secret_access_key = "AKIA..."` MUST fail the scan.
-# `make verify` runs a mechanical secret scan so the gate never depends on the
-# gitleaks binary being installed; this file is consumed by the optional
-# `make gitleaks` target and by the pre-commit gitleaks hook.
 
-title = "agent-orchestrator gitleaks config"
+title = "CMR gitleaks config"
 
 [extend]
 useDefault = true
 
 [allowlist]
-description = "agent-orchestrator allowlist — placeholder/example markers only; no blanket passes."
+description = "CMR allowlist — placeholder/example markers only; no blanket passes."
 regexTarget = "line"
 regexes = [
   '(?i)\b(example|sample|placeholder|dummy|fake|your-?key|xxx|changeme|replace-me)\b.*\b(key|secret|token|password|api[-_.]?key)\b',
+  # Portal localStorage store names (gdc.exemptions.v1 / gdc.audit.v1) are not
+  # secrets; they tripped the generic-api-key rule when a const name contained
+  # "KEY" (portal GDC-006/013). Narrow — matches only these two store names.
+  'gdc[-.]?(exemptions|audit)[-.]v1',
 ]
 
+# "budgets/FinOps" (monitoring-stack module.json + ADR-0042) is a plain-English
+# phrase — GCP budgets + FinOps cost-anomaly detection — not a secret. It trips
+# generic-api-key on entropy alone (~3.66, CMR-773). `stopwords` matches against
+# the *matched secret text*, not the whole line (unlike `regexes` above, which
+# is regexTarget="line" and would blind the scanner to a real secret sharing
+# the line). Verified: a real `aws_secret_access_key` on the same line as
+# "budgets/FinOps" still fires (aws-access-token rule, untouched by this entry).
+stopwords = ["budgets/finops"]
+
 paths = [
-  # Vendored submodule + local research scratch are not authored here.
-  '(^|/)(vendor|\.research|node_modules|\.terraform|\.venv|venv)/',
-  # Inert synthetic SSO test fixture (verified 2026-09-08): a fake acme.example
-  # tenant OIDC identity-token JWT (alice@acme.example.com,
-  # issuer.acme.example.com, exp ~2027) used by identity/sso tests — no real
-  # credential. Allowlisted so gitleaks' default `jwt` rule does not re-flag it.
-  'identity/sso/tests/fixtures/oidc-acme-idtoken\.jwt$',
+  # Generated artifacts recreated by tooling (not authored, not committed).
+  # Keep this list to build outputs only — never a source, docs, or config dir.
+  '(^|/)(node_modules|\.terraform|\.venv|venv)/',
+  # Nested git worktrees (.claude/worktrees/<name>/...) are full checkouts of
+  # this same repo, living under the repo root. In --no-git filesystem-walk
+  # mode, gitleaks has no notion of "worktree" and walks every nested copy as
+  # ordinary files, multiplying scan time by the live worktree count (see
+  # docs/RCA-WORKTREE-SPRAWL.md). Each nested tree is scanned in its own right
+  # when its own gate runs from inside it.
+  '(^|/)\.claude/worktrees/',
 ]

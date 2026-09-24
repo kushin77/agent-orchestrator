@@ -1,24 +1,9 @@
-# Spoke-side standards pin (EPIC-26/M23, GH #453; schema: cmr.standards-pin/v1
-# in vendor/CMR/sync/cmr-pin.schema.json, seeded from
-# vendor/CMR/templates/module/cmr-pin.yaml). Records which CMR standards
-# bundle this repo (agent-orchestrator, kushin77/CMR spoke) last synced.
-#
-# First real pin for this repo (issue #949, parent #878): the template seed's
-# all-zero placeholder values were never written here before. Values below are
-# computed against the pinned hub submodule commit (`vendor/CMR` gitlink,
-# recorded in `.gitmodules`), not guessed:
-#   - bundle_ref    = `git -C vendor/CMR rev-parse HEAD` at pin time
-#   - manifest_sha  = sha256 of vendor/CMR/controller/standards-manifest.txt
-#                     at bundle_ref
-#   - bundle_digest = sha256 over the sorted "path:sha256(content)\n" lines
-#                     for every non-comment file path listed in that manifest,
-#                     read at bundle_ref (per the algorithm the schema
-#                     describes; recomputation/health-state comparison against
-#                     a live CMR ref is out of scope here, same as
-#                     sync/validate-cmr-pin.py — Phase 1 only validates shape)
+# Spoke-side standards pin (EPIC-26/M23, GH #453) — machine-written by
+# controller/lib/deliver-bundle.sh (#1030). Do not hand-edit; the next
+# delivery overwrites this file.
 schema: cmr.standards-pin/v1
-bundle_ref: "33d04e5b6e35ad9a82d7ace9e10c5597fd21238d"
-manifest_sha: "2685fbed7b2e1161b84b31d47c72127b0b96e2d3c17d3822e83cd0195435f618"
-bundle_digest: "5df4b491c32185ecaa2dff6c77f18fb6bc2c8ebff35568422ccd2365f0ff8bff"
-delivered_at: "2026-09-21T23:52:10Z"
-delivered_by: "https://github.com/kushin77/agent-orchestrator/issues/1557"
+bundle_ref: 11f390d5729dd0439570c1ed8024e5536c24ffae
+manifest_sha: 2685fbed7b2e1161b84b31d47c72127b0b96e2d3c17d3822e83cd0195435f618
+bundle_digest: f72f7bdebb6399299eeed8e027c99b5e35b4b1e21a23eaefe87ab2664bd0d6be
+delivered_at: "2026-09-24T00:51:25Z"
+delivered_by: "https://github.com/kushin77/CMR/commit/11f390d5729dd0439570c1ed8024e5536c24ffae"

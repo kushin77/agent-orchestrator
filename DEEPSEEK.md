@@ -1,15 +1,29 @@
-# CMR — Cursor rules (pointer)
+# DEEPSEEK.md — CMR (DeepSeek pointer)
 
-This file is the **Cursor** runtime pointer for CMR. It contains only Cursor-specific
+## Connections
+
+- **Owner-lane:** qa-sme
+- **Class:** class
+- **Connects-to:** consumes=none; called-by=none; gates=none
+- **Env:** none
+- **Updated-by:** qa-sme (2026-09-12)
+- **Landed-by:** 2f022c3
+
+This file is the **DeepSeek** runtime pointer for CMR. It contains only DeepSeek-specific
 invocation context. **Read `AGENTS.md` first — it is the canonical, model-agnostic
 instruction file; do not contradict it.** The model-agnostic policy, the runtime → file
 map, and the drift check live in `docs/MODEL-AGNOSTIC.md`.
 
-## Cursor-specific context
+## DeepSeek-specific context
 
-- Cursor reads `.cursorrules` from the repo root as its project rules entry point.
+- DeepSeek is invoked as an agent runtime via MCP (`mcp__deepseek__*` tools) or as a
+  subagent dispatch target in CMR sessions. This file serves as the DeepSeek-specific
+  entry point.
 - Dispatch work per the FinOps ladder in `docs/MODEL-PROFILES.md` (flash-by-default;
   escalate on observed difficulty, never pre-emptively).
+- Local guardrails hard-deny floor: `guardrails/hooks/` (shell-aware + scale-aware
+  PreToolUse deny); code-native gate `make guardrails-check`. Runtime permission modes:
+  `docs/PERMISSIONS-OPERATIONS.md`.
 
 ## Pointers
 

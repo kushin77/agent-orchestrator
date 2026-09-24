@@ -1,0 +1,90 @@
+name: Module cannibalization
+description: Harvest an existing kushin77 asset (repo or surface) into a governed CMR module/catalog entry. Per GR-10, provenance is mandatory.
+title: "Cannibalize: <source-repo> → <destination>"
+labels: ["area:harvest", "type:task", "status:canibalize"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        <!-- cmr-refs: {"id":"...","module":"...","links":[{"type":"...","target":"owner/repo#n"}]} -->
+        _Fill the `cmr-refs` marker above with this entity's typed links (see `docs/CROSS-REFERENCE-LAYER.md`). It is machine-readable, not prose._
+
+  - type: markdown
+    attributes:
+      value: |
+        Harvest an existing asset instead of rebuilding it (NG5: harvest and adopt
+        incrementally). Per **GR-10**, every canibalized asset records its source
+        — repo, path, license — in `canibalization/INDEX.md` / `registry.csv`
+        **before** reuse. Labels follow `board/LABELS.md`.
+  - type: input
+    id: source-repo
+    attributes:
+      label: Source repo
+      description: "kushin77 repo to harvest from. Example: kushin77/shared-frontend."
+      placeholder: "kushin77/<repo>"
+    validations:
+      required: true
+  - type: input
+    id: source-path
+    attributes:
+      label: Source path / surface
+      description: "Surface(s) to pull: whole repo, docs/**, a module, etc."
+      placeholder: "docs/MODEL-PROFILES.md, scripts/*"
+    validations:
+      required: true
+  - type: input
+    id: license
+    attributes:
+      label: License
+      description: License of the source asset (provenance, GR-10).
+      placeholder: "MIT / proprietary / unknown"
+    validations:
+      required: true
+  - type: input
+    id: destination
+    attributes:
+      label: Destination module
+      description: "Where it lands in CMR. Example: catalog/modules/<id>/, docs/, guardrails/."
+      placeholder: "catalog/modules/<id>"
+    validations:
+      required: true
+  - type: textarea
+    id: stack
+    attributes:
+      label: Stack / notes
+      description: Framework, language, build target — fill during triage.
+    validations:
+      required: false
+  - type: checkboxes
+    id: provenance
+    attributes:
+      label: Provenance (GR-10)
+      description: Confirm the source is recorded before reuse.
+      options:
+        - label: "Recorded in canibalization/INDEX.md (repo, path, license)"
+          required: true
+        - label: "Row added to canibalization/registry.csv"
+          required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: Standardize what is harvested; no blind copy.
+      placeholder: |
+        - [ ] Deep-triage upstream (surface, license, deps)
+        - [ ] Import surface; standardize to CMR conventions
+        - [ ] Write module.json / provenance manifest
+        - [ ] Register in catalog + validate
+        - [ ] Update canibalization INDEX + registry.csv
+    validations:
+      required: true
+  - type: textarea
+    id: definition-of-done
+    attributes:
+      label: Definition of done
+      description: "Checkboxes. Each objectively verifiable (GR-12)."
+      placeholder: |
+        - [ ] Asset lands in destination, provenance recorded
+        - [ ] `make verify` green
+    validations:
+      required: true

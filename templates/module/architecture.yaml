@@ -1,0 +1,57 @@
+# architecture.yaml — per-repo SSOT declaration seed.
+#
+# Provided per kushin77/diagrams#320 (CMR:ONBOARD-0005, Part B — the mandatory
+# consumer surface half of onboarding `diagrams` as CMR's `diagrams.blueprint`
+# module, GR-18). This is the *input* to the `diagrams.blueprint` always-current
+# sync (the module pin declared alongside this file in gdc-manifest.yaml:
+# `modules[].module == diagrams.blueprint`): a governed repo declares WHERE its
+# own live topology, resources, and Terraform state actually live, and the sync
+# reads from those pointers to regenerate the `generated:` block below on drift
+# — this file's content is never hand-maintained past the fields a
+# human/agent fills in once at onboarding.
+#
+# Shape adopted verbatim from the vendor's first-shipped seed at
+# `kushin77/diagrams@templates/module/architecture.yaml` (DR-023): only
+# `schema` and the top-level key names are fixed contract; every other value
+# below is a schema-valid worked example for a repo with no Python
+# extraction pipeline of its own — replace it with this repo's real
+# generator/resource/Terraform-state equivalents at onboarding.
+
+schema: cmr.architecture-manifest/v1
+repo: "{{REPO}}"
+
+# Where this repo's own live topology/resource graph is actually produced.
+# `diagrams.blueprint` does not scrape source at large; it imports/executes
+# this concrete entrypoint. A repo with no Python extraction pipeline of its
+# own points `generator.entrypoint` at whatever it does have instead (a
+# Terraform plan JSON, a CDK synth, a CloudFormation template, ...) via
+# `generator.kind`.
+generator:
+  kind: manual # python-module | terraform-plan | cdk-synth | cloudformation | manual
+  entrypoint: null
+  graph_builder: null
+  extractor: null
+  extractor_helpers: []
+  drift_check: null
+  diagram_render: null
+  blueprint_engine: null
+
+# Live resources this repo's own generator actually extracts — informs what
+# the sync can regenerate for THIS repo. Fill in with this repo's own real
+# resource surface at onboarding.
+live_resources:
+  source: manual # gcp-cloud-asset-api | aws-config | azure-resource-graph | manual
+  scope: {}
+
+# Terraform-state references this repo's declared-vs-live drift comparison
+# is drawn from. List every real state root this repo manages; `backend`
+# names the actually configured Terraform backend for that root.
+terraform_state: []
+
+# Filled in / overwritten by the sync run itself on every pass — never
+# hand-edited by a human or an agent. `null` here means this repo has not
+# yet had a first sync pass.
+generated:
+  last_synced: null
+  synced_by: null
+  content_hash: null
