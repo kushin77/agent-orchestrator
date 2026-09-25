@@ -1,27 +1,134 @@
-# Declarative LIVE promotion state - agent-orchestrator rollout pipeline
-# (issue #914, child of #607 go-live). This is the ONLY committed file that
-# may ever record a flag above "off": infra/rollout/rollout-state.yaml stays
-# the declared-default document (GR-28) and
-# infra/rollout/model.py::validate_rollout_state_doc still refuses any flag
-# there that is not "off" - unchanged by this file.
-#
-# Every entry here is a genuine, ordered transition
-# (infra/rollout/model.py::validate_live_state_doc enforces: never "off" -
-# omit the row instead; from_stage -> stage must be an allowed forward step;
-# exactly one of approval_id/policy; "full" requires a human approval_id -
-# a policy auto-approval can never reach full) whose audit_record must
-# resolve to a real file under infra/rollout/audit/ or infra/rollout/approvals/
-# (infra/rollout/checks/check_rollout.py::check_live_state enforces that
-# existence - an I/O concern, not this file's own schema).
-#
-# RolloutEngine.load overlays this file's entries onto the rollout-state.yaml
-# defaults (infra/rollout/engine.py); `cli.py promote/rollback/canary
-# --live-state-out` is what writes it. Empty is the correct, honest state
-# today: nothing has been promoted yet.
-#
-# Schema: flags.<name> = {stage, from_stage, since, audit_record,
-#                          approval_id (human) | policy (auto-approve)}
-
 schema_version: 1
-
-flags: {}
+flags:
+  ci_cd.apply_trigger:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/ci-cd-apply-trigger-gradual-full-s0006-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-ci_cd-apply_trigger-full
+  ci_cd.verify_trigger:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/ci-cd-verify-trigger-gradual-full-s0003-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-ci_cd-verify_trigger-full
+  services.engine:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-engine-gradual-full-s0018-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-engine-full
+  services.erp_module:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-erp-module-gradual-full-s0057-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-erp_module-full
+  services.erp_webhooks_bridge:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-erp-webhooks-bridge-gradual-full-s0060-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-erp_webhooks_bridge-full
+  services.gateway:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-gateway-gradual-full-s0012-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-gateway-full
+  services.guardrails:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-guardrails-gradual-full-s0021-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-guardrails-full
+  services.identity:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-identity-gradual-full-s0030-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-identity-full
+  services.mcp_outbound:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-mcp-outbound-gradual-full-s0015-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-mcp_outbound-full
+  services.org_chart:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-org-chart-gradual-full-s0039-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-org_chart-full
+  services.portal:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-portal-gradual-full-s0033-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-portal-full
+  services.registry:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-registry-gradual-full-s0009-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-registry-full
+  services.sandbox_runtime:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-sandbox-runtime-gradual-full-s0024-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-sandbox_runtime-full
+  services.skill_studio:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-skill-studio-gradual-full-s0042-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-skill_studio-full
+  services.task_board:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-task-board-gradual-full-s0045-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-task_board-full
+  services.telemetry:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-telemetry-gradual-full-s0027-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-telemetry-full
+  services.web:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/services-web-gradual-full-s0036-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-services-web-full
+  surfaces.edge_cutover:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/surfaces-edge-cutover-gradual-full-s0066-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-surfaces-edge_cutover-full
+  surfaces.erp_module:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/surfaces-erp-module-gradual-full-s0063-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-surfaces-erp_module-full
+  surfaces.fleet_projection:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/surfaces-fleet-projection-gradual-full-s0048-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-surfaces-fleet_projection-full
+  surfaces.operator_terminal:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/surfaces-operator-terminal-gradual-full-s0054-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-surfaces-operator_terminal-full
+  surfaces.remote_control:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T20:34:38Z'
+    audit_record: audit/surfaces-remote-control-gradual-full-s0051-20260925T203438Z.md
+    approval_id: ao-20260925T203034Z-surfaces-remote_control-full
