@@ -126,6 +126,18 @@ phases:
       # as the other portal surfaces above.
       - flag: surfaces.edge_cutover
         go_live_stage: full
+      # Remaining portal surfaces (issue #2081) — promoted through phase 7
+      # because the registry files them under service: portal.
+      - flag: surfaces.live_bridge
+        go_live_stage: full
+      - flag: surfaces.telemetry_live_feed
+        go_live_stage: full
+      - flag: surfaces.ops_health
+        go_live_stage: full
+      - flag: surfaces.finops_reports
+        go_live_stage: full
+      - flag: surfaces.chat
+        go_live_stage: full
   "8":
     name: autonomous operations and governance
     note: This rollout pipeline (dogfooded first) and merge governance.

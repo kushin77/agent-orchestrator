@@ -168,6 +168,38 @@ flags:
     posture: hold
     rollout_pct: 0
     targeted: []
+  # Remaining portal surfaces (issue #2081) — declared drivable so the pipeline
+  # can promote them. All have registry default=True; promotion to full
+  # replaces the static default with an auditable live-state projection.
+  surfaces.live_bridge:
+    stage: "off"
+    promotion_issue: "#1523"
+    rollout_pct: 0
+    targeted: []
+  surfaces.telemetry_live_feed:
+    stage: "off"
+    posture: hold
+    promotion_issue: "#2081"
+    rollout_pct: 0
+    targeted: []
+  surfaces.ops_health:
+    stage: "off"
+    posture: hold
+    promotion_issue: "#2081"
+    rollout_pct: 0
+    targeted: []
+  surfaces.finops_reports:
+    stage: "off"
+    posture: hold
+    promotion_issue: "#2081"
+    rollout_pct: 0
+    targeted: []
+  surfaces.chat:
+    stage: "off"
+    posture: hold
+    promotion_issue: "#2081"
+    rollout_pct: 0
+    targeted: []
   rollout.pipeline:
     stage: "off"
     rollout_pct: 0
