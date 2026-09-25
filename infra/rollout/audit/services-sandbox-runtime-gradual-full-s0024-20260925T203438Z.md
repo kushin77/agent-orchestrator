@@ -1,0 +1,34 @@
+# Promotion audit record - `services.sandbox_runtime` gradual -> full
+
+One transition, written by the promotion path immediately BEFORE the
+live-state entry that names it (`infra/rollout/cli.py promote --live-state-out`,
+and the ordered driver `infra/rollout/go_live.py`). `check_rollout.py` refuses a
+promoted flag whose record is missing, so this file is what makes the promotion
+provable rather than claimed.
+
+| field | value |
+|---|---|
+| flag | `services.sandbox_runtime` |
+| transition | `gradual` -> `full` |
+| actor | `deployer-sa` |
+| approval | human approval_id `ao-20260925T203034Z-services-sandbox_runtime-full` |
+| verify_green | true |
+| recorded_at | 2026-09-25T20:34:38Z |
+| live-state | `live-state.yaml` |
+| audit log | `audit/promotion-audit.jsonl` seq 24, hash `279f4aff00089bec30184966e0838edd23eaa6d49ba623f960ae08fa6b4a4ab4` |
+
+## The command (re-runnable)
+
+```
+python3 infra/rollout/go_live.py --phase 0-7 --canary-health-ok --gradual-complete --actor deployer-sa
+```
+
+## What the engine reported
+
+```
+promoted services.sandbox_runtime gradual -> full
+```
+
+A record is evidence, not a claim: the audit-log line above is machine-checkable
+(`AuditLog.verify` recomputes the sha-256 chain) and the transition it names is
+the one the live-state entry carries.
