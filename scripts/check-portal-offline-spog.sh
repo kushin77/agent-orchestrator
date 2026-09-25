@@ -189,6 +189,7 @@ start_server() {
         ROOT_ADMIN_EMAILS="$email" \
         AO_SURFACE_REGISTRY="$registry" \
         AO_SURFACE_STATE="$state" \
+        AO_ROLLOUT_LIVE_STATE="$clean_state" \
         python3 -m portal.server.main --host 127.0.0.1 --port "$candidate" ) >"$log" 2>&1 &
     server_pid=$!
     started_pids+=("$server_pid")
@@ -303,7 +304,7 @@ source, target, surface = sys.argv[1:4]
 doc = yaml.safe_load(open(source, encoding="utf-8").read())
 doc["surfaces"] = {name: (dict(entry) if isinstance(entry, dict) else entry) for name, entry in doc["surfaces"].items()}
 doc["surfaces"][surface] = dict(doc["surfaces"][surface])
-doc["surfaces"][surface]["default"] = "off"
+doc["surfaces"][surface]["default"] = False
 doc["surfaces"][surface]["promoted"] = False
 with open(target, "w", encoding="utf-8") as fh:
     yaml.safe_dump(doc, fh, sort_keys=False)

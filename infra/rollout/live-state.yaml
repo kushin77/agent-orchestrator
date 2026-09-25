@@ -102,6 +102,12 @@ flags:
     since: '2026-09-25T20:34:38Z'
     audit_record: audit/services-web-gradual-full-s0036-20260925T203438Z.md
     approval_id: ao-20260925T203034Z-services-web-full
+  surfaces.chat:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T21:50:45Z'
+    audit_record: audit/surfaces-chat-gradual-full-s0081-20260925T215045Z.md
+    approval_id: ao-20260925T203034Z-surfaces-chat-full
   surfaces.edge_cutover:
     stage: full
     from_stage: gradual
@@ -114,21 +120,45 @@ flags:
     since: '2026-09-25T20:34:38Z'
     audit_record: audit/surfaces-erp-module-gradual-full-s0063-20260925T203438Z.md
     approval_id: ao-20260925T203034Z-surfaces-erp_module-full
+  surfaces.finops_reports:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T21:50:45Z'
+    audit_record: audit/surfaces-finops-reports-gradual-full-s0080-20260925T215045Z.md
+    approval_id: ao-20260925T203034Z-surfaces-finops_reports-full
   surfaces.fleet_projection:
     stage: full
     from_stage: gradual
     since: '2026-09-25T20:34:38Z'
     audit_record: audit/surfaces-fleet-projection-gradual-full-s0048-20260925T203438Z.md
     approval_id: ao-20260925T203034Z-surfaces-fleet_projection-full
+  surfaces.live_bridge:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T21:50:44Z'
+    audit_record: audit/surfaces-live-bridge-gradual-full-s0077-20260925T215044Z.md
+    approval_id: ao-20260925T203034Z-surfaces-live_bridge-full
   surfaces.operator_terminal:
     stage: full
     from_stage: gradual
     since: '2026-09-25T20:34:38Z'
     audit_record: audit/surfaces-operator-terminal-gradual-full-s0054-20260925T203438Z.md
     approval_id: ao-20260925T203034Z-surfaces-operator_terminal-full
+  surfaces.ops_health:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T21:50:45Z'
+    audit_record: audit/surfaces-ops-health-gradual-full-s0079-20260925T215045Z.md
+    approval_id: ao-20260925T203034Z-surfaces-ops_health-full
   surfaces.remote_control:
     stage: full
     from_stage: gradual
     since: '2026-09-25T20:34:38Z'
     audit_record: audit/surfaces-remote-control-gradual-full-s0051-20260925T203438Z.md
     approval_id: ao-20260925T203034Z-surfaces-remote_control-full
+  surfaces.telemetry_live_feed:
+    stage: full
+    from_stage: gradual
+    since: '2026-09-25T21:50:44Z'
+    audit_record: audit/surfaces-telemetry-live-feed-gradual-full-s0078-20260925T215044Z.md
+    approval_id: ao-20260925T203034Z-surfaces-telemetry_live_feed-full
