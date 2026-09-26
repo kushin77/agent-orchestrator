@@ -47,6 +47,16 @@ complete-brief checklist (goal frontloaded, exact file set, exact verify command
 expected diff, explicit constraints/non-goals, context pack) — canonical template:
 `guardrails/prompts/dispatch.prompt.md`. Fix the brief and re-dispatch cheap first.
 
+**Enforcement status (GR-29).** The precondition is split, and stated rather than implied.
+*Gateable:* that the six-item checklist and its cross-reference *still exist* is asserted
+by a completeness gate — each item by its own label, the copy-paste template by its six
+`[ ]` lines, so deleting any one turns it red (`scripts/check-brief-checklist.sh`,
+specified and handed back on #1112). *Declared advisory:* the precondition's *effect* —
+escalation inadmissible on a thin brief — is unobservable; nothing records a dispatch
+brief, so a dispatcher can still escalate instead of completing one and no gate notices.
+The canonical file (`guardrails/instructions/model-tier-discipline.md`) carries the
+`enforcer:` line.
+
 ## 6. State the reason
 
 Every non-default dispatch states tier + model + a one-line reason

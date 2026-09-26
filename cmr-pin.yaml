@@ -2,8 +2,8 @@
 # controller/lib/deliver-bundle.sh (#1030). Do not hand-edit; the next
 # delivery overwrites this file.
 schema: cmr.standards-pin/v1
-bundle_ref: ddf3ff064fd2199f2bc529ae1cdc338192d31ccf
-manifest_sha: 2685fbed7b2e1161b84b31d47c72127b0b96e2d3c17d3822e83cd0195435f618
-bundle_digest: 859289e2b708ecd7b85f2330b08cbb6656224ad2db7270af7449b73994c1cb8b
-delivered_at: "2026-09-24T19:56:29Z"
-delivered_by: "https://github.com/kushin77/CMR/commit/ddf3ff064fd2199f2bc529ae1cdc338192d31ccf"
+bundle_ref: 76f4f3a3e7222a331a82eba021e4c7cb1a337c4f
+manifest_sha: 24750ab2b8b9a7b8371a8e8ee859042ab4f5c47c931caa3cc80411ca7755cca2
+bundle_digest: 9d0dfeaa40950dd93a8f1aae41cb75008156bda974bfdd5c2ba6d842074f69bd
+delivered_at: "2026-09-26T20:43:44Z"
+delivered_by: "https://github.com/kushin77/CMR/commit/76f4f3a3e7222a331a82eba021e4c7cb1a337c4f"

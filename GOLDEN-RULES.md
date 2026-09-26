@@ -49,6 +49,8 @@ Smallest focused diff; no unrelated edits. (R13) Operating layer:
 
 PR required, required status checks, no direct pushes (enforced via Terraform,
 CMR-104). **No auto-merge; merging without green CI is forbidden.** (NG2)
+— narrow exception for standards-bundle-only delivery PRs, ADR-0054, see the
+canonical merge rule below.
 Whether a *self-authored* PR may be merged is tripwire-conditional — see the
 canonical merge rule below, which governs. A
 denied action (e.g. a blocked push) is never routed around via another tool
@@ -69,8 +71,16 @@ stale and is a conformance finding, not an alternative reading.
 **Always absolute, at every scale — never lifted by any carve-out:**
 - **Merging without green CI is forbidden.** This is an *evidence* gate, not
   a coordination gate: no tripwire state, ownership, or authorship makes it
-  optional. GR-12 verification evidence must be attached.
-- **No auto-merge** (NG2) — a merge is always a deliberate, evidenced act.
+  optional. GR-12 verification evidence must be attached. **Narrow exception
+  (ADR-0054):** on a repo with zero required status checks configured
+  (GR-15 code-native-only), a standards-bundle-only delivery PR treats
+  `guardrails/gates/standards_pin_check.py` reporting `HEALTHY` on the PR
+  head as that repo's evidence in place of CI — see the exact predicate
+  below. Every other PR, on every repo, is unaffected: "no CI configured"
+  never means "nothing has reported yet" (pending checks still block).
+- **No auto-merge** (NG2) — a merge is always a deliberate, evidenced act,
+  **except** the one mechanical, auditable case defined immediately below
+  (ADR-0054); nothing else is exempted by this bullet.
 - Branch protection, required status checks, and no direct pushes to `main`
   remain Terraform-sourced (CMR-104, GR-5/GR-15).
 
@@ -80,15 +90,37 @@ PR in an `auto_merge=true` repo — when the absolutes above are satisfied.
 This is not a self-merge. **Authorship is the GitHub PR author (the
 account/identity that opened the PR), not the commit-author trailer or which
 agent lane/session wrote the diff** — a cosmetic trailer (e.g. "Akushnir
-Agent") does not make a PR independently-authored.
+Agent") does not make a PR independently-authored. Since every fleet account
+is `kushin77`, a controller standards-bundle PR is identified **not** by
+author but by shape (ADR-0054): every changed path is manifest-listed (no
+spoke-owned file in the diff) and the PR was opened by
+`controller/lib/deliver-bundle.sh` on its fixed `cmr/onboard` /
+`cmr/standards-sync` / `cmr/policy-sync` branch convention. **Forbidden vs.
+newly allowed, precisely:** a feature/behavior-code PR (any changed path
+outside the manifest) is never auto-merged, at any scale — unchanged. A
+standards-bundle-only PR, as just defined, on a `channels/spokes.tsv`
+`auto_merge=true` row, may be merged unattended by the delivery job **only**
+when (a) `standards_pin_check.py` reports `HEALTHY` on the PR head, **and**
+(b) `deliver-bundle.sh`'s `db_required_checks_state()` for that head returns
+`green`, **or** returns `none` (no required checks) **and** the PR head's
+`statusCheckRollup` is also empty (no CI of any kind reporting on this
+commit — `none` alone is not enough, since non-required CI could still be
+red). `unverifiable`, `red:*`, and `pending:*` all still refuse the merge
+and leave the PR open. MAJOR bundle version bumps are excluded and stay
+human-merged. Full predicate, rationale, and scope limits:
+`docs/decision-records/ADR-0054-standards-bundle-auto-merge-exception.md`.
 
 **Self-authored PRs — tripwire-conditional (ADR-0027, ADR-0020, umbrella
 ADR-0030; amended by ADR-0033):**
 - **While `ops/scale-tripwire.sh` has NOT fired:** a CMR agent may merge a PR
-  it authored on **CMR itself**, provided the absolutes above hold and the
-  work is the active owner's own solo-authored work. A single-account repo
-  does **not** disqualify this carve-out — the solo-account condition is
-  precisely the state the carve-out exists to serve.
+  it authored on **CMR itself, or a kushin77-owned repo registered in
+  `channels/spokes.tsv`** (ADR-0030's ownership gate; ADR-0033 as amended
+  2026-09-26, CMR#1034 — the coordination half reaches registered repos below
+  the trigger, and every repo failing the ownership gate keeps "never
+  self-merge"), provided the absolutes above hold and the work is the active
+  owner's own solo-authored work. A single-account repo does **not**
+  disqualify this carve-out — the solo-account condition is precisely the
+  state the carve-out exists to serve.
 - **Once the tripwire fires:** the carve-out reverts instantly and a
   self-authored PR requires an independent human reviewer's approval before
   merge (NG2 rubber-stamp rule).
@@ -125,7 +157,10 @@ runs in verify. (R12)
 ## GR-7 — SemVer is law; consumers pin
 
 `vX.Y.Z` git tag = source of truth. Nothing force-pushes breaking changes
-downstream; upgrades arrive as reviewable PRs. (R7, NG2)
+downstream; upgrades arrive as reviewable PRs. (R7, NG2) A non-MAJOR
+standards-bundle delivery PR may merge unattended under ADR-0054's narrow
+predicate; a MAJOR/breaking bundle bump is always excluded from that
+exception and stays human-merged, unconditionally.
 
 ## GR-8 — Private by default, forever
 
