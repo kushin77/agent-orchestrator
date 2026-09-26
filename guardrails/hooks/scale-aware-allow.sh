@@ -139,7 +139,41 @@
 # ============================================================================
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# CMR#1153: settings.json always invokes this hook by the RELATIVE command
+# string "guardrails/hooks/scale-aware-allow.sh", so BASH_SOURCE[0]-relative
+# resolution is only correct when the session's cwd is inside a checkout of
+# this repo. When a session `cd`s into an unrelated cloned repo, that
+# relative `cd` fails or lands somewhere wrong, ROOT ends up empty/bogus,
+# and every downstream lookup breaks -- which previously hard-failed (deny)
+# and blocked EVERY subsequent Bash call session-wide, in any directory,
+# until the hook was manually unregistered. This hook's collaboration-scale
+# governance is meaningless outside a CMR checkout, so THAT specific case
+# now falls through (allow) instead of denying -- real CMR-repo protection
+# still comes from shell-aware-deny.sh's static settings.json deny list,
+# enforced by the harness independent of cwd.
+#
+# This must NOT weaken the fail-closed posture for a genuinely broken
+# analyzer *inside* a real checkout (scripts/check-scale-aware-allow-self-
+# test.sh section 6 deliberately invokes this hook by an ABSOLUTE path
+# pointing at an isolated sandbox with a mutated/missing analyzer, to prove
+# a broken analyzer denies rather than fails open -- see hard_fail() below).
+# Absolute vs. relative BASH_SOURCE[0] is exactly the signal that separates
+# "the live session's cwd wandered outside the checkout this relative
+# command string assumes" (real bug, fall through) from "something
+# deliberately invoked this script directly and its internals are broken"
+# (keep the original hard-fail-closed behavior unchanged).
+case "${BASH_SOURCE[0]}" in
+  /*)
+    ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    ;;
+  *)
+    ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+    if [ -z "$ROOT" ] || [ ! -f "$ROOT/guardrails/hooks/lib/scale_aware_allow_analyzer.py" ]; then
+      echo "scale-aware-allow: cwd ($(pwd 2>/dev/null)) is not inside a CMR checkout for BASH_SOURCE=${BASH_SOURCE[0]} -- outside this hook's scope, falling through." >&2
+      exit 0
+    fi
+    ;;
+esac
 STATE_DIR="${CMR_SCALE_ALLOW_STATE_DIR:-$ROOT/ops/.state}"
 TRIPWIRE="${CMR_SCALE_ALLOW_TRIPWIRE:-$ROOT/ops/scale-tripwire.sh}"
 TTL="${CMR_SCALE_ALLOW_TTL:-300}"
@@ -223,7 +257,7 @@ fi
 # nothing from site-packages; -E additionally stops a stray
 # PYTHONPATH/PYTHONSTARTUP from influencing a security check.
 # ---------------------------------------------------------------------------
-ANALYZER_DIR="$(dirname "${BASH_SOURCE[0]}")/lib"
+ANALYZER_DIR="$ROOT/guardrails/hooks/lib"
 if [ ! -f "$ANALYZER_DIR/scale_aware_allow_analyzer.py" ]; then
   hard_fail "the analyzer module is missing from $ANALYZER_DIR."
 fi
@@ -382,7 +416,7 @@ case "$VERDICT" in
     # distinction ops/scale-tripwire.sh already draws.
     case "$VERDICT_CAUSE" in
       threshold-breach)
-        WHY="ops/scale-tripwire.sh has FIRED on a REAL THRESHOLD BREACH — a scale signal (git-committer identities, onboarded non-hub spokes, or GitHub repo collaborators) reached 10. This is the trigger the operator specified." ;;
+        WHY="ops/scale-tripwire.sh has FIRED on a REAL THRESHOLD BREACH — the authoritative scale signal (distinct human GitHub accounts with repository access; CMR#1034) reached 10. This is the trigger the operator specified." ;;
       gh-unreachable)
         WHY="ops/scale-tripwire.sh has FIRED as a FAIL-SAFE ESCALATION, not a proven breach — the GitHub collaborators signal is unreachable (no gh, no auth, network down, or an under-scoped token), so solo scale cannot be proven and #627 assumes collaborative. Fix gh auth, or set SCALE_TRIPWIRE_GH_OPTIONAL=1 if you have independently confirmed solo scale." ;;
       timeout)

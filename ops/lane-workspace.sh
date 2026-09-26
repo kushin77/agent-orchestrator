@@ -37,6 +37,12 @@
 # ============================================================================
 set -euo pipefail
 
+# Neutralize any inherited git environment BEFORE the first git call: an
+# inherited GIT_DIR DEFEATS `git -C`, so this provisioner would resolve its
+# mirror and worktree paths against whatever repository GIT_DIR names instead
+# of the one it intends (see scripts/verify.d/git-env-inheritance.sh, #611).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+
 log() { printf '[lane-workspace] %s\n' "$*" >&2; }
 fail() { log "FAIL: $*"; exit "${2:-1}"; }
 

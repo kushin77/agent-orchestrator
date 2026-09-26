@@ -235,3 +235,17 @@ inadmissible unless the brief already satisfied all six — live in
 `guardrails/instructions/model-tier-discipline.md` §6 (the precondition rule itself). This section
 does not restate either; it cross-references them so DR-069's frontloading mechanism and the
 escalation ladder's tier rules stay consistent with each other.
+
+**Enforcement status of the precondition (GR-29, #1112).** The precondition is split, and the
+split is stated rather than left silent:
+
+- **Gateable — artifact integrity.** That the six-item checklist and the precondition's
+  cross-reference *still exist* is a completeness check: each item by its own label, the
+  copy-paste template by its six `[ ]` lines, so deleting any one is caught. The gate
+  (`scripts/check-brief-checklist.sh` / `make brief-checklist`) is specified and handed back on
+  #1112. (The conformance gate's `finops-doctrine` signal is a separate, earlier mechanism — it
+  asserts *this* DR-069 section is present; it does not read the checklist.)
+- **Advisory — the precondition's effect.** Whether a real dispatch brief was complete before a
+  tier was escalated is **unobservable**: no artifact records a brief, so "escalation is
+  inadmissible on an incomplete brief" is a conduct rule, not a gate. A dispatcher can still
+  escalate past a thin brief and nothing notices. Residual on #1112.

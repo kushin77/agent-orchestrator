@@ -13,6 +13,13 @@
 # ============================================================================
 set -euo pipefail
 
+# Neutralize any inherited git environment BEFORE the first git call: this
+# self-test CREATES fixture repositories (`git init`), and an inherited GIT_DIR
+# DEFEATS `git -C`, so the fixtures would be written into whatever repository
+# GIT_DIR names — on this host, the shared .git of every lane (#611).
+# (see scripts/verify.d/git-env-inheritance.sh)
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HELPER="$ROOT/ops/lane-workspace.sh"
 FAIL=0
