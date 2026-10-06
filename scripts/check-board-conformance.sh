@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-conformance.sh — CMR class/pattern/template conformance (issue #140).
+# check-board-conformance.sh — CMR class/pattern/template conformance (issue #140).
 #
 # Every item of in-scope work must be classified against the CMR ladder, and the
 # class it declares must hold: a milestoned issue that declares no class cannot be
@@ -36,10 +36,10 @@
 # Exit-code contract: 0 OK / 1 NOT-OK / 2 CANNOT-ASSESS (no policy, no snapshot,
 # no readable label inventory). CANNOT-ASSESS must never be reported as a pass.
 #
-# Usage: bash scripts/check-conformance.sh
+# Usage: bash scripts/check-board-conformance.sh
 #
 # ---knowledge---
-# module_id: scripts.check-conformance
+# module_id: scripts.check-board-conformance
 # system: governance
 # app: gates
 # solution_class: enterprise
@@ -60,7 +60,7 @@ root="$(find_repo_root)"
 cd "$root" || exit 2
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "check-conformance: CANNOT-ASSESS — python3 not found" >&2
+  echo "check-board-conformance: CANNOT-ASSESS — python3 not found" >&2
   exit 2
 fi
 
@@ -91,15 +91,15 @@ declared="$(python3 governance/conformance/cli.py file --dry-run --title T --bod
   --declare phase=8-autonomous-ops 2>&1)"
 rc=$?
 if [ "$rc" -ne 0 ]; then
-  echo "check-conformance: FAIL — the declared-companion filing was refused (rc=$rc)" >&2
+  echo "check-board-conformance: FAIL — the declared-companion filing was refused (rc=$rc)" >&2
   printf '%s\n' "$declared" >&2
   fail=1
 elif ! printf '%s' "$declared" | grep -q 'pillar:autonomous-ops'; then
-  echo "check-conformance: FAIL — the declared \`pillar:\` was DROPPED from the labels" >&2
+  echo "check-board-conformance: FAIL — the declared \`pillar:\` was DROPPED from the labels" >&2
   printf '%s\n' "$declared" >&2
   fail=1
 elif ! printf '%s' "$declared" | grep -q 'phase:8-autonomous-ops'; then
-  echo "check-conformance: FAIL — the declared \`phase:\` was DROPPED from the labels" >&2
+  echo "check-board-conformance: FAIL — the declared \`phase:\` was DROPPED from the labels" >&2
   printf '%s\n' "$declared" >&2
   fail=1
 fi
@@ -111,11 +111,11 @@ refused="$(python3 governance/conformance/cli.py file --dry-run --title T --body
   --class enterprise --declare priorty=P1 2>&1)"
 rc=$?
 if [ "$rc" -eq 0 ]; then
-  echo "check-conformance: FAIL — an unrecognised \`--declare priorty=\` was accepted (rc=0)" >&2
+  echo "check-board-conformance: FAIL — an unrecognised \`--declare priorty=\` was accepted (rc=0)" >&2
   printf '%s\n' "$refused" >&2
   fail=1
 elif ! printf '%s' "$refused" | grep -q 'priorty'; then
-  echo "check-conformance: FAIL — the refusal does not name the unrecognised field" >&2
+  echo "check-board-conformance: FAIL — the refusal does not name the unrecognised field" >&2
   printf '%s\n' "$refused" >&2
   fail=1
 fi
@@ -129,12 +129,12 @@ fi
 resolved="$(python3 governance/conformance/cli.py labels 2>&1)"
 rc=$?
 if [ "$rc" -eq 2 ]; then
-  echo "check-conformance: CANNOT-ASSESS — ${resolved##*CANNOT-ASSESS — }" >&2
+  echo "check-board-conformance: CANNOT-ASSESS — ${resolved##*CANNOT-ASSESS — }" >&2
   exit 2
 fi
 printf '%s\n' "$resolved"
 if [ "$rc" -ne 0 ]; then
-  echo "check-conformance: FAIL — the filing defaults do not resolve (rc=$rc)" >&2
+  echo "check-board-conformance: FAIL — the filing defaults do not resolve (rc=$rc)" >&2
   fail=1
 fi
 

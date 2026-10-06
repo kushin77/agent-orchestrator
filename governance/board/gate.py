@@ -62,7 +62,7 @@ REPORT_RELPATH = Path(".verify") / "board-report.json"
 
 REQUIRED_CHECKS: Tuple[Tuple[str, str], ...] = (
     ("knowledge-index", "bash scripts/check-knowledge-index.sh"),
-    ("conformance", "bash scripts/check-conformance.sh"),
+    ("conformance", "bash scripts/check-board-conformance.sh"),
     ("lessons", "bash scripts/check-lessons.sh"),
     ("remediation", "bash scripts/check-remediation.sh"),
 )
