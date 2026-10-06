@@ -61,7 +61,7 @@ python3 governance/conformance/cli.py policy
 ```
 
 `make conformance` runs the board check *and* the filing self-control;
-`make verify` runs it as the 12th check via `scripts/check-conformance.sh`.
+`make verify` runs it as the 12th check via `scripts/check-board-conformance.sh`.
 
 ## Per-surface target solution-classes (issue #351)
 
@@ -149,7 +149,7 @@ path cannot be reached is a formality). It provokes, for real:
 | refuses two different classes | `--class elite` plus a declared `class:enterprise` (#517) |
 | a dry run shows the filing's labels | the same plan the real filing would run (#517) |
 
-`scripts/check-conformance.sh` adds the same two controls at the CLI boundary — the
+`scripts/check-board-conformance.sh` adds the same two controls at the CLI boundary — the
 layer the #517 defect was observed at: the labels a filing prints must include a
 declared `pillar:`/`phase:`, and an unrecognised `--declare` must exit non-zero
 naming the field.
