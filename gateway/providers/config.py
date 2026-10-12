@@ -216,6 +216,8 @@ def default_provider_configs() -> dict[str, ProviderConfig]:
             {"LOW": "paperclip-planner", "MED": "paperclip-planner",
              "HIGH": "paperclip-planner", "MAX": "paperclip-planner"},
         ),
+        # Namesake, not the hermes-agents routing service - see the
+        # NAMESAKE WARNING in gateway/providers/hermes.py and ADR-0012 §7.
         "hermes": _base(
             "hermes",
             "http://localhost:8080",
