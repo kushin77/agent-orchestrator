@@ -260,13 +260,32 @@ def default_provider_configs() -> dict[str, ProviderConfig]:
     }
     for name in configs:
         configs[name] = _with_fallback(configs[name], ("ollama",))
+    # Ollama's model ids are whatever the OPERATOR happens to have pulled on
+    # this host (``ollama pull <id>``) - there is no "the" default Ollama
+    # model, so a hardcoded tier map is wrong on every host that didn't pull
+    # exactly ``llama3.2``/``qwen2.5`` (issue filed: gateway/#<N>). Each tier
+    # is overridable via ``AO_OLLAMA_MODEL_<TIER>``; the literals below are
+    # only the fallback when no env var is set. ``supported_models`` is left
+    # empty (passthrough, see ``ProviderConfig.model_supported``) rather than
+    # derived from this map, so the fail-closed check never rejects a model
+    # that is genuinely installed locally but wasn't one of these four ids -
+    # the gateway cannot enumerate what an operator has pulled.
+    ollama_tiers = {
+        tier: os.environ.get(f"AO_OLLAMA_MODEL_{tier}", default)
+        for tier, default in {
+            "LOW": "llama3.2", "MED": "llama3.2",
+            "HIGH": "qwen2.5", "MAX": "qwen2.5",
+        }.items()
+    }
     configs["ollama"] = _base(
         "ollama",
         "http://localhost:11434",
         "/api/chat",
-        {"LOW": "llama3.2", "MED": "llama3.2", "HIGH": "qwen2.5", "MAX": "qwen2.5"},
+        ollama_tiers,
     )
-    configs["ollama"] = _replace(configs["ollama"], requires_key=False)
+    configs["ollama"] = _replace(
+        configs["ollama"], requires_key=False, supported_models=frozenset()
+    )
     configs["hermes"] = _replace(configs["hermes"], requires_key=False)
     return configs
 
