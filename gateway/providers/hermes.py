@@ -12,6 +12,15 @@ The frozen team mapping (EPIC #253) routes ``hermes -> hermes/ollama``: hermes
 is the primary local hop and local Ollama is its terminal fallback, declared on
 the provider config in ``providers.config.default_provider_configs()``.
 
+NAMESAKE WARNING (measured in ``docs/decision-records/ADR-0012-hermes-paperclip-boundary.md``
+§7): this provider is an Ollama-protocol endpoint serving the Hermes-3 *LLM* at
+``http://localhost:8080``. It is NOT the ``hermes-agents`` routing/capability-
+registry/tiering *service* (Flask, port 9501, ``/health`` ``/api/capabilities``
+``/api/router`` ``/api/tiering``) that the rest of this repo's fleet-dispatch
+layer adopts as the policy owner per ADR-0012. Nothing here talks to port 9501;
+both the port and the model id are deliberately a different target sharing a
+name. If you're trying to reach the routing service, this is the wrong file.
+
 ---knowledge---
 module_id: gateway.providers.hermes
 system: gateway
