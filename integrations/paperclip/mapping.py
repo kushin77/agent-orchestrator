@@ -573,3 +573,63 @@ def to_create_issue_body(
     if assignee_agent_id:
         body["assigneeAgentId"] = assignee_agent_id
     return body
+
+
+# --------------------------------------------------------------------------
+# Org chart -> upstream create-agent request body
+# --------------------------------------------------------------------------
+# The mapper's agent record (agent_id/name/role/reports_to/tier/capabilities/
+# kind) and the upstream ``createAgentSchema`` are different contracts, exactly
+# as tickets are. Measured live 2026-10-15: ``adapterType`` is REQUIRED and
+# ``capabilities`` is a STRING, not the seam's array, so the raw record would
+# 400. The seam's C-suite roles map onto the upstream enum; every other seam
+# posture (reviewer/orchestrator/sme/...) has no upstream equivalent and lands
+# as ``general`` rather than failing or inventing a role.
+SEAM_ROLE_TO_UPSTREAM_AGENT_ROLE = {
+    "ceo": "ceo",
+    "cto": "cto",
+    "cfo": "cfo",
+    "cmo": "cmo",
+    "pmo": "pm",
+}
+# The C-suite is identified by its ORG-CHART id (ceo/cto/cfo/cmo/pmo); the seam's
+# ``role`` field carries the persona posture (e.g. "orchestrator", "strategy"),
+# which only ever matched by luck. Resolve the office from the id first, then
+# fall back to a posture match, then to the upstream default.
+UPSTREAM_DEFAULT_AGENT_ROLE = "general"
+# Matches the bootstrap CEO's adapter on this deployment, so every projected
+# agent is dispatchable through the same local runtime out of the box.
+DEFAULT_AGENT_ADAPTER_TYPE = "claude_local"
+
+
+def to_create_agent_body(
+    agent: Dict[str, Any], *, reports_to_agent_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Translate one seam org-chart record into ``createAgentSchema``.
+
+    ``reports_to_agent_id`` is the RESOLVED upstream uuid of this agent's
+    ``reports_to`` (a second pass, after the parent exists). The seam identity is
+    preserved in ``metadata`` — that is the tag the sync matches on, so a renamed
+    upstream display name never orphans the projection.
+    """
+    capabilities = agent.get("capabilities") or []
+    seam_id = str(agent["agent_id"])
+    office_role = SEAM_ROLE_TO_UPSTREAM_AGENT_ROLE.get(seam_id) or SEAM_ROLE_TO_UPSTREAM_AGENT_ROLE.get(
+        str(agent.get("role", "")), UPSTREAM_DEFAULT_AGENT_ROLE
+    )
+    body: Dict[str, Any] = {
+        "name": str(agent.get("name") or seam_id),
+        "role": office_role,
+        "adapterType": DEFAULT_AGENT_ADAPTER_TYPE,
+        "capabilities": ", ".join(str(c) for c in capabilities),
+        "metadata": {
+            "seam_agent_id": seam_id,
+            "seam_reports_to": str(agent.get("reports_to", "")),
+            "seam_tier": str(agent.get("tier", "")),
+            "seam_kind": str(agent.get("kind", "")),
+            "managed_by": "agent-orchestrator",
+        },
+    }
+    if reports_to_agent_id:
+        body["reportsTo"] = reports_to_agent_id
+    return body

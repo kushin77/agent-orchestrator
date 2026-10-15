@@ -146,6 +146,47 @@ def _append_ledger(path: "Path | None", ids: list) -> None:
             handle.write(f"{ticket_id}\n")
 
 
+def _rows(response: object, *keys: str) -> list:
+    """Read a list payload from a Response, tolerating an envelope or a bare list."""
+    body = getattr(response, "body", None)
+    if isinstance(body, list):
+        return body
+    if isinstance(body, dict):
+        for key in keys:
+            rows = body.get(key)
+            if isinstance(rows, list):
+                return rows
+    return []
+
+
+def _agent_index(client: "client_mod.PaperclipClient") -> dict:
+    """Map upstream agent id, name, and ``metadata.seam_agent_id`` -> upstream id.
+
+    Resolving three ways is what makes the projection idempotent AND adoptable: a
+    pre-existing agent (the bootstrap ``CEO``) is reused by name instead of
+    duplicated, and a lost ledger still recovers assignees from the metadata tag.
+    """
+    index: dict = {}
+    try:
+        rows = _rows(client.agents(), "agents", "items")
+    except PaperclipError:
+        return index
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("id"):
+            continue
+        agent_id = str(row["id"])
+        index[agent_id] = agent_id
+        name = row.get("name")
+        if name:
+            index[str(name)] = agent_id
+            index[str(name).lower()] = agent_id
+        meta = row.get("metadata") or {}
+        seam = meta.get("seam_agent_id") if isinstance(meta, dict) else None
+        if seam:
+            index[str(seam)] = agent_id
+    return index
+
+
 def cmd_push(args: argparse.Namespace) -> int:
     root = _root(args)
     plan = mapping_mod.build_plan(root, company_id=args.company, session_id=args.session_id)
@@ -173,26 +214,68 @@ def cmd_push(args: argparse.Namespace) -> int:
     # authoritative for "already pushed", and the board read is a best-effort
     # safety net for a lost/rebuilt ledger.
     ledger_path = Path(args.state_file).expanduser() if args.state_file else None
+    agent_ledger_path = (
+        Path(args.agent_state_file).expanduser() if args.agent_state_file else None
+    )
     sent = 0
     skipped = 0
+    agents_sent = 0
+    agents_skipped = 0
     newly: list = []
+    new_agents: list = []
     try:
         client.health()
+        # 1) Project the ORG CHART first (idempotent, ledger-backed) so that step 2
+        #    can carry a real assigneeAgentId — the upstream refuses in_progress
+        #    without one, so order matters, not just tidiness.
+        agent_ids = _agent_index(client)
+        for agent in plan["agents"]:
+            seam_id = str(agent["agent_id"])
+            name = str(agent.get("name") or seam_id)
+            resolved = agent_ids.get(seam_id) or agent_ids.get(name) or agent_ids.get(name.lower())
+            if resolved:
+                agent_ids[seam_id] = resolved
+                agents_skipped += 1
+                continue
+            hired = client.create_agent_hire(mapping_mod.to_create_agent_body(agent))
+            body = getattr(hired, "body", None) or {}
+            approval = body.get("approval") or {}
+            if args.approve_hires and approval.get("id"):
+                client.approve(
+                    str(approval["id"]),
+                    "owner-authorized org projection (agent-orchestrator sync)",
+                )
+            agents_sent += 1
+            new_agents.append(seam_id)
+            created_id = str((body.get("agent") or {}).get("id") or "")
+            if created_id:
+                agent_ids[seam_id] = created_id
+        _append_ledger(agent_ledger_path, new_agents)
+        # 2) Tickets, owner resolved to an upstream agent id where we have one.
         existing = _existing_billing_codes(client) | _load_ledger(ledger_path)
         for ticket in plan["tickets"]:
             if ticket["id"] in existing:
                 skipped += 1
                 continue
-            client.create_issue(mapping_mod.to_create_issue_body(ticket))
+            client.create_issue(
+                mapping_mod.to_create_issue_body(
+                    ticket, assignee_agent_id=agent_ids.get(str(ticket.get("owner", "")))
+                )
+            )
             sent += 1
             newly.append(ticket["id"])
     except PaperclipError as exc:
         _append_ledger(ledger_path, newly)
-        print(f"push: FAILED after {sent} ticket(s) — {exc}", file=sys.stderr)
+        _append_ledger(agent_ledger_path, new_agents)
+        print(
+            f"push: FAILED after {sent} ticket(s) / {agents_sent} agent(s) — {exc}",
+            file=sys.stderr,
+        )
         return 1
     _append_ledger(ledger_path, newly)
     print(
-        f"push: sent {sent} ticket(s), skipped {skipped} already-present, "
+        f"push: agents sent {agents_sent} (skipped {agents_skipped}); "
+        f"tickets sent {sent}, skipped {skipped}, "
         f"to {args.base_url}/api/companies/{args.company}"
     )
     return 0
@@ -221,6 +304,12 @@ def build_parser() -> argparse.ArgumentParser:
     push.add_argument("--token", default="", help="upstream agent key / JWT / board token (or $PAPERCLIP_TOKEN)")
     push.add_argument("--run-id", default=None, help="X-Paperclip-Run-Id for mutating calls (must reference an existing heartbeat run)")
     push.add_argument("--state-file", default="", help="pushed-ticket ledger; makes re-runs idempotent beyond the upstream page cap")
+    push.add_argument("--agent-state-file", default="", help="pushed-agent ledger (seam agent ids); idempotent org-chart projection")
+    push.add_argument(
+        "--approve-hires",
+        action="store_true",
+        help="resolve the hire approval each projection creates (the company requires board approval for new agents)",
+    )
     push.add_argument("--dry-run", action="store_true", help="print what would be sent")
     push.set_defaults(func=cmd_push)
     return parser

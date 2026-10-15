@@ -210,6 +210,25 @@ class PaperclipClient:
     def agents(self) -> Response:
         return self.transport.request("GET", self._company_path("agents"))
 
+    def create_agent_hire(self, payload: Dict[str, Any]) -> Response:
+        """Request an agent hire (the governed create path).
+
+        A company with ``requireBoardApprovalForNewAgents`` rejects POST /agents
+        with 409 and names this route; it returns ``{agent, approval}`` with the
+        agent in ``pending_approval`` until the approval is resolved.
+        """
+        return self.transport.request(
+            "POST", self._company_path("agent-hires"), json=payload
+        )
+
+    def approve(self, approval_id: str, note: str = "") -> Response:
+        """Resolve a pending approval (``decisionNote`` is optional upstream)."""
+        return self.transport.request(
+            "POST",
+            f"/api/approvals/{approval_id}/approve",
+            json={"decisionNote": note or None},
+        )
+
     def issues(self) -> Response:
         return self.transport.request("GET", self._company_path("issues"))
 
