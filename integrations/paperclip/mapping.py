@@ -483,3 +483,93 @@ def activity_from_audit(record: Dict[str, Any]) -> Activity:
 def map_audit_activities(records: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Project audit records into the ``Activity`` records the /api surface carries."""
     return [activity_from_audit(record).to_dict() for record in records]
+
+
+# --------------------------------------------------------------------------
+# Seam ticket -> upstream create-issue request body
+# --------------------------------------------------------------------------
+# The seam ticket (``docs/contracts/paperclip/ticket.schema.json``) and the
+# upstream ``createIssueSchema`` are DIFFERENT contracts by design: the seam is
+# the fleet's vocabulary (id/owner/status/blocked_by/goal/evidence), the upstream
+# body is the issue surface's. ``cmd_push`` sent the raw ticket, so the upstream
+# returned HTTP 400 `title: Required` on every record — measured live against
+# paperclip 2026-10-15. This is the one translation, kept here so a lane extends
+# *this* module (ADR-0016) rather than inventing a second one.
+#
+#   * ``title``       — upstream requires minLength 1; synthesized as
+#                       ``<ticket-id> — <goal>`` (stable, greppable, unique).
+#   * ``status``      — the seam spells ``in-progress``/``in-review``; upstream
+#                       spells ``in_progress``/``in_review`` (ISSUE_STATUSES).
+#                       An unmapped value degrades to ``backlog``, never fails.
+#   * ``billingCode`` — the seam ticket id. This is the idempotency key: a re-run
+#                       reads the board and skips what is already there, so the
+#                       sync is safe to schedule (DRY, no duplicates).
+#   * ``blocked_by``  — seam ids are fleet refs (``repo#N``), not upstream uuids,
+#                       so they ride in ``description`` instead of
+#                       ``blockedByIssueIds``.
+SEAM_STATUS_TO_UPSTREAM = {
+    "in-progress": "in_progress",
+    "in-review": "in_review",
+    "blocked": "blocked",
+    "done": "done",
+}
+UPSTREAM_DEFAULT_STATUS = "backlog"
+# Upstream: `in_progress`/`in_review` are REFUSED (HTTP 422, "in_progress issues
+# require an assignee") unless the issue carries an assignee. The seam's
+# ``owner`` is an agent NAME (a fleet principal), not an upstream agent uuid, and
+# the agent projection is a separate push — so an owner that has not (yet) been
+# resolved to an upstream agent id lands as ``todo`` rather than failing the
+# whole sync. Measured live 2026-10-15.
+STATUSES_REQUIRING_ASSIGNEE = frozenset({"in_progress", "in_review"})
+UNASSIGNED_FALLBACK_STATUS = "todo"
+
+
+def _evidence_line(item: Any) -> str:
+    """Render one evidence entry (v1 bare string OR v2 structured receipt)."""
+    if isinstance(item, str):
+        return item
+    import json as _json
+
+    return _json.dumps(item, sort_keys=True)
+
+
+def to_create_issue_body(
+    ticket: Dict[str, Any], *, assignee_agent_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """Translate one seam ticket into the upstream ``createIssueSchema`` body.
+
+    ``assignee_agent_id`` is the RESOLVED upstream agent uuid for the ticket's
+    owner, when the caller has one (the agent projection maps ``owner`` names to
+    upstream ids). Absent it, an in-progress/in-review ticket degrades to
+    :data:`UNASSIGNED_FALLBACK_STATUS` so the upstream's assignee rule cannot
+    fail the batch.
+    """
+    ticket_id = str(ticket["id"])
+    goal = str(ticket.get("goal", ""))
+    status = SEAM_STATUS_TO_UPSTREAM.get(str(ticket.get("status", "")), UPSTREAM_DEFAULT_STATUS)
+    if assignee_agent_id is None and status in STATUSES_REQUIRING_ASSIGNEE:
+        status = UNASSIGNED_FALLBACK_STATUS
+    evidence = ticket.get("evidence") or []
+    lines = [
+        f"Seam ticket `{ticket_id}`",
+        f"owner: {ticket.get('owner', '')}",
+        f"status: {ticket.get('status', '')}",
+        f"goal: {goal}",
+    ]
+    blocked = ticket.get("blocked_by") or []
+    if blocked:
+        lines.append("blocked_by: " + ", ".join(str(b) for b in blocked))
+    lines.append("")
+    lines.append("Evidence:")
+    lines.extend(f"- {_evidence_line(e)}" for e in evidence)
+    if not evidence:
+        lines.append("- (none)")
+    body: Dict[str, Any] = {
+        "title": f"{ticket_id} — {goal}" if goal else ticket_id,
+        "description": "\n".join(lines),
+        "status": status,
+        "billingCode": ticket_id,
+    }
+    if assignee_agent_id:
+        body["assigneeAgentId"] = assignee_agent_id
+    return body

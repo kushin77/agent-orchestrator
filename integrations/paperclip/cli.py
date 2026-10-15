@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -103,12 +104,42 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _existing_billing_codes(client: "client_mod.PaperclipClient") -> set:
+    """Collect the ``billingCode`` of every issue already on the upstream board.
+
+    The translator stamps ``billingCode`` with the seam ticket id, so this is the
+    idempotency key: a scheduled re-run skips what already landed instead of
+    duplicating the board (DRY; the sync is safe to put on a timer).
+    """
+    try:
+        response = client.issues()
+    except PaperclipError:
+        return set()
+    body = getattr(response, "body", None)
+    if isinstance(body, dict):
+        rows = body.get("issues") or body.get("items") or []
+    elif isinstance(body, list):
+        rows = body
+    else:
+        rows = []
+    codes = set()
+    for row in rows:
+        if isinstance(row, dict) and row.get("billingCode"):
+            codes.add(str(row["billingCode"]))
+    return codes
+
+
 def cmd_push(args: argparse.Namespace) -> int:
     root = _root(args)
     plan = mapping_mod.build_plan(root, company_id=args.company, session_id=args.session_id)
+    # Token precedence: explicit --token, else $PAPERCLIP_TOKEN. The env path is
+    # what the deployment wrapper uses: a secret on the command line is visible in
+    # `ps`/`/proc/*/cmdline` to every local user, so the scheduled sync never
+    # passes it as an argument.
+    token = args.token or os.environ.get("PAPERCLIP_TOKEN", "")
     client = client_mod.PaperclipClient(
         args.base_url,
-        token=args.token,
+        token=token,
         company_id=args.company,
         run_id=args.run_id,
     )
@@ -119,15 +150,28 @@ def cmd_push(args: argparse.Namespace) -> int:
         )
         return 0
     sent = 0
+    skipped = 0
     try:
         client.health()
+        existing = _existing_billing_codes(client)
+        if existing:
+            print(
+                f"push: {len(existing)} issue(s) already on the board — skipping those",
+                file=sys.stderr,
+            )
         for ticket in plan["tickets"]:
-            client.create_issue(ticket)
+            if ticket["id"] in existing:
+                skipped += 1
+                continue
+            client.create_issue(mapping_mod.to_create_issue_body(ticket))
             sent += 1
     except PaperclipError as exc:
         print(f"push: FAILED after {sent} ticket(s) — {exc}", file=sys.stderr)
         return 1
-    print(f"push: sent {sent} ticket(s) to {args.base_url}/api/companies/{args.company}")
+    print(
+        f"push: sent {sent} ticket(s), skipped {skipped} already-present, "
+        f"to {args.base_url}/api/companies/{args.company}"
+    )
     return 0
 
 
