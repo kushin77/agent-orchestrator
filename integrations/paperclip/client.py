@@ -232,6 +232,18 @@ class PaperclipClient:
     def issues(self) -> Response:
         return self.transport.request("GET", self._company_path("issues"))
 
+    def issues_by_status(self, status: str, *, limit: int = 1000) -> Response:
+        """List the issues in one status bucket.
+
+        The upstream list is page-capped (``ISSUE_LIST_MAX_LIMIT`` = 1000) and
+        exposes no offset, so a whole-board read silently truncates. Sweeping one
+        status at a time keeps every bucket inside the cap, which is the only
+        way this surface can be enumerated.
+        """
+        return self.transport.request(
+            "GET", f"{self._company_path('issues')}?status={status}&limit={int(limit)}"
+        )
+
     def costs(self) -> Response:
         return self.transport.request("GET", self._company_path("costs"))
 

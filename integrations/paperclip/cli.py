@@ -281,6 +281,59 @@ def cmd_push(args: argparse.Namespace) -> int:
     return 0
 
 
+# Statuses where an owner is actionable. Closed history (done/cancelled) is
+# deliberately out of scope: a finished ticket needs no assignee, and enumerating
+# 1000+ done rows would sit right on the page cap for no benefit.
+ASSIGNABLE_STATUSES = ("todo", "blocked", "in_progress", "in_review", "backlog")
+
+
+def cmd_assign(args: argparse.Namespace) -> int:
+    """Backfill ``assigneeAgentId`` on open issues from the seam plan's owner.
+
+    Tickets created before the org chart existed carry no assignee, because the
+    seam owner is an agent NAME and an agent id did not exist yet. The projection
+    creates the agents; this closes the loop so work in flight has an owner, by
+    PATCHing the existing issues rather than re-sending them (which the ticket
+    ledger would skip, and a re-send would duplicate).
+    """
+    plan = mapping_mod.build_plan(
+        _root(args), company_id=args.company, session_id=args.session_id
+    )
+    owner_by_code = {
+        str(ticket["id"]): str(ticket.get("owner", "")) for ticket in plan["tickets"]
+    }
+    # Same token precedence as push: explicit --token, else $PAPERCLIP_TOKEN, so a
+    # secret never has to appear on the command line.
+    token = args.token or os.environ.get("PAPERCLIP_TOKEN", "")
+    client = client_mod.PaperclipClient(
+        args.base_url,
+        token=token,
+        company_id=args.company,
+        run_id=args.run_id,
+    )
+    assigned = 0
+    skipped = 0
+    try:
+        client.health()
+        agent_ids = _agent_index(client)
+        for status in ASSIGNABLE_STATUSES:
+            for issue in _rows(client.issues_by_status(status), "issues", "items"):
+                if not isinstance(issue, dict) or not issue.get("id"):
+                    continue
+                code = str(issue.get("billingCode") or "")
+                wanted = agent_ids.get(owner_by_code.get(code, ""))
+                if not wanted or str(issue.get("assigneeAgentId") or "") == wanted:
+                    skipped += 1
+                    continue
+                client.update_issue(str(issue["id"]), {"assigneeAgentId": wanted})
+                assigned += 1
+    except PaperclipError as exc:
+        print(f"assign: FAILED after {assigned} — {exc}", file=sys.stderr)
+        return 1
+    print(f"assign: assigned {assigned}, skipped {skipped} (already owned / no mapping)")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="paperclip-adapter",
@@ -312,6 +365,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     push.add_argument("--dry-run", action="store_true", help="print what would be sent")
     push.set_defaults(func=cmd_push)
+
+    assign = sub.add_parser(
+        "assign",
+        help="backfill owners on open issues now that the org chart exists",
+    )
+    assign.add_argument("--base-url", required=True, help="upstream server root")
+    assign.add_argument("--token", default="", help="upstream board token (or $PAPERCLIP_TOKEN)")
+    assign.add_argument("--run-id", default=None, help="X-Paperclip-Run-Id for mutating calls")
+    assign.set_defaults(func=cmd_assign)
     return parser
 
 
