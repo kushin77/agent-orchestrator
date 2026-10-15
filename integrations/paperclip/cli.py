@@ -129,6 +129,23 @@ def _existing_billing_codes(client: "client_mod.PaperclipClient") -> set:
     return codes
 
 
+def _load_ledger(path: "Path | None") -> set:
+    """Read the pushed-ticket ledger (one seam ticket id per line)."""
+    if path is None or not path.exists():
+        return set()
+    return {line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()}
+
+
+def _append_ledger(path: "Path | None", ids: list) -> None:
+    """Append newly-pushed ticket ids to the ledger (create-if-missing)."""
+    if path is None or not ids:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        for ticket_id in ids:
+            handle.write(f"{ticket_id}\n")
+
+
 def cmd_push(args: argparse.Namespace) -> int:
     root = _root(args)
     plan = mapping_mod.build_plan(root, company_id=args.company, session_id=args.session_id)
@@ -149,25 +166,31 @@ def cmd_push(args: argparse.Namespace) -> int:
             f"{args.base_url}/api/companies/{args.company}/issues"
         )
         return 0
+    # Idempotency has TWO sources on purpose. The upstream list endpoint is
+    # page-capped (no offset), so on a board larger than one page it CANNOT be
+    # enumerated -- a list-only dedupe silently re-sent 395 tickets and produced
+    # 948 duplicate rows (measured 2026-10-15). The ledger is therefore
+    # authoritative for "already pushed", and the board read is a best-effort
+    # safety net for a lost/rebuilt ledger.
+    ledger_path = Path(args.state_file).expanduser() if args.state_file else None
     sent = 0
     skipped = 0
+    newly: list = []
     try:
         client.health()
-        existing = _existing_billing_codes(client)
-        if existing:
-            print(
-                f"push: {len(existing)} issue(s) already on the board — skipping those",
-                file=sys.stderr,
-            )
+        existing = _existing_billing_codes(client) | _load_ledger(ledger_path)
         for ticket in plan["tickets"]:
             if ticket["id"] in existing:
                 skipped += 1
                 continue
             client.create_issue(mapping_mod.to_create_issue_body(ticket))
             sent += 1
+            newly.append(ticket["id"])
     except PaperclipError as exc:
+        _append_ledger(ledger_path, newly)
         print(f"push: FAILED after {sent} ticket(s) — {exc}", file=sys.stderr)
         return 1
+    _append_ledger(ledger_path, newly)
     print(
         f"push: sent {sent} ticket(s), skipped {skipped} already-present, "
         f"to {args.base_url}/api/companies/{args.company}"
@@ -195,8 +218,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     push = sub.add_parser("push", help="send the plan to the upstream /api surface")
     push.add_argument("--base-url", required=True, help="upstream server root")
-    push.add_argument("--token", default="", help="upstream agent key / JWT / board token")
-    push.add_argument("--run-id", default=None, help="X-Paperclip-Run-Id for mutating calls")
+    push.add_argument("--token", default="", help="upstream agent key / JWT / board token (or $PAPERCLIP_TOKEN)")
+    push.add_argument("--run-id", default=None, help="X-Paperclip-Run-Id for mutating calls (must reference an existing heartbeat run)")
+    push.add_argument("--state-file", default="", help="pushed-ticket ledger; makes re-runs idempotent beyond the upstream page cap")
     push.add_argument("--dry-run", action="store_true", help="print what would be sent")
     push.set_defaults(func=cmd_push)
     return parser
