@@ -231,8 +231,21 @@ marker_self_test() {
   return "$rc"
 }
 
+# Shared file enumerator for every docs/link/whitespace gate.
+#
+# `--others` is deliberate (untracked-but-not-ignored files are still product
+# files), but it drags in agent scratch worktrees and fleet snapshot trees,
+# which are NOT this checkout: `.claude/worktrees/` holds per-agent scratch
+# checkouts and `.fleet/` holds read-only release-train snapshots. Scanning them
+# produced FAILs for files nobody owns here (trailing whitespace in another
+# agent's MIGRATION_NOTES.md, links to paths that exist in a different tree).
+# Excluding them centrally keeps every gate that uses this helper honest, instead
+# of each gate growing its own copy of the list.
 repo_files() {
-  git ls-files --cached --others --exclude-standard -- "$@"
+  git ls-files --cached --others --exclude-standard -- "$@" \
+    ':(exclude).claude/worktrees/**' \
+    ':(exclude).fleet/**' \
+    ':(exclude).playwright-mcp/**'
 }
 
 
