@@ -73,14 +73,25 @@ def main():
     if not missing:
         print("docs-index-fix: nothing to add, index already covers every tracked doc")
 
-    # Locate the "## Canonical docs" table: header line, "| Doc | Purpose |",
-    # separator, then rows until the first non-"| " line.
+    # Locate the "## Canonical docs" table. A blank line sits between the
+    # section header and the table, so the positions are found by scanning
+    # rather than assumed: the first "|" line after the header is the column
+    # header ("| Doc | Purpose |"), the next "|" line is the separator
+    # ("|-----|---------|"), and the data rows start after it. Header and
+    # separator are preserved verbatim at the top of the table; only data
+    # rows are sorted. Folding the separator into the sortable rows would
+    # sort it to the bottom and break the table.
     try:
         hidx = next(i for i, l in enumerate(lines) if l.strip() == SECTION_HEADER)
     except StopIteration:
         print(f"docs-index-fix: FAIL — {SECTION_HEADER!r} not found in {README}", file=sys.stderr)
         return 2
-    row_start = hidx + 3  # header, "| Doc | Purpose |", "|---|---|"
+    hline = next((i for i in range(hidx + 1, len(lines)) if lines[i].startswith("|")), None)
+    if hline is None or hline + 1 >= len(lines) or "---" not in lines[hline + 1]:
+        print(f"docs-index-fix: FAIL — no table header + separator under {SECTION_HEADER!r} "
+              f"in {README}", file=sys.stderr)
+        return 2
+    row_start = hline + 2
     row_end = row_start
     while row_end < len(lines) and lines[row_end].startswith("|"):
         row_end += 1

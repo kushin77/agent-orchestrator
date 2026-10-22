@@ -23,10 +23,10 @@ body:
     validations:
       required: true
   - type: textarea
-    id: steps
+    id: reproduction
     attributes:
       label: Steps to reproduce
-      description: Numbered, minimal, runnable. Include the repo/path and commands.
+      description: Numbered, minimal, runnable. Include the repo and path. Include the commands.
       placeholder: |
         1. ...
         2. ...
@@ -72,6 +72,80 @@ body:
         - priority:P2
         - priority:P3
       default: 2
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How serious the defect is. Each option maps to a triage action in `guardrails/isolation/model.py`. Do not add a rung.
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true
+  - type: input
+    id: parent_epic
+    attributes:
+      label: Parent epic
+      description: "The epic this defect belongs to. Write a bare reference (e.g. #1510)."
+      placeholder: "#1510"
+    validations:
+      required: true
+  - type: dropdown
+    id: model_tier
+    attributes:
+      label: Model tier
+      description: The tier this work starts at on the escalation ladder. The options are L0, L1 and L2. This is NOT the FinOps executor tier (`model-tier`). The two vocabularies are separate.
+      options:
+        - L0
+        - L1
+        - L2
+    validations:
+      required: true
+  - type: textarea
+    id: root_cause
+    attributes:
+      label: Root cause
+      description: The symptom, the mechanism (name the file and the line), the governance gap that let it through, and what would have caught it earlier. Write `RCA required, Step 1` when the cause is not yet known.
+      value: |
+        **Symptom:**
+        **Mechanism:** `<file>:<line>`
+        **Governance gap:**
+        **Earlier catch:**
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: rca
+    attributes:
+      label: RCA record
+      description: The link to the root-cause record in `governance/lessons/` that this defect feeds. Write the path or the RCA issue number. Write `N/A` only when the defect is not incident-class.
+      placeholder: "governance/lessons/<record>.md or #<rca-issue>"
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: lifecycle_contract
+    attributes:
+      label: Lifecycle contract
+      description: Acknowledge the closure contract before filing. `governance/lifecycle/cli.py close` drives these invariants.
+      options:
+        - label: "I will close this only via a merged PR with `Closes #n` plus acceptance and negative-control evidence, own it to closure, and use the escalation protocol for handoff."
+          required: true
+    validations:
+      required: true
+  - type: textarea
+    id: escalation
+    attributes:
+      label: Escalation
+      description: The sanctioned handoff path. Make 3 attempts at the stated tier. Then write a comment that names the exact failure, add an `escalate:L1` or `escalate:L2` label, and stop. Silent abandonment is not a handoff.
+      value: |
+        N = 3 attempts at <tier>.
+        Then — a comment naming the exact failure, the `escalate:<L1|L2>` label, and stop.
+      render: text
     validations:
       required: true
   - type: checkboxes
