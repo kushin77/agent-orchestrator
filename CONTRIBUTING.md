@@ -9,10 +9,11 @@
 - **Updated-by:** qa-sme (2026-09-12)
 - **Landed-by:** 9d61bf5
 
-> **New to the CMR program?** Start at the official onboarding process —
-> [`docs/ONBOARDING.md`](docs/ONBOARDING.md) — it routes every role (owner, SME, lane agent,
-> vendor, spoke consumer, repo role) to its canonical instruction files, checklist, gate, and
-> "onboarded" record. This file is the human contributor's working guide **once onboarded**.
+> **New to the CMR program?** Start at [`AGENTS.md`](AGENTS.md) — the
+> precedence-ordered doctrine every role (owner, SME, lane agent, vendor, spoke
+> consumer, repo role) reads first — then at [`docs/README.md`](docs/README.md),
+> the index of every canonical doc. This file is the human contributor's
+> working guide once you have read those.
 
 CMR is the **hub / control plane** for the `kushin77` ecosystem. Start here:
 

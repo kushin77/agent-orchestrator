@@ -43,6 +43,7 @@ Index of the repo's canonical documentation. Agents start at
 | [`GOVERNANCE.md`](GOVERNANCE.md) | Branch, provenance, session-label, review/merge conventions. |
 | [`INDEXER-CATALOG-CLASSIFICATION.md`](INDEXER-CATALOG-CLASSIFICATION.md) | Indexer catalog classification — the stub cannot be mechanical |
 | [`INFRA-LIMITS.md`](INFRA-LIMITS.md) | The sandbox + ephemeral-storage contract — the blocked network, the read-only-except-workspace filesystem, the shared `/tmp` tmpfs, the write-is-not-a-write-until-read-back rule, and the `scripts/check-infra-limits.sh` guard that enforces them (EPIC #708, issue #729). |
+| [`MODEL-PROFILES.md`](MODEL-PROFILES.md) | Canonical model-selection ladder for dispatching subagents — what the `fleet/MANIFEST.tsv` `tier` column's L0/L1/L2 mean and how they map onto DeepSeek Flash (mechanical) and DeepSeek Pro (judgment); the machine-readable resolver is `fleet/dispatch.sh model`. |
 | [`MODULE-ADMISSION.md`](MODULE-ADMISSION.md) | The parent-side sub-module admission contract — what a sub-module is, what each side declares, and what a module must not inherit (EPIC #422, issue #423). |
 | [`MODULE-SCAFFOLD.md`](MODULE-SCAFFOLD.md) | Module scaffold — the de facto shape of a new internal module |
 | [`PAPERCLIP-ING-DEPLOY.md`](PAPERCLIP-ING-DEPLOY.md) | The self-hosted paperclip runtime runbook — declaration-only, enabled by default (AO-GR-6), pinned upstream release, offline `/api/health` probe (issue #411). |

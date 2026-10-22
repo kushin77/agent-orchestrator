@@ -140,6 +140,92 @@ body:
       default: 1
     validations:
       required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Purpose
+      description: One paragraph. Why this epic exists, in the fleet's terms.
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: The single measurable outcome this epic delivers. State the end state, not the activity.
+    validations:
+      required: true
+  - type: textarea
+    id: measured-landscape
+    attributes:
+      label: Measured landscape
+      description: What is true today, measured. Name the files, counts, and gate output that prove the starting point. An unmeasured claim is not a landscape.
+    validations:
+      required: true
+  - type: textarea
+    id: children
+    attributes:
+      label: Children
+      description: The child issues that make up this epic, as bare references. One per line.
+      placeholder: |
+        - #1510
+        - #1511
+    validations:
+      required: true
+  - type: textarea
+    id: verification-contract
+    attributes:
+      label: Verification contract
+      description: The commands that prove this epic is done, and the evidence each one leaves. An agent must be able to run these and read a verdict.
+      value: |
+        Verify:
+        Evidence:
+    validations:
+      required: true
+  - type: dropdown
+    id: model_tier
+    attributes:
+      label: Model tier
+      description: The tier work under this epic starts at on the escalation ladder. The options are L0, L1 and L2. This is NOT the FinOps executor tier (`model-tier`).
+      options:
+        - L0
+        - L1
+        - L2
+    validations:
+      required: true
+  - type: textarea
+    id: root_cause
+    attributes:
+      label: Root cause
+      description: The gap this epic closes, and the mechanism that produces it today. Name the file and the line. Write `RCA required, Step 1` when the cause is not yet known.
+      value: |
+        **Symptom:**
+        **Mechanism:** `<file>:<line>`
+        **Governance gap:**
+        **Earlier catch:**
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: lifecycle_contract
+    attributes:
+      label: Lifecycle contract
+      description: Acknowledge the closure contract before filing. `governance/lifecycle/cli.py close` drives these invariants.
+      options:
+        - label: "I will close this only via a merged PR with `Closes #n` plus acceptance and negative-control evidence, own it to closure, and use the escalation protocol for handoff."
+          required: true
+    validations:
+      required: true
+  - type: textarea
+    id: escalation
+    attributes:
+      label: Escalation
+      description: The sanctioned handoff path. Make 3 attempts at the stated tier. Then write a comment that names the exact failure, add an `escalate:L1` or `escalate:L2` label, and stop. Silent abandonment is not a handoff.
+      value: |
+        N = 3 attempts at <tier>.
+        Then — a comment naming the exact failure, the `escalate:<L1|L2>` label, and stop.
+      render: text
+    validations:
+      required: true
   - type: checkboxes
     id: area
     attributes:
