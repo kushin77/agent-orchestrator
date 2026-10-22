@@ -62,7 +62,10 @@ ladder:
       failure only. The MAX registry tier (advisor-only, decisions-only) is
       out of scope for the chooser and is never returned as a routing target.
     models:
-      - { id: deepseek-v4-pro-thinking, provider: deepseek, costPerMTok: 0.46, role: primary }
+      # L2 uses the L1 model at high reasoning effort. The DeepSeek API rejects
+      # the model id `deepseek-v4-pro-thinking` with HTTP 400. Reasoning effort
+      # is a request parameter, not part of the model id.
+      - { id: deepseek-v4-pro, provider: deepseek, costPerMTok: 0.46, reasoning_effort: high, role: primary }
       - { id: claude-opus-5, provider: anthropic, costPerMTok: 15.00, role: fallback }
 
 # ── Task classes: cheapest-capable default tier + escalation cap ─────
