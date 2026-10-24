@@ -40,6 +40,8 @@ done < <(find . -type f -name '*.sh' \
   -not -path './vendor/*' \
   -not -path './.research/*' \
   -not -path './.claude/worktrees/*' \
+  -not -path './.fleet/*' \
+  -not -path './.playwright-mcp/*' \
   | LC_ALL=C sort)
 
 if [ "$failed" -ne 0 ]; then
