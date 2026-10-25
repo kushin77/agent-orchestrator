@@ -37,9 +37,11 @@
 # existing external `shared-services-net`. The shared-services run half lifts it
 # into its own repo (recommended: `infra/docker-compose.agentconsole.yml`) and
 # brings it up with the console surface flag promoted. Until BOTH happen the
-# console is not exposed: `surfaces.operator_terminal` ships default OFF, and the
-# flag is checked BEFORE authentication, so `/console` and its view answer 404
-# `feature_disabled` rather than being merely unauthorised.
+# console's source declaration currently enables `surfaces.operator_terminal`
+# by default. The flag is checked BEFORE authentication, so an explicit OFF
+# still makes `/console` and its view answer 404 `feature_disabled` rather than
+# being merely unauthorised. The overlay remains a declaration; this repo does
+# not apply it to the live cluster.
 # Full contract: docs/AGENTCONSOLE-HOSTING.md.
 #
 # ── what the service runs ───────────────────────────────────────────────────

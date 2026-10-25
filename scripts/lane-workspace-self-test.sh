@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+# ---knowledge---
+# module_id: scripts.lane-workspace-self-test
+# system: testing
+# app: isolation
+# solution_class: enterprise
+# patterns: [negative-control, adversarial-fixture]
+# derives_from: ops/lane-workspace.sh
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [exit 0 when every planted guard passes]
+# invariants: "each guard refusal is load-bearing and the live helper is never weakened"
+# gotchas: "fixture repositories must remain outside the shared mirror"
+# related: ["#667"]
+# do_not_duplicate: null
+# ---knowledge---
 # ============================================================================
 # scripts/lane-workspace-self-test.sh — GR-12 adversarial self-test for
 # ops/lane-workspace.sh (ADR-0036 / GR-30).
@@ -26,7 +41,7 @@ FAIL=0
 pass() { printf '  \033[32mPASS\033[0m %s\n' "$*"; }
 badr() { printf '  \033[31mFAIL\033[0m %s\n' "$*"; FAIL=1; }
 
-WORK="$(mktemp -d)"
+WORK="$(mktemp -d /tmp/ao-lane-workspace.XXXXXX)"
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 
@@ -46,7 +61,7 @@ git -C "$MIRROR" add marker.txt
 git -C "$MIRROR" commit -qm "main commit"
 git -C "$MIRROR" remote add origin "$BARE"
 git -C "$MIRROR" push -q -u origin main
-git -C "$BARE" symbolic-ref HEAD refs/heads/main
+git --git-dir="$BARE" symbolic-ref HEAD refs/heads/main
 git -C "$MIRROR" symbolic-ref -q refs/remotes/origin/HEAD >/dev/null 2>&1 || \
   git -C "$MIRROR" remote set-head origin main
 

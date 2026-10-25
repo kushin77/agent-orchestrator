@@ -222,7 +222,17 @@ mutated["surfaces"] = dict(registry["surfaces"])
 mutated["surfaces"]["operator_terminal"] = dict(entry)
 mutated["surfaces"]["operator_terminal"]["default"] = "off"
 scratch.write_text(yaml.safe_dump(mutated), encoding="utf-8")
-flipped = read_surface_default(ROOT, registry_path=scratch, surface="operator_terminal")
+no_live_promotion = (
+    Path("/tmp")
+    / f"ao774-no-live-promotion.{os.getpid()}.{int(time.time() * 1000)}.yaml"
+)
+no_live_state = no_live_promotion.with_name(no_live_promotion.stem + "-state.json")
+flipped = read_surface_default(
+    ROOT,
+    registry_path=scratch,
+    surface="operator_terminal",
+    live_state_path=no_live_promotion,
+)
 scratch.unlink(missing_ok=True)
 if flipped == "off":
     ok("MUTATION: flipping the flag to 'off' makes the reader say 'off' (the gate is the flag, not a hardcoded 'on')")
@@ -572,15 +582,20 @@ unpromoted_doc["surfaces"]["operator_terminal"]["default"] = "off"
 unpromoted_doc["surfaces"]["operator_terminal"]["promoted"] = False
 unpromoted_work.write_text(yaml.safe_dump(unpromoted_doc, sort_keys=False), encoding="utf-8")
 
+nc_env_names = ("AO_SURFACE_REGISTRY", "AO_SURFACE_STATE", "AO_ROLLOUT_LIVE_STATE")
+nc_starting_env = {name: os.environ.get(name) for name in nc_env_names}
+# This negative control isolates the static registry flag; a committed live
+# promotion would otherwise correctly override the deliberately unpromoted row.
+os.environ["AO_ROLLOUT_LIVE_STATE"] = str(no_live_promotion)
+os.environ["AO_SURFACE_STATE"] = str(no_live_state)
 unpromoted_readiness = readiness(ROOT, "operator_terminal", registry_path=unpromoted_work)
 
 # the /console probe must ALSO be driven by the fixture registry, via the same
 # AO_SURFACE_REGISTRY env seam (h2) build_app() reads when no
 # operator_terminal_enabled kwarg overrides it — an explicit kwarg would make
 # this probe inert (it would 404 regardless of what the fixture declares).
-nc_starting_env = {name: os.environ.get(name) for name in ("AO_SURFACE_REGISTRY", "AO_SURFACE_STATE")}
 os.environ["AO_SURFACE_REGISTRY"] = str(unpromoted_work)
-os.environ["AO_SURFACE_STATE"] = str(Path("/tmp") / f"ao1043-unpromoted-state.{os.getpid()}.json")
+os.environ["AO_SURFACE_STATE"] = str(no_live_state)
 status, payload, _ = request(build_app(sso=sso()), "GET", "/console", cookie)
 for name, value in nc_starting_env.items():
     if value is None:

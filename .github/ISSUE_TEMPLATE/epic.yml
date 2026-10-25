@@ -1,3 +1,18 @@
+# ---knowledge---
+# module_id: github.issue-template.epic
+# system: governance
+# app: board
+# solution_class: pattern
+# patterns: [issue-first, dependency-ordered-epic]
+# derives_from: scripts/check-issue-template.sh
+# owner_sme: pmo-sme
+# tier: L0
+# interfaces: [the epic issue body fields]
+# invariants: "epic briefs capture measured scope, child dependencies, verification and lifecycle ownership"
+# gotchas: "YAML comments are ignored by GitHub's issue-form renderer"
+# related: ["#622", "#1533"]
+# do_not_duplicate: null
+# ---knowledge---
 name: Epic
 description: A large roadmap theme on the hub board, spanning many issues. Mirrors one board/epics/EPIC-*.md.
 title: "Epic: "
@@ -15,6 +30,77 @@ body:
         Epics mirror `board/epics/EPIC-*.md` and materialize to the board via
         `board/materialize.sh`. Use the namespaced labels from `board/LABELS.md`
         so the board stays machine-readable.
+  - type: input
+    id: purpose
+    attributes:
+      label: Purpose
+      description: The business or platform outcome this epic exists to deliver.
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: Measurable outcome and scope boundary for this epic.
+    validations:
+      required: true
+  - type: textarea
+    id: measured-landscape
+    attributes:
+      label: Measured landscape
+      description: Current state, evidence, and material gaps this epic addresses.
+    validations:
+      required: true
+  - type: textarea
+    id: children
+    attributes:
+      label: Child issues
+      description: Issue numbers, ownership, and dependency order.
+      placeholder: |
+        - #123 — description — depends on: none
+    validations:
+      required: true
+  - type: textarea
+    id: verification-contract
+    attributes:
+      label: Verification contract
+      description: Exact commands and observable acceptance evidence required for closure.
+    validations:
+      required: true
+  - type: dropdown
+    id: model_tier
+    attributes:
+      label: Execution tier
+      description: Lowest suitable execution tier from the lifecycle contract.
+      options:
+        - L0
+        - L1
+        - L2
+    validations:
+      required: true
+  - type: textarea
+    id: root_cause
+    attributes:
+      label: Root cause
+      description: Mechanism or systemic gap this epic addresses.
+    validations:
+      required: true
+  - type: checkboxes
+    id: lifecycle_contract
+    attributes:
+      label: Lifecycle contract
+      description: Acknowledge the repository's verify-before-close lifecycle.
+      options:
+        - label: I will close the epic only after child issues are terminal with evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: escalation
+    attributes:
+      label: Escalation
+      description: Owner, approval, or blocker requiring escalation if the contract cannot be met.
+    validations:
+      required: true
   - type: dropdown
     id: solution_class
     attributes:

@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+# ---knowledge---
+# module_id: ops.lane-workspace
+# system: operations
+# app: isolation
+# solution_class: enterprise
+# patterns: [session-owned-worktree, fail-closed]
+# derives_from: docs/decision-records/ADR-0036-local-mirror-workspace-provisioning.md
+# owner_sme: platform-sme
+# tier: L1
+# interfaces: [absolute worktree path on stdout, exit 0/1/2]
+# invariants: "never writes a primary checkout and never creates an unowned worktree"
+# gotchas: "inherited GIT_DIR must be unset before the first git call"
+# related: ["#667"]
+# do_not_duplicate: null
+# ---knowledge---
 # ============================================================================
 # ops/lane-workspace.sh — ADR-0036 / GR-30 workspace provisioning helper.
 #
@@ -149,7 +164,18 @@ WT_ROOT="$MIRROR_ROOT/.claude/worktrees"
 WT_PATH="$WT_ROOT/$LANE"
 BRANCH="lane/$LANE"
 
-if git -C "$MIRROR_ROOT" worktree list --porcelain 2>/dev/null | grep -qx "worktree $WT_PATH"; then
+if ! worktree_listing="$(git -C "$MIRROR_ROOT" worktree list --porcelain 2>/dev/null)"; then
+  fail "cannot list worktrees in mirror $MIRROR_ROOT" 2
+fi
+worktree_exists=0
+while IFS= read -r worktree_line; do
+  if [[ "$worktree_line" == "worktree $WT_PATH" ]]; then
+    worktree_exists=1
+    break
+  fi
+done <<< "$worktree_listing"
+
+if [ "$worktree_exists" -eq 1 ]; then
   log "worktree already exists for lane '$LANE' — reusing (idempotent)"
   printf '%s\n' "$WT_PATH"
   exit 0

@@ -224,9 +224,17 @@ write_registry "$work/on.yaml" on
 probe() { # probe <registry> <json-field>  -> prints one JSON line
   python3 - "$root" "$1" "$2" "$3" <<'PY'
 import json
+import os
 import sys
+from pathlib import Path
 
 root, registry, field, store = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+# Isolate the registry mutation from the higher-precedence live rollout and
+# rollback inputs. The committed rollout may promote chat and must not mask this
+# static-flag negative control.
+fixture = Path(registry).with_name("no-live-promotion.yaml")
+os.environ["AO_ROLLOUT_LIVE_STATE"] = str(fixture)
+os.environ["AO_SURFACE_STATE"] = str(fixture.with_name("isolated-surface-state.json"))
 sys.path.insert(0, root)
 from portal.server.app import build_app  # noqa: E402
 from portal.server.chat import ChatSurface  # noqa: E402

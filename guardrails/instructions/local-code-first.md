@@ -21,7 +21,7 @@ applyTo: "**"
 > signal verifies the directive is present. The FinOps side of this doctrine —
 > checking the known-answer cache (L1) + this indexer KB at LOW tier *before*
 > dispatching a subagent to re-derive an answer, frontloaded dispatch briefs,
-> and warm-start packs for new sessions — is `docs/MODEL-PROFILES.md` →
+> and warm-start packs for new sessions — is `vendor/CMR/docs/MODEL-PROFILES.md` →
 > "Known-answers, cache & frontloading (DR-069)"; the conformance gate's
 > `finops-doctrine` signal verifies that section is present.
 

@@ -27,7 +27,7 @@ model-agnostic policy, the runtime → file map, and the drift check live in
   onboarded-spoke count vs. the 10 threshold); re-add the deny entry when it fires.
   The deny list is a safety default; `AGENTS.md` (Hard DON'Ts) and `GOLDEN-RULES.md`
   are the rule.
-- Dispatch Claude subagents per the FinOps ladder in `docs/MODEL-PROFILES.md`
+- Dispatch Claude subagents per the FinOps ladder in `vendor/CMR/docs/MODEL-PROFILES.md`
   (flash-by-default in ladder terms — the concrete Claude Code model is
   **haiku**, set as the project default via `.claude/settings.json`'s
   `CLAUDE_CODE_SUBAGENT_MODEL`; escalate on observed difficulty, never

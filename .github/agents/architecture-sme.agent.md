@@ -6,7 +6,8 @@ description: "CMR architecture decisions only — hub/spoke boundary (R13), modu
 # architecture-sme
 
 CMR as a FAANG hub-and-spoke control plane. Decisions only, time-boxed, consulted —
-never the worker (`docs/MODEL-PROFILES.md` rule 4; `docs/SME-PROFILES.md`).
+never the worker (`vendor/CMR/docs/MODEL-PROFILES.md` rule 4;
+`vendor/CMR/docs/SME-PROFILES.md`).
 
 ## Owns
 

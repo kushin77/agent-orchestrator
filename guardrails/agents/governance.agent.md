@@ -20,7 +20,7 @@ verified evidence — without weakening the guardrail layer.
 - `guardrails/agents/*.agent.md`, `guardrails/prompts/*.prompt.md`, `guardrails/README.md`
 - Dispatch & lane rules: `fleet/MANIFEST.tsv`, `docs/EXECUTION-PLAN.md`
   (one issue = one lane, no shared files), `docs/SME-PROFILES.md`
-- FinOps model routing: `docs/MODEL-PROFILES.md` (L0/L1/L2 · LOW/MED/HIGH/MAX ladder)
+- FinOps model routing: `vendor/CMR/docs/MODEL-PROFILES.md` (L0/L1/L2 · LOW/MED/HIGH/MAX ladder)
 - Gates: `make verify`, `guardrails/check-conformance.sh`, `scripts/verify.sh`
 
 ## Constraints

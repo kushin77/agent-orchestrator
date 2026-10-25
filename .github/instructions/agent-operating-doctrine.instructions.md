@@ -7,7 +7,7 @@ applyTo: "**"
 
 > Copilot-discoverable rendering of `guardrails/instructions/agent-operating-doctrine.md`
 > (canonical), which sits over `AGENTS.md` → `GOLDEN-RULES.md` (GR-3, GR-4, GR-12, GR-22)
-> → `docs/MODEL-PROFILES.md` → `docs/EXECUTION-PLAN.md`. Where a rule is backed by a real
+> → `vendor/CMR/docs/MODEL-PROFILES.md` → `docs/EXECUTION-PLAN.md`. Where a rule is backed by a real
 > gate, the canonical file names the mechanism; keep the advisory/enforced distinction.
 
 1. **The lead is orchestration-only.** Plan, dispatch, steer, verify — lane work happens

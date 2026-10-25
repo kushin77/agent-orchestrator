@@ -60,7 +60,7 @@
     },
     "defaultModelTier": {
       "$ref": "#/definitions/modelTier",
-      "description": "Default dispatch tier on the flash/pro ladder (LOW/MED -> flash, HIGH/MAX -> pro; CMR docs/MODEL-PROFILES.md). Model routing (phase 2) consumes this."
+      "description": "Default dispatch tier on the flash/pro ladder (LOW/MED -> flash, HIGH/MAX -> pro; CMR vendor/CMR/docs/MODEL-PROFILES.md). Model routing (phase 2) consumes this."
     },
     "memoryScope": {
       "type": "array",

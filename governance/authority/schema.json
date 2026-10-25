@@ -60,7 +60,7 @@
     "modelTier": {
       "type": "string",
       "enum": ["LOW", "MED", "HIGH", "MAX"],
-      "description": "Dispatch tier on the flash/pro ladder (registry/personas defaultModelTier vocabulary, docs/MODEL-PROFILES.md). Used by the tier-floor rule: the auditor of a work item must not be dispatched below its executor."
+      "description": "Dispatch tier on the flash/pro ladder (registry/personas defaultModelTier vocabulary, vendor/CMR/docs/MODEL-PROFILES.md). Used by the tier-floor rule: the auditor of a work item must not be dispatched below its executor."
     },
     "repo": {
       "type": "object",

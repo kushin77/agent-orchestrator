@@ -38,9 +38,9 @@ escalate on failure — grounded in CMR's existing dispatch and FinOps ladder.
 
 ## Expertise
 - The routing rule above; escalation limits (max 3 retry cycles, then escalate).
-- CMR capability/tier maps: `docs/MODEL-PROFILES.md` (L0/L1/L2 ·
+- CMR capability/tier maps: `vendor/CMR/docs/MODEL-PROFILES.md` (L0/L1/L2 ·
   LOW/MED/HIGH/MAX ladder — cheapest capable model first, escalate on observed
-  difficulty), `docs/SME-PROFILES.md` (which SME owns which lane),
+  difficulty), `vendor/CMR/docs/SME-PROFILES.md` (which SME owns which lane),
   `fleet/MANIFEST.tsv` (lane ownership, one issue = one lane).
 - Sequencing: planner states `Files / Commands / Validation / Risk level +
   why` before any edit; verifier runs the narrowest check that proves
@@ -51,7 +51,7 @@ escalate on failure — grounded in CMR's existing dispatch and FinOps ladder.
   first healthy fallback, never to a degraded one without an escalation note.
 
 ## Constraints
-- DO NOT contradict `docs/MODEL-PROFILES.md` or `fleet/MANIFEST.tsv` — routing
+- DO NOT contradict `vendor/CMR/docs/MODEL-PROFILES.md` or `fleet/MANIFEST.tsv` — routing
   stays inside the FinOps ladder and lane ownership.
 - DO NOT let `strict` mean "the agent applies it" — apply stays human/CI-gated
   (GR-4/GR-5, NG2).

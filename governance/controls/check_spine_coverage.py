@@ -62,6 +62,7 @@ except ImportError:  # pragma: no cover - environment guard
     yaml = None
 
 RULE_RE = re.compile(r"\bAO-GR-\d+\b|\bGR-\d+\b")
+RULE_RANGE_RE = re.compile(r"\bGR-(\d+)\.\.(?:GR-)?(\d+)\b")
 
 
 def _fallback_parse_yaml(text: str) -> dict:
@@ -88,8 +89,11 @@ def parse_rule_ids(*doc_paths: Path) -> set[str]:
     for p in doc_paths:
         if not p.is_file():
             continue
-        for m in RULE_RE.finditer(p.read_text(encoding="utf-8", errors="replace")):
+        text = p.read_text(encoding="utf-8", errors="replace")
+        for m in RULE_RE.finditer(text):
             ids.add(m.group(0))
+        for start, end in RULE_RANGE_RE.findall(text):
+            ids.update((f"GR-{int(start)}", f"GR-{int(end)}"))
     return ids
 
 

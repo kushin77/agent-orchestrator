@@ -9,39 +9,6 @@
 # change rather than a comment in a script nobody reads.
 slack: 10
 
-# Temporary ratchet (issue #1265 comment 3): the target is `slack: 10`, but the
-# real box was NOT at that number the day this landed even after running the
-# reaper's own `--apply` (only provably-dead worktrees removed first). Gating
-# straight to the target the same day this gate ships would red on a pile this
-# PR did not create and cannot instantly clear by itself. `measured` is what
-# was left on THIS host after that reap; the gate honours
-# `cap = lanes + max(slack, measured - lanes)` until `expires`, printing
-# `worktree-cap-ratchet:<n>` as a NOTE while it is in force. After `expires`
-# the declared `slack` above is the only cap — this block is not renewed
-# automatically, so the pile has to keep shrinking rather than being re-measured
-# and re-excused forever.
-#
-# RE-MEASURED 2026-09-19 (issue #1414), and TIGHTENED 90 -> 60. The instrument
-# is this ratchet's own consumer, whose header line prints the count it compares
-# against the cap: `check-worktree-cap: 50 worktree(s), 47 open lane record(s),
-# slack 10, cap 90`. So `measured_count: 50` is that count on ElevatedIQ-AK at
-# 2026-09-19, and `measured: 60` is it plus the SAME `churn_headroom: 10` the
-# 2026-09-18 number carried (that day's post-reap 80 + 10 = 90). No number here
-# is loosened — a loosening would need its own issue, and the ratchet shrinks
-# instead. `scripts/check-ratchets.sh` (#1414) reds the day `expires` arrives
-# with no `renewed_at`, so the deadline is no longer a date nobody reads.
-ratchet:
-  measured: 60
-  measured_count: 50
-  churn_headroom: 10
-  measured_by: "bash scripts/check-worktree-cap.sh"
-  host: ElevatedIQ-AK
-  renewed_at: "2026-09-19"
-  expires: "2026-10-02"
-  note: >-
-    Re-measured 2026-09-19 (#1414) with the gate's own count: 50 worktrees on
-    ElevatedIQ-AK + 10 churn headroom = 60, tightened from the 2026-09-18
-    ratchet of 90 (that day's post-reap 80 + 10). Cap = lanes + max(slack,
-    measured - lanes), so 47 lanes + 13 = 60 the day it was measured; after
-    2026-10-02 the declared `slack: 10` above is the only cap.
-
+# 2026-10-06: `bash scripts/check-worktree-cap.sh` measured one worktree and
+# zero open lane records, below the declared cap of ten. The expired temporary
+# ratchet is retired; the normal slack cap now applies without an exception.

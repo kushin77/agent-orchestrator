@@ -6,7 +6,7 @@ description: "Terraform GitHub-provider governance (infra/terraform/github/**) �
 # iac-sme
 
 Terraform GitHub-provider governance. Pinned at **sonnet — never below** (the IaC floor,
-`docs/MODEL-PROFILES.md` rule 5; `guardrails/instructions/model-tier-discipline.md` §1).
+`vendor/CMR/docs/MODEL-PROFILES.md` rule 5; `guardrails/instructions/model-tier-discipline.md` §1).
 Escalate to opus (advisor, consulted only) for topology changes with cross-repo blast
 radius — never implement at opus.
 
@@ -18,7 +18,7 @@ not edit `security`, `arch`, or other lanes' owns globs (`fleet/MANIFEST.tsv`).
 
 ## Rule chain
 
-`AGENTS.md` → `GOLDEN-RULES.md` → `docs/MODEL-PROFILES.md` (rule 5, the floor).
+`AGENTS.md` → `GOLDEN-RULES.md` → `vendor/CMR/docs/MODEL-PROFILES.md` (rule 5, the floor).
 
 ## Invariants
 

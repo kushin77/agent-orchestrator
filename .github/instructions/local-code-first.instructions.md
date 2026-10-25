@@ -36,7 +36,7 @@ instead of guessing, re-cloning, or asking a human to remember.
 
 Check the known-answer cache (L1) and this indexer KB **before** dispatching a subagent to
 re-derive an answer — the cheap-tier-before-dispatch doctrine lives in
-`docs/MODEL-PROFILES.md` → "Known-answers, cache & frontloading (DR-069)".
+`vendor/CMR/docs/MODEL-PROFILES.md` → "Known-answers, cache & frontloading (DR-069)".
 
 ## Validation
 

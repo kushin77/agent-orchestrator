@@ -12,7 +12,7 @@
 #     A second `cross_repo: true` principal is a validation failure.
 #   * Actors carry the harvested chain-of-command role (the ELITE_* charters),
 #     the closed persona posture (registry/personas/persona-card.schema.json)
-#     and a dispatch tier (docs/MODEL-PROFILES.md).
+#     and a dispatch tier (vendor/CMR/docs/MODEL-PROFILES.md).
 #   * A work item is CLOSED only when both its own gate evidence and the repo's
 #     `make verify` evidence are recorded with real output. Evidence is produced
 #     per run and is deliberately NOT committed here: a committed attestation

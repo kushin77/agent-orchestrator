@@ -1,13 +1,14 @@
 # Edge cutover — how `ai.purebliss.app` is fronted, and what is retired (issue #731)
 
-> **Status: declaration, not a deployment.** This page declares the fronting for
-> `ai.purebliss.app` and the disposition of the GCP edge route. **No cutover has
-> happened**: the hostname still answers through its current fronting, and the
-> run-half steps in [§5](#5-the-run-half-steps-env-seam-and-named-refusals) are
-> **owed, not done.** The Terraform half of the reconciliation is declared and
-> flag-gated OFF ([§4](#4-the-retired-route-as-code)); the mechanical gate that
-> keeps it from regressing is `scripts/check-edge-cutover.sh`
-> ([§9](#9-how-this-cannot-silently-regress)).
+> **Status: live front door measured; authenticated content remains gated.** On
+> 2026-10-05, `ai.purebliss.app` resolved through Cloudflare; `GET /` redirected
+> to `/auth/login`, `/healthz` returned 200, and the unauthenticated fleet
+> snapshot returned the portal's JSON 401 (`missing console session token`).
+> The shared-services run half records the live OS-auth-gate cutover and retires
+> Open WebUI as the public hostname owner. These probes establish the front door
+> and protected API route, not the signed-in page or laptop host card; those
+> remain separate acceptance work. This repository declares and tests the
+> retired GCP route but does not apply the run-half cutover.
 
 Companion pages: [`AGENTCONSOLE-HOSTING.md`](AGENTCONSOLE-HOSTING.md) (where the
 console runs and who makes it run — this page's decision is its sibling for the
@@ -66,12 +67,10 @@ hostname, and the boundary this page respects:
 > enabled in the shared-services run half, the way `os.purebliss.app` was.
 > Nothing in this repo hardcodes a domain.
 
-The same page already lists this hostname in its live-surface table
-([`AGENTCONSOLE-HOSTING.md:209`](AGENTCONSOLE-HOSTING.md)) as
-`ai.purebliss.app | oauth2-proxy front over Open WebUI | remote cluster
-192.168.168.42`, and its run-half handoff ends with
-(`AGENTCONSOLE-HOSTING.md:265`) `Wire DNS + the Cloudflare tunnel ingress rule to
-192.168.168.42:<port>`.
+The older [`AGENTCONSOLE-HOSTING.md`](AGENTCONSOLE-HOSTING.md) entry that called
+this hostname an oauth2-proxy front over Open WebUI is historical. The current
+hosting declaration names the shared-services OS auth gate as the front door;
+the Open WebUI public-hostname path is retired (shared-services #4909).
 
 Consequences, stated plainly:
 
@@ -92,11 +91,10 @@ The ingress / WAF / DNS rules that mechanism obeys are stated once in
 [`CLOUDFLARE-POLICY.md`](CLOUDFLARE-POLICY.md) — that page is the policy; this
 section does not restate it.
 
-## 3. Today, measured
+## 3. Today, measured (2026-10-05)
 
-Captured `2026-09-16T16:55:54Z` from this checkout. These are the numbers the
-close comment for #731 must record, and the baseline the cutover is measured
-against.
+These read-only probes were run against the public hostname. The DNS and route
+checks agree with the shared-services run-half declaration.
 
 ```
 $ dig +short NS purebliss.app
@@ -104,46 +102,52 @@ greg.ns.cloudflare.com.
 gracie.ns.cloudflare.com.
 
 $ dig +short ai.purebliss.app
-104.21.34.108
 172.67.159.67
+104.21.34.108
 
 $ dig +short CNAME ai.purebliss.app
-                        # empty: proxied A records, no CNAME
+                        # empty: Cloudflare-proxied A records
 ```
 
 ```
-$ curl -sS -I https://ai.purebliss.app/
+$ curl -sS -D - --max-time 10 https://ai.purebliss.app/
 HTTP/2 302
-content-type: text/plain; charset=utf-8
-content-length: 33
 location: /auth/login
 server: cloudflare
-cf-ray: a3c166617dc00d33-EWR
 ```
 
 ```
-$ curl -sS -w '\nHTTP=%{http_code} BYTES=%{size_download}\n' \
-    https://ai.purebliss.app/api/fleet/snapshot
-Found. Redirecting to /auth/login
-HTTP=302 BYTES=33
+$ curl -sS --max-time 10 https://ai.purebliss.app/healthz
+{"ok":true}
+
+$ curl -sS -D - --max-time 10 https://ai.purebliss.app/api/fleet/snapshot
+HTTP/2 401
+{"ok":false,"status":401,"data":null,
+ "error":{"code":"unauthorized","message":"missing console session token"}}
 ```
 
-What that measures, and one thing it does **not**:
+```
+$ bash scripts/check-edge-cutover.sh --live
+fronting=cloudflare (declared: cloudflare)  acceptance(/api/fleet/snapshot JSON)=met
+check-edge-cutover: OK — the fronting matches the declaration and the SPoG answers
+```
 
-- The zone is served by **Cloudflare nameservers**, and the hostname answers from
-  **Cloudflare proxy addresses** — so the first half of the decision (Cloudflare
-  fronting) is already the live reality, and the retired GCP route is *not* what
-  answers today.
-- The 302 is returned **before any origin routing**: the response is a 33-byte
-  plain-text `Found. Redirecting to /auth/login`, and **none of the headers the
-  portal itself sets** appear in it. It is a fronting proxy's redirect, not the
-  SPoG's answer — the SPoG's own contract for that path is **401**
-  (see [§6](#6-what-731s-acceptance-can-and-cannot-be-satisfied-here)).
-- **Which origin answers today is not observable from outside this gate.** An
-  unauthenticated caller is redirected by the front proxy, so *the legacy seed and
-  the SPoG are indistinguishable from the internet*. This page therefore does not
-  claim which one is live, and the cutover's success criterion is not observable
-  from here either — which is exactly why §6 exists.
+The script's displayed `status: 501` is its `HEAD /` measurement; the browser
+uses `GET /`, which returns the auth-gate redirect above. The API check is a GET
+and its JSON 401 is the expected session boundary, not a failed origin. Do not
+conflate HEAD and GET when interpreting the probe.
+
+This confirms Cloudflare fronting and that the protected fleet API is reachable
+behind the shared-services OS auth gate. The live shared-services runbook records
+the same cutover and says the Open WebUI/Ollama services remain on private ports
+while their public hostname path is retired. Anonymous probes do **not** establish
+what an authenticated browser renders, nor whether the laptop card is present;
+that is tracked separately by agent-orchestrator #2087 and local-laptop #25.
+
+The 2026-09-16 capture in the preceding revision of this document is the
+**pre-cutover baseline**: at that time the unauthenticated request was redirected
+before the portal API could be observed. It is superseded by the measurements
+above.
 
 ## 4. The retired route, as code
 
@@ -215,6 +219,12 @@ or GCP Secret Manager only, never a file and never git (GR-6).
 | 4. Point the SPoG origin at the service that serves `/api/fleet/snapshot` | `AO_EDGE_ORIGIN` (port is the **run half's** choice) | `refused: AO_EDGE_ORIGIN is required` |
 | 5. Verify: rule present in the live config, name resolves, live edge returns the SPoG's own answer | — | `refused: nothing is reported applied before it is verified` |
 
+**Current state:** these are the run-half deployment and rollback steps, not
+outstanding cutover work. `shared-services` records `enable_os_ai_gate = true`
+and `enable_oauth2_proxy_ai = false`; the current public probes in [§3](#3-today-measured-2026-10-05)
+confirm the OS auth-gate redirect, health endpoint and protected fleet API.
+Open WebUI remains a private workload, not the public hostname owner.
+
 Notes that are part of the declaration, not commentary:
 
 - **Do not replace the tunnel's ingress array.** The API has no "add one rule"
@@ -234,38 +244,22 @@ Notes that are part of the declaration, not commentary:
 
 ## 6. What #731's acceptance can and cannot be satisfied here
 
-Issue #731's acceptance, checked item by item against what this lane can honestly
-measure:
+Issue #731's acceptance, checked against the current live measurements:
 
-| # | Acceptance | Status from this lane |
+| # | Acceptance | Status |
 |---|---|---|
-| a | The fronting is decided and declared | **SATISFIED** — [§2](#2-the-decision-a-cloudflare-tunnel-to-the-shared-services-run-half), with the code reconciliation in [§4](#4-the-retired-route-as-code) |
-| b | The hostname serves the new SPoG routes; TLS valid; the legacy seed is no longer served | **NOT SATISFIED — the run half's to close.** It is not a repository change: it is the ingress re-point in [§5](#5-the-run-half-steps-env-seam-and-named-refusals) |
-| c | `dig +short ai.purebliss.app` recorded in the close comment | **SATISFIED** for the *before* state — [§3](#3-today-measured) records it verbatim; the *after* state is owed with (b) |
+| a | The fronting is decided and declared | **SATISFIED** — Cloudflare to the shared-services run half; the public application front door is the OS auth gate, not Open WebUI. |
+| b | The hostname serves the new SPoG routes; TLS valid; the legacy seed is no longer served | **FRONT DOOR SATISFIED; authenticated content not independently observed.** HTTPS validation succeeded; `GET /` redirects to `/auth/login`, `/healthz` returns 200 and the fleet snapshot returns the expected JSON 401. The run-half record says the Open WebUI hostname path is retired. Anonymous probes cannot prove the signed-in page or data contents. |
+| c | `dig +short ai.purebliss.app` recorded in the close comment | **SATISFIED** — the current DNS answers are recorded in [§3](#3-today-measured-2026-10-05). |
 
-The `Verify:` command in the issue is measured here, and it does not currently
-distinguish anything:
-
-```
-$ curl -sSL -o /dev/null -w '%{http_code}\n' https://ai.purebliss.app/
-302
-$ curl -s https://ai.purebliss.app/api/fleet/snapshot | head
-Found. Redirecting to /auth/login
-```
-
-Two measured reasons why that probe is **not yet a usable acceptance test**:
-
-1. **Today it never reaches an origin.** The front proxy redirects before
-   routing, so the body is a redirect notice rather than any origin's answer.
-2. **The SPoG's own contract for that path is 401, not fleet JSON.** Measured in
-   [`../portal/tests/test_fleet_access_control.py`](../portal/tests/test_fleet_access_control.py)
-   (`AC1 — an unauthenticated GET /api/fleet/snapshot returns 401`, with
-   `payload["error"]["code"] == "unauthorized"`), every fleet route requires a
-   session. So "fleet JSON, not the seed" is **not observable by an
-   unauthenticated curl even after a correct cutover** — it needs a session
-   (`os-session-token`), which only the run half can mint. The probe should be
-   widened when (b) is closed, and that widening is the run half's call, not
-   this repository's.
+The earlier 2026-09-16 probe did not distinguish the origin because the request
+was redirected before reaching the fleet API. The current probe does: the live
+endpoint returns the portal's JSON 401 with `missing console session token`,
+matching the unauthenticated contract in
+[`../portal/tests/test_fleet_access_control.py`](../portal/tests/test_fleet_access_control.py).
+The JSON error is the API's expected auth boundary, not a successful anonymous
+data read. The signed-in page and laptop host entry remain separately verifiable
+work under #2087 and local-laptop #25.
 
 ## 7. The residual boundary
 
@@ -274,14 +268,17 @@ Two measured reasons why that probe is **not yet a usable acceptance test**:
   refuses a regression of the posture.
 - **The run half (`kushin77/shared-services`) owns**: the tunnel, the ingress
   rule, the origin and its port, the SPoG service's presence in the live compose
-  stack, and the DNS answer for the hostname. **Nothing here is applied by
-  agent-orchestrator**, and nothing here can make the hostname serve anything.
+  stack, and the DNS answer for the hostname. The OS auth-gate cutover is now
+  recorded and externally measured; **nothing here is applied by
+  agent-orchestrator**. An authenticated browser session is still required to
+  verify the rendered fleet data.
 - **The owner owns**: the go-live act and any Cloudflare Access policy in front of
   the SPoG. Handover to the run half is by a **direction issue on that board**,
   never by editing that repository from here.
-- Explicitly **not** claimed: that a cutover has happened, that the SPoG is live
-  at this hostname, that TLS is valid for the new origin, or that the legacy seed
-  is gone. None of those is established by this lane.
+- Explicitly **not** claimed: that the signed-in fleet page renders the intended
+  data, or that the laptop host card is present. The anonymous live probe verifies
+  the gate and protected API boundary only; the host-card issue is tracked
+  separately.
 
 ## 8. Deliberately not done in this lane
 
@@ -328,7 +325,10 @@ probe is available as `bash scripts/check-edge-cutover.sh --live` (or by setting
 `AO_EDGE_HOST`), which reports the measured DNS records, the HTTP status, the
 `server:` header and the acceptance body — and exits **2, CANNOT-ASSESS**, when it
 cannot measure, never 0. That mode is never on the `make verify` path, and it
-returns **1** while the cutover is outstanding, which is the honest answer today.
+returned **0** on 2026-10-05: Cloudflare matched the declaration and the fleet
+API returned its expected JSON auth response. A later live failure means the
+measured fronting or acceptance body no longer matches the contract; it is not a
+signal to assume the cutover is still pending.
 
 The gate proves it can fail: it mutates a copy of the declaration and of the module
 one property at a time, and requires each mutation to be refused **by name** — a

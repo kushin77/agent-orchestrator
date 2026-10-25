@@ -232,7 +232,10 @@ marker_self_test() {
 }
 
 repo_files() {
-  git ls-files --cached --others --exclude-standard -- "$@"
+  local path
+  while IFS= read -r path; do
+    [ -e "$path" ] && printf '%s\n' "$path"
+  done < <(git ls-files --cached --others --exclude-standard -- "$@")
 }
 
 

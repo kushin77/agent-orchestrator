@@ -7,13 +7,13 @@ applyTo: "**"
 
 > Copilot-discoverable rendering of `guardrails/instructions/model-tier-discipline.md`
 > (canonical). The LOW/MED/HIGH/MAX ladder and the flash/pro (haiku/sonnet+opus)
-> mapping are owned by `docs/MODEL-PROFILES.md` — do not restate them from memory.
+> mapping are owned by `vendor/CMR/docs/MODEL-PROFILES.md` — do not restate them from memory.
 
 ## 1. The floor comes first
 
 Security, secrets, auth, and production-IaC work starts at **sonnet (HIGH)** and never
 drops below it — regardless of how mechanical the task looks and regardless of the cheap
-default below (`docs/MODEL-PROFILES.md` rule 5). The default may not override the floor.
+default below (`vendor/CMR/docs/MODEL-PROFILES.md` rule 5). The default may not override the floor.
 
 ## 2. The default
 
@@ -60,5 +60,5 @@ The canonical file (`guardrails/instructions/model-tier-discipline.md`) carries 
 ## 6. State the reason
 
 Every non-default dispatch states tier + model + a one-line reason
-(`docs/MODEL-PROFILES.md` rule 3). An unexplained above-floor dispatch is a hygiene
+(`vendor/CMR/docs/MODEL-PROFILES.md` rule 3). An unexplained above-floor dispatch is a hygiene
 breach the cost report treats as a failure condition.

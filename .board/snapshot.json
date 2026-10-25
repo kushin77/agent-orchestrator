@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T20:32:04Z",
+  "generated_at": "2026-10-06T14:11:25Z",
   "source": "kushin77/agent-orchestrator",
   "issues": [
     {
@@ -1349,6 +1349,7 @@
         "area:standards",
         "class:enterprise",
         "epic:vendor-compliance",
+        "escalate:L1",
         "gdc:enterprise",
         "pmo:triaged",
         "priority:P2",
@@ -11179,7 +11180,7 @@
     {
       "number": 1254,
       "title": "EPIC: mechanical, not doctrinal \u2014 the merge path, PR contract, and every rule that broke this week become gates (#1145)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -11192,7 +11193,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T10:33:52Z",
       "files": []
     },
     {
@@ -11333,7 +11334,7 @@
     {
       "number": 1268,
       "title": "EPIC: mechanical, not doctrinal, between runtimes \u2014 paperclip / hermes / Claude / DeepSeek coordination becomes records and gates",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M27 - Paperclip boundary & parity adoption",
       "labels": [
         "area:standards",
@@ -11346,7 +11347,7 @@
       "parent": null,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T04:21:53Z",
       "files": []
     },
     {
@@ -13112,7 +13113,7 @@
     {
       "number": 1527,
       "title": "indexer: fix context_pack.py graph path mismatch",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -13128,7 +13129,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T22:33:35Z",
       "files": []
     },
     {
@@ -13155,7 +13156,7 @@
     {
       "number": 1529,
       "title": "indexer: seed module.json stubs for the 99 uncataloged repos",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -13173,13 +13174,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T04:52:17Z",
       "files": []
     },
     {
       "number": 1530,
       "title": "indexer: onboard checkouts for the 13 catalog-known-but-never-indexed repos",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -13195,13 +13196,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T20:44:31Z",
       "files": []
     },
     {
       "number": 1531,
       "title": "indexer: classify RCA/incident docs in the asset classifier",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -13217,13 +13218,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T01:07:02Z",
       "files": []
     },
     {
       "number": 1532,
       "title": "indexer: wire front_load() MCP tool and register with agents",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -13239,7 +13240,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T00:10:11Z",
       "files": []
     },
     {
@@ -13349,7 +13350,7 @@
     {
       "number": 1538,
       "title": "code-knowledge: backfill code headers across agent-orchestrator (10 directory lanes)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -13366,13 +13367,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T22:45:24Z",
       "files": []
     },
     {
       "number": 1539,
       "title": "code-knowledge: dedupe pass using indexer + headers, file one issue per cluster",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -13389,7 +13390,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T00:25:42Z",
       "files": []
     },
     {
@@ -13664,7 +13665,7 @@
     {
       "number": 1557,
       "title": "indexer: bump the vendor/CMR pin \u2014 the #1527 fix is unreachable until 5 spoke gates clear",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -13677,7 +13678,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T23:56:09Z",
       "files": []
     },
     {
@@ -13736,7 +13737,7 @@
     {
       "number": 1561,
       "title": "spog: console Nous surface (native views via gateway proxy, never iframe)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "Agent Single Pane of Glass (e2e)",
       "labels": [
         "area:standards",
@@ -13753,7 +13754,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T19:48:20Z",
       "files": []
     },
     {
@@ -14077,7 +14078,7 @@
     {
       "number": 1602,
       "title": "reconcile: 41 orphan lanes blocked on unlanded branches/PR-merge evidence \u2014 triage list",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M31 - Gate hygiene & master-red clearance",
       "labels": [
         "area:standards",
@@ -14090,7 +14091,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T23:35:44Z",
       "files": []
     },
     {
@@ -14225,7 +14226,7 @@
     {
       "number": 1637,
       "title": "indexer: classify + seed the 102 uncataloged catalog/modules entries \u2014 the stub cannot be mechanical (blocks #1529)",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "M24 - Enterprise Knowledge Index & Policy Normalization",
       "labels": [
         "area:standards",
@@ -14238,7 +14239,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T03:41:54Z",
       "files": []
     },
     {
@@ -14782,7 +14783,7 @@
     {
       "number": 1733,
       "title": "[cmr-gap] googlecloudplatform: record baseline conformance grade",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:knowledge-index",
@@ -14794,7 +14795,7 @@
       "parent": 1666,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T12:07:46Z",
       "files": []
     },
     {
@@ -14830,7 +14831,7 @@
     {
       "number": 1738,
       "title": "spog: live-instance observation of Sessions operator controls",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -14842,7 +14843,7 @@
       "parent": 1667,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-22T18:28:34Z",
       "files": []
     },
     {
@@ -15046,7 +15047,7 @@
     {
       "number": 1764,
       "title": "policy: Paperclip has no policy-delivery path from this repo's declarations",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -15058,13 +15059,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T20:36:11Z",
       "files": []
     },
     {
       "number": 1765,
       "title": "policy(git): branch/merge policy fragmented across 4+ sources, branch protection not IaC-declared",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -15076,13 +15077,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T20:35:52Z",
       "files": []
     },
     {
       "number": 1766,
       "title": "policy(cloudflare): edge/DNS/WAF policy has no single spec, implicit across 5+ scripts and docs",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -15094,13 +15095,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T20:36:00Z",
       "files": []
     },
     {
       "number": 1767,
       "title": "policy(gcs): Terraform-declared bucket policy has no governance/ mirror for control-plane visibility",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -15112,13 +15113,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T20:35:56Z",
       "files": []
     },
     {
       "number": 1768,
       "title": "policy(local-dev): AO-GR-17 not registered as a control-plane-visible policy domain",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -15130,13 +15131,13 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T20:36:03Z",
       "files": []
     },
     {
       "number": 1769,
       "title": "policy: CMR/vendor GDC-equivalent policy claim unresolved -- vendor/CMR has no matching artifact",
-      "state": "OPEN",
+      "state": "CLOSED",
       "milestone": "",
       "labels": [
         "area:standards",
@@ -15148,7 +15149,7 @@
       "parent": 1510,
       "blocked_by": [],
       "cross_refs": [],
-      "closed_at": "",
+      "closed_at": "2026-09-21T20:36:08Z",
       "files": []
     },
     {
@@ -15241,6 +15242,2385 @@
     {
       "number": 1790,
       "title": "fleet: the live loop's venue is a closed epic's stranded branch (HEAD 629f22f5, 203 behind master), so the checkout-behind remedy cannot apply and the queue is frozen",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T04:00:37Z",
+      "files": []
+    },
+    {
+      "number": 1795,
+      "title": "fleet: the checkout-behind remedy (#780 bootstrap) is never scheduled, so the fleet parks itself \u2014 6 incidents measured in 5 days",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T03:52:27Z",
+      "files": []
+    },
+    {
+      "number": 1799,
+      "title": "gate: make verify is CANNOT-ASSESS on master \u2014 16 checks red incl. 3 gate self-controls (measured, pre-existing)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:27:17Z",
+      "files": []
+    },
+    {
+      "number": 1802,
+      "title": "code-knowledge: backfill code headers in registry/ (child of #1538, 1 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1538,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T20:54:48Z",
+      "files": []
+    },
+    {
+      "number": 1806,
+      "title": "code-knowledge: backfill code headers in portal/ (child of #1538, 2 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1538,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:25:24Z",
+      "files": []
+    },
+    {
+      "number": 1809,
+      "title": "gate: integrations/paperclip/policy_map.py lacks the mandatory ---knowledge--- header (refusal introduced by #1764)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:26:30Z",
+      "files": []
+    },
+    {
+      "number": 1811,
+      "title": "gate: check-code-headers.sh --files bypasses the in_scope() filter and raises KeyError on non-source extensions",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:19:23Z",
+      "files": []
+    },
+    {
+      "number": 1814,
+      "title": "code-knowledge: backfill code headers in control-plane/ (child of #1538, 3 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1538,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:43:26Z",
+      "files": []
+    },
+    {
+      "number": 1815,
+      "title": "gate: branch-protection declaration still requires ao/gate-of-record while the adopted single-developer method says no required check \u2014 the last box-wide verify red",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pmo:triaged",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:21:32Z",
+      "files": []
+    },
+    {
+      "number": 1818,
+      "title": "gate: record the squash merge 2548e5d0 (#1812) in landed-baseline.json \u2014 my merge omitted the Refs trailer",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:44:16Z",
+      "files": []
+    },
+    {
+      "number": 1821,
+      "title": "gate: fleet/runners.py uses the retired role term 'operator' in prose (check-fleet-vocabulary)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:56:59Z",
+      "files": []
+    },
+    {
+      "number": 1822,
+      "title": "gate: integrations/paperclip/adapters/sync suite is run by no gate (check-ungated-suites)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:57:03Z",
+      "files": []
+    },
+    {
+      "number": 1823,
+      "title": "gate: check-agentconsole-hosting self-test fails \u2014 P3 rule matches everything (3 surfaces unnamed)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:57:08Z",
+      "files": []
+    },
+    {
+      "number": 1824,
+      "title": "code-headers: backfill knowledge blocks in telemetry/ (child of #1538, 4 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:52:23Z",
+      "files": []
+    },
+    {
+      "number": 1825,
+      "title": "code-headers: backfill knowledge blocks in engine/ (child of #1538, 5 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:53:04Z",
+      "files": []
+    },
+    {
+      "number": 1826,
+      "title": "code-headers: backfill knowledge blocks in identity/ (child of #1538, 6 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T21:53:36Z",
+      "files": []
+    },
+    {
+      "number": 1834,
+      "title": "code-headers: backfill knowledge blocks in guardrails/ (child of #1538, 7 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:29:49Z",
+      "files": []
+    },
+    {
+      "number": 1835,
+      "title": "code-headers: backfill knowledge blocks in gateway/ (child of #1538, 8 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:30:23Z",
+      "files": []
+    },
+    {
+      "number": 1836,
+      "title": "code-headers: backfill knowledge blocks in governance/ (child of #1538, 9 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:31:32Z",
+      "files": []
+    },
+    {
+      "number": 1837,
+      "title": "gate: fix the last refused occurrence in docs/SHELL-PATTERNS.md (check-shell-patterns)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:45:33Z",
+      "files": []
+    },
+    {
+      "number": 1838,
+      "title": "gate: 4 scripts exceed their recorded verdict-contains budget (check-verdict-contains)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:45:36Z",
+      "files": []
+    },
+    {
+      "number": 1839,
+      "title": "gate: check-squash-message.sh runs 'cd null' when find_repo_root cannot resolve (governance/isolation suite red)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:45:40Z",
+      "files": []
+    },
+    {
+      "number": 1840,
+      "title": "gate: the futureproof capstone suite is red (check-futureproof-e2e)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:45:43Z",
+      "files": []
+    },
+    {
+      "number": 1841,
+      "title": "gate: check-paperclip-deploy + telemetry/observability still assert the pre-#1789 flag defaults (stale)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:45:46Z",
+      "files": []
+    },
+    {
+      "number": 1850,
+      "title": "code-headers: backfill knowledge blocks in scripts/ (child of #1538, 10 of 10 dirs)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T22:44:34Z",
+      "files": []
+    },
+    {
+      "number": 1851,
+      "title": "dispatch: the active-epic frontier names #1529, which no reader can take \u2014 escalate:* is not a frontier refusal (same class as #1168)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pmo:triaged",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:34:02Z",
+      "files": []
+    },
+    {
+      "number": 1852,
+      "title": "[reconcile] suspect session #1851",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:47:42Z",
+      "files": []
+    },
+    {
+      "number": 1855,
+      "title": "gate: scripts/tests/test_pr_queue_merged_tree_verify.py is red (check-pytest-suites' last red suite)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:33:22Z",
+      "files": []
+    },
+    {
+      "number": 1856,
+      "title": "land: scripts/land.sh refuses every mergeable PR (REST boolean judged by the GraphQL enum) and its self-test asserts the bug",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pmo:triaged",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:33:56Z",
+      "files": []
+    },
+    {
+      "number": 1857,
+      "title": "[reconcile] suspect session #1856",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:47:44Z",
+      "files": []
+    },
+    {
+      "number": 1859,
+      "title": "gate: check-pr-queue-squash-guard's venue omits scripts/lib/common.sh (its arms read rc 2 as a verdict)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:38:53Z",
+      "files": []
+    },
+    {
+      "number": 1860,
+      "title": "gate: check-skip-ratchet self-test fails with rc 2 across its venue arms",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:33:11Z",
+      "files": []
+    },
+    {
+      "number": 1861,
+      "title": "gate: check-venue-invalid \u2014 6 of 6 assertions fail, all reading rc 2 as a verdict",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:33:15Z",
+      "files": []
+    },
+    {
+      "number": 1862,
+      "title": "gate: check-python-patterns-doctrine self-test is vacuous (no-scan-script fires with no plant)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:33:18Z",
+      "files": []
+    },
+    {
+      "number": 1869,
+      "title": "[reconcile] shelved lane #1859 \u2014 unmerged work at risk",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:47:46Z",
+      "files": []
+    },
+    {
+      "number": 1870,
+      "title": "gate: check-python-patterns-doctrine.sh carries a verdict-contains idiom (added by my #1866 fix)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:51:14Z",
+      "files": []
+    },
+    {
+      "number": 1872,
+      "title": "gate: the cto-overlay secret scanner matches the word 'task' \u2014 the sk- rule has no leading boundary, so 34 ordinary strings are flagged and the gate is red",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pmo:triaged",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-21T23:57:57Z",
+      "files": []
+    },
+    {
+      "number": 1874,
+      "title": "[reconcile] suspect session #1872",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:35:55Z",
+      "files": []
+    },
+    {
+      "number": 1876,
+      "title": "gate: raise the injected-prompt ceiling with a documented reason \u2014 AGENTS.md grew 2072 bytes across four landed commits, so check-finops-kpi is red",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pmo:triaged",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:01:42Z",
+      "files": []
+    },
+    {
+      "number": 1877,
+      "title": "[reconcile] suspect session #1876",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:35:56Z",
+      "files": []
+    },
+    {
+      "number": 1879,
+      "title": "gate: the last red is a box-state check in the lane venue \u2014 check-reconcile's real-tree drift says 'not fatal' and exits 1, while rule 7 assigns it to make master-attestation",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pmo:triaged",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:14:38Z",
+      "files": []
+    },
+    {
+      "number": 1880,
+      "title": "[reconcile] suspect session #1879",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:35:58Z",
+      "files": []
+    },
+    {
+      "number": 1885,
+      "title": "gate: check-finops-kpi is red 361 bytes after the last documented raise \u2014 and the zero-headroom ceiling means every doc commit reds the gate of record",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "pmo:triaged",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:25:01Z",
+      "files": []
+    },
+    {
+      "number": 1886,
+      "title": "[reconcile] suspect session #1879",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:35:59Z",
+      "files": []
+    },
+    {
+      "number": 1887,
+      "title": "reconcile: the reclaimer deleted a remote branch holding unmerged work \u2014 rule 17 requires `parked` (branch kept), and the pass is now wedged failing every 60s",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:29:36Z",
+      "files": []
+    },
+    {
+      "number": 1888,
+      "title": "[reconcile] suspect session #1885",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T00:36:00Z",
+      "files": []
+    },
+    {
+      "number": 1890,
+      "title": "standards: the security-header contract is restated in 7 places across 4 repos and the copies disagree (X-Frame-Options DENY vs SAMEORIGIN, Permissions-Policy 3 vs 7 features, HSTS 1y vs 2y)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "governance-tier",
+        "pmo:triaged",
+        "priority:P2",
+        "tier:L1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T16:33:06Z",
+      "files": []
+    },
+    {
+      "number": 1891,
+      "title": "standards: the commit-message rule is enforced twice with different rules (Conventional-Commits hook vs PR-contract trailer rule), a third mechanism differs again, and shared-frontend has none",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "escalate:L2",
+        "gdc:enterprise",
+        "governance-tier",
+        "pmo:triaged",
+        "priority:P2",
+        "tier:L1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T13:29:11Z",
+      "files": []
+    },
+    {
+      "number": 1892,
+      "title": "standards: the accepted-debt (\"grandfather\") ledger is re-implemented 3 ways with identical semantics \u2014 decide shared-core-vs-per-repo (tradeoff stated)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "governance-tier",
+        "pmo:triaged",
+        "priority:P2",
+        "tier:L1",
+        "type:task"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:07:49Z",
+      "files": []
+    },
+    {
+      "number": 1894,
+      "title": "[reconcile] suspect session #1892",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:42:51Z",
+      "files": []
+    },
+    {
+      "number": 1895,
+      "title": "[reconcile] suspect session #1887",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:42:52Z",
+      "files": []
+    },
+    {
+      "number": 1896,
+      "title": "[reconcile] suspect session #1892",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:42:54Z",
+      "files": []
+    },
+    {
+      "number": 1897,
+      "title": "[reconcile] the reclaim destroys work it never measured: a lane whose HEAD is on master is force-reclaimed with uncommitted edits (it deleted a live lane), and an unreadable worktree still wedges every pass",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T01:38:15Z",
+      "files": []
+    },
+    {
+      "number": 1899,
+      "title": "1268 DoD: bullet 1's venue half is un-evidenced \u2014 `control-plane-verify` is red on every run and the venue is retired (Parent: #1268)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1268,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T01:11:22Z",
+      "files": []
+    },
+    {
+      "number": 1900,
+      "title": "[reconcile] suspect session #1892",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:42:55Z",
+      "files": []
+    },
+    {
+      "number": 1904,
+      "title": "EPIC: classify the 96 uncataloged kushin77 repos into catalog/modules entries (successor to #1637's classification pass)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": 1666,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1905,
+      "title": "gate: check-gate-publish cannot assess in ANY venue \u2014 its fixture omits scripts/lib/common.sh, so the skip ratchet reds every run (4th instance of the #1753 ripple)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1254,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T03:01:22Z",
+      "files": []
+    },
+    {
+      "number": 1906,
+      "title": "EPIC: retire overlap and legacy code \u2014 measured, not guessed",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T12:36:28Z",
+      "files": []
+    },
+    {
+      "number": 1907,
+      "title": "hermes module.json declares status:retired but the provider is live-wired and actively expanding",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1906,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:12:36Z",
+      "files": []
+    },
+    {
+      "number": 1908,
+      "title": "EPIC: codebase hygiene \u2014 headers, tagging, wrappers, env-var patterns, templates",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T03:06:46Z",
+      "files": []
+    },
+    {
+      "number": 1909,
+      "title": "Sample dead-code check: 7/20 classify/resolve/route candidates show zero direct callers",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1906,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T04:57:55Z",
+      "files": []
+    },
+    {
+      "number": 1910,
+      "title": "Clear header debt in integrations/ (174 ledger rows)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1908,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:36:53Z",
+      "files": []
+    },
+    {
+      "number": 1911,
+      "title": "Clear header debt in infra/ (50 ledger rows, 6 drifted)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1908,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:33:16Z",
+      "files": []
+    },
+    {
+      "number": 1912,
+      "title": "Clear header debt in fleet/ (43 ledger rows, 5 drifted)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1908,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:34:41Z",
+      "files": []
+    },
+    {
+      "number": 1913,
+      "title": "Clear header debt in e2e/, .github/, contrib/ (21 rows, 4 drifted)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1908,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:32:05Z",
+      "files": []
+    },
+    {
+      "number": 1914,
+      "title": "Add README manifests to 6 unmanifested top-level dirs",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1908,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:31:02Z",
+      "files": []
+    },
+    {
+      "number": 1915,
+      "title": "Route undeclared plain-config env reads through the flags/config aggregators (155 sites)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1908,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1916,
+      "title": "Write down the de facto new-module scaffold (README + entry + tests)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1908,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:29:59Z",
+      "files": []
+    },
+    {
+      "number": 1919,
+      "title": "EPIC: governance doctrine consistency \u2014 no contradictions, no stale references",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T17:27:29Z",
+      "files": []
+    },
+    {
+      "number": 1920,
+      "title": "doctrine: .cursorrules still states the retired flag-gated-OFF rule",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:12:10Z",
+      "files": []
+    },
+    {
+      "number": 1921,
+      "title": "doctrine: docs/GOVERNANCE.md rule 4 restates the retired flag-gated-OFF default",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:12:10Z",
+      "files": []
+    },
+    {
+      "number": 1922,
+      "title": "doctrine: docs/ARCHITECTURE.md and docs/CROSS-REPO-EXECUTION-BOUNDARY.md restate the retired flag-gated-OFF rule",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:12:11Z",
+      "files": []
+    },
+    {
+      "number": 1924,
+      "title": "doctrine: iac-sme and gcp-gatekeeper-sme persona cards instruct agents to enforce the retired flag-gated-OFF rule",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:12:11Z",
+      "files": []
+    },
+    {
+      "number": 1925,
+      "title": "doctrine: docs/EXECUTION-PLAN.md posture:iac definition restates the retired flag-gated-OFF default",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:12:11Z",
+      "files": []
+    },
+    {
+      "number": 1926,
+      "title": "stale: docs/RELEASE-PLAN.md MINOR-bump example still cites flag-gated-OFF-by-default outside its supersede banner",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:44:49Z",
+      "files": []
+    },
+    {
+      "number": 1927,
+      "title": "stale: ~15 secondary docs still describe flag-gated-OFF as the live default (sweep, not doctrine-of-record)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:47:52Z",
+      "files": []
+    },
+    {
+      "number": 1928,
+      "title": "redundancy: GR-5 rule identity is numbered three different, unreconciled ways (AGENTS.md GR-5, GOLDEN-RULES.md AO-GR-5/AO-GR-6, check-terraform-iac.sh GR-28)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T15:19:05Z",
+      "files": []
+    },
+    {
+      "number": 1932,
+      "title": "EPIC: end-to-end compliance closure \u2014 frontend/backend/middleware, fully tested",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T17:37:12Z",
+      "files": []
+    },
+    {
+      "number": 1933,
+      "title": "portal: org_chart/skill_studio/task_board still default:off in portal/config/feature-flags.yaml despite registry's GR-5 reversal to default:on",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1932,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:44:02Z",
+      "files": []
+    },
+    {
+      "number": 1934,
+      "title": "EPIC: end-to-end compliance closure \u2014 frontend/backend/middleware, fully tested",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T03:10:00Z",
+      "files": []
+    },
+    {
+      "number": 1935,
+      "title": "test infra: governance/gateway module basename collisions cause false pytest failures outside the sanctioned per-suite runner",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1940,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T03:00:18Z",
+      "files": []
+    },
+    {
+      "number": 1936,
+      "title": "portal: org_chart/skill_studio/task_board default:off in the actual gating file despite GR-5 reversal",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1934,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T03:10:00Z",
+      "files": []
+    },
+    {
+      "number": 1937,
+      "title": "test-infra: governance/gateway test dirs missing __init__.py cause basename-collision failures on batched pytest runs",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1934,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T03:10:00Z",
+      "files": []
+    },
+    {
+      "number": 1938,
+      "title": "governance: #1562 (Hermes A2A dispatch) appears already landed in route.py but is still open",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1934,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:42:27Z",
+      "files": []
+    },
+    {
+      "number": 1940,
+      "title": "EPIC: end-to-end compliance closure \u2014 frontend/backend/middleware, fully tested",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P0",
+        "type:epic"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T03:10:01Z",
+      "files": []
+    },
+    {
+      "number": 1941,
+      "title": "portal: org_chart/skill_studio/task_board views still gated off despite GR-5 default-on policy",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:44:02Z",
+      "files": []
+    },
+    {
+      "number": 1942,
+      "title": "cloudbuild(owner): three control-plane triggers still ENABLED, not disabled per #1465",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": 1932,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T17:37:01Z",
+      "files": []
+    },
+    {
+      "number": 1947,
+      "title": "[reconcile] suspect session #1562",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:43:08Z",
+      "files": []
+    },
+    {
+      "number": 1952,
+      "title": "[reconcile] suspect session #1560",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:43:10Z",
+      "files": []
+    },
+    {
+      "number": 1953,
+      "title": "guardrails: `hermes-head-guardrails` is inert while its capability ships ON \u2014 the 2026-09-21 enabled-by-default reversal reached the provider flag but not the paired blocking control",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T03:14:18Z",
+      "files": []
+    },
+    {
+      "number": 1955,
+      "title": "gate: check-erp-portal.sh fails on clean master (erp_module default contract)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P1",
+        "type:bug"
+      ],
+      "parent": 1940,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T02:51:30Z",
+      "files": []
+    },
+    {
+      "number": 1960,
+      "title": "test infra: gateway/governance pytest import convention prevents bulk collection",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "gdc:enterprise",
+        "priority:P2",
+        "type:task"
+      ],
+      "parent": 1666,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 1966,
+      "title": "reconcile: a `suspect` finding can never resolve by the session it names, and the documented beat recipe manufactures one every pass",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T04:49:58Z",
+      "files": []
+    },
+    {
+      "number": 1971,
+      "title": "gate(master-red): check-pytest-basename-collisions.sh \u2014 unguarded cd (SP-10) and a missing knowledge header",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T05:42:38Z",
+      "files": []
+    },
+    {
+      "number": 1972,
+      "title": "gate(master-red): check-fleet-bootstrap-scheduled.sh shipped without its knowledge header, so code-headers is red (from PR #1967)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T05:42:38Z",
+      "files": []
+    },
+    {
+      "number": 1973,
+      "title": "gate(master-red): check-finops-kpi \u2014 injected-prompt budget 33505 > ceiling 33244, raise the ceiling with an attributable reason",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T05:42:39Z",
+      "files": []
+    },
+    {
+      "number": 1974,
+      "title": "gate(master-red): check-fleet-vocabulary \u2014 the prose rule flags the structural module_id 'fleet.brain'",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T05:42:39Z",
+      "files": []
+    },
+    {
+      "number": 1975,
+      "title": "gate(master-red): check-secrets \u2014 the high-signal 'sk-' shape is unanchored, so it matches 'sk-' inside the word 'task' (the #1872 bug class, unfixed in this scanner)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T05:42:39Z",
+      "files": []
+    },
+    {
+      "number": 1977,
+      "title": "gate(master-red): surfaces.fleet_projection is self-contradictory (default: on + promoted: false) \u2014 reds both e2e and the portal suite",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T07:16:34Z",
+      "files": []
+    },
+    {
+      "number": 1978,
+      "title": "gate(master-red): shared-frontend-onboarding \u2014 root assets are not the render of the instance (half-updated tokens pin)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T07:16:35Z",
+      "files": []
+    },
+    {
+      "number": 1979,
+      "title": "gate(master-red): fleet-cron-dev-run \u2014 the local and container personas disagree on governance.reconcile.cli's real dry-run output",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T07:16:35Z",
+      "files": []
+    },
+    {
+      "number": 1981,
+      "title": "gate(master-red): pytest-suites reds on governance/modules + paperclip/reporting once make verify materialises vendor/CMR (race-dependent, pre-existing)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T07:58:04Z",
+      "files": []
+    },
+    {
+      "number": 1983,
+      "title": "gate: make verify is not idempotent \u2014 check-secrets reds on the gate's own .verify/ scratch output on any second run in the same venue",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T09:41:15Z",
+      "files": []
+    },
+    {
+      "number": 1985,
+      "title": "gate: the declared pytest suites write fixture mailboxes into the repo own .fleet/ \u2014 the judged set still drifts (+4 files) between two make verify runs",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T12:11:57Z",
+      "files": []
+    },
+    {
+      "number": 1987,
+      "title": "process: an epic-closure body is hand-authored, so check-pr-contract's required fields are silently skipped (2 findings landed on PR #1986 closing #1254)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T12:12:30Z",
+      "files": []
+    },
+    {
+      "number": 1991,
+      "title": "[reconcile] suspect session #1928",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T17:36:34Z",
+      "files": []
+    },
+    {
+      "number": 1992,
+      "title": "doctrine: the #1789 flag-default reversal never propagated to ~40 prose surfaces (second wave of the #1919 audit)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T12:30:16Z",
+      "files": []
+    },
+    {
+      "number": 1993,
+      "title": "doctrine: the #1789 reversal never propagated to the machine authorities (tagging, conformance, rollout) \u2014 two contradictory machine statements",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": 1919,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T12:24:51Z",
+      "files": []
+    },
+    {
+      "number": 1994,
+      "title": "docs(vendor-compliance): record the measured shared-services gap for #132",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1295,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T12:20:47Z",
+      "files": []
+    },
+    {
+      "number": 2000,
+      "title": "portal: full Playwright E2E pass + backend error logger + demo account",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T13:17:18Z",
+      "files": []
+    },
+    {
+      "number": 2001,
+      "title": "reconcile: the 15m orphan TTL is shorter than a composite gate, so a live lane is reaped inside its own gate run (measured 2x)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P1",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T14:10:20Z",
+      "files": []
+    },
+    {
+      "number": 2004,
+      "title": "Amend EPIC #1295 DoD bullets 1 and 4 to the live venue (retired shared-services/verify / ao/gate-of-record)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1295,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T13:17:06Z",
+      "files": []
+    },
+    {
+      "number": 2006,
+      "title": "gate: apply attribution is declared-only \u2014 add check-apply-attribution.sh (EPIC #1295 bullet 2)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1295,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T14:07:20Z",
+      "files": []
+    },
+    {
+      "number": 2009,
+      "title": "gate: portal/server/error_log.py is unrecorded, so check-code-headers is RED on master and blocks every landing (#2005)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T14:17:41Z",
+      "files": []
+    },
+    {
+      "number": 2012,
+      "title": "vendor: add AgenticAutomationFramework as pinned Playwright E2E submodule",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T13:50:10Z",
+      "files": []
+    },
+    {
+      "number": 2013,
+      "title": "check-cross-reference.sh reds inside a gate run: the gate refreshes .board/snapshot.json in place, so the spine is judged against gate scratch",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T15:37:31Z",
+      "files": []
+    },
+    {
+      "number": 2014,
+      "title": "master python-lint red: portal/server/error_log.py imports typing.Optional but never uses it (landed in #2005)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T15:17:50Z",
+      "files": []
+    },
+    {
+      "number": 2015,
+      "title": "reconcile: a mid-edit lane is RECLAIMED as 'landed' because the test reads HEAD, destroying 28 files of uncommitted work (measured)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T16:18:22Z",
+      "files": []
+    },
+    {
+      "number": 2017,
+      "title": "master red (14:07:18Z, PR #2008): check-apply-attribution.sh adds 3 quiet-grep pipes the shrink-only record refuses by name",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:standards",
+        "class:enterprise",
+        "priority:P0",
+        "type:task"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T15:17:55Z",
+      "files": []
+    },
+    {
+      "number": 2023,
+      "title": "master red: check-codeidx-capability-register's frozen EPIC #472 transcription still carries the retired 'flag-gated OFF' phrase",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T15:17:59Z",
+      "files": []
+    },
+    {
+      "number": 2025,
+      "title": "board snapshot refresh TRUNCATES at --limit 1000 and writes in place, so a gate run hands every committed-snapshot consumer a lossy board",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T16:33:22Z",
+      "files": []
+    },
+    {
+      "number": 2027,
+      "title": "master red: check-env-surface \u2014 portal/server/error_log.py reads AO_PORTAL_ERROR_LOG, which infra/env/registry.yaml never declared",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T15:17:45Z",
+      "files": []
+    },
+    {
+      "number": 2029,
+      "title": "make land refuses every PR: land.sh compares REST's boolean 'mergeable' against GraphQL's 'MERGEABLE' string",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T15:32:47Z",
+      "files": []
+    },
+    {
+      "number": 2030,
+      "title": "stale live claim (EPIC #1919 residue, #1927 closed with no evidence): control-plane/cli/README.md and portal/README.md say surfaces ship OFF, the registry says default: on",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T15:23:18Z",
+      "files": []
+    },
+    {
+      "number": 2032,
+      "title": "master red (87981ef4, PR #2026): check-verdict-contains refused a NEW occurrence the #2013 fix added to check-cross-reference.sh",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T15:40:35Z",
+      "files": []
+    },
+    {
+      "number": 2036,
+      "title": "master red (re-fire of closed #1973): check-finops-kpi injected-prompt budget 33558 > ceiling 33505",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T17:02:47Z",
+      "files": []
+    },
+    {
+      "number": 2038,
+      "title": "master red: check-isolation-landed \u2014 landed commit a8f6cd7d carries its ref outside the trailer block and needs a reviewed landed-baseline row",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T17:02:42Z",
+      "files": [
+        "governance/isolation/landed-baseline.json` (+ the schema note in `governance/isolation/README.md` if it is needed)."
+      ]
+    },
+    {
+      "number": 2041,
+      "title": "master red: check-pytest-suites \u2014 the governance/modules suite fails (re-fire/regression vs closed #1981)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T17:02:37Z",
+      "files": []
+    },
+    {
+      "number": 2042,
+      "title": "master red (90e172fc): the no-vendoring control refuses the pinned E2E submodule #2012 deliberately adopted \u2014 narrow the clause to its rationale",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T17:33:25Z",
+      "files": []
+    },
+    {
+      "number": 2044,
+      "title": "[reconcile] suspect session #2041",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T17:36:36Z",
+      "files": []
+    },
+    {
+      "number": 2046,
+      "title": "preflight: nothing compares a lane's files against what origin/master changed since its base \u2014 a whole lane was spent on a red master had already fixed",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2047,
+      "title": "[reconcile] suspect session #2046",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2048,
+      "title": "[reconcile] suspect session #2046",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2050,
+      "title": "[reconcile] failed to reconcile #1561",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T19:49:04Z",
+      "files": []
+    },
+    {
+      "number": 2053,
+      "title": "master red: pytest-fleet \u2014 test_board_triggers' refresh fixture returns \"[]\" where the post-#2035 fetch requires an object per row (blocks every lane's gate)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T19:47:50Z",
+      "files": []
+    },
+    {
+      "number": 2055,
+      "title": "[reconcile] suspect session #2053",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T19:49:02Z",
+      "files": []
+    },
+    {
+      "number": 2056,
+      "title": "ci(venue): two checks hard-FAIL when the container supplies no gh (the gh half of control-plane-verify)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T20:47:51Z",
+      "files": []
+    },
+    {
+      "number": 2058,
+      "title": "portal: flip fleet_board/sessions/settings surfaces to default-on",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": 1510,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T20:47:09Z",
+      "files": []
+    },
+    {
+      "number": 2060,
+      "title": "ci(venue): the remaining control-plane-verify causes \u2014 the claude runner (pytest-fleet, check-runner-capability) and the portal suite",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T21:22:33Z",
+      "files": []
+    },
+    {
+      "number": 2061,
+      "title": "[reconcile] suspect session #2056",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T20:55:46Z",
+      "files": []
+    },
+    {
+      "number": 2062,
+      "title": "console deploy: #1513's claimed ss-agentconsole-deploy.timer does not exist in shared-services",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2063,
+      "title": "master red: check-isolation-landed \u2014 the #2059 squash message carried no Refs trailer (self-inflicted, merged past a failing check)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T20:54:19Z",
+      "files": []
+    },
+    {
+      "number": 2066,
+      "title": "skip-ratchet record: #2059 shipped rows without a `decision` key and left the suite's count pin stale (master `scripts` suite red)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "gate"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-22T22:00:09Z",
+      "files": []
+    },
+    {
+      "number": 2068,
+      "title": "[reconcile] suspect session #1561",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2069,
+      "title": "[reconcile] suspect session #2046",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2070,
+      "title": "[reconcile] suspect session #2046",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:board",
+        "class:enterprise",
+        "pillar:autonomous-ops",
+        "type:governance"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2072,
+      "title": "governance/lifecycle: CLOSING_EVIDENCE_MISSING checks presence, not content",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2074,
+      "title": "Stale DeepSeek model IDs \u2014 deepseek-v4.1-flash/pro/thinking don't exist in the API",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "area:fleet",
+        "bug",
+        "handoff:deepseek",
+        "pillar:model-gateway",
+        "priority:P0"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2075,
+      "title": "meituan/longcat-2.0:ultra provider reference in tiers.yaml is non-existent",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "bug",
+        "handoff:deepseek",
+        "pillar:observability-finops",
+        "priority:P0"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2076,
+      "title": "`deepseek-v4.1-pro-thinking` model doesn't exist in tiers.yaml L2 fallback",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "bug",
+        "handoff:deepseek",
+        "pillar:observability-finops",
+        "priority:P0",
+        "tier:L2"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2077,
+      "title": "Add DeepSeek aliases to LEGACY_MODEL_ALIASES in model_aliases.py",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "bug",
+        "handoff:deepseek",
+        "pillar:observability-finops",
+        "priority:P1"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2078,
+      "title": "Consolidate duplicate tier-to-model definitions across 6+ files",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "enhancement",
+        "governance",
+        "pillar:model-gateway",
+        "priority:P2"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2079,
+      "title": "AI portal shows no live data \u2014 all 41 feature flags OFF, nothing promoted (info)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [
+        "pillar:control-plane",
+        "priority:P3",
+        "type:spike"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-25T21:41:16Z",
+      "files": []
+    },
+    {
+      "number": 2080,
+      "title": "Add model-ID validation gate to verify.sh",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [
+        "enhancement",
+        "gate",
+        "lifecycle:verify",
+        "priority:P1",
+        "testing"
+      ],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2081,
+      "title": "Portal: wire remaining 5 surfaced into rollout pipeline (live_bridge, telemetry_live_feed, ops_health, finops_reports, chat)",
+      "state": "CLOSED",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "2026-09-25T22:03:40Z",
+      "files": []
+    },
+    {
+      "number": 2085,
+      "title": "codeidx MCP: tolerate the opt-in `ranking` block and `coverage.ranked_trimmed` (code-indexing#169)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2086,
+      "title": "code-indexing: ranking envelope fields published in the MCP tool contract (closes the gap #129/#161 opened)",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2087,
+      "title": "Host card for the laptop in the fleet view at ai.purebliss.app",
+      "state": "OPEN",
+      "milestone": "",
+      "labels": [],
+      "parent": null,
+      "blocked_by": [],
+      "cross_refs": [],
+      "closed_at": "",
+      "files": []
+    },
+    {
+      "number": 2088,
+      "title": "Reconcile the ai.purebliss.app cutover state with the live front door",
       "state": "OPEN",
       "milestone": "",
       "labels": [],

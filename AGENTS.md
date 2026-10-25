@@ -53,8 +53,8 @@ Do not restate long standards here — point at them, so agents stay current:
 - **Decisions** → `docs/decision-records/` (ADRs — write one for a new decision).
 - **Vendor boundary & handshake** → `docs/VENDOR-HANDSHAKE.md` (NG6).
 - **Automation (code-native)** → `ops/README.md` (no GitHub Actions, GR-15).
-- **Quality ladder** → `docs/SOLUTION-CLASSES.md`; **model tiers / FinOps** →
-  `docs/MODEL-PROFILES.md`; **SME dispatch** → `docs/SME-PROFILES.md`;
+- **Quality ladder** → `vendor/CMR/docs/SOLUTION-CLASSES.md`; **model tiers / FinOps** →
+  `vendor/CMR/docs/MODEL-PROFILES.md`; **SME dispatch** → `vendor/CMR/docs/SME-PROFILES.md`;
   **parallel lanes** → `docs/EXECUTION-PLAN.md`. (Docs land under M1/EPIC-01; until
   present, follow `board/` + this file.)
 - **Defaults & no-questions** → `docs/DEFAULTS.md` (decision defaults registry); GR-22
@@ -63,6 +63,28 @@ Do not restate long standards here — point at them, so agents stay current:
   (orchestration-only lead, one issue = one lane = one branch, FinOps tier, "resolved
   with evidence", merge/push posture per GR-4, escalate before/after, never route
   around a denied action).
+
+## Session, closure, and recovery contracts
+
+These are enforceable lifecycle contracts; use their canonical procedures rather
+than recreating them in a lane:
+
+- **Session identity & lane isolation** → `governance/isolation/` and
+  `docs/EXECUTION-PLAN.md`. Open each lane on its `issue-<n>` branch with a
+  worktree-local identity (`git config --worktree`); `AO_SESSION_ID` identifies
+  the session. `scripts/check-session-isolation.sh` verifies the contract.
+- **End-to-end closure** → `governance/lifecycle/`,
+  `docs/GOVERNANCE.md`, and `docs/EXECUTION-PLAN.md`. A close-out is complete
+  only when every required artifact is hygienically terminal; run the declared
+  lifecycle procedure before closing the issue. Record verification during
+  close-out before lane teardown; never reclaim a lane whose required evidence
+  has not been recorded.
+- **Orphan reconciliation** → `governance/reconcile/` and
+  `docs/GOVERNANCE.md`. A heartbeat explains active sessions; unexplained,
+  unmerged work is shelved rather than deleted. `scripts/check-reconcile.sh`
+  verifies the recovery decisions.
+- **Infrastructure limits** → `docs/INFRA-LIMITS.md`. Read back and verify
+  generated evidence, and respect the declared scratch-space and storage limits.
 
 ## How to work in this repo
 
@@ -90,6 +112,10 @@ Do not restate long standards here — point at them, so agents stay current:
   ASAP/never idle, minimal operator questions, issue-first) is defined once in
   `guardrails/instructions/agent-behavior.md` — follow it (`fleet/DISPATCH.md`,
   `docs/EXECUTION-PLAN.md` are the dispatch mechanics).
+- **Fleet durability:** AO-GR-21, AO-GR-22, AO-GR-23, AO-GR-24, AO-GR-25,
+  AO-GR-26, and AO-GR-27 in `docs/GOLDEN-RULES.md`
+  govern bounded work, gate admission, publish-before-gate, disjoint waves,
+  remote-measured drift, dependency preflight, and signal handling.
 - **GR-16:** every successful push to `main` notifies each `onboarded=true` vendor with a pinned
   `cmr:notify` issue summarizing the push (`channels/notify.sh`, `ops/run.sh notify-vendors`).
   Notification never merges or approves anything (NG2) and never touches vendor code (NG6).
@@ -98,15 +124,22 @@ Do not restate long standards here — point at them, so agents stay current:
 
 These are **standing business-as-usual** concerns — never re-request, never skip:
 
+- **Chronological, dependency-gated selection** — work from the Kanban board's
+  oldest ready issue, respecting blockers and declared issue dependencies; do not
+  scavenge newer work around an older eligible item.
 - **Everything goes on the board** — planned or ad-hoc, every task, lesson, enhancement,
   catch, and fix lands on the CMR issues board; off-board work is backfilled (GR-20,
   `docs/BOARD-MANDATE.md`).
+- **Tag authority** — governed artifacts use the closed vocabulary in
+  `governance/tagging/taxonomy.yaml`; declare the `posture` and `lifecycle`
+  dimensions and run `scripts/check-tagging.sh` to verify the contract. The
+  tag authority is the source of truth for that vocabulary.
 - **Onboarding requests get official onboarding** — every role follows the one onboarding
   process (EPIC-13).
 - **Vendor updates are rolling + single-pinned** — one pinned `cmr:notify` per vendor,
   rolling summaries (GR-16).
 - **The model chooser is flash-by-default** — dispatch at the cheapest level that fits;
-  flash/pro LOW-MED-HIGH-MAX ladder (EPIC-15, `docs/MODEL-PROFILES.md`).
+  flash/pro LOW-MED-HIGH-MAX ladder (EPIC-15, `vendor/CMR/docs/MODEL-PROFILES.md`).
 - **Hygiene runs every loop** — `ops/run.sh hygiene` on the loop; a red gate blocks the
   next dispatch wave (GR-19).
 - **Closed issues are unpinned** — a closed pinned issue is pollution (GR-20).

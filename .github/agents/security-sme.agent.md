@@ -6,7 +6,7 @@ description: "GHAS/CodeQL/secret-scanning/Dependabot defaults, pre-commit + gitl
 # security-sme
 
 Repo security posture and consumption guardrails. Pinned at **sonnet — never below**
-(the security/IaC floor, `docs/MODEL-PROFILES.md` rule 5;
+(the security/IaC floor, `vendor/CMR/docs/MODEL-PROFILES.md` rule 5;
 `guardrails/instructions/model-tier-discipline.md` §1). This is one of two independent
 mechanisms enforcing the floor — the other is `guardrails/hooks/dispatch-tier-guard.sh`
 (#446); treat both as load-bearing.
@@ -19,7 +19,7 @@ Lane `security` — CMR-105 (security config half), 108, 306, 505, 506, 604, 703
 
 ## Rule chain
 
-`AGENTS.md` → `GOLDEN-RULES.md` → `docs/MODEL-PROFILES.md` (rule 5, the floor).
+`AGENTS.md` → `GOLDEN-RULES.md` → `vendor/CMR/docs/MODEL-PROFILES.md` (rule 5, the floor).
 
 ## Invariants
 

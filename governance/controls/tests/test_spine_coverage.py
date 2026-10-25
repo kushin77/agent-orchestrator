@@ -58,6 +58,13 @@ def test_missing_rule_row_is_reported(tmp_path: Path) -> None:
     assert any("AO-GR-2" in f and "rule-missing-row" in f for f in findings)
 
 
+def test_range_reference_adds_endpoints_not_every_rule_in_the_range(tmp_path: Path) -> None:
+    doc = tmp_path / "AGENTS.md"
+    doc.write_text("CMR GR-1..GR-24 rules apply; local AO-GR-14 is separate.\n")
+
+    assert csc.parse_rule_ids(doc) == {"GR-1", "GR-24", "AO-GR-14"}
+
+
 def test_covered_row_with_nonexistent_gate_is_refused_by_name(tmp_path: Path) -> None:
     map_path = tmp_path / "spine-coverage.yaml"
     map_path.write_text(

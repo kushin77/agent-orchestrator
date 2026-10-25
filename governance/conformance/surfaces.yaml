@@ -186,11 +186,21 @@ waived_roots:
     DECLARED, not waived. The waiver is recorded here so the new sweep does not
     report a pre-existing, already-tracked gap as though this lane had found it.
     Remove this entry when #944 lands.
+  ops: >-
+    Small operator-side shell helpers (lane workspace provisioning and the
+    scale tripwire), not a separately deployed product surface. Their contracts
+    are exercised by repository-level governance gates; this root contains no
+    independent service, module, or release artifact to measure.
   scripts: >-
     This repository's own gate and tooling tree. Its `check-*` files are
     consumed as the `gate` evidence OF product surfaces (measure_gate reads
     scripts/check-*), and a root whose artifacts are other surfaces' evidence is
     not itself a product surface — the ladder would be measuring the ruler.
+  templates: >-
+    Source data for the generated module scaffold, consumed by the module
+    template tooling rather than deployed or released as an independent product.
+    Its generated consumer surface is governed and verified by the template
+    contract gates.
   vendor: >-
     The pinned CMR hub submodule (vendor/CMR; AGENTS.md forbids editing
     vendor/). Third-party, pinned by gitlink and verified by

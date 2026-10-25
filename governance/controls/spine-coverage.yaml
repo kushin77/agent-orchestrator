@@ -17,9 +17,9 @@
 #
 # SCOPE
 #   * AO-GR-1..27  — this repo's own spine (docs/GOLDEN-RULES.md Parts A/B/C).
-#   * GR-2/3/4/5/6/7/8/9/10/12 — hub (kushin77/CMR) rules this repo's spine
-#     explicitly cites by number (docs/GOLDEN-RULES.md line ~690 table and the
-#     per-rule "Why." citations). Each is recorded as `origin: hub-cited`,
+#   * GR-2/3/4/5/6/7/8/9/10/12/14/15/16/19/20/22 — hub (kushin77/CMR)
+#     rules this repo's spine explicitly cites by number (AGENTS.md and
+#     docs/GOLDEN-RULES.md). Each is recorded as `origin: hub-cited`,
 #     mapped to the LOCAL control that operationalizes it in this repo (the
 #     same control the citing AO-GR-x row uses, since the citation exists
 #     precisely because the local rule implements the hub rule here).
@@ -328,6 +328,34 @@ rules:
     modules: [scripts/]
     gate: scripts/check-lifecycle-verify-order.sh,scripts/check-verdict-contains.sh
     note: "Cited by AO-GR-3 (\"CMR GR-12\")."
+  GR-14:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [governance/board/]
+    gate: scripts/check-cross-repo-boundary.sh
+    note: "The cross-repo boundary gate refuses unapproved spoke-side work and names the owning direction issue."
+  GR-15:
+    status: ENFORCED
+    covered: true
+    origin: hub-cited
+    modules: [scripts/]
+    gate: scripts/check-no-actions.sh
+    note: "The no-actions gate refuses workflow files and proves its detector with a planted workflow."
+  GR-16:
+    status: GAP
+    covered: false
+    origin: hub-cited
+    modules: []
+    gate: "-"
+    note: "The push-to-vendor notification rule is declared, but this repository has no local gate proving each successful main push reaches every onboarded vendor."
+  GR-19:
+    status: PARTIAL
+    covered: true
+    origin: hub-cited
+    modules: [governance/board/, governance/reconcile/]
+    gate: scripts/check-board-gate.sh,scripts/check-reconcile.sh
+    note: "These gates cover board hygiene and orphan/worktree reconciliation; they do not prove all GitHub-side stale PR, branch, Dependabot, error-row, and alert-rollup conditions across every governed surface."
   GR-28:
     status: not-applicable
     covered: false
@@ -349,13 +377,6 @@ rules:
     modules: []
     gate: "-"
     note: "Cited only as the range endpoint in AGENTS.md line 9 (\"GR-1..GR-24\"), not as a specific local rule (do not confuse with AO-GR-24, which IS a local rule with its own row above)."
-  GR-17:
-    status: GAP
-    covered: false
-    origin: hub-cited
-    modules: []
-    gate: "-"
-    note: "Cited in AGENTS.md numbered doctrine item 11, \"Local-code-first (GR-17)\": debug against this checkout first. No scripts/check-*.sh mechanically asserts an agent consulted local code before guessing — this is agent-behavior guidance, not a repo-state invariant a gate can check today. Honest GAP, not rounded to PARTIAL."
   GR-20:
     status: ENFORCED
     covered: true
@@ -370,14 +391,6 @@ rules:
     modules: []
     gate: "-"
     note: "Cited in AGENTS.md numbered doctrine item 12, \"No-questions (GR-22)\": apply the documented default, escalate only when genuinely absent. No scripts/check-*.sh asserts this behavioral default. Honest GAP."
-
-  GR-29:
-    status: PARTIAL
-    covered: true
-    origin: hub-cited
-    modules: [governance/tagging/]
-    gate: scripts/check-tagging.sh
-    note: "Cited by AO-GR-28 (\"a rule only prose carries is advice\"). The principle — a doc-only rule is advisory, only a platform-enforced gate is binding — is instantiated for THIS rule by scripts/check-tagging.sh's tagging-mandate check, which reads the contract documents and fails naming the document and the marker the moment one stops declaring the tag authority. Recorded PARTIAL, not ENFORCED: no gate enumerates doc-only rules in general and refuses them, so the principle is enforced rule-by-rule as each gate ships rather than by one control."
 
 # ---- #803 delivery controls (branch protection, required checks, CODEOWNERS) ----
 # #803 is an open EPIC (PR #1075 in flight) that this lane does not close.

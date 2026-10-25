@@ -1,3 +1,18 @@
+# ---knowledge---
+# module_id: github.issue-template.bug
+# system: governance
+# app: board
+# solution_class: pattern
+# patterns: [issue-first, structured-defect-report]
+# derives_from: scripts/check-issue-template.sh
+# owner_sme: pmo-sme
+# tier: L0
+# interfaces: [the bug issue body fields]
+# invariants: "required fields capture reproduction, severity, root cause, lifecycle ownership and escalation"
+# gotchas: "YAML comments are ignored by GitHub's issue-form renderer"
+# related: ["#622", "#1533"]
+# do_not_duplicate: null
+# ---knowledge---
 name: Bug
 description: Something behaved incorrectly. Per GR-2, file it even if already fixed — the failure mode becomes searchable.
 title: "Bug: "
@@ -15,6 +30,77 @@ body:
         File this **even when the fix landed in the same change** (GR-2). The value
         is not the fix — it is that the failure mode becomes searchable. Anchor the
         report to mechanism, not prose. Labels follow `board/LABELS.md`.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction command
+      description: Minimal runnable steps that reproduce the defect and capture its real output.
+      placeholder: |
+        1. Run: ...
+        2. Observe: ...
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Triage severity from the canonical defect vocabulary.
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true
+  - type: input
+    id: rca
+    attributes:
+      label: RCA ledger reference
+      description: Link or identifier for the root-cause record under governance/lessons/.
+      placeholder: governance/lessons/<record>.md
+    validations:
+      required: true
+  - type: input
+    id: parent_epic
+    attributes:
+      label: Parent epic
+      description: Owning epic issue number, or N/A when this defect is standalone.
+    validations:
+      required: true
+  - type: dropdown
+    id: model_tier
+    attributes:
+      label: Execution tier
+      description: Lowest suitable execution tier from the lifecycle contract.
+      options:
+        - L0
+        - L1
+        - L2
+    validations:
+      required: true
+  - type: textarea
+    id: root_cause
+    attributes:
+      label: Root cause
+      description: Mechanism that produced the observed failure.
+    validations:
+      required: true
+  - type: checkboxes
+    id: lifecycle_contract
+    attributes:
+      label: Lifecycle contract
+      description: Acknowledge the evidence and verify requirements before closure.
+      options:
+        - label: I will verify the fix and record evidence before closing this issue.
+    validations:
+      required: true
+  - type: textarea
+    id: escalation
+    attributes:
+      label: Escalation
+      description: Owner, approval, or blocker requiring escalation if the contract cannot be met.
+    validations:
+      required: true
   - type: textarea
     id: observed
     attributes:

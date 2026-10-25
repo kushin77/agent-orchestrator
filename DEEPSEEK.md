@@ -19,7 +19,7 @@ map, and the drift check live in `docs/MODEL-AGNOSTIC.md`.
 - DeepSeek is invoked as an agent runtime via MCP (`mcp__deepseek__*` tools) or as a
   subagent dispatch target in CMR sessions. This file serves as the DeepSeek-specific
   entry point.
-- Dispatch work per the FinOps ladder in `docs/MODEL-PROFILES.md` (flash-by-default;
+- Dispatch work per the FinOps ladder in `vendor/CMR/docs/MODEL-PROFILES.md` (flash-by-default;
   escalate on observed difficulty, never pre-emptively).
 - Local guardrails hard-deny floor: `guardrails/hooks/` (shell-aware + scale-aware
   PreToolUse deny); code-native gate `make guardrails-check`. Runtime permission modes:

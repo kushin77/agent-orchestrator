@@ -66,8 +66,8 @@ Every statement below is what the code does today, not an intention:
 | Fact | Where it is true |
 |---|---|
 | One link, `GET /console`; the view is `views/console.html` + `js/operator.js` | `portal/server/app.py` |
-| Surface flag `surfaces.operator_terminal`, **default `off`, `promoted: false`**, service `portal` | `infra/feature-flags/registry.yaml` |
-| The flag is checked **before** authentication — while it is off, `/console` and its assets answer `404 feature_disabled`, so an unpromoted surface is absent rather than merely unauthorised | `portal/server/app.py` |
+| Surface flag `surfaces.operator_terminal`, **default `on`, `promoted: true`**, service `portal` | `infra/feature-flags/registry.yaml` |
+| The flag is checked **before** authentication — if it is set off, `/console` and its assets answer `404 feature_disabled`, so a disabled surface is absent rather than merely unauthorised | `portal/server/app.py` |
 | It invents no login: an unauthenticated visitor is redirected to the OS auth gate's `/auth/login`, and a session exists only from a verified RS256 `os-session-token` checked **offline** against a mirror of the gate's published JWKS | `portal/server/main.py`, `portal/server/sso.py` |
 | Read half = the existing `GET /api/fleet/*` projection; write half = the existing `POST /api/control/*` verbs, each with its own capability check and the existing audit rail | `portal/server/fleet.py`, `portal/server/control_audit.py` |
 | `GET /api/healthz` is public and checked before authentication | `portal/server/app.py` |
@@ -172,16 +172,16 @@ environment-only, sourced by the run half at `up` time:
   holds them: every `${...}` in it either has an empty default (so an unconfigured
   bring-up fails closed) or is a public path, port or image tag.
 
-### 5b. The deploy route takes the same two variables from Secret Manager (#730)
+### 5b. Historical Cloud Run auth wiring — retired route (#730)
 
-The compose handoff above gets its two variables from the run half's shell. The
-**deployed** surface cannot: a variable exported on a box is configuration nobody
-can audit, and an unset one is a console that refuses every session. So the Cloud
-Run service declared by `infra/terraform/modules/web-surface` is wired to Secret
-Manager, and the wiring is **declared once** in `auth-env.json`, shipped inside
-that module (`infra/terraform/modules/web-surface/auth-env.json`), and projected
-into the service — the env names exist in one non-code place, and
-`scripts/check-portal-auth-env.sh` refuses a name restated in the Terraform.
+The compose handoff gets its two variables from the shared-services run half.
+The former Cloud Run route (`infra/terraform/modules/web-surface`) is **retired**
+and is not the deployed public surface. Its Secret Manager wiring remains as
+historical IaC and is **not evidence of a live Cloud Run service**. The wiring is
+declared once in `auth-env.json`, shipped inside that module
+(`infra/terraform/modules/web-surface/auth-env.json`), and checked by
+`scripts/check-portal-auth-env.sh`; retain it only for the retired route's
+reproducibility and rollback history.
 
 | Variable | Secret Manager secret | How it reaches the container |
 |---|---|---|
@@ -239,9 +239,9 @@ fleet channel, and takes no action.
 
 | Surface | What it is | Live host / port |
 |---|---|---|
-| `ai.purebliss.app` | oauth2-proxy front over Open WebUI | remote cluster `192.168.168.42` |
+| `ai.purebliss.app` | Cloudflare front door → shared-services OS auth gate → AgentConsole; Open WebUI is private and no longer owns this public hostname | auth gate `192.168.168.42:18280`; AgentConsole `192.168.168.42:18286` |
 | `os.purebliss.app` | the OS portal shell (container `shared-services-os`), live since 2026-09-04 | `192.168.168.42:18280` |
-| **AgentConsole** | this page's subject, behind the same SSO gate | proposed `192.168.168.42:18286` |
+| **AgentConsole** | this page's subject, behind the shared-services OS auth gate; `/api/healthz` answers 200 and unauthenticated `/console` redirects to `/auth/login` (measured 2026-10-06) | `192.168.168.42:18286` |
 
 Two things follow, and both matter:
 
@@ -250,11 +250,13 @@ Two things follow, and both matter:
    `os.purebliss.app` and verifies the *same* `os-session-token` offline. So the
    oauth wiring is not a new oauth client: it is the auth-gate JWKS mirror plus an
    allowlist, exactly as `portal/README.md` documents.
-2. **The ingress hostname is the run half's decision.** The overlay ships no
-   hostname and this page proposes none as fact: DNS, the Cloudflare tunnel
-   ingress rule and (if the run half wants the extra hop) an Access policy are
-   enabled in the shared-services run half, the way `os.purebliss.app` was.
-   Nothing in this repo hardcodes a domain.
+2. **The live ingress is owned by the run half.** The overlay ships no hostname.
+   The 2026-10-06 public probe confirms Cloudflare fronting, `/api/healthz`
+   returning 200, the fleet snapshot returning the portal's JSON 401 boundary,
+   and `/auth/login` redirecting to the identity provider. These measurements
+   establish the current route, not the shared-services container's full
+   configuration; that remains owned by the run half. Nothing in this repo
+   applies DNS or tunnel changes.
 
 Because it is a top-level console behind SSO and never an iframe, the overlay
 carries no `os.origin` (framing/CSP) label — that convention belongs to the framed
@@ -262,12 +264,16 @@ modules, and adding it here would declare a policy nothing applies.
 
 ## 7. Rollout, rollback and the flag posture
 
-- The surface is **declared and OFF**: `surfaces.operator_terminal` is
-  `default: off` / `promoted: false`, and the gate is checked before
-  authentication. An unpromoted console is *absent*, not merely unauthorised.
-- Promotion is therefore a reviewed act with two independent halves: flip the
-  flag in this repo (and the two surfaces it composes, `fleet_projection` and
-  `remote_control`), and have the run half lift the overlay.
+- The surface is **declared enabled**: `surfaces.operator_terminal` is
+  `default: on` / `promoted: true`; `fleet_projection` and `remote_control`
+  also default to `on`. The application checks the runtime flag before
+  authentication, so setting it off makes `/console` absent rather than merely
+  unauthorised.
+- The public route is measured live in [§3 of EDGE-CUTOVER.md](EDGE-CUTOVER.md);
+  that probe does not prove every deployment detail (image provenance, state
+  mounts, or a successful signed-in session). Changes to the flag or overlay
+  still require the source-repository gate and the shared-services run-half
+  review; do not treat the public health response alone as readiness.
 - **Rollback**: flipping `operator_terminal` back to OFF removes the surface
   again; `docker compose … down agentconsole` removes the process. Both are
   safe because the console writes no fleet state — its only writes are audit
@@ -276,10 +282,16 @@ modules, and adding it here would declare a policy nothing applies.
   failure and is audited, with a gate probe that provokes it) is lane #802's
   deliverable. This page does not claim it exists.
 
-## 8. What the run half must do
+## 8. Run-half rollout and remaining evidence
 
-Handed over by direction issue on the shared-services board (never by an edit to
-that repo):
+The checklist retains the run-half rollout actions; it is not a live deployment
+state database. On 2026-10-06, read-only public probes confirmed Cloudflare DNS
+and fronting, the portal-console health endpoint, the fleet API's unauthenticated
+JSON 401 boundary, and the `/auth/login` redirect. Those probes do not establish
+image provenance, overlay synchronization, host-port configuration, state
+mounts, or a successful signed-in session; those require run-half evidence.
+Deployment changes remain owned by the shared-services board and are never
+applied from this repository.
 
 - [ ] Lift the overlay (recommended `infra/docker-compose.agentconsole.yml`) —
       **automated, not a hand copy** (issue #1513): the lift is no longer a
@@ -325,9 +337,12 @@ that repo):
       (On the **deploy** route this is §5b's Secret Manager wiring instead:
       publish the mirror into `portal-auth-gate-jwks` and the allowlist into
       `portal-root-admin-emails` before flipping `enable_web`.)
-- [ ] Wire DNS + the Cloudflare tunnel ingress rule to `192.168.168.42:<port>`.
-- [ ] Confirm `/api/healthz` answers and that an unauthenticated visit to
-      `/console` redirects to the gate rather than serving the console.
+- [x] The public DNS/front-door path is live through Cloudflare; the measured
+      edge response is recorded in [EDGE-CUTOVER.md](EDGE-CUTOVER.md). This
+      proves the public route, not its internal origin port or configuration.
+- [x] Public `GET /api/healthz` returns 200, and unauthenticated `GET /console`
+      redirects to `/auth/login` (measured 2026-10-06). This proves health and
+      the anonymous auth boundary, not a successful authenticated session.
 
 ## 9. Verifying this declaration (offline)
 
