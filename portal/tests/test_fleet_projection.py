@@ -9,6 +9,22 @@ or writes the live fleet's state and none needs a tmux, a TTY or the network.
 Cannibalization is asserted, not assumed: the snapshot test compares the served
 keys against the keys of the very ``console.snapshot()`` the server delegates to,
 so a key added on one side and not the other fails.
+
+---knowledge---
+module_id: portal.tests.test_fleet_projection
+system: portal
+app: tests
+solution_class: pattern
+patterns: [projection-contract, fail-closed]
+derives_from: null
+owner_sme: qa-sme
+tier: L1
+interfaces: [fleet snapshot HTTP response, offline projection]
+invariants: "the served snapshot shape matches the console projection"
+gotchas: "the registry's live-state overlay can override a test registry"
+related: ["#331", "#2087"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
@@ -54,6 +70,7 @@ EXPECTED_KEYS = {
     "closed",
     "events",
     "watchdog",
+    "hosts",
 }
 
 
@@ -115,6 +132,32 @@ def test_snapshot_returns_exactly_the_console_projection(fleet):
     assert set(served) == EXPECTED_KEYS
     assert set(served) == set(fleet.console.snapshot())
     assert set(served["rungs"]) == {"brain", "sister", "monitor"}
+
+
+def test_snapshot_includes_the_single_timestamped_host_report(fleet):
+    fleet.enabled = True
+    status, payload = _authed_client(_app(fleet)).get("/api/fleet/snapshot")
+    assert status == 200
+    hosts = payload["data"]["hosts"]
+    assert len(hosts) == 1
+    host = hosts[0]
+    assert host["hostname"] == "aklt-elevatediq"
+    assert host["platform"] == "Linux 7.0.0-34-generic"
+    assert host["reported_by"] == "laptop-local-tools"
+    assert host["measured_at"] == "2026-10-05T17:05:42Z"
+    assert host["gpu"] == {
+        "name": "NVIDIA RTX 4000 Ada Generation Laptop GPU",
+        "memory_total_mib": 12282,
+        "memory_used_mib": 14,
+        "driver_version": "595.91.07",
+    }
+    assert host["ollama_models"] == [
+        {"tag": "deepseek-r1:7b", "parameter_size": "7.6B"},
+        {"tag": "llama3.1:latest", "parameter_size": "8.0B"},
+        {"tag": "qwen2.5-coder:7b", "parameter_size": "7.6B"},
+        {"tag": "deepseek-coder-v2:latest", "parameter_size": "15.7B"},
+        {"tag": "llama3.2:latest", "parameter_size": "3.2B"},
+    ]
 
 
 def test_snapshot_projects_a_live_heartbeat(fleet):
@@ -255,12 +298,20 @@ def test_projection_needs_no_tmux_no_tty_and_no_network(fleet, monkeypatch):
             raise AssertionError("the fleet projection must not open a socket")
 
     monkeypatch.setattr(socket, "socket", _NetworkForbidden)
+    monkeypatch.setattr(
+        fleet.console.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("the fleet projection must not poll host tools")
+        ),
+    )
 
     app = _app(fleet)
     api = _authed_client(app)
     status, payload = api.get("/api/fleet/snapshot")
     assert status == 200, "a poisoned network must not break the offline projection"
     assert set(payload["data"]) == EXPECTED_KEYS
+    assert payload["data"]["hosts"][0]["hostname"] == "aklt-elevatediq"
 
 
 def test_http_transport_boots_and_streams_sse_over_loopback(fleet, monkeypatch):
@@ -347,7 +398,11 @@ def test_flag_on_serves_the_surface(fleet):
     assert status == 200
 
 
-def test_surface_enabled_reads_the_registry_and_fails_closed(tmp_path):
+def test_surface_enabled_reads_the_registry_and_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "portal.server.fleet.read_live_state_doc",
+        lambda *args, **kwargs: None,
+    )
     registry = tmp_path / "registry.yaml"
     registry.write_text("surfaces:\n  fleet_projection:\n    default: on\n", encoding="utf-8")
     assert surface_enabled(REPO_ROOT, registry_path=registry) is True

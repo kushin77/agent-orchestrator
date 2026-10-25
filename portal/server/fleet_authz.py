@@ -279,6 +279,7 @@ ROW_SPECS: tuple[RowSpec, ...] = (
     RowSpec("closed", "sequence", OWNER_PLATFORM),
     RowSpec("events", "sequence", OWNER_ROW),
     RowSpec("watchdog", "sequence", OWNER_PLATFORM),
+    RowSpec("hosts", "sequence", OWNER_PLATFORM),
 )
 
 #: The sections a scoped response always carries, so a tenant's view has the

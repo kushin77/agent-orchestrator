@@ -19,6 +19,22 @@ Row ownership is derived from live sources rather than invented fixtures: an
 agent named by a row is resolved through the console's own org directory
 (``portal/server/state.py``), and a lane through the registry's persona cards.
 The two seeded tenants (``acme``, ``globex``) exist in that directory.
+
+---knowledge---
+module_id: portal.tests.test_fleet_access_control
+system: portal
+app: tests
+solution_class: enterprise
+patterns: [tenant-isolation, fail-closed]
+derives_from: null
+owner_sme: security-sme
+tier: L1
+interfaces: [fleet scoped snapshot, fleet authorization decisions]
+invariants: "tenant principals never receive platform-owned fleet rows"
+gotchas: "permission checks alone do not establish tenant scope"
+related: ["#333", "#2087"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
@@ -286,7 +302,7 @@ def test_the_cross_read_is_refused_at_the_scope_gate(app):
 
 
 def test_platform_rows_are_invisible_to_a_tenant(app):
-    """The runtime's own rows (rungs, steering queue, watchdog, ledger) are the
+    """The runtime's own rows (including host reports) are the
     platform org's; a tenant sees the dashboard's shape and none of its data."""
     owner_a = _snapshot(_client(app, OWNER_A, TENANT_A))
     assert owner_a["uptime"] is None
@@ -294,6 +310,8 @@ def test_platform_rows_are_invisible_to_a_tenant(app):
     assert owner_a["orders"] == {}
     assert owner_a["closed"] == []
     assert owner_a["watchdog"] == []
+    assert owner_a["hosts"] == []
+    assert "aklt-elevatediq" not in json.dumps(owner_a)
     # the platform-owned lane the claim line names stays invisible too
     assert owner_a["claims"] == []
 
@@ -317,6 +335,7 @@ def test_the_platform_operator_sees_the_whole_board(app):
         [AGENT_A, AGENT_B]
     )
     assert operator["rungs"] and set(operator["rungs"]) == {"brain", "sister", "monitor"}
+    assert [host["hostname"] for host in operator["hosts"]] == ["aklt-elevatediq"]
     assert SNAPSHOT_SECTIONS == tuple(spec.name for spec in ROW_SPECS)
     assert set(operator) == set(SNAPSHOT_SECTIONS)
 

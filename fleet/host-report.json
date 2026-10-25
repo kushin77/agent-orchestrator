@@ -1,0 +1,36 @@
+[
+  {
+    "hostname": "aklt-elevatediq",
+    "platform": "Linux 7.0.0-34-generic",
+    "reported_by": "laptop-local-tools",
+    "measured_at": "2026-10-05T17:05:42Z",
+    "gpu": {
+      "name": "NVIDIA RTX 4000 Ada Generation Laptop GPU",
+      "memory_total_mib": 12282,
+      "memory_used_mib": 14,
+      "driver_version": "595.91.07"
+    },
+    "ollama_models": [
+      {
+        "tag": "deepseek-r1:7b",
+        "parameter_size": "7.6B"
+      },
+      {
+        "tag": "llama3.1:latest",
+        "parameter_size": "8.0B"
+      },
+      {
+        "tag": "qwen2.5-coder:7b",
+        "parameter_size": "7.6B"
+      },
+      {
+        "tag": "deepseek-coder-v2:latest",
+        "parameter_size": "15.7B"
+      },
+      {
+        "tag": "llama3.2:latest",
+        "parameter_size": "3.2B"
+      }
+    ]
+  }
+]

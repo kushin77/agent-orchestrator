@@ -6,3 +6,4 @@ cryptography>=42
 python-hcl2>=4.3
 pyflakes>=3.2
 esprima>=4.0.1
+websocket-client>=1.8.0
