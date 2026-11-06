@@ -60,3 +60,9 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+7. **A branch that is not on origin cannot be a base.** Nine of 29 base
+   branches named by kvm issues survive only as local archive tags, and
+   none sit on origin. Check the base of an issue before you claim it.
