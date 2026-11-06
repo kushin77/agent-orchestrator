@@ -60,3 +60,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **Check every origin branch, not only the base.** A KVM feature issue can be stale when its work already landed on an unmerged integration branch. Search the branch list for the code before you build it again.
