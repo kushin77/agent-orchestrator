@@ -60,3 +60,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **The guests layer is not on origin/main.** Guest issues edit files that do not exist on the base. File one platform issue for the missing layer, not one per child.
