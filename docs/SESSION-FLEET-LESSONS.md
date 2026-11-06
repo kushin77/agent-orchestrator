@@ -55,7 +55,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 
 ## Platform RCA register 2026-11-06 (PAP-22)
 
-This register lists 15 root-cause classes from the Paperclip platform. PAP-22 tracks it.
+This register lists 16 root-cause classes from the Paperclip platform. PAP-22 tracks it.
 Detector status comes from `git ls-tree` on `origin/master` in paperclip-live.
 No detector below is on `origin/master`.
 Lane pc-run-health holds `run-health.sh` and `verify-declared-timeouts.sh`.
@@ -81,6 +81,7 @@ Lanes pc-run-id-header, pc-claude-api-first and pc-flow-keeper hold server and r
 | 13 | Several full verifies at once starved the host. A nested full verify also recursed (fix fceb6126). | Host lock contention and the nested-verify process tree: no script found. | One heavy gate for each host (ADR-0122 lock). Tests use fixtures, never the real gate they belong to. | A gate that runs its own gate loops. Fixtures break the loop. |
 | 14 | process_lost on live hermes_local runs (PAP-31). Adapter 0.2.0 calls `runChildProcess` without `onSpawn`, so processPid is null. | Run-health rule `pid-untracked`: on lane pap-31-process-lost, not landed. | Every local adapter records processPid. | A run with no pid looks dead. Record the pid at spawn. |
 | 15 | Company resume did not re-wake cancelled work (C16). | Agents with todo, in_progress or in_review issues sit idle after a resume: no script found. | Wake the holders after a resume. | A resume restores state. It does not restore wakes. |
+| 16 | The server has no agent JWT secret, so no claude_local run gets `PAPERCLIP_API_KEY` (C18). Evidence: 105 journal lines "local agent jwt secret missing or invalid; running without injected PAPERCLIP_API_KEY" since 22:00 UTC. `paperclip-dev.service` had neither `PAPERCLIP_AGENT_JWT_SECRET` nor `BETTER_AUTH_SECRET`. pap-reviewer refused to post. Other agents posted as the board and woke themselves. Break-glass fix: secret file `~/.config/paperclip/agent-jwt.env` plus drop-in `paperclip-dev.service.d/agent-jwt.conf`. The declaration in `infra/systemd/user/paperclip-dev.service` is still open. | The startup banner check for `PAPERCLIP_AGENT_JWT_SECRET` is only a warn today. Make it a run-health finding and count the journal warning: not landed, no script found. | Every agent API call carries an issued run credential. The install step creates the secret file when it is absent. | An auth rule for agents needs a detector that shows the credential is issued. |
 
 ## Related
 
