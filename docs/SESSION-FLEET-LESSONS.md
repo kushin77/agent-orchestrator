@@ -60,3 +60,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+- **RCA C20 — search all companies before filing; never label a step "owner" without proof.** Search open issues across every company before filing a new one. A duplicate wastes work and blocks a real fix. Do not label a step "owner step" unless you have checked that only the owner can do it. An unreadable secret in the agent sandbox is a sandbox scope finding, not an owner step.
