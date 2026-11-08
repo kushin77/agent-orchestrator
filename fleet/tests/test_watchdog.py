@@ -364,7 +364,7 @@ def _stranded_checkout(tmp_path):
     """
     origin = tmp_path / "origin.git"
     assert _run("git", "init", "--bare", "-q", str(origin)).returncode == 0
-    assert _run("git", "-C", str(origin), "symbolic-ref", "HEAD", "refs/heads/master").returncode == 0
+    assert _run("git", "--git-dir", str(origin), "symbolic-ref", "HEAD", "refs/heads/master").returncode == 0
     seed = tmp_path / "seed"
     assert _run("git", "clone", "-q", str(origin), str(seed)).returncode == 0
     (seed / "base.txt").write_text("base\n", encoding="utf-8")
@@ -1012,7 +1012,7 @@ def _stale_checkout(tmp_path):
     """
     origin = tmp_path / "origin.git"
     assert _run("git", "init", "--bare", "-q", str(origin)).returncode == 0
-    assert _run("git", "-C", str(origin), "symbolic-ref", "HEAD", "refs/heads/master").returncode == 0
+    assert _run("git", "--git-dir", str(origin), "symbolic-ref", "HEAD", "refs/heads/master").returncode == 0
 
     seed = tmp_path / "seed"
     assert _run("git", "clone", "-q", str(origin), str(seed)).returncode == 0

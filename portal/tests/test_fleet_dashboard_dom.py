@@ -29,6 +29,22 @@ Acceptance criteria covered (issue #332):
   AC4  the roll-up shows per-org rows keyed to #151       -> test_..._rollup
   AC5  the page keeps working when a section's data is missing
                                                           -> test_..._missing
+
+---knowledge---
+module_id: portal.tests.test_fleet_dashboard_dom
+system: portal
+app: tests
+solution_class: enterprise
+patterns: [real-browser, same-origin, text-only-rendering]
+derives_from: null
+owner_sme: frontend-sme
+tier: L1
+interfaces: [fleet page live DOM, browser network requests]
+invariants: "untrusted report fields render only as text and requests stay same-origin"
+gotchas: "Chrome and websocket-client are both required for browser execution"
+related: ["#332", "#2087"]
+do_not_duplicate: null
+---knowledge---
 """
 
 from __future__ import annotations
@@ -735,6 +751,74 @@ def test_rollup_shows_per_org_rows_keyed_to_the_tenant_hierarchy(dashboard):
     ) == ORG_ELEVATEDIQ
 
 
+def test_measured_host_report_renders_without_polling_or_new_origins(dashboard):
+    page = dashboard.page
+    page.wait_for("document.querySelectorAll('#hostReports [data-row=\"host\"]').length === 1")
+    report = page.evaluate(
+        "(function(){var card=document.querySelector('#hostReports [data-row=\"host\"]');"
+        "return {text:card.textContent,state:card.getAttribute('data-report-state'),"
+        "count:document.querySelectorAll('#hostReports [data-row=\"host\"]').length};})()"
+    )
+    assert report["count"] == 1
+    assert report["state"] == "measured"
+    for value in (
+        "aklt-elevatediq",
+        "Linux 7.0.0-34-generic",
+        "2026-10-05T17:05:42Z",
+        "reported by laptop tools",
+        "NVIDIA RTX 4000 Ada Generation Laptop GPU",
+        "14 MiB used",
+        "12282 MiB total",
+        "595.91.07",
+        "deepseek-r1:7b",
+        "llama3.1:latest",
+        "qwen2.5-coder:7b",
+        "deepseek-coder-v2:latest",
+        "llama3.2:latest",
+        "7.6B",
+        "8.0B",
+        "15.7B",
+        "3.2B",
+        "snapshot, not a health check",
+    ):
+        assert value in report["text"], value
+    assert "online" not in report["text"].lower()
+
+    urls = page.request_urls()
+    assert urls, "no requests observed; the network recorder did not arm"
+    assert not [url for url in urls if not url.startswith(dashboard.origin)]
+    assert not [url for url in urls if "172.17.0.1" in url or "/api/tags" in url]
+
+    stale = page.evaluate(
+        "(function(){var frame=FleetDashboard.state.frame;frame.hosts=[{"
+        "hostname:'stale-host',measured_at:'2020-01-01T00:00:00Z'}];"
+        "FleetDashboard.render(document,FleetDashboard.buildModel({frame:frame}));"
+        "var card=document.querySelector('#hostReports [data-row=\"host\"]');"
+        "return {state:card.getAttribute('data-report-state'),text:card.textContent};})()"
+    )
+    assert stale["state"] == "stale"
+    assert "stale report" in stale["text"]
+    assert "2020-01-01T00:00:00Z" in stale["text"]
+
+    hostile_text = (
+        '<img id="host-report-injected" src="x" '
+        'onerror="window.hostReportExecuted=true">'
+        '<script>window.hostReportExecuted=true</script>'
+    )
+    xss = page.evaluate(
+        "(function(){window.hostReportExecuted=false;"
+        "var frame=FleetDashboard.state.frame;frame.hosts=[{hostname:%r,"
+        "measured_at:'2026-10-05T17:05:42Z'}];"
+        "FleetDashboard.render(document,FleetDashboard.buildModel({frame:frame}));"
+        "var card=document.querySelector('#hostReports [data-row=\"host\"]');"
+        "return {text:card.textContent,element:!!document.getElementById('host-report-injected'),"
+        "executed:window.hostReportExecuted};})()" % hostile_text
+    )
+    assert hostile_text in xss["text"]
+    assert xss["element"] is False
+    assert xss["executed"] is False
+
+
 # --------------------------------------------------------------------------
 # AC5 — the page keeps working when a section's data is missing
 # --------------------------------------------------------------------------
@@ -756,13 +840,17 @@ def test_the_page_survives_an_empty_projection_and_missing_sections(dashboard):
         "emptyRungs:!!document.querySelector('#rungsBody [data-empty=\"rungs\"]'),"
         "emptyRollup:!!document.querySelector('#rollupBody [data-empty=\"rollup\"]'),"
         "emptyTimeline:!!document.querySelector('#timeline [data-empty=\"timeline\"]'),"
-        "emptyWatchdog:!!document.querySelector('#watchdogList [data-empty=\"watchdog\"]')"
+        "emptyWatchdog:!!document.querySelector('#watchdogList [data-empty=\"watchdog\"]'),"
+        "emptyHosts:!!document.querySelector('#hostReports [data-empty=\"hosts\"]')"
         "};})()"
     )
     assert result["rows"] == 0, "an empty projection cannot yield rows"
     for key in ("lanes", "rungs", "rollup", "timeline"):
         assert result[key] == 0, key
-    for key in ("emptyLanes", "emptyRungs", "emptyRollup", "emptyTimeline", "emptyWatchdog"):
+    for key in (
+        "emptyLanes", "emptyRungs", "emptyRollup", "emptyTimeline", "emptyWatchdog",
+        "emptyHosts",
+    ):
         assert result[key] is True, f"{key}: a missing section must render its own placeholder"
     assert not page.exceptions(), page.exceptions()
 

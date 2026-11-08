@@ -192,13 +192,15 @@ def test_snapshot_carries_every_key_and_survives_an_empty_fleet(monkeypatch):
     monkeypatch.setattr(console, "loop_pid", lambda pattern: None)
     monkeypatch.setattr(console, "claims_snapshot", lambda: [])
     monkeypatch.setattr(console, "closed_issues", lambda **kwargs: set())
+    monkeypatch.setattr(console, "host_reports_snapshot", lambda: [])
     snap = console.snapshot()
     assert set(snap) == {
         "repo", "head", "now", "uptime", "rungs", "orders", "dispatches",
-        "claims", "waves", "closed", "events", "watchdog",
+        "claims", "waves", "closed", "events", "watchdog", "hosts",
     }
     assert set(snap["rungs"]) == {"brain", "sister", "monitor"}
     assert snap["orders"]["pending"] == 0
+    assert snap["hosts"] == []
     assert snap["waves"] == [] and snap["claims"] == [] and snap["closed"] == []
     assert console.render(snap)
 

@@ -165,7 +165,8 @@
       waves: asArray(src.waves),
       closed: asArray(src.closed),
       events: asArray(src.events),
-      watchdog: asArray(src.watchdog)
+      watchdog: asArray(src.watchdog),
+      hosts: asArray(src.hosts)
     };
   }
 
@@ -669,6 +670,85 @@
     });
   }
 
+  function hostReportState(host) {
+    var measuredAt = String(host.measured_at || "");
+    var timestamp = Date.parse(measuredAt);
+    if (!measuredAt || !isFinite(timestamp)) {
+      return {
+        state: "unknown",
+        label: "timestamp unavailable",
+        detail: "report timestamp unavailable"
+      };
+    }
+    var age = Date.now() - timestamp;
+    if (age < 0) {
+      return {
+        state: "unknown",
+        label: "timestamp unavailable",
+        detail: "report timestamp is in the future"
+      };
+    }
+    if (age > 24 * 60 * 60 * 1000) {
+      return {
+        state: "stale",
+        label: "stale report",
+        detail: "measured at " + measuredAt
+      };
+    }
+    return {
+      state: "measured",
+      label: "measured snapshot",
+      detail: "measured at " + measuredAt
+    };
+  }
+
+  function reportValue(value, suffix) {
+    if (value === null || value === undefined || value === "") return "not reported";
+    return String(value) + (suffix || "");
+  }
+
+  function renderHosts(doc, model) {
+    var list = panel(doc, "hostReports");
+    if (!list) return;
+    clear(list);
+    if (!model.frame.hosts.length) {
+      list.appendChild(placeholder(doc, "hosts", "no measured host reports available"));
+      return;
+    }
+    model.frame.hosts.forEach(function (host) {
+      var report = asObject(host);
+      var gpu = asObject(report.gpu);
+      var status = hostReportState(report);
+      var models = asArray(report.ollama_models);
+      var modelList = el("ul", { class: "mono dim" }, models.map(function (item) {
+        var modelReport = asObject(item);
+        return el("li", { text: reportValue(modelReport.tag) + " · "
+          + reportValue(modelReport.parameter_size) });
+      }));
+      list.appendChild(el("article", {
+        class: "feed-item",
+        "data-row": "host",
+        "data-host": report.hostname || "",
+        "data-report-state": status.state
+      }, [
+        el("div", { class: "spread" }, [
+          el("strong", { class: "mono", text: reportValue(report.hostname) }),
+          badge(status.label, status.state === "stale" ? "warn"
+            : status.state === "unknown" ? "info" : "ok")
+        ]),
+        el("div", { class: "mono dim", text: reportValue(report.platform) }),
+        el("div", { class: "hint", text: (report.reported_by === "laptop-local-tools"
+          ? "reported by laptop tools · " : "") + status.detail
+          + " · snapshot, not a health check" }),
+        el("div", { class: "mono", text: "GPU: " + reportValue(gpu.name)
+          + " · memory: " + reportValue(gpu.memory_used_mib, " MiB used")
+          + " / " + reportValue(gpu.memory_total_mib, " MiB total")
+          + " · driver " + reportValue(gpu.driver_version) }),
+        models.length ? modelList : placeholder(doc, "host-models", "no model tags reported")
+      ]));
+    });
+  }
+
   function render(doc, model) {
     var target = doc || document;
     var built = model === undefined ? buildModel() : model;
@@ -679,6 +759,7 @@
     renderRollup(target, built);
     renderTimeline(target, built);
     renderWatchdog(target, built);
+    renderHosts(target, built);
     state.renders += 1;
     return built;
   }

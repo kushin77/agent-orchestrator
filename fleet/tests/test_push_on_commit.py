@@ -46,7 +46,7 @@ def test_push_lane_branch_pushes_a_real_commit_to_a_bare_remote(tmp_path):
     outcome, detail = terminal.push_lane_branch("ao-740-lane", lane, timeout=30, directive_id="d1")
     assert outcome == terminal.PUSH_OK, detail
     branches = subprocess.run(
-        ["git", "branch"], cwd=str(bare), capture_output=True, text=True
+        ["git", "--git-dir", str(bare), "branch"], capture_output=True, text=True
     ).stdout
     assert "ao-740-lane" in branches
 

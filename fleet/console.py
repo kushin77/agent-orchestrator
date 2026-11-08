@@ -381,6 +381,15 @@ def fleet_uptime(rungs: dict, now: str) -> str:
     return human_duration(max(0, int((current - born).total_seconds())))
 
 
+def host_reports_snapshot() -> list[dict]:
+    report_path = ROOT / "fleet" / "host-report.json"
+    try:
+        reports = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return reports if isinstance(reports, list) else []
+
+
 def snapshot() -> dict:
     """Everything the frame shows, gathered once. The only part that does I/O."""
     rungs = rungs_snapshot()
@@ -398,6 +407,7 @@ def snapshot() -> dict:
         "closed": sorted(closed_issues()),
         "events": events_snapshot(),
         "watchdog": tail_lines(watchdog_log(), 5),
+        "hosts": host_reports_snapshot(),
     }
 
 
