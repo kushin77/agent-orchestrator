@@ -60,3 +60,9 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **A batch lane has three correctness rules.** Keep the row lane name equal
+   to the branch name. Set class held:gate-change with a release_when for a
+   gate-change batch. Keep a lane with no independent review out.
