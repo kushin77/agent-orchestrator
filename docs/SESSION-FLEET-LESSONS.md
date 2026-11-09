@@ -60,3 +60,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **A kvm lane agent cannot finish a shared-services or paperclip infra issue.** Its Verify command reaches a remote host the agent cannot touch. Reassign a cross-lane issue before the wake, not after three retries.
