@@ -60,3 +60,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **A correct batch lane still waits on the one-d-file fix.** PAP-118 admits one added d-file. A batch adds two, so it stays held:gate-change. It releases only when PR #608 (PAP-667) lands, or a manual bin/pr-queue run frees it.
