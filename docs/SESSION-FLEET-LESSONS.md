@@ -60,3 +60,9 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **An upstream-pin re-vendor waits on an owner main merge, not a lane.**
+   KUS-113 re-woke three times on one unmoved blocker. Set blocked once with an
+   "Owner step:" line. Do not flip the issue back to in_progress.
