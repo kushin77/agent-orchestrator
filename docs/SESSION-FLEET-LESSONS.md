@@ -60,3 +60,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **Check the merge before you fix gate reds.** PR #561 merged one day before KUS-569 was filed. All four fixes already sat in origin/main. Read the PR state and origin/main first, then run the Verify once to confirm.
