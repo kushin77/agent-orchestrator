@@ -60,3 +60,9 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **Quote the Verify command and output in fenced code blocks.** The atomic review
+   returns an evidence comment to in_progress when the command and output are plain
+   text. Put both in triple-backtick blocks before you move to in_review.
