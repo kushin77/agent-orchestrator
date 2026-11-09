@@ -60,3 +60,9 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **A paused worker is a blocker.** Do not hold an issue in_progress while you
+   post waiting checkpoints. That loop burned KUS-136. Set blocked with a link
+   and one clear comment.
