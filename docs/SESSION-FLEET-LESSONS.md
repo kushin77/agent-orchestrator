@@ -60,3 +60,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **The atomic review needs a fenced code block in the evidence comment.** It accepts a triple-backtick block with two or more non-empty lines, or a line that starts with `$` and a command. A plain `Output:` list fails the check and loops the issue in in_progress.
