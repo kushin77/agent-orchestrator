@@ -60,3 +60,10 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **The atomic review reads the title and labels, not the description.** An
+   issue auto-dones on in_review when the risk check finds no risk word in
+   them. Put the risk word (auth, secret, gate) in the title or a label, or an
+   auth change named only in the body is falsely done.
