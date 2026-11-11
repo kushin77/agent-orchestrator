@@ -60,3 +60,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **Blocked with a link, never re-batched.** KUS-729 looped for two days. The review file could not reach main. The fix was one blockedBy link to KUS-739, not more batch lanes.
