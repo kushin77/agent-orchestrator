@@ -60,3 +60,9 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **A shared login cannot prove who reviewed.** Every agent on this host posts to GitHub as one login, so a verdict posted as a PR comment or a PR review names no agent. Keep the verdict as a commit: its author is the only identity the queue can check. A `reviewers` list checked against `user.login` lets a lane author approve its own lane.
+2. **A review lane cannot release itself.** Measured at local-laptop main `06151d3c`: the queue held four open lanes on one line, "no independent APPROVE on main". Two of the four were review lanes. Treat a review lane as its own verdict: it changes one file under `docs/reviews/`, and that shape is its admission.
+3. **A done state with no artifact is not a pass.** An issue went `done` with no comment, no branch and no commit, right after the runtime reported `adapter_failed` for that agent. Read the artifact, not the status: a missing branch, a 404 on the verdict file and zero reviews on the pull request together prove a phantom.
