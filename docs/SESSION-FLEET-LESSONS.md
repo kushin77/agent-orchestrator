@@ -60,3 +60,7 @@ precedence is [`../AGENTS.md`](../AGENTS.md).
 - #166 — session bootstrap + runbook: runtime attestation artifact
 - #141 — enforce RCA and lessons capture
 - #180 — this issue (the register itself)
+
+## Agent lessons (Paperclip)
+
+1. **Check main's gate state before you dispatch a shared-services lane.** The pre-push hook runs about 33 minutes and 380 gates, then refuses on pre-existing reds. Three red gates on main (dispatch-router, quarantine-freshness, failover-test) blocked the KUS-1320 lane push. Probe main first so a lane does not spend half an hour on a doomed push.
